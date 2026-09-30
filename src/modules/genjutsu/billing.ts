@@ -166,11 +166,25 @@ export async function reserveGenjutsuCredits(params: {
   return result.task;
 }
 
-export async function markGenjutsuSubmitting(params: {
+function mutationCount(result: any): number | null {
+  const candidates = [
+    result?.rowsAffected,
+    result?.rowCount,
+    result?.changes,
+    result?.affectedRows,
+    result?.[0]?.affectedRows,
+    result?.[0]?.rowCount,
+    result?.[0]?.changes,
+  ];
+  const found = candidates.find((value) => typeof value === 'number');
+  return typeof found === 'number' ? found : null;
+}
+
+export async function claimGenjutsuSubmission(params: {
   generationId: string;
   userId: string;
 }) {
-  await db()
+  const result = await db()
     .update(aiTask)
     .set({ status: 'submitting' })
     .where(
@@ -181,6 +195,12 @@ export async function markGenjutsuSubmitting(params: {
         eq(aiTask.status, 'reserved')
       )
     );
+
+  const count = mutationCount(result);
+  if (count == null) {
+    throw new Error('Unable to verify Genjutsu submission claim');
+  }
+  return count === 1;
 }
 
 export async function markGenjutsuSubmitted(params: {
