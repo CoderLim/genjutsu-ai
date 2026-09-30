@@ -10,11 +10,11 @@ export function PricingSection() {
       <div className="container mx-auto px-4">
         <div className="mx-auto mb-10 max-w-3xl text-center">
           <h2 className="text-foreground mb-4 text-3xl font-semibold lg:text-4xl">
-            Pay only for what you generate
+            Genjutsu AI Pricing
           </h2>
           <p className="text-muted-foreground text-base">
-            No subscription. Choose a one-time credit pack and use your credits
-            for Genjutsu Motion Transfer or Object Swap.
+            No subscription. Choose a one-time credit pack and spend credits on
+            Genjutsu Motion Transfer or Object Swap.
           </p>
         </div>
 
@@ -79,9 +79,11 @@ export function PricingSection() {
           ))}
         </div>
 
-        <p className="text-muted-foreground mx-auto mt-6 max-w-2xl text-center text-xs">
-          Generation cost depends on video duration and resolution. The exact
-          credit charge is calculated on the server before generation starts.
+        <p className="text-muted-foreground mx-auto mt-6 max-w-2xl text-center text-sm leading-relaxed">
+          Each generation consumes API time equal to your input clip duration
+          (rounded up to the next second). Credits are calculated from that
+          estimate on the server before the job starts — longer clips and higher
+          resolution cost more.
         </p>
       </div>
     </section>

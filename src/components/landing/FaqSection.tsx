@@ -13,12 +13,14 @@ type FaqSectionProps = {
   items?: FaqItem[];
   title?: string;
   className?: string;
+  description?: string;
 };
 
 export function FaqSection({
   items = FAQ_ITEMS,
   title = 'Frequently Asked Questions — Free AI Image Generator',
   className,
+  description,
 }: FaqSectionProps) {
   return (
     <section id="faq" className={cn('py-16', className)}>
@@ -36,15 +38,21 @@ export function FaqSection({
           <h2 className="text-foreground mt-4 text-3xl font-bold tracking-tight sm:text-4xl">
             {title}
           </h2>
-          <p className="text-foreground/70 mt-6 text-base font-medium">
-            Have another question? Contact us at{' '}
-            <a
-              href="mailto:support@raphael.app"
-              className="text-primary underline-offset-2 hover:underline"
-            >
-              support@raphael.app
-            </a>
-          </p>
+          {description ? (
+            <p className="text-foreground/70 mx-auto mt-6 max-w-2xl text-base font-medium">
+              {description}
+            </p>
+          ) : (
+            <p className="text-foreground/70 mt-6 text-base font-medium">
+              Have another question? Contact us at{' '}
+              <a
+                href="mailto:support@raphael.app"
+                className="text-primary underline-offset-2 hover:underline"
+              >
+                support@raphael.app
+              </a>
+            </p>
+          )}
         </div>
 
         <Accordion

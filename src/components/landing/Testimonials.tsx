@@ -82,11 +82,11 @@ export function Testimonials() {
             </div>
           </div>
           <h2 className="text-foreground mt-6 text-3xl font-bold tracking-tight sm:text-4xl">
-            What Users Say About Raphael AI — Free AI Image Generator
+            What Creators Say About Genjutsu AI
           </h2>
           <p className="text-foreground/80 mt-6 text-lg leading-relaxed">
-            See how creators use Raphael AI and AI Image Editor to boost their
-            productivity
+            Editors, producers, and short-form teams using video-to-video to
+            keep the original motion
           </p>
         </div>
 
