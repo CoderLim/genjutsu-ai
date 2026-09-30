@@ -1,8 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router';
 
 import { Link } from '@/core/i18n/navigation';
-import { envConfigs } from '@/config';
-import { getLocale, locales, localizeUrl } from '@/paraglide/runtime.js';
+import { localeLinks, socialMeta } from '@/lib/seo';
+import { getLocale } from '@/paraglide/runtime.js';
 import { GENJUTSU_PROMPT_IDEAS } from '@/components/landing/content';
 import { SiteFooter } from '@/components/landing/SiteFooter';
 import { SiteHeader } from '@/components/landing/SiteHeader';
@@ -80,28 +80,18 @@ export const Route = createFileRoute('/genjutsu-prompts')({
   },
   head: ({ loaderData }) => {
     const locale = loaderData?.locale ?? 'en';
-    const urlFor = (loc: string) => {
-      const base = envConfigs.app_url || 'http://localhost:3000';
-      return localizeUrl(new URL('/genjutsu-prompts', base).href, {
-        locale: loc as 'en' | 'zh',
-      }).href;
-    };
+    const { canonical, alternates } = localeLinks('/genjutsu-prompts', locale);
     return {
       meta: [
         { title: PAGE_TITLE },
         { name: 'description', content: PAGE_DESCRIPTION },
-        { property: 'og:title', content: PAGE_TITLE },
-        { property: 'og:description', content: PAGE_DESCRIPTION },
+        ...socialMeta({
+          title: PAGE_TITLE,
+          description: PAGE_DESCRIPTION,
+          url: canonical,
+        }),
       ],
-      links: [
-        { rel: 'canonical', href: urlFor(locale) },
-        ...locales.map((loc) => ({
-          rel: 'alternate',
-          hrefLang: loc,
-          href: urlFor(loc),
-        })),
-        { rel: 'alternate', hrefLang: 'x-default', href: urlFor('en') },
-      ],
+      links: [{ rel: 'canonical', href: canonical }, ...alternates],
     };
   },
   component: GenjutsuPromptsPage,

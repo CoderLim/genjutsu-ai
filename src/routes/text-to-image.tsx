@@ -2,7 +2,8 @@ import { createFileRoute } from '@tanstack/react-router';
 
 import { Link } from '@/core/i18n/navigation';
 import { envConfigs } from '@/config';
-import { getLocale, locales, localizeUrl } from '@/paraglide/runtime.js';
+import { localeLinks, socialMeta } from '@/lib/seo';
+import { getLocale } from '@/paraglide/runtime.js';
 import {
   TEXT_TO_IMAGE_BADGES,
   TEXT_TO_IMAGE_FAQS,
@@ -115,30 +116,14 @@ export const Route = createFileRoute('/text-to-image')({
     const title = `AI Text to Image Generator | ${envConfigs.app_name}`;
     const description =
       'Generate images from text with GPT Image 2, Nano Banana 2, Seedream 5, and Seedream 3.5 Pro.';
-    const urlFor = (loc: string) => {
-      const base = envConfigs.app_url || 'http://localhost:3000';
-      return localizeUrl(new URL('/text-to-image', base).href, {
-        locale: loc as 'en' | 'zh',
-      }).href;
-    };
+    const { canonical, alternates } = localeLinks('/text-to-image', locale);
     return {
       meta: [
         { title },
         { name: 'description', content: description },
-        { property: 'og:title', content: title },
-        { property: 'og:description', content: description },
-        { name: 'twitter:title', content: title },
-        { name: 'twitter:description', content: description },
+        ...socialMeta({ title, description, url: canonical }),
       ],
-      links: [
-        { rel: 'canonical', href: urlFor(locale) },
-        ...locales.map((loc) => ({
-          rel: 'alternate',
-          hrefLang: loc,
-          href: urlFor(loc),
-        })),
-        { rel: 'alternate', hrefLang: 'x-default', href: urlFor('en') },
-      ],
+      links: [{ rel: 'canonical', href: canonical }, ...alternates],
     };
   },
   component: TextToImagePage,

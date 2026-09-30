@@ -8,6 +8,7 @@ const STATIC_PATHS = [
   '',
   '/pricing',
   '/genjutsu-prompts',
+  '/text-to-image',
   '/blog',
   '/privacy-policy',
   '/terms-of-service',

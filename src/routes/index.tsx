@@ -1,7 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router';
 
 import { envConfigs } from '@/config';
-import { getLocale, locales, localizeUrl } from '@/paraglide/runtime.js';
+import { localeLinks, socialMeta } from '@/lib/seo';
+import { getLocale } from '@/paraglide/runtime.js';
 import { GENJUTSU_FAQS } from '@/components/landing/content';
 import { FaqSection } from '@/components/landing/FaqSection';
 import {
@@ -70,26 +71,35 @@ export const Route = createFileRoute('/')({
   },
   head: ({ loaderData }) => {
     const locale = loaderData?.locale ?? 'en';
-    const urlFor = (loc: string) =>
-      localizeUrl(`${envConfigs.app_url}/`, { locale: loc as 'en' | 'zh' })
-        .href;
+    const { canonical, alternates } = localeLinks('/', locale);
+    const faqLd = {
+      '@context': 'https://schema.org',
+      '@type': 'FAQPage',
+      mainEntity: GENJUTSU_FAQS.map((item) => ({
+        '@type': 'Question',
+        name: item.question,
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: item.answer,
+        },
+      })),
+    };
     return {
       meta: [
         { title: PAGE_TITLE },
         { name: 'description', content: PAGE_DESCRIPTION },
-        { property: 'og:title', content: PAGE_TITLE },
-        { property: 'og:description', content: PAGE_DESCRIPTION },
-        { name: 'twitter:title', content: PAGE_TITLE },
-        { name: 'twitter:description', content: PAGE_DESCRIPTION },
+        ...socialMeta({
+          title: PAGE_TITLE,
+          description: PAGE_DESCRIPTION,
+          url: canonical,
+        }),
       ],
-      links: [
-        { rel: 'canonical', href: urlFor(locale) },
-        ...locales.map((loc) => ({
-          rel: 'alternate',
-          hrefLang: loc,
-          href: urlFor(loc),
-        })),
-        { rel: 'alternate', hrefLang: 'x-default', href: urlFor('en') },
+      links: [{ rel: 'canonical', href: canonical }, ...alternates],
+      scripts: [
+        {
+          type: 'application/ld+json',
+          children: JSON.stringify(faqLd),
+        },
       ],
     };
   },

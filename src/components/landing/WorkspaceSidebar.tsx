@@ -20,6 +20,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 
+import { useSession } from '@/core/auth/client';
 import { Link, usePathname } from '@/core/i18n/navigation';
 import { envConfigs } from '@/config';
 import { cn } from '@/lib/cn';
@@ -31,6 +32,7 @@ import {
   type WorkspaceTool,
 } from '@/components/landing/content';
 import { LocaleSelector } from '@/components/locale-selector';
+import { SiteUserMenu } from '@/components/site-user-menu';
 
 const CATEGORY_ICONS: Record<WorkspaceCategory['icon'], LucideIcon> = {
   image: ImageIcon,
@@ -302,6 +304,8 @@ function CategoryBlock({
 
 export function WorkspaceSidebar({ className }: { className?: string }) {
   const pathname = usePathname();
+  const { data: session, isPending } = useSession();
+  const user = session?.user;
   const [collapsed, setCollapsed] = useState(false);
 
   const defaultOpen = useMemo(() => {
@@ -438,12 +442,25 @@ export function WorkspaceSidebar({ className }: { className?: string }) {
             className="text-foreground/40 hover:bg-muted/40 hover:text-foreground/70 flex h-8 w-8 items-center justify-center rounded-lg transition-colors"
           />
           {!collapsed ? (
-            <Link
-              href="/sign-in"
-              className="relative inline-flex h-10 items-center justify-center rounded-[10px] bg-[rgb(204,144,92)] px-4 text-sm font-medium text-[rgb(247,246,243)] transition-colors hover:bg-[rgb(190,130,80)]"
-            >
-              Sign In
-            </Link>
+            isPending ? (
+              <div
+                className="bg-muted/40 size-9 animate-pulse rounded-full"
+                aria-hidden
+              />
+            ) : user ? (
+              <SiteUserMenu
+                name={user.name || 'User'}
+                email={user.email}
+                image={user.image}
+              />
+            ) : (
+              <Link
+                href="/sign-in"
+                className="relative inline-flex h-10 items-center justify-center rounded-[10px] bg-[rgb(204,144,92)] px-4 text-sm font-medium text-[rgb(247,246,243)] transition-colors hover:bg-[rgb(190,130,80)]"
+              >
+                Sign In
+              </Link>
+            )
           ) : null}
         </div>
       </div>

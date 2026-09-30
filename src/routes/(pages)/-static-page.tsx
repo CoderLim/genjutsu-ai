@@ -2,6 +2,7 @@ import type { ComponentType } from 'react';
 import { notFound, useLoaderData } from '@tanstack/react-router';
 
 import { envConfigs } from '@/config';
+import { socialMeta } from '@/lib/seo';
 import { m } from '@/paraglide/messages.js';
 import { baseLocale, getLocale, localizeUrl } from '@/paraglide/runtime.js';
 
@@ -54,6 +55,11 @@ export function staticPageRouteOptions(slug: string) {
         meta: [
           { title: meta.title },
           { name: 'description', content: meta.description },
+          ...socialMeta({
+            title: meta.title,
+            description: meta.description,
+            url: canonical,
+          }),
         ],
         links: [{ rel: 'canonical', href: canonical }],
       };

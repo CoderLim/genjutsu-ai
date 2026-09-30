@@ -14,9 +14,10 @@ export function Hero({ className }: { className?: string }) {
       <h1 className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[28px] leading-[1.15] font-bold tracking-[-1px] text-[rgb(237,234,222)] sm:text-[34px] md:text-[40px] md:leading-[46px]">
         <img
           src="/logo.webp"
-          alt=""
+          alt="Genjutsu AI"
           width={48}
           height={48}
+          fetchPriority="high"
           className="size-9 rounded-full sm:size-10 md:size-12"
         />
         <span>Genjutsu AI Video Generator</span>

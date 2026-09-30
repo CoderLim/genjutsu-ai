@@ -1,27 +1,37 @@
 import { createFileRoute } from '@tanstack/react-router';
 
-import { m } from '@/paraglide/messages.js';
+import { envConfigs } from '@/config';
+import { localeLinks, socialMeta } from '@/lib/seo';
 import { getLocale } from '@/paraglide/runtime.js';
 import { Footer } from '@/blocks/footer';
 import { Header } from '@/blocks/header';
 import { Pricing } from '@/blocks/pricing';
 
+const PAGE_TITLE = `Genjutsu AI Pricing | ${envConfigs.app_name}`;
+const PAGE_DESCRIPTION =
+  'One-time Genjutsu credit packs for Motion Transfer and Object Swap. No subscription — pay only for the video generations you run.';
+
 export const Route = createFileRoute('/pricing')({
   loader: () => {
     const locale = getLocale();
+    return { locale };
+  },
+  head: ({ loaderData }) => {
+    const locale = loaderData?.locale ?? 'en';
+    const { canonical, alternates } = localeLinks('/pricing', locale);
     return {
-      title: m['landing.pricing.title']({}, { locale }),
-      description: m['landing.pricing.description']({}, { locale }),
+      meta: [
+        { title: PAGE_TITLE },
+        { name: 'description', content: PAGE_DESCRIPTION },
+        ...socialMeta({
+          title: PAGE_TITLE,
+          description: PAGE_DESCRIPTION,
+          url: canonical,
+        }),
+      ],
+      links: [{ rel: 'canonical', href: canonical }, ...alternates],
     };
   },
-  head: ({ loaderData }) => ({
-    meta: loaderData
-      ? [
-          { title: loaderData.title },
-          { name: 'description', content: loaderData.description },
-        ]
-      : [],
-  }),
   component: PricingPage,
 });
 
