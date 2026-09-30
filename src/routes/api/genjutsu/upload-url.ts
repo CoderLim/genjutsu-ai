@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
 
+import { getAuth } from '@/core/auth';
 import { createHiggsfieldUploadUrl } from '@/modules/genjutsu/service';
 import { enforceMinIntervalRateLimit } from '@/lib/rate-limit';
 import { respData, respErr } from '@/lib/resp';
@@ -12,6 +13,12 @@ async function POST({ request }: { request: Request }) {
   if (limited) return limited;
 
   try {
+    const auth = getAuth();
+    const session = await auth.api.getSession({ headers: request.headers });
+    if (!session?.user) {
+      return respErr('Unauthorized', { status: 401 });
+    }
+
     const body = await request.json().catch(() => ({}));
     const contentTypes = Array.isArray(body.contentTypes)
       ? body.contentTypes.filter(
@@ -22,7 +29,9 @@ async function POST({ request }: { request: Request }) {
         : [];
 
     if (contentTypes.length < 1 || contentTypes.length > 9) {
-      return respErr('Provide between 1 and 9 upload content types');
+      return respErr('Provide between 1 and 9 upload content types', {
+        status: 400,
+      });
     }
 
     const uploads = [];
@@ -33,7 +42,9 @@ async function POST({ request }: { request: Request }) {
     return respData({ uploads });
   } catch (error: any) {
     console.error('genjutsu upload-url failed:', error);
-    return respErr(error?.message || 'Failed to create upload URL');
+    return respErr(error?.message || 'Failed to create upload URL', {
+      status: 400,
+    });
   }
 }
 
