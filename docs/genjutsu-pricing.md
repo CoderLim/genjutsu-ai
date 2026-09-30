@@ -55,15 +55,16 @@ Higgsfield currently publishes Genjutsu list pricing before account discounts:
 
 - 480p: $0.318 per input-video second
 - 720p: $0.681 per input-video second
+- 1080p: $1.632 per input-video second
 - input duration is rounded up to the next whole second
 
-Those rates are captured as a **fallback estimate** in
-`src/modules/genjutsu/pricing.ts`. An authoritative server-side provider
-quote/settled cost should win whenever Higgsfield exposes it reliably to this
-integration.
+Those rates are captured as a **display/test fallback** in
+`src/modules/genjutsu/pricing.ts`. Production charging uses Higgsfield's
+`POST /estimate/<model>` endpoint with the exact request body and converts
+the returned USD estimate into Genjutsu credits on the server.
 
-Do not base customer pricing on a temporary provider discount. The list-rate
-fallback is intentionally conservative.
+Do not trust a client-supplied price, credit amount, or duration-based cost.
+The provider estimate is authoritative for reserve pricing.
 
 ## Important margin note
 
@@ -128,15 +129,11 @@ billing outcome. Higgsfield states that some rejected/server-error requests are
 not billed; do not automatically assume every failed terminal generation is
 free.
 
-## Resolution constraint found during pricing review
+## Resolution support
 
-Current Genjutsu API documentation publishes **480p and 720p** pricing for
-Motion Transfer / Object Swap. The existing feature branch currently exposes
-`1080p` in the UI/service types.
-
-Before production billing is enabled, remove or gate 1080p unless Higgsfield
-documents and accepts it for Genjutsu. Otherwise users can select an option
-that has no supported pricing rule and may be rejected upstream.
+Higgsfield's current Genjutsu API reference supports **480p, 720p and 1080p**
+for both Motion Transfer and Object Swap. Keep all three options server
+validated and priced through the provider estimate endpoint.
 
 ## First-launch scope
 
