@@ -296,7 +296,7 @@ export async function refundGenjutsuGeneration(params: {
   });
   if (!task) return null;
 
-  if (task.status === 'refunded') return task;
+  if (task.status === 'refunded' || task.status === 'completed') return task;
 
   if (task.creditId) {
     await revoke(task.creditId);
