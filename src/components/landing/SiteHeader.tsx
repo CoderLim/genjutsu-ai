@@ -1,9 +1,11 @@
 import { useState } from 'react';
 
+import { useSession } from '@/core/auth/client';
 import { Link } from '@/core/i18n/navigation';
 import { envConfigs } from '@/config';
 import { cn } from '@/lib/cn';
 import { GlobeIcon, MenuIcon, RaphaelLogo } from '@/components/icons';
+import { SiteUserMenu } from '@/components/site-user-menu';
 import {
   Sheet,
   SheetContent,
@@ -65,6 +67,35 @@ function SignInButton({ className }: { className?: string }) {
   );
 }
 
+function AuthSlot({ className }: { className?: string }) {
+  const { data: session, isPending } = useSession();
+  const user = session?.user;
+
+  if (isPending) {
+    return (
+      <div
+        className={cn(
+          'bg-muted/40 size-9 animate-pulse rounded-full',
+          className
+        )}
+        aria-hidden
+      />
+    );
+  }
+
+  if (user) {
+    return (
+      <SiteUserMenu
+        name={user.name || 'User'}
+        email={user.email}
+        image={user.image}
+      />
+    );
+  }
+
+  return <SignInButton className={className} />;
+}
+
 export function SiteHeader() {
   const [sheetOpen, setSheetOpen] = useState(false);
 
@@ -93,7 +124,7 @@ export function SiteHeader() {
             >
               <GlobeIcon className="size-4" />
             </button>
-            <SignInButton />
+            <AuthSlot />
           </div>
         </nav>
 
@@ -102,7 +133,7 @@ export function SiteHeader() {
           <BrandLink />
           <div className="flex items-center gap-2">
             <UpgradePill className="hidden sm:inline-flex" />
-            <SignInButton />
+            <AuthSlot />
             <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
               <SheetTrigger
                 aria-label="Open menu"
@@ -140,7 +171,7 @@ export function SiteHeader() {
                       <GlobeIcon className="size-4" />
                       Language
                     </button>
-                    <SignInButton className="w-full" />
+                    <AuthSlot className="w-full" />
                   </div>
                 </div>
               </SheetContent>
