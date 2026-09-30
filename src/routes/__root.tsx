@@ -14,7 +14,7 @@ import { ThemeProvider } from 'next-themes';
 
 import { envConfigs } from '@/config';
 import { getQueryClient } from '@/lib/query-client';
-import { getLocale, locales, localizeUrl } from '@/paraglide/runtime.js';
+import { getLocale } from '@/paraglide/runtime.js';
 import { Ads } from '@/components/analytics/ads';
 import { GoogleAnalytics } from '@/components/analytics/google-analytics';
 import { Plausible } from '@/components/analytics/plausible';
@@ -57,48 +57,35 @@ const getAnalyticsConfigs = createServerFn().handler(async () => {
 
 export const Route = createRootRoute({
   loader: () => getAnalyticsConfigs(),
-  head: () => {
-    // head() runs on the SSR server AND again on the client during hydration.
-    // On the client, app_url falls back to the localhost dev default when
-    // VITE_APP_URL wasn't inlined into the client bundle at build — which would
-    // emit a second, localhost set of hreflang links. Prefer the live origin
-    // on the client so it always matches; the server uses the configured URL.
-    const appUrl =
-      (typeof window !== 'undefined' && window.location?.origin) ||
-      envConfigs.app_url ||
-      '';
-    return {
-      meta: [
-        { charSet: 'utf-8' },
-        { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-        { title: envConfigs.app_name },
-        { name: 'description', content: envConfigs.app_description },
-      ],
-      links: [
-        { rel: 'icon', href: '/favicon.svg', type: 'image/svg+xml' },
-        { rel: 'icon', href: '/favicon/favicon.ico' },
-        {
-          rel: 'icon',
-          href: '/favicon/favicon-32x32.png',
-          type: 'image/png',
-          sizes: '32x32',
-        },
-        {
-          rel: 'icon',
-          href: '/favicon/favicon-16x16.png',
-          type: 'image/png',
-          sizes: '16x16',
-        },
-        { rel: 'apple-touch-icon', href: '/favicon/apple-touch-icon.png' },
-        { rel: 'shortcut icon', href: '/favicon/favicon.ico' },
-        ...locales.map((loc) => ({
-          rel: 'alternate',
-          hrefLang: loc,
-          href: localizeUrl(`${appUrl}/`, { locale: loc }).href,
-        })),
-      ],
-    };
-  },
+  // Do not emit homepage hreflang here — it leaks onto every route and fails
+  // production-audit / Ahrefs (duplicate language URLs, missing return tags).
+  // Each public route owns its own canonical + en/zh + x-default.
+  head: () => ({
+    meta: [
+      { charSet: 'utf-8' },
+      { name: 'viewport', content: 'width=device-width, initial-scale=1' },
+      { title: envConfigs.app_name },
+      { name: 'description', content: envConfigs.app_description },
+    ],
+    links: [
+      { rel: 'icon', href: '/favicon.svg', type: 'image/svg+xml' },
+      { rel: 'icon', href: '/favicon/favicon.ico' },
+      {
+        rel: 'icon',
+        href: '/favicon/favicon-32x32.png',
+        type: 'image/png',
+        sizes: '32x32',
+      },
+      {
+        rel: 'icon',
+        href: '/favicon/favicon-16x16.png',
+        type: 'image/png',
+        sizes: '16x16',
+      },
+      { rel: 'apple-touch-icon', href: '/favicon/apple-touch-icon.png' },
+      { rel: 'shortcut icon', href: '/favicon/favicon.ico' },
+    ],
+  }),
   component: RootComponent,
   shellComponent: RootDocument,
   notFoundComponent: NotFound,

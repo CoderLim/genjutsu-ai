@@ -10,11 +10,10 @@ import { baseLocale } from '@/paraglide/runtime.js';
  * This module is isomorphic (safe in client bundles). Database posts are
  * fetched through the server functions in ./server.ts and merged with the
  * local posts via the pure helpers below.
+ *
+ * Local MDX slugs only — empty until Genjutsu posts are written.
  */
-export const BLOG_POST_SLUGS = [
-  'what-is-shipany',
-  'blocks-vs-components',
-] as const;
+export const BLOG_POST_SLUGS: readonly string[] = [];
 
 export type BlogPostMeta = {
   title: string;
@@ -54,7 +53,7 @@ const postModules = import.meta.glob<PostModule>('/src/content/posts/*.mdx', {
 });
 
 export function loadLocalPost(slug: string, locale: string): PostModule | null {
-  if (!BLOG_POST_SLUGS.includes(slug as (typeof BLOG_POST_SLUGS)[number])) {
+  if (!BLOG_POST_SLUGS.includes(slug)) {
     return null;
   }
   return (
@@ -84,6 +83,21 @@ export function getLocalPosts(locale: string): BlogPost[] {
   }))
     .filter((m): m is { slug: string; mod: PostModule } => m.mod !== null)
     .map(({ slug, mod }) => localPostToItem(slug, mod.meta));
+}
+
+/** Locales that have a real MDX file for this slug (no fallback). */
+export function getLocalPostLocales(slug: string): string[] {
+  if (!BLOG_POST_SLUGS.includes(slug)) {
+    return [];
+  }
+  const prefix = `/src/content/posts/${slug}.`;
+  const found: string[] = [];
+  for (const key of Object.keys(postModules)) {
+    if (!key.startsWith(prefix) || !key.endsWith('.mdx')) continue;
+    const locale = key.slice(prefix.length, -'.mdx'.length);
+    if (locale) found.push(locale);
+  }
+  return found;
 }
 
 /**

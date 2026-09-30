@@ -65,3 +65,6 @@ package-lock.json
 
 # Runtime image uploads (no-storage local fallback)
 /public/uploads/
+
+# Launch pipeline generated GA id (set via scripts/set-ga-id.mjs)
+scripts/.ga-id.json
