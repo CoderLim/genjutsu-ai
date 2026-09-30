@@ -9,6 +9,17 @@ const VALID_RESOLUTIONS = new Set<GenjutsuResolution>([
   '1080p',
 ]);
 
+export class HiggsfieldHttpError extends Error {
+  constructor(
+    public status: number,
+    message: string,
+    public payload?: unknown
+  ) {
+    super(message);
+    this.name = 'HiggsfieldHttpError';
+  }
+}
+
 function getApiKey() {
   const value = envConfigs.higgsfield_api_key?.trim();
   if (!value) {
@@ -26,7 +37,7 @@ function getApiBaseUrl() {
   ).replace(/\/$/, '');
 }
 
-function getModel(mode: GenjutsuMode) {
+export function getGenjutsuModel(mode: GenjutsuMode) {
   if (mode === 'motion-transfer') {
     return (
       envConfigs.higgsfield_genjutsu_motion_model?.trim() ||
@@ -34,12 +45,9 @@ function getModel(mode: GenjutsuMode) {
     );
   }
 
-  // Higgsfield's current Object Swap workflow documentation publishes the
-  // provider segment as "higgsfiled". Keep it configurable so this can be
-  // corrected without a deploy if their catalog mapping changes.
   return (
     envConfigs.higgsfield_genjutsu_object_swap_model?.trim() ||
-    'higgsfiled/genjutsu/object-swap/v1.0'
+    'higgsfield/genjutsu/object-swap/v1.0'
   );
 }
 
@@ -53,8 +61,10 @@ async function readProviderJson(response: Response) {
     payload?.message ||
     payload?.error ||
     `Higgsfield request failed with HTTP ${response.status}`;
-  throw new Error(
-    typeof message === 'string' ? message : JSON.stringify(message)
+  throw new HiggsfieldHttpError(
+    response.status,
+    typeof message === 'string' ? message : JSON.stringify(message),
+    payload
   );
 }
 
@@ -105,7 +115,7 @@ export async function createHiggsfieldUploadUrl(contentType: string) {
   };
 }
 
-export async function submitGenjutsu(input: {
+function buildGenjutsuPayload(input: {
   mode: GenjutsuMode;
   resolution: GenjutsuResolution;
   prompt?: string;
@@ -135,15 +145,61 @@ export async function submitGenjutsu(input: {
     throw new Error('Provide between 1 and 8 valid reference image URLs');
   }
 
-  const model = getModel(input.mode);
-  const payload = await providerFetch(`/${model.replace(/^\/+/, '')}`, {
-    method: 'POST',
-    body: JSON.stringify({
+  return {
+    model: getGenjutsuModel(input.mode),
+    body: {
       prompt,
       video_url: input.videoUrl,
       image_urls: input.imageUrls,
       resolution: input.resolution,
-    }),
+    },
+  };
+}
+
+export async function estimateGenjutsuProviderCost(input: {
+  mode: GenjutsuMode;
+  resolution: GenjutsuResolution;
+  prompt?: string;
+  videoUrl: string;
+  imageUrls: string[];
+}) {
+  const { model, body } = buildGenjutsuPayload(input);
+  const payload = await providerFetch(
+    `/estimate/${model.replace(/^\/+/, '')}`,
+    {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }
+  );
+
+  const usdRaw =
+    payload?.usd ??
+    payload?.cost_usd ??
+    payload?.cost?.usd ??
+    payload?.estimate?.usd;
+  const providerCostUsd = Number(usdRaw);
+  if (!Number.isFinite(providerCostUsd) || providerCostUsd <= 0) {
+    throw new Error('Higgsfield did not return a valid USD cost estimate');
+  }
+
+  return {
+    providerCostUsd,
+    providerCredits: payload?.credits ?? null,
+    payload,
+  };
+}
+
+export async function submitGenjutsu(input: {
+  mode: GenjutsuMode;
+  resolution: GenjutsuResolution;
+  prompt?: string;
+  videoUrl: string;
+  imageUrls: string[];
+}) {
+  const { model, body } = buildGenjutsuPayload(input);
+  const payload = await providerFetch(`/${model.replace(/^\/+/, '')}`, {
+    method: 'POST',
+    body: JSON.stringify(body),
   });
 
   if (typeof payload?.request_id !== 'string' || !payload.request_id) {
