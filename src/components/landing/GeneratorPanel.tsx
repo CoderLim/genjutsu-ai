@@ -9,7 +9,8 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 
-import { apiGet, apiPost, uploadToSignedUrl } from '@/lib/api-client';
+import { useSession } from '@/core/auth/client';
+import { ApiError, apiGet, apiPost, uploadToSignedUrl } from '@/lib/api-client';
 import { cn } from '@/lib/cn';
 import {
   ChevronDownIcon,
@@ -585,6 +586,7 @@ type GenerationResult = {
   previewUrl: string;
   imageCount: number;
   createdAt: number;
+  reservedCredits?: number;
 };
 
 type SignedUpload = {
@@ -594,8 +596,11 @@ type SignedUpload = {
 };
 
 type GenerationStart = {
-  requestId: string;
+  generationId: string;
+  requestId: string | null;
   status: string;
+  reservedCredits: number;
+  providerCostUsd?: number | null;
 };
 
 type GenerationPoll = {
@@ -603,6 +608,7 @@ type GenerationPoll = {
   providerStatus: string;
   videoUrl: string | null;
   error?: string;
+  refundedCredits?: number;
 };
 
 const sleep = (ms: number) =>
@@ -636,6 +642,9 @@ function ResultPanel({
             <p className="mt-0.5 truncate text-[11px] text-white/45">
               {modeLabel} · {result.resolution} · {result.imageCount} reference
               {result.imageCount === 1 ? '' : 's'}
+              {result.reservedCredits
+                ? ` · ${result.reservedCredits} credits`
+                : ''}
               {result.prompt ? ` · ${result.prompt}` : ''}
             </p>
           ) : (
@@ -699,6 +708,7 @@ export function GeneratorPanel({
   hidePromo: _hidePromo = false,
   onModeChange,
 }: GeneratorPanelProps) {
+  const { data: session } = useSession();
   const [internalMode, setInternalMode] =
     useState<GeneratorMode>('motion-transfer');
   const mode = modeProp ?? internalMode;
@@ -716,6 +726,7 @@ export function GeneratorPanel({
   const [status, setStatus] = useState<GenerationStatus>('idle');
   const [result, setResult] = useState<GenerationResult | null>(null);
   const [error, setError] = useState('');
+  const [needsCredits, setNeedsCredits] = useState(false);
 
   const settingsRef = useRef<HTMLDivElement>(null);
   const generationRunRef = useRef(0);
@@ -762,9 +773,21 @@ export function GeneratorPanel({
   const handleGenerate = async () => {
     if (!video || images.length === 0 || status === 'generating') return;
 
+    if (!session?.user) {
+      const callbackUrl = encodeURIComponent(
+        `${window.location.pathname}${window.location.search}`
+      );
+      window.location.href = `/sign-in?callbackUrl=${callbackUrl}`;
+      return;
+    }
+
     const runId = ++generationRunRef.current;
+    const generationId =
+      typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        ? crypto.randomUUID()
+        : `gen-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
     const draft: GenerationResult = {
-      id: `${Date.now()}`,
+      id: generationId,
       mode,
       resolution,
       prompt: prompt.trim(),
@@ -774,6 +797,7 @@ export function GeneratorPanel({
     };
 
     setError('');
+    setNeedsCredits(false);
     setResult(draft);
     setStatus('generating');
 
@@ -816,6 +840,7 @@ export function GeneratorPanel({
       const started = await apiPost<GenerationStart>(
         '/api/genjutsu/generate',
         {
+          generationId,
           mode,
           resolution,
           prompt: prompt.trim(),
@@ -824,13 +849,18 @@ export function GeneratorPanel({
         }
       );
 
+      setResult({
+        ...draft,
+        reservedCredits: started.reservedCredits,
+      });
+
       let delayMs = 1_500;
       for (let attempt = 0; attempt < 90; attempt += 1) {
         await sleep(delayMs);
         if (generationRunRef.current !== runId) return;
 
         const polled = await apiGet<GenerationPoll>(
-          `/api/genjutsu/status?requestId=${encodeURIComponent(started.requestId)}`
+          `/api/genjutsu/status?generationId=${encodeURIComponent(started.generationId)}`
         );
 
         if (polled.status === 'completed' && polled.videoUrl) {
@@ -857,6 +887,13 @@ export function GeneratorPanel({
       if (generationRunRef.current !== runId) return;
       setStatus('idle');
       setResult(null);
+
+      const apiData =
+        cause instanceof ApiError && cause.data && typeof cause.data === 'object'
+          ? (cause.data as Record<string, unknown>)
+          : null;
+      const insufficient = apiData?.code === 'INSUFFICIENT_CREDITS';
+      setNeedsCredits(insufficient);
       setError(
         cause instanceof Error ? cause.message : 'Generation failed unexpectedly'
       );
@@ -962,6 +999,14 @@ export function GeneratorPanel({
         >
           <p className="font-medium">Generation failed</p>
           <p className="mt-1 text-xs text-red-100/65">{error}</p>
+          {needsCredits ? (
+            <a
+              href="/pricing"
+              className="mt-2 inline-flex text-xs font-semibold text-red-50 underline underline-offset-2"
+            >
+              Buy credits
+            </a>
+          ) : null}
         </div>
       ) : null}
     </div>
