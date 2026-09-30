@@ -7,6 +7,7 @@ import { getLocalPosts, mergePosts } from '@/content/posts';
 const STATIC_PATHS = [
   '',
   '/pricing',
+  '/genjutsu-prompts',
   '/blog',
   '/privacy-policy',
   '/terms-of-service',
