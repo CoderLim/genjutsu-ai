@@ -23,6 +23,7 @@ export enum CreditTransactionScene {
   RENEWAL = 'renewal',
   GIFT = 'gift',
   REWARD = 'reward',
+  GENJUTSU = 'genjutsu',
 }
 
 type NewCredit = typeof credit.$inferInsert;
@@ -36,7 +37,7 @@ export function calculateCreditExpirationTime(params: {
   const { creditsValidDays, currentPeriodEnd } = params;
 
   if (!creditsValidDays || creditsValidDays <= 0) {
-    return null; // never expires
+    return null;
   }
 
   if (currentPeriodEnd) {
@@ -125,7 +126,6 @@ export async function consume(params: {
   const now = new Date();
 
   const execute = async (tx: any) => {
-    // 1. Check balance
     const [balance] = await tx
       .select({ total: sum(credit.remainingCredits) })
       .from(credit)
@@ -143,7 +143,6 @@ export async function consume(params: {
       return { success: false };
     }
 
-    // 2. FIFO consumption with batching
     let remainingToConsume = amount;
     const batchSize = 1000;
     const maxBatches = 10;
@@ -192,7 +191,10 @@ export async function consume(params: {
       batchNo++;
     }
 
-    // 3. Create consumption record
+    if (remainingToConsume > 0) {
+      throw new Error('Credit reservation became inconsistent');
+    }
+
     const consumedCredit: NewCredit = {
       id: getUuid(),
       userId,
@@ -216,27 +218,58 @@ export async function consume(params: {
   return db().transaction(execute);
 }
 
-// --- Revoke (restore credits from a consumed record) ---
+function affectedRows(result: any): number | null {
+  const candidates = [
+    result?.rowsAffected,
+    result?.rowCount,
+    result?.changes,
+    result?.affectedRows,
+    result?.[0]?.affectedRows,
+    result?.[0]?.rowCount,
+    result?.[0]?.changes,
+  ];
+  const found = candidates.find((value) => typeof value === 'number');
+  return typeof found === 'number' ? found : null;
+}
+
+// --- Revoke (idempotently restore credits from a consumed record) ---
 
 export async function revoke(consumeCreditId: string) {
-  const [consumeRecord] = await db()
-    .select()
-    .from(credit)
-    .where(
-      and(
-        eq(credit.id, consumeCreditId),
-        eq(credit.transactionType, CreditTransactionType.CONSUME),
-        eq(credit.status, CreditStatus.ACTIVE)
+  return db().transaction(async (tx: any) => {
+    const [consumeRecord] = await tx
+      .select()
+      .from(credit)
+      .where(
+        and(
+          eq(credit.id, consumeCreditId),
+          eq(credit.transactionType, CreditTransactionType.CONSUME),
+          eq(credit.status, CreditStatus.ACTIVE)
+        )
       )
-    )
-    .limit(1);
+      .limit(1);
 
-  if (!consumeRecord || !consumeRecord.consumedDetail) return;
+    if (!consumeRecord || !consumeRecord.consumedDetail) return false;
 
-  const items = JSON.parse(consumeRecord.consumedDetail);
+    // Claim the refund before restoring source grants. This update and the
+    // restoration below live in one transaction, so a concurrent duplicate
+    // refund can only restore the credits once.
+    const claim = await tx
+      .update(credit)
+      .set({ status: CreditStatus.DELETED })
+      .where(
+        and(
+          eq(credit.id, consumeCreditId),
+          eq(credit.status, CreditStatus.ACTIVE)
+        )
+      );
 
-  await db().transaction(async (tx: any) => {
-    // Atomic increment per source grant — no read-modify-write race.
+    const count = affectedRows(claim);
+    if (count === 0) return false;
+    if (count == null) {
+      throw new Error('Unable to verify atomic credit refund claim');
+    }
+
+    const items = JSON.parse(consumeRecord.consumedDetail);
     for (const item of items) {
       await tx
         .update(credit)
@@ -246,11 +279,7 @@ export async function revoke(consumeCreditId: string) {
         .where(eq(credit.id, item.creditId));
     }
 
-    // Mark consumption record as deleted
-    await tx
-      .update(credit)
-      .set({ status: CreditStatus.DELETED })
-      .where(eq(credit.id, consumeCreditId));
+    return true;
   });
 }
 
