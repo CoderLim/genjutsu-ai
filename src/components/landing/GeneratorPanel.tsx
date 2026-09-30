@@ -611,8 +611,18 @@ type GenerationPoll = {
   refundedCredits?: number;
 };
 
+type PersistedGeneration = {
+  userId: string;
+  generationId: string;
+  draft: GenerationResult;
+  reservedCredits: number;
+};
+
 const sleep = (ms: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+const activeGenerationKey = (userId: string) =>
+  `genjutsu_active_generation:${userId}`;
 
 function ResultPanel({
   status,
@@ -767,6 +777,96 @@ export function GeneratorPanel({
       ? 'Describe what to swap in the video (optional)...'
       : 'Describe the new scene or character (optional)...';
 
+  const pollGeneration = useCallback(
+    async (active: PersistedGeneration, runId: number) => {
+      let delayMs = 1_500;
+
+      for (let attempt = 0; attempt < 90; attempt += 1) {
+        await sleep(delayMs);
+        if (generationRunRef.current !== runId) return;
+
+        let polled: GenerationPoll;
+        try {
+          polled = await apiGet<GenerationPoll>(
+            `/api/genjutsu/status?generationId=${encodeURIComponent(active.generationId)}`
+          );
+        } catch {
+          // A transient status request must not unlock Generate while a paid
+          // provider job may still be running. Keep the persisted job and try
+          // again on the next poll.
+          delayMs = Math.min(5_000, Math.ceil(delayMs * 1.2));
+          continue;
+        }
+
+        if (polled.status === 'completed' && polled.videoUrl) {
+          if (generationRunRef.current !== runId) return;
+          localStorage.removeItem(activeGenerationKey(active.userId));
+          setResult({
+            ...active.draft,
+            reservedCredits: active.reservedCredits,
+            previewUrl: polled.videoUrl,
+          });
+          setError('');
+          setStatus('done');
+          return;
+        }
+
+        if (polled.status === 'failed') {
+          localStorage.removeItem(activeGenerationKey(active.userId));
+          setStatus('idle');
+          setResult(null);
+          setError(
+            polled.error ||
+              `Higgsfield generation failed (${polled.providerStatus})`
+          );
+          return;
+        }
+
+        delayMs = Math.min(5_000, Math.ceil(delayMs * 1.2));
+      }
+
+      // Do not return to idle here: the provider job can still be running and
+      // enabling Generate would make a second paid generation too easy.
+      setError(
+        'Generation is still processing. This job remains reserved; refresh the page to resume checking it.'
+      );
+    },
+    []
+  );
+
+  useEffect(() => {
+    const userId = session?.user?.id;
+    if (!userId || status !== 'idle') return;
+
+    try {
+      const raw = localStorage.getItem(activeGenerationKey(userId));
+      if (!raw) return;
+
+      const active = JSON.parse(raw) as PersistedGeneration;
+      if (
+        active.userId !== userId ||
+        !active.generationId ||
+        !active.draft ||
+        !Number.isFinite(active.reservedCredits)
+      ) {
+        localStorage.removeItem(activeGenerationKey(userId));
+        return;
+      }
+
+      const runId = ++generationRunRef.current;
+      setError('');
+      setNeedsCredits(false);
+      setResult({
+        ...active.draft,
+        reservedCredits: active.reservedCredits,
+      });
+      setStatus('generating');
+      void pollGeneration(active, runId);
+    } catch {
+      localStorage.removeItem(activeGenerationKey(userId));
+    }
+  }, [pollGeneration, session?.user?.id, status]);
+
   const canGenerate =
     Boolean(video && images.length > 0) && status !== 'generating';
 
@@ -849,44 +949,23 @@ export function GeneratorPanel({
         }
       );
 
+      const active: PersistedGeneration = {
+        userId: session.user.id,
+        generationId: started.generationId,
+        draft,
+        reservedCredits: started.reservedCredits,
+      };
+
+      localStorage.setItem(
+        activeGenerationKey(session.user.id),
+        JSON.stringify(active)
+      );
       setResult({
         ...draft,
         reservedCredits: started.reservedCredits,
       });
 
-      let delayMs = 1_500;
-      for (let attempt = 0; attempt < 90; attempt += 1) {
-        await sleep(delayMs);
-        if (generationRunRef.current !== runId) return;
-
-        const polled = await apiGet<GenerationPoll>(
-          `/api/genjutsu/status?generationId=${encodeURIComponent(started.generationId)}`
-        );
-
-        if (polled.status === 'completed' && polled.videoUrl) {
-          if (generationRunRef.current !== runId) return;
-          setResult({
-            ...draft,
-            reservedCredits: started.reservedCredits,
-            previewUrl: polled.videoUrl,
-          });
-          setStatus('done');
-          return;
-        }
-
-        if (polled.status === 'failed') {
-          throw new Error(
-            polled.error ||
-              `Higgsfield generation failed (${polled.providerStatus})`
-          );
-        }
-
-        delayMs = Math.min(5_000, Math.ceil(delayMs * 1.2));
-      }
-
-      throw new Error(
-        'Generation is still processing. Please try again in a few minutes.'
-      );
+      await pollGeneration(active, runId);
     } catch (cause) {
       if (generationRunRef.current !== runId) return;
       setStatus('idle');
