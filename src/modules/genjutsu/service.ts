@@ -1,4 +1,5 @@
 import { envConfigs } from '@/config';
+
 import {
   createGenjutsuE2ERequestId,
   isGenjutsuE2EMockEnabled,
@@ -36,8 +37,7 @@ function getApiKey() {
 
 function getApiBaseUrl() {
   return (
-    envConfigs.higgsfield_api_base_url?.trim() ||
-    'https://api.higgsfield.ai'
+    envConfigs.higgsfield_api_base_url?.trim() || 'https://api.higgsfield.ai'
   ).replace(/\/$/, '');
 }
 
@@ -106,7 +106,11 @@ export async function createHiggsfieldUploadUrl(contentType: string) {
 
   const rawHeaders = payload?.upload_headers;
   const uploadHeaders: Record<string, string> = {};
-  if (rawHeaders && typeof rawHeaders === 'object' && !Array.isArray(rawHeaders)) {
+  if (
+    rawHeaders &&
+    typeof rawHeaders === 'object' &&
+    !Array.isArray(rawHeaders)
+  ) {
     for (const [key, value] of Object.entries(rawHeaders)) {
       if (typeof value === 'string') uploadHeaders[key] = value;
     }
@@ -169,17 +173,7 @@ export async function estimateGenjutsuProviderCost(input: {
 }) {
   const { model, body } = buildGenjutsuPayload(input);
 
-  if (isGenjutsuE2EMockEnabled()) {
-    return {
-      providerCostUsd: 0.01,
-      providerCredits: 1,
-      payload: {
-        mock: true,
-        model,
-        usd: 0.01,
-      },
-    };
-  }
+  // Estimate is free preflight pricing — always hit the real endpoint.
   const payload = await providerFetch(
     `/estimate/${model.replace(/^\/+/, '')}`,
     {
