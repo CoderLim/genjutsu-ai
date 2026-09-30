@@ -41,13 +41,21 @@ function inputFromBody(body: any): GenerationInput {
   };
 }
 
-function inputFromTask(task: { options?: string | null }): GenerationInput {
+function inputFromTask(task: {
+  options?: string | null;
+  prompt?: string | null;
+}): GenerationInput {
   if (!task.options) throw new Error('Generation input is missing');
   const parsed = JSON.parse(task.options);
   return {
     mode: parsed.mode as GenjutsuMode,
     resolution: parsed.resolution as GenjutsuResolution,
-    prompt: typeof parsed.prompt === 'string' ? parsed.prompt : '',
+    prompt:
+      typeof parsed.prompt === 'string'
+        ? parsed.prompt
+        : typeof task.prompt === 'string'
+          ? task.prompt
+          : '',
     videoUrl: typeof parsed.videoUrl === 'string' ? parsed.videoUrl : '',
     imageUrls: Array.isArray(parsed.imageUrls) ? parsed.imageUrls : [],
   };
