@@ -1,4 +1,4 @@
-export type GenjutsuBillableResolution = '480p' | '720p';
+export type GenjutsuBillableResolution = '480p' | '720p' | '1080p';
 
 export type GenjutsuCreditPack = {
   id: 'starter' | 'creator' | 'pro' | 'studio';
@@ -9,22 +9,21 @@ export type GenjutsuCreditPack = {
 };
 
 /**
- * Pricing decision (2026-09-30).
+ * Customer-wallet conversion and markup.
  *
- * 100 credits represent roughly $1 of customer wallet value at the Starter
- * pack. Generation credits are derived from provider cost, not hard-coded
- * per action, so provider price changes can be absorbed without changing the
- * pack catalog.
+ * The provider estimate is authoritative for a concrete generation request.
+ * We convert its USD estimate into our own credits here; the browser never
+ * supplies the price or number of credits to charge.
  */
 export const GENJUTSU_CREDITS_PER_USD = 100;
 export const GENJUTSU_PROVIDER_COST_MULTIPLIER = 1.7;
 
 /**
- * Higgsfield's published Genjutsu list rates as of 2026-09-30, before
- * account/customer discounts. Use these only as a conservative fallback
- * estimate when an authoritative provider quote is not available.
+ * Public Higgsfield Genjutsu list rates as of 2026-09-30.
  *
- * Input duration is billed in whole seconds (rounded up).
+ * These are useful for UI/fallback estimates and tests only. Production
+ * generation charging uses Higgsfield POST /estimate/<model> with the exact
+ * generation body.
  */
 export const GENJUTSU_LIST_RATE_USD_PER_SECOND: Record<
   GenjutsuBillableResolution,
@@ -32,6 +31,7 @@ export const GENJUTSU_LIST_RATE_USD_PER_SECOND: Record<
 > = {
   '480p': 0.318,
   '720p': 0.681,
+  '1080p': 1.632,
 };
 
 export const GENJUTSU_CREDIT_PACKS: readonly GenjutsuCreditPack[] = [
@@ -85,7 +85,9 @@ export function estimateGenjutsuListCost(input: {
     throw new Error('durationSeconds must be a positive finite number');
   }
 
-  const billedSeconds = Math.ceil(input.durationSeconds);
+  // Higgsfield trims Genjutsu source video to 30 seconds and bills whole
+  // input seconds rounded upward.
+  const billedSeconds = Math.min(30, Math.ceil(input.durationSeconds));
   return billedSeconds * GENJUTSU_LIST_RATE_USD_PER_SECOND[input.resolution];
 }
 
