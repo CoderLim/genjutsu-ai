@@ -58,6 +58,20 @@ export async function getGenjutsuTaskById(params: {
   return task ?? null;
 }
 
+export async function getGenjutsuTaskByRequestIdAnyUser(requestId: string) {
+  const [task] = await db()
+    .select()
+    .from(aiTask)
+    .where(
+      and(
+        eq(aiTask.taskId, requestId),
+        eq(aiTask.scene, GENJUTSU_SCENE)
+      )
+    )
+    .limit(1);
+  return task ?? null;
+}
+
 export async function getGenjutsuTaskByRequestId(params: {
   requestId: string;
   userId: string;
