@@ -1,4 +1,5 @@
 import { Link } from '@/core/i18n/navigation';
+import { envConfigs } from '@/config';
 import { cn } from '@/lib/cn';
 import { BuiltWithShipAny } from '@/components/built-with-shipany';
 import { RaphaelLogo } from '@/components/icons';
@@ -60,14 +61,12 @@ export function SiteFooter() {
                 <div className="flex items-center justify-center gap-2 lg:justify-start">
                   <RaphaelLogo size={44} className="h-11 w-11" />
                   <p className="text-foreground text-3xl font-semibold">
-                    Raphael AI
+                    {envConfigs.app_name}
                   </p>
                 </div>
                 <p className="text-md text-muted-foreground mt-6">
-                  Raphael AI Image Generator: free and unlimited AI image
-                  generator, featuring top models including Nano Banana 2 / Pro,
-                  Qwen-Image, and Seedream 5.0. No registration, no count
-                  limits.
+                  {envConfigs.app_description ||
+                    'Genjutsu AI swaps characters, outfits and scenes in any video while keeping the original motion.'}
                 </p>
               </div>
             </div>
@@ -101,7 +100,7 @@ export function SiteFooter() {
               'lg:flex-row lg:items-center lg:text-left'
             )}
           >
-            <p>© 2025 • Raphael AI All rights reserved.</p>
+            <p>© 2025 • {envConfigs.app_name} All rights reserved.</p>
             <div className="flex flex-wrap items-center justify-center gap-4 lg:justify-end">
               <Link
                 href="/privacy-policy"

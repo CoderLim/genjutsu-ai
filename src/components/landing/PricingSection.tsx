@@ -6,7 +6,7 @@ import { cn } from '@/lib/cn';
 
 export function PricingSection() {
   return (
-    <section id="pricing" className="py-12 md:py-20">
+    <section id="pricing" className="scroll-mt-24 py-12 md:py-20">
       <div className="container mx-auto px-4">
         <div className="mx-auto mb-10 max-w-3xl text-center">
           <h2 className="text-foreground mb-4 text-3xl font-semibold lg:text-4xl">

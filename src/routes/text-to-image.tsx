@@ -35,7 +35,7 @@ function TextToImagePage() {
               className="size-7 rounded-full"
             />
             <span className="text-sm font-bold text-[rgb(249,166,57)]">
-              Raphael AI
+              {envConfigs.app_name}
             </span>
           </Link>
           <div className="ml-auto flex items-center gap-2">
@@ -112,7 +112,7 @@ export const Route = createFileRoute('/text-to-image')({
   },
   head: ({ loaderData }) => {
     const locale = loaderData?.locale ?? 'en';
-    const title = 'AI Text to Image Generator | Raphael AI';
+    const title = `AI Text to Image Generator | ${envConfigs.app_name}`;
     const description =
       'Generate images from text with GPT Image 2, Nano Banana 2, Seedream 5, and Seedream 3.5 Pro.';
     const urlFor = (loc: string) => {

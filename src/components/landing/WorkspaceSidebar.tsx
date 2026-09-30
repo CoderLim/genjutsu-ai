@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 
 import { Link, usePathname } from '@/core/i18n/navigation';
+import { envConfigs } from '@/config';
 import { cn } from '@/lib/cn';
 import {
   WORKSPACE_NAV,
@@ -347,14 +348,14 @@ export function WorkspaceSidebar({ className }: { className?: string }) {
         >
           <img
             src="/logo.webp"
-            alt="Raphael"
+            alt="Genjutsu AI"
             width={24}
             height={24}
             className="h-6 w-6 shrink-0"
           />
           {!collapsed ? (
             <span className="text-foreground hidden text-[15px] font-semibold whitespace-nowrap lg:inline">
-              Raphael AI
+              {envConfigs.app_name}
             </span>
           ) : null}
         </Link>
