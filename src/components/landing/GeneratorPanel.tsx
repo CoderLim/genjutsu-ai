@@ -865,7 +865,11 @@ export function GeneratorPanel({
 
         if (polled.status === 'completed' && polled.videoUrl) {
           if (generationRunRef.current !== runId) return;
-          setResult({ ...draft, previewUrl: polled.videoUrl });
+          setResult({
+            ...draft,
+            reservedCredits: started.reservedCredits,
+            previewUrl: polled.videoUrl,
+          });
           setStatus('done');
           return;
         }
