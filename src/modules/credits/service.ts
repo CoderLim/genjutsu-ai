@@ -218,21 +218,6 @@ export async function consume(params: {
   return db().transaction(execute);
 }
 
-function affectedRows(result: any): number | null {
-  const candidates = [
-    result?.rowsAffected,
-    result?.rowCount,
-    result?.changes,
-    result?.count,
-    result?.affectedRows,
-    result?.[0]?.affectedRows,
-    result?.[0]?.rowCount,
-    result?.[0]?.changes,
-  ];
-  const found = candidates.find((value) => typeof value === 'number');
-  return typeof found === 'number' ? found : null;
-}
-
 // --- Revoke (idempotently restore credits from a consumed record) ---
 
 export async function revoke(consumeCreditId: string) {
@@ -251,12 +236,28 @@ export async function revoke(consumeCreditId: string) {
 
     if (!consumeRecord || !consumeRecord.consumedDetail) return false;
 
-    // Claim the refund before restoring source grants. This update and the
-    // restoration below live in one transaction, so a concurrent duplicate
-    // refund can only restore the credits once.
-    const claim = await tx
+    const refundClaim = getUuid();
+    let metadata: Record<string, unknown> = {};
+    if (consumeRecord.metadata) {
+      try {
+        const parsed = JSON.parse(consumeRecord.metadata);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          metadata = parsed;
+        }
+      } catch {
+        metadata = {};
+      }
+    }
+
+    // Claim the refund before restoring source grants. A unique token lets us
+    // verify which concurrent caller won without relying on driver-specific
+    // affected-row result shapes.
+    await tx
       .update(credit)
-      .set({ status: CreditStatus.DELETED })
+      .set({
+        status: CreditStatus.DELETED,
+        metadata: JSON.stringify({ ...metadata, refundClaim }),
+      })
       .where(
         and(
           eq(credit.id, consumeCreditId),
@@ -264,11 +265,23 @@ export async function revoke(consumeCreditId: string) {
         )
       );
 
-    const count = affectedRows(claim);
-    if (count === 0) return false;
-    if (count == null) {
-      throw new Error('Unable to verify atomic credit refund claim');
+    const [claimed] = await tx
+      .select({ metadata: credit.metadata, status: credit.status })
+      .from(credit)
+      .where(eq(credit.id, consumeCreditId))
+      .limit(1);
+
+    if (!claimed || claimed.status !== CreditStatus.DELETED) return false;
+
+    let claimedToken: string | null = null;
+    if (claimed.metadata) {
+      try {
+        claimedToken = JSON.parse(claimed.metadata)?.refundClaim ?? null;
+      } catch {
+        claimedToken = null;
+      }
     }
+    if (claimedToken !== refundClaim) return false;
 
     const items = JSON.parse(consumeRecord.consumedDetail);
     for (const item of items) {
