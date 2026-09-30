@@ -1,4 +1,8 @@
 import { envConfigs } from '@/config';
+import {
+  createGenjutsuE2ERequestId,
+  isGenjutsuE2EMockEnabled,
+} from './e2e-mock';
 
 export type GenjutsuMode = 'motion-transfer' | 'objects-swap';
 export type GenjutsuResolution = '480p' | '720p' | '1080p';
@@ -164,6 +168,18 @@ export async function estimateGenjutsuProviderCost(input: {
   imageUrls: string[];
 }) {
   const { model, body } = buildGenjutsuPayload(input);
+
+  if (isGenjutsuE2EMockEnabled()) {
+    return {
+      providerCostUsd: 0.01,
+      providerCredits: 1,
+      payload: {
+        mock: true,
+        model,
+        usd: 0.01,
+      },
+    };
+  }
   const payload = await providerFetch(
     `/estimate/${model.replace(/^\/+/, '')}`,
     {
@@ -207,6 +223,13 @@ export async function submitGenjutsu(input: {
   imageUrls: string[];
 }) {
   const { model, body } = buildGenjutsuPayload(input);
+
+  if (isGenjutsuE2EMockEnabled()) {
+    return {
+      requestId: createGenjutsuE2ERequestId(),
+      status: 'queued',
+    };
+  }
   const modelPath = model.replace(/^\/+/, '');
   const webhookUrl = getGenjutsuWebhookUrl();
   const path = webhookUrl
