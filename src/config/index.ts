@@ -100,7 +100,7 @@ export const envConfigs: Record<string, string> = {
     'higgsfield/genjutsu/motion-transfer/v1.0',
   higgsfield_genjutsu_object_swap_model:
     procEnv.HIGGSFIELD_GENJUTSU_OBJECT_SWAP_MODEL ??
-    'higgsfiled/genjutsu/object-swap/v1.0',
+    'higgsfield/genjutsu/object-swap/v1.0',
 
   // Locale (public)
   locale: publicEnv('VITE_DEFAULT_LOCALE') ?? 'en',
