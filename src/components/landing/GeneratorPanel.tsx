@@ -608,6 +608,7 @@ type GenerationPoll = {
   providerStatus: string;
   videoUrl: string | null;
   error?: string;
+  reservedCredits?: number;
   refundedCredits?: number;
 };
 
@@ -780,6 +781,7 @@ export function GeneratorPanel({
   const pollGeneration = useCallback(
     async (active: PersistedGeneration, runId: number) => {
       let delayMs = 1_500;
+      let notFoundCount = 0;
 
       for (let attempt = 0; attempt < 90; attempt += 1) {
         await sleep(delayMs);
@@ -790,12 +792,60 @@ export function GeneratorPanel({
           polled = await apiGet<GenerationPoll>(
             `/api/genjutsu/status?generationId=${encodeURIComponent(active.generationId)}`
           );
-        } catch {
+        } catch (cause) {
+          const data =
+            cause instanceof ApiError &&
+            cause.data &&
+            typeof cause.data === 'object'
+              ? (cause.data as Record<string, unknown>)
+              : null;
+
+          if (data?.code === 'GENERATION_NOT_FOUND') {
+            notFoundCount += 1;
+            // A lost /generate response can race the server-side estimate.
+            // Wait generously before concluding the paid request never began.
+            if (notFoundCount >= 15) {
+              localStorage.removeItem(activeGenerationKey(active.userId));
+              setStatus('idle');
+              setResult(null);
+              setError(
+                'Generation was not accepted by the server. No active paid job was found.'
+              );
+              return;
+            }
+          }
+
           // A transient status request must not unlock Generate while a paid
           // provider job may still be running. Keep the persisted job and try
           // again on the next poll.
           delayMs = Math.min(5_000, Math.ceil(delayMs * 1.2));
           continue;
+        }
+
+        notFoundCount = 0;
+
+        if (
+          typeof polled.reservedCredits === 'number' &&
+          polled.reservedCredits > 0 &&
+          polled.reservedCredits !== active.reservedCredits
+        ) {
+          active.reservedCredits = polled.reservedCredits;
+          localStorage.setItem(
+            activeGenerationKey(active.userId),
+            JSON.stringify(active)
+          );
+          setResult({
+            ...active.draft,
+            reservedCredits: polled.reservedCredits,
+          });
+        }
+
+        if (polled.providerStatus === 'submission_unknown') {
+          setError(
+            polled.error ||
+              'The provider submission result is uncertain. This generation remains locked to avoid a duplicate charge.'
+          );
+          return;
         }
 
         if (polled.status === 'completed' && polled.videoUrl) {
@@ -937,6 +987,20 @@ export function GeneratorPanel({
       const [videoUpload, ...imageUploads] = uploadBatch.uploads;
       if (!videoUpload) throw new Error('Missing uploaded video URL');
 
+      // Persist before the paid POST. If the browser loses the response after
+      // the server accepted it, refresh/resume will reconcile by generationId
+      // instead of creating a second paid request.
+      const active: PersistedGeneration = {
+        userId: session.user.id,
+        generationId,
+        draft,
+        reservedCredits: 0,
+      };
+      localStorage.setItem(
+        activeGenerationKey(session.user.id),
+        JSON.stringify(active)
+      );
+
       const started = await apiPost<GenerationStart>(
         '/api/genjutsu/generate',
         {
@@ -949,13 +1013,8 @@ export function GeneratorPanel({
         }
       );
 
-      const active: PersistedGeneration = {
-        userId: session.user.id,
-        generationId: started.generationId,
-        draft,
-        reservedCredits: started.reservedCredits,
-      };
-
+      active.generationId = started.generationId;
+      active.reservedCredits = started.reservedCredits;
       localStorage.setItem(
         activeGenerationKey(session.user.id),
         JSON.stringify(active)
@@ -968,14 +1027,53 @@ export function GeneratorPanel({
       await pollGeneration(active, runId);
     } catch (cause) {
       if (generationRunRef.current !== runId) return;
-      setStatus('idle');
-      setResult(null);
 
       const apiData =
         cause instanceof ApiError && cause.data && typeof cause.data === 'object'
           ? (cause.data as Record<string, unknown>)
           : null;
       const insufficient = apiData?.code === 'INSUFFICIENT_CREDITS';
+      const submissionUnknown = apiData?.code === 'SUBMISSION_UNKNOWN';
+
+      if (cause instanceof ApiError && !submissionUnknown) {
+        // The server returned a definitive structured error, so there is no
+        // live paid request to resume (or it has already been refunded).
+        localStorage.removeItem(activeGenerationKey(session.user.id));
+        setStatus('idle');
+        setResult(null);
+        setNeedsCredits(insufficient);
+        setError(cause.message);
+        return;
+      }
+
+      // Network failure or SUBMISSION_UNKNOWN: the paid POST may have reached
+      // Higgsfield. Keep the generation locked and reconcile by generationId.
+      const raw = localStorage.getItem(activeGenerationKey(session.user.id));
+      if (raw) {
+        try {
+          const active = JSON.parse(raw) as PersistedGeneration;
+          setNeedsCredits(false);
+          setResult({
+            ...active.draft,
+            reservedCredits: active.reservedCredits,
+          });
+          setStatus('generating');
+          setError(
+            submissionUnknown
+              ? cause instanceof Error
+                ? cause.message
+                : 'Generation submission result is uncertain.'
+              : 'Connection lost while starting generation. Checking the existing job before allowing another submission.'
+          );
+          void pollGeneration(active, runId);
+          return;
+        } catch {
+          localStorage.removeItem(activeGenerationKey(session.user.id));
+        }
+      }
+
+      setStatus('idle');
+      setResult(null);
       setNeedsCredits(insufficient);
       setError(
         cause instanceof Error ? cause.message : 'Generation failed unexpectedly'
