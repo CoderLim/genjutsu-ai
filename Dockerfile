@@ -11,6 +11,10 @@ WORKDIR /app
 # Copy package manifests, build config, and ALL dialect templates so the
 # postinstall hook can stamp out a matching schema.ts during install.
 COPY package.json pnpm-lock.yaml* vite.config.ts ./
+# postinstall runs Paraglide immediately, so its project + message sources must
+# exist in the dependency stage before pnpm install.
+COPY project.inlang project.inlang
+COPY messages messages
 COPY scripts/db-setup.mjs scripts/db-setup.mjs
 COPY src/config/db/schema.sqlite.ts src/config/db/schema.sqlite.ts
 COPY src/config/db/schema.postgres.ts src/config/db/schema.postgres.ts
