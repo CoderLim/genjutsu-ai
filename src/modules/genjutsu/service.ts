@@ -4,6 +4,7 @@ import {
   createGenjutsuE2ERequestId,
   isGenjutsuE2EMockEnabled,
 } from './e2e-mock';
+import { estimateGenjutsuListCost } from './pricing';
 
 export type GenjutsuMode = 'motion-transfer' | 'objects-swap';
 export type GenjutsuResolution = '480p' | '720p' | '1080p';
@@ -13,6 +14,16 @@ const VALID_RESOLUTIONS = new Set<GenjutsuResolution>([
   '720p',
   '1080p',
 ]);
+
+/** Free estimate must not stall generation if Higgsfield is slow. */
+const ESTIMATE_TIMEOUT_MS = 8_000;
+
+/**
+ * When estimate returns a pricing description (or fails), bill against the
+ * published list rate. Cap at Genjutsu's 30s source limit; prefer a
+ * conservative upper bound when duration is unknown so we do not under-reserve.
+ */
+const FALLBACK_DURATION_SECONDS = 30;
 
 export class HiggsfieldHttpError extends Error {
   constructor(
@@ -82,6 +93,24 @@ async function providerFetch(path: string, init?: RequestInit) {
     },
   });
   return readProviderJson(response);
+}
+
+function parseEstimateUsd(payload: any): number | null {
+  const usdRaw =
+    payload?.usd ??
+    payload?.cost_usd ??
+    payload?.cost?.usd ??
+    payload?.estimate?.usd;
+  const providerCostUsd = Number(usdRaw);
+  if (!Number.isFinite(providerCostUsd) || providerCostUsd <= 0) return null;
+  return providerCostUsd;
+}
+
+function normalizeFallbackDurationSeconds(value: unknown) {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+    return FALLBACK_DURATION_SECONDS;
+  }
+  return Math.min(FALLBACK_DURATION_SECONDS, Math.max(1, value));
 }
 
 export async function createHiggsfieldUploadUrl(contentType: string) {
@@ -164,38 +193,96 @@ function buildGenjutsuPayload(input: {
   };
 }
 
+export type GenjutsuCostEstimate = {
+  providerCostUsd: number;
+  providerCredits: unknown;
+  payload: unknown;
+  source: 'estimate' | 'list_fallback';
+};
+
+/**
+ * Best-effort Higgsfield estimate. Returns null when the response has no
+ * usable USD figure (e.g. Genjutsu's `pricing_description` shape).
+ */
 export async function estimateGenjutsuProviderCost(input: {
   mode: GenjutsuMode;
   resolution: GenjutsuResolution;
   prompt?: string;
   videoUrl: string;
   imageUrls: string[];
-}) {
+}): Promise<GenjutsuCostEstimate | null> {
   const { model, body } = buildGenjutsuPayload(input);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ESTIMATE_TIMEOUT_MS);
 
-  // Estimate is free preflight pricing — always hit the real endpoint.
-  const payload = await providerFetch(
-    `/estimate/${model.replace(/^\/+/, '')}`,
-    {
-      method: 'POST',
-      body: JSON.stringify(body),
-    }
-  );
+  try {
+    // Estimate is free preflight pricing — always hit the real endpoint.
+    const payload = await providerFetch(
+      `/estimate/${model.replace(/^\/+/, '')}`,
+      {
+        method: 'POST',
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      }
+    );
 
-  const usdRaw =
-    payload?.usd ??
-    payload?.cost_usd ??
-    payload?.cost?.usd ??
-    payload?.estimate?.usd;
-  const providerCostUsd = Number(usdRaw);
-  if (!Number.isFinite(providerCostUsd) || providerCostUsd <= 0) {
-    throw new Error('Higgsfield did not return a valid USD cost estimate');
+    const providerCostUsd = parseEstimateUsd(payload);
+    if (providerCostUsd == null) return null;
+
+    return {
+      providerCostUsd,
+      providerCredits: payload?.credits ?? null,
+      payload,
+      source: 'estimate',
+    };
+  } finally {
+    clearTimeout(timer);
   }
+}
+
+/**
+ * Prefer live `/estimate` USD; on timeout, HTTP error, or description-only
+ * payloads, fall back to published list rates so generation can proceed.
+ */
+export async function resolveGenjutsuProviderCost(input: {
+  mode: GenjutsuMode;
+  resolution: GenjutsuResolution;
+  prompt?: string;
+  videoUrl: string;
+  imageUrls: string[];
+  durationSeconds?: number;
+}): Promise<GenjutsuCostEstimate> {
+  try {
+    const estimate = await estimateGenjutsuProviderCost(input);
+    if (estimate) return estimate;
+    console.warn(
+      'genjutsu estimate returned no usable USD; using list-rate fallback'
+    );
+  } catch (error) {
+    console.warn(
+      'genjutsu estimate unavailable, using list-rate fallback:',
+      error instanceof Error ? error.message : error
+    );
+  }
+
+  const durationSeconds = normalizeFallbackDurationSeconds(
+    input.durationSeconds
+  );
+  const providerCostUsd = estimateGenjutsuListCost({
+    durationSeconds,
+    resolution: input.resolution,
+  });
 
   return {
     providerCostUsd,
-    providerCredits: payload?.credits ?? null,
-    payload,
+    providerCredits: null,
+    payload: {
+      source: 'list_fallback',
+      durationSeconds,
+      resolution: input.resolution,
+      reason: 'estimate_unavailable_or_non_numeric',
+    },
+    source: 'list_fallback',
   };
 }
 

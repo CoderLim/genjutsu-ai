@@ -2,30 +2,30 @@ import { createFileRoute } from '@tanstack/react-router';
 
 import { getAuth } from '@/core/auth';
 import {
-  HiggsfieldHttpError,
-  estimateGenjutsuProviderCost,
-  submitGenjutsu,
-  type GenjutsuMode,
-  type GenjutsuResolution,
-} from '@/modules/genjutsu/service';
-import { calculateGenjutsuCredits } from '@/modules/genjutsu/pricing';
-import { isGenjutsuE2EMockEnabled } from '@/modules/genjutsu/e2e-mock';
-import {
   CreditTransactionScene,
   getBalance,
   grant,
 } from '@/modules/credits/service';
 import {
-  InsufficientCreditsError,
   assertGenerationId,
   claimGenjutsuSubmission,
   getGenjutsuTaskById,
-  markGenjutsuSubmitted,
+  InsufficientCreditsError,
   markGenjutsuSubmissionUnknown,
+  markGenjutsuSubmitted,
   parseGenjutsuTaskInfo,
   refundGenjutsuGeneration,
   reserveGenjutsuCredits,
 } from '@/modules/genjutsu/billing';
+import { isGenjutsuE2EMockEnabled } from '@/modules/genjutsu/e2e-mock';
+import { calculateGenjutsuCredits } from '@/modules/genjutsu/pricing';
+import {
+  HiggsfieldHttpError,
+  resolveGenjutsuProviderCost,
+  submitGenjutsu,
+  type GenjutsuMode,
+  type GenjutsuResolution,
+} from '@/modules/genjutsu/service';
 import { enforceMinIntervalRateLimit } from '@/lib/rate-limit';
 import { respData, respErr, respJson } from '@/lib/resp';
 
@@ -110,10 +110,16 @@ async function POST({ request }: { request: Request }) {
     } else {
       input = inputFromBody(body);
 
-      // Same exact body that will be sent to generation is first sent to
-      // Higgsfield's server-side estimate endpoint. Client-provided price or
-      // credit values are intentionally ignored.
-      const estimate = await estimateGenjutsuProviderCost(input);
+      // Prefer live /estimate USD, but never block generation on a missing or
+      // non-numeric estimate (Genjutsu may return pricing_description only).
+      // Client-supplied credit amounts are still ignored.
+      const estimate = await resolveGenjutsuProviderCost({
+        ...input,
+        durationSeconds:
+          typeof body.durationSeconds === 'number'
+            ? body.durationSeconds
+            : undefined,
+      });
       const credits = calculateGenjutsuCredits(estimate.providerCostUsd);
 
       if (isGenjutsuE2EMockEnabled()) {
