@@ -101,6 +101,7 @@ export const envConfigs: Record<string, string> = {
   higgsfield_genjutsu_object_swap_model:
     procEnv.HIGGSFIELD_GENJUTSU_OBJECT_SWAP_MODEL ??
     'higgsfield/genjutsu/object-swap/v1.0',
+  genjutsu_e2e_mock: procEnv.GENJUTSU_E2E_MOCK ?? 'false',
 
   // Locale (public)
   locale: publicEnv('VITE_DEFAULT_LOCALE') ?? 'en',
