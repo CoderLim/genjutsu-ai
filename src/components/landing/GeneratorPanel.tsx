@@ -681,7 +681,8 @@ function ResultPanel({
           <div className="flex flex-col items-center gap-3 py-10">
             <span className="border-primary size-9 animate-spin rounded-full border-2 border-t-transparent" />
             <p className="text-sm text-white/55">
-              Uploading references and running Genjutsu ({result?.resolution ?? '…'})…
+              Uploading references and running Genjutsu (
+              {result?.resolution ?? '…'})…
             </p>
           </div>
         ) : result ? (
@@ -959,9 +960,9 @@ export function GeneratorPanel({
 
     try {
       const media = [video, ...images];
-      const contentTypes = media.map((item, index) =>
-        item.file.type ||
-        (index === 0 ? 'video/mp4' : 'image/jpeg')
+      const contentTypes = media.map(
+        (item, index) =>
+          item.file.type || (index === 0 ? 'video/mp4' : 'image/jpeg')
       );
       const uploadBatch = await apiPost<{ uploads: SignedUpload[] }>(
         '/api/genjutsu/upload-url',
@@ -1001,17 +1002,14 @@ export function GeneratorPanel({
         JSON.stringify(active)
       );
 
-      const started = await apiPost<GenerationStart>(
-        '/api/genjutsu/generate',
-        {
-          generationId,
-          mode,
-          resolution,
-          prompt: prompt.trim(),
-          videoUrl: videoUpload.publicUrl,
-          imageUrls: imageUploads.map((item) => item.publicUrl),
-        }
-      );
+      const started = await apiPost<GenerationStart>('/api/genjutsu/generate', {
+        generationId,
+        mode,
+        resolution,
+        prompt: prompt.trim(),
+        videoUrl: videoUpload.publicUrl,
+        imageUrls: imageUploads.map((item) => item.publicUrl),
+      });
 
       active.generationId = started.generationId;
       active.reservedCredits = started.reservedCredits;
@@ -1029,7 +1027,9 @@ export function GeneratorPanel({
       if (generationRunRef.current !== runId) return;
 
       const apiData =
-        cause instanceof ApiError && cause.data && typeof cause.data === 'object'
+        cause instanceof ApiError &&
+        cause.data &&
+        typeof cause.data === 'object'
           ? (cause.data as Record<string, unknown>)
           : null;
       const insufficient = apiData?.code === 'INSUFFICIENT_CREDITS';
@@ -1076,7 +1076,9 @@ export function GeneratorPanel({
       setResult(null);
       setNeedsCredits(insufficient);
       setError(
-        cause instanceof Error ? cause.message : 'Generation failed unexpectedly'
+        cause instanceof Error
+          ? cause.message
+          : 'Generation failed unexpectedly'
       );
     }
   };
@@ -1084,7 +1086,7 @@ export function GeneratorPanel({
   return (
     <div
       className={cn(
-        'relative z-[120] mx-auto w-full max-w-[1128px] sm:rounded-2xl sm:shadow-[0_28px_72px_-42px_rgba(0,0,0,0.72)]',
+        'relative z-[120] mx-auto w-full max-w-[1180px] sm:rounded-2xl sm:shadow-[0_28px_72px_-42px_rgba(0,0,0,0.72)]',
         className
       )}
     >

@@ -7,7 +7,7 @@ export function Hero({ className }: { className?: string }) {
   return (
     <section
       className={cn(
-        'relative mx-auto w-full max-w-[1128px] pt-6 pb-8 text-center sm:pt-8 md:pt-10',
+        'relative mx-auto w-full max-w-[1180px] pt-6 pb-8 text-center sm:pt-8 md:pt-10',
         className
       )}
     >
