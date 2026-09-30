@@ -75,7 +75,14 @@ export const Route = createRootRoute({
         { name: 'description', content: envConfigs.app_description },
       ],
       links: [
+        { rel: 'icon', href: '/favicon.svg', type: 'image/svg+xml' },
         { rel: 'icon', href: '/favicon/favicon.ico' },
+        {
+          rel: 'icon',
+          href: '/favicon/favicon-32x32.png',
+          type: 'image/png',
+          sizes: '32x32',
+        },
         {
           rel: 'icon',
           href: '/favicon/favicon-16x16.png',
@@ -83,7 +90,7 @@ export const Route = createRootRoute({
           sizes: '16x16',
         },
         { rel: 'apple-touch-icon', href: '/favicon/apple-touch-icon.png' },
-        { rel: 'shortcut icon', href: '/favicon/favicon-16x16.png' },
+        { rel: 'shortcut icon', href: '/favicon/favicon.ico' },
         ...locales.map((loc) => ({
           rel: 'alternate',
           hrefLang: loc,

@@ -18,7 +18,7 @@ export const envConfigs: Record<string, string> = {
   app_url: publicEnv('VITE_APP_URL') ?? 'http://localhost:3000',
   app_name: publicEnv('VITE_APP_NAME') ?? 'ShipAny',
   app_description: publicEnv('VITE_APP_DESCRIPTION') ?? 'Ship your SaaS faster',
-  app_logo: publicEnv('VITE_APP_LOGO') ?? '/logo.svg',
+  app_logo: publicEnv('VITE_APP_LOGO') ?? '/logo.webp',
 
   // Database
   database_url: procEnv.DATABASE_URL ?? '',

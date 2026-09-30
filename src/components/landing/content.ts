@@ -417,66 +417,66 @@ export const ADVANCED_TABS: AdvancedTab[] = [
 export const TESTIMONIALS: Testimonial[] = [
   {
     quote:
-      'The Raphael AI Image Generator boosted my creative efficiency by 10x! The image quality is beyond imagination and perfectly meets commercial requirements.',
+      'I swapped the actor in a walk-and-talk and the camera still tracked the same path. Genjutsu kept the motion so the edit dropped straight into the cut.',
     name: 'Sophie Miller',
-    role: 'Freelance Designer',
-    avatarSrc: '/testimonials/sophie-miller.webp',
-  },
-  {
-    quote:
-      'With the AI Image Editor feature, I can precisely control every detail. Raphael AI is the most powerful AI Image Generator available!',
-    name: 'Michael Chen',
-    role: 'Creative Director',
-    avatarSrc: '/testimonials/michael-chen.webp',
-  },
-  {
-    quote:
-      'As an e-commerce manager, the Raphael AI Image Generator helps me quickly generate product showcase images. The results are much better than other AI tools!',
-    name: 'Sarah Wang',
-    role: 'E-commerce Manager',
-    avatarSrc: '/testimonials/sarah-wang.webp',
-  },
-  {
-    quote:
-      'AI Image Editor lets me maintain brand style consistency. The Raphael AI Image Generator truly understands my needs.',
-    name: 'David Liu',
-    role: 'Brand Designer',
+    role: 'Freelance Editor',
     avatarSrc: '/testimonials/david-liu.webp',
   },
   {
     quote:
-      'Raphael AI Image Generator speed is amazing! Professional-quality images in seconds, dramatically shortening project cycles.',
-    name: 'Emma Zhang',
-    role: 'Content Creator',
+      'Object Swap let us restage a product in a new outfit without reshooting. Original timing stayed intact — that is the whole point of video-to-video.',
+    name: 'Michael Chen',
+    role: 'Creative Director',
     avatarSrc: '/testimonials/emma-zhang.webp',
   },
   {
     quote:
-      'The level of detail is unparalleled. As a game developer, the Raphael AI Image Generator has become our go-to tool for concept design.',
-    name: 'Kevin Wu',
-    role: 'Game Concept Artist',
+      'Pay-per-generation credits beat a monthly Higgsfield seat for our volume. We run a few Genjutsu jobs a week, not every day.',
+    name: 'Sarah Wang',
+    role: 'E-commerce Video Lead',
     avatarSrc: '/testimonials/kevin-wu.webp',
   },
   {
     quote:
-      "I've tried many tools, but the Raphael AI Image Generator plus its AI Image Editor feature is a true game-changer!",
-    name: 'Jessica Li',
-    role: 'Digital Marketing Expert',
+      'Wardrobe tests used to mean another studio day. Now I upload the take, prompt the look, and keep the original blocking.',
+    name: 'David Liu',
+    role: 'Fashion Filmmaker',
     avatarSrc: '/testimonials/jessica-li.webp',
   },
   {
     quote:
-      'The Raphael AI Image Generator makes ad creative production so simple. It generates images that reach commercial photography standards.',
-    name: 'Tom Anderson',
-    role: 'Ad Creative Director',
+      'Minutes, not overnight renders. I rewrite who is in the clip, download, and post. Motion transfer is what makes it feel like the same shot.',
+    name: 'Emma Zhang',
+    role: 'Short-form Creator',
     avatarSrc: '/testimonials/tom-anderson.webp',
   },
   {
     quote:
-      "As an indie developer, Raphael AI's API integration is very friendly. It's the best AI Image Generator solution on the market!",
-    name: 'Nina Patel',
-    role: 'Full-stack Developer',
+      'We use it for animatic stand-ins: same camera move, different character. Concept reviews got faster because the timing is already locked.',
+    name: 'Kevin Wu',
+    role: 'Game Cinematic Artist',
     avatarSrc: '/testimonials/nina-patel.webp',
+  },
+  {
+    quote:
+      'Credits are transparent enough for client billing. Each job is one clip, one prompt, one charge — no unused subscription sitting in the budget.',
+    name: 'Jessica Li',
+    role: 'Agency Producer',
+    avatarSrc: '/testimonials/sophie-miller.webp',
+  },
+  {
+    quote:
+      'Scene swap on a locked tracking shot sold the location change. We still had to grade, but we did not have to recast or rebuild the move.',
+    name: 'Tom Anderson',
+    role: 'Ad Creative Director',
+    avatarSrc: '/testimonials/michael-chen.webp',
+  },
+  {
+    quote:
+      'I pick 720p for drafts and 1080p for finals. Paying only for seconds of input video is easier to explain than a studio plan.',
+    name: 'Nina Patel',
+    role: 'Indie Filmmaker',
+    avatarSrc: '/testimonials/sarah-wang.webp',
   },
 ];
 
@@ -1072,3 +1072,198 @@ export const WORKSPACE_NAV = {
     },
   ] satisfies WorkspaceModel[],
 } as const;
+
+export const GENJUTSU_HOW_IT_WORKS = [
+  {
+    step: '1',
+    title: 'Upload the original clip',
+    description:
+      'Drop in the video whose motion, camera path, and timing you want to keep.',
+  },
+  {
+    step: '2',
+    title: 'Describe the result',
+    description:
+      'Write who or what should appear instead — character, outfit, scene, or prop.',
+  },
+  {
+    step: '3',
+    title: 'The model rewrites the subject',
+    description:
+      'Genjutsu swaps the subject while preserving the original movement and shot timing.',
+  },
+] as const;
+
+export const GENJUTSU_CHANGE_ITEMS = [
+  {
+    title: 'Characters',
+    description:
+      'Replace the person on screen with another identity while they still walk, turn, and hit the same marks.',
+  },
+  {
+    title: 'Outfits',
+    description:
+      'Keep the performance, change the wardrobe — full costume swap or a single garment.',
+  },
+  {
+    title: 'Scenes',
+    description:
+      'Restage the location around a locked camera move: interior to alley, day to night, studio to street.',
+  },
+  {
+    title: 'Props',
+    description:
+      'Swap the object in hand or in frame without rebuilding the take.',
+  },
+] as const;
+
+export const GENJUTSU_CHANGE_EXAMPLES = [
+  'Swap a man in a black jacket for a woman in a red evening dress on the same sidewalk walk.',
+  'Replace street clothes with samurai armor while the original handheld camera still breathes.',
+  'Turn a living-room talking-head into a rainy Tokyo alley at night, keeping the head turns.',
+  'Swap a coffee cup for a glowing crystal orb without changing the hand path.',
+  'Restyle the subject as an anime character and keep the original cut timing.',
+  'Replace a modern car in a tracking shot with a vintage motorcycle.',
+] as const;
+
+export const GENJUTSU_HOWTO_STEPS = [
+  {
+    step: '1',
+    title: 'Upload your clip',
+    description:
+      'Use the upload box in the generator. This is the source of motion — camera move and duration stay with this file.',
+  },
+  {
+    step: '2',
+    title: 'Pick Motion Transfer or Objects Swap',
+    description:
+      'Motion Transfer rewrites the performer against the original move. Objects Swap targets clothing, props, or other objects in the frame.',
+  },
+  {
+    step: '3',
+    title: 'Write the result you want',
+    description:
+      'Prompt the new identity, outfit, location, or object. Be specific about what changes and what must stay.',
+  },
+  {
+    step: '4',
+    title: 'Choose resolution and generate',
+    description:
+      'Select 480p, 720p, or 1080p. Credits are reserved from a server-side estimate before the job starts.',
+  },
+  {
+    step: '5',
+    title: 'Download the rewritten video',
+    description:
+      'When the task finishes, download the new clip. Timing should match the original take.',
+  },
+] as const;
+
+export const GENJUTSU_PROMPT_IDEAS = [
+  {
+    title: 'Cast swap on a walk',
+    prompt:
+      'Replace the man in the black jacket with a woman in a red evening dress. Keep the original walking motion and camera path.',
+  },
+  {
+    title: 'Armor over street clothes',
+    prompt:
+      'Swap the street clothes for full samurai armor. Preserve handheld camera movement and timing.',
+  },
+  {
+    title: 'Night alley restage',
+    prompt:
+      'Change the living room to a rainy Tokyo alley at night. Keep the talking-head framing and head turns.',
+  },
+  {
+    title: 'Prop swap',
+    prompt:
+      'Replace the coffee cup in her hand with a glowing crystal orb. Do not change the arm motion.',
+  },
+  {
+    title: 'Anime restyle',
+    prompt:
+      'Turn the subject into an anime character with the same hairstyle color. Keep the original cut timing.',
+  },
+  {
+    title: 'Empty landscape',
+    prompt:
+      'Replace the background crowd with empty snowy mountains. Keep the original tracking shot.',
+  },
+  {
+    title: 'Disco wardrobe',
+    prompt:
+      'Outfit swap to 1970s disco sequins. Keep the original dance choreography.',
+  },
+  {
+    title: 'Vehicle swap',
+    prompt:
+      'Replace the car with a vintage motorcycle. Keep the tracking shot and speed.',
+  },
+] as const;
+
+export const GENJUTSU_VS_ROWS = [
+  {
+    label: 'How you pay',
+    ours: 'Prepaid credits, pay per generation',
+    official: 'Subscription plans on Higgsfield',
+  },
+  {
+    label: 'What you get',
+    ours: 'Focused Genjutsu video-to-video (motion transfer and object swap)',
+    official: 'Full Higgsfield product surface, including Genjutsu',
+  },
+  {
+    label: 'Best when',
+    ours: 'You need a few clips and do not want a monthly seat',
+    official: 'You already use Higgsfield across multiple tools every month',
+  },
+  {
+    label: 'Model',
+    ours: 'Higgsfield Genjutsu, billed through this site',
+    official: 'The same Genjutsu model in the official Higgsfield app',
+  },
+] as const;
+
+export const GENJUTSU_FAQS: FaqItem[] = [
+  {
+    question: 'What is Genjutsu AI?',
+    answer:
+      'Genjutsu is a Higgsfield video-to-video model. It rewrites who and what is in your clip — character, outfit, scene, or prop — while keeping the original camera movement and timing.',
+  },
+  {
+    question: 'How is this different from text-to-video?',
+    answer:
+      'You start with a real take. The model does not invent a new camera path from a prompt alone. It transfers or preserves the motion already in the file you upload.',
+  },
+  {
+    question: 'What can I change in a clip?',
+    answer:
+      'Characters, outfits, scenes, and props. You can aim for a full restage or a local swap (one object, one garment) depending on the mode and prompt.',
+  },
+  {
+    question: 'Do I need a Higgsfield subscription?',
+    answer:
+      'No. This site sells prepaid credit packs and charges per generation. The official Higgsfield product is subscription-based if you prefer to work there instead.',
+  },
+  {
+    question: 'How are credits calculated?',
+    answer:
+      'Each job is estimated from the provider cost for your input duration and resolution. Input length is rounded up to the next whole second. The exact credit reserve is calculated on the server before generation starts.',
+  },
+  {
+    question: 'How long does a generation take?',
+    answer:
+      'Typical jobs finish in minutes, depending on clip length, resolution, and queue. You can leave the page and check status; the task is tracked on the server.',
+  },
+  {
+    question: 'Which resolutions are available?',
+    answer:
+      '480p, 720p, and 1080p. Higher resolution costs more credits because the provider charges more per second of input video.',
+  },
+  {
+    question: 'Can I use the output commercially?',
+    answer:
+      'You may use generated videos subject to our Terms of Service, Higgsfield usage rules, and applicable law. Do not upload footage you do not have rights to edit.',
+  },
+];

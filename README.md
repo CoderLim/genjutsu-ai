@@ -148,7 +148,7 @@ All admin pages include:
 # Required (public vars use the VITE_ prefix; secrets stay server-only)
 VITE_APP_URL=http://localhost:3000
 VITE_APP_NAME=My App
-VITE_APP_LOGO=/logo.png
+VITE_APP_LOGO=/logo.webp
 DATABASE_PROVIDER=sqlite
 DATABASE_URL=file:data/local.db
 AUTH_SECRET=generate-with-openssl-rand-base64-32
