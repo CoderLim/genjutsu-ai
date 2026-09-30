@@ -9,6 +9,12 @@ import {
   type GenjutsuResolution,
 } from '@/modules/genjutsu/service';
 import { calculateGenjutsuCredits } from '@/modules/genjutsu/pricing';
+import { isGenjutsuE2EMockEnabled } from '@/modules/genjutsu/e2e-mock';
+import {
+  CreditTransactionScene,
+  getBalance,
+  grant,
+} from '@/modules/credits/service';
 import {
   InsufficientCreditsError,
   assertGenerationId,
@@ -109,6 +115,19 @@ async function POST({ request }: { request: Request }) {
       // credit values are intentionally ignored.
       const estimate = await estimateGenjutsuProviderCost(input);
       const credits = calculateGenjutsuCredits(estimate.providerCostUsd);
+
+      if (isGenjutsuE2EMockEnabled()) {
+        const balance = await getBalance(session.user.id);
+        if (balance < credits) {
+          await grant({
+            userId: session.user.id,
+            userEmail: session.user.email,
+            credits: Math.max(1000 - balance, credits - balance),
+            description: 'Genjutsu E2E test credits',
+            scene: CreditTransactionScene.GENJUTSU_E2E,
+          });
+        }
+      }
 
       task = await reserveGenjutsuCredits({
         generationId,
