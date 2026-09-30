@@ -9,6 +9,7 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 
+import { apiGet, apiPost, uploadToSignedUrl } from '@/lib/api-client';
 import { cn } from '@/lib/cn';
 import {
   ChevronDownIcon,
@@ -18,7 +19,6 @@ import {
   MotionTransferIcon,
   ObjectsSwapIcon,
   PlusIcon,
-  ZapIcon,
 } from '@/components/icons';
 
 export type GeneratorMode = 'motion-transfer' | 'objects-swap';
@@ -75,7 +75,7 @@ function createMediaItem(file: File): MediaItem {
   };
 }
 
-const IMAGE_MAX = 30;
+const IMAGE_MAX = 8;
 
 function revokeItem(item: MediaItem | null) {
   if (item) URL.revokeObjectURL(item.url);
@@ -461,7 +461,7 @@ function ImageUploadSlot({
         {items.length === 0 ? (
           <EmptyUploadButton
             title="Add your characters, products, or clothes"
-            hint="Up to 30 images"
+            hint="Up to 8 images"
             icon={<ImageModeIcon className="text-primary/78 size-5 shrink-0" />}
             dragging={dragging}
             onClick={() => inputRef.current?.click()}
@@ -582,11 +582,31 @@ type GenerationResult = {
   mode: GeneratorMode;
   resolution: Resolution;
   prompt: string;
-  /** Mock preview — uses the uploaded source video until real API is wired */
   previewUrl: string;
   imageCount: number;
   createdAt: number;
 };
+
+type SignedUpload = {
+  uploadUrl: string;
+  uploadHeaders: Record<string, string>;
+  publicUrl: string;
+};
+
+type GenerationStart = {
+  requestId: string;
+  status: string;
+};
+
+type GenerationPoll = {
+  status: 'processing' | 'completed' | 'failed';
+  providerStatus: string;
+  videoUrl: string | null;
+  error?: string;
+};
+
+const sleep = (ms: number) =>
+  new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 function ResultPanel({
   status,
@@ -620,7 +640,7 @@ function ResultPanel({
             </p>
           ) : (
             <p className="mt-0.5 text-[11px] text-white/45">
-              Mock run — no API yet. Preview uses your uploaded video.
+              Uploading references and starting Higgsfield…
             </p>
           )}
         </div>
@@ -641,7 +661,7 @@ function ResultPanel({
           <div className="flex flex-col items-center gap-3 py-10">
             <span className="border-primary size-9 animate-spin rounded-full border-2 border-t-transparent" />
             <p className="text-sm text-white/55">
-              Running Genjutsu ({result?.resolution ?? '…'})…
+              Uploading references and running Genjutsu ({result?.resolution ?? '…'})…
             </p>
           </div>
         ) : result ? (
@@ -665,7 +685,7 @@ function ResultPanel({
             Download
           </a>
           <span className="text-[11px] text-white/40">
-            Placeholder preview (source video) — wire Higgsfield API next
+            Generated with Higgsfield Genjutsu
           </span>
         </div>
       ) : null}
@@ -695,9 +715,10 @@ export function GeneratorPanel({
   const [images, setImages] = useState<MediaItem[]>([]);
   const [status, setStatus] = useState<GenerationStatus>('idle');
   const [result, setResult] = useState<GenerationResult | null>(null);
+  const [error, setError] = useState('');
 
   const settingsRef = useRef<HTMLDivElement>(null);
-  const generateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const generationRunRef = useRef(0);
 
   useEffect(() => {
     setSettingsOpen(false);
@@ -705,9 +726,9 @@ export function GeneratorPanel({
 
   useEffect(() => {
     return () => {
+      generationRunRef.current += 1;
       revokeItem(video);
       revokeAll(images);
-      if (generateTimerRef.current) clearTimeout(generateTimerRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- revoke only on unmount
   }, []);
@@ -737,22 +758,22 @@ export function GeneratorPanel({
 
   const canGenerate =
     Boolean(video && images.length > 0) && status !== 'generating';
-  const creditCost =
-    resolution === '1080p' ? 20 : resolution === '720p' ? 12 : 8;
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     if (!video || images.length === 0 || status === 'generating') return;
 
+    const runId = ++generationRunRef.current;
     const draft: GenerationResult = {
       id: `${Date.now()}`,
       mode,
       resolution,
       prompt: prompt.trim(),
-      previewUrl: video.url,
+      previewUrl: '',
       imageCount: images.length,
       createdAt: Date.now(),
     };
 
+    setError('');
     setResult(draft);
     setStatus('generating');
 
@@ -762,10 +783,84 @@ export function GeneratorPanel({
         ?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     });
 
-    if (generateTimerRef.current) clearTimeout(generateTimerRef.current);
-    generateTimerRef.current = setTimeout(() => {
-      setStatus('done');
-    }, 2200);
+    try {
+      const media = [video, ...images];
+      const contentTypes = media.map((item, index) =>
+        item.file.type ||
+        (index === 0 ? 'video/mp4' : 'image/jpeg')
+      );
+      const uploadBatch = await apiPost<{ uploads: SignedUpload[] }>(
+        '/api/genjutsu/upload-url',
+        { contentTypes }
+      );
+
+      if (uploadBatch.uploads.length !== media.length) {
+        throw new Error('Higgsfield returned an incomplete upload batch');
+      }
+
+      for (let index = 0; index < media.length; index += 1) {
+        const upload = uploadBatch.uploads[index];
+        if (!upload) throw new Error('Missing Higgsfield upload URL');
+        await uploadToSignedUrl({
+          url: upload.uploadUrl,
+          file: media[index].file,
+          headers: upload.uploadHeaders,
+        });
+      }
+
+      if (generationRunRef.current !== runId) return;
+
+      const [videoUpload, ...imageUploads] = uploadBatch.uploads;
+      if (!videoUpload) throw new Error('Missing uploaded video URL');
+
+      const started = await apiPost<GenerationStart>(
+        '/api/genjutsu/generate',
+        {
+          mode,
+          resolution,
+          prompt: prompt.trim(),
+          videoUrl: videoUpload.publicUrl,
+          imageUrls: imageUploads.map((item) => item.publicUrl),
+        }
+      );
+
+      let delayMs = 1_500;
+      for (let attempt = 0; attempt < 90; attempt += 1) {
+        await sleep(delayMs);
+        if (generationRunRef.current !== runId) return;
+
+        const polled = await apiGet<GenerationPoll>(
+          `/api/genjutsu/status?requestId=${encodeURIComponent(started.requestId)}`
+        );
+
+        if (polled.status === 'completed' && polled.videoUrl) {
+          if (generationRunRef.current !== runId) return;
+          setResult({ ...draft, previewUrl: polled.videoUrl });
+          setStatus('done');
+          return;
+        }
+
+        if (polled.status === 'failed') {
+          throw new Error(
+            polled.error ||
+              `Higgsfield generation failed (${polled.providerStatus})`
+          );
+        }
+
+        delayMs = Math.min(5_000, Math.ceil(delayMs * 1.2));
+      }
+
+      throw new Error(
+        'Generation is still processing. Please try again in a few minutes.'
+      );
+    } catch (cause) {
+      if (generationRunRef.current !== runId) return;
+      setStatus('idle');
+      setResult(null);
+      setError(
+        cause instanceof Error ? cause.message : 'Generation failed unexpectedly'
+      );
+    }
   };
 
   return (
@@ -847,10 +942,6 @@ export function GeneratorPanel({
             )}
           >
             {status === 'generating' ? 'Generating…' : 'Generate'}
-            <span className="ml-1.5 inline-flex items-center gap-0.5 text-[11px] font-medium opacity-80">
-              <ZapIcon className="size-3" />
-              {creditCost}
-            </span>
           </button>
         </div>
       </div>
@@ -863,6 +954,16 @@ export function GeneratorPanel({
           setResult(null);
         }}
       />
+
+      {error ? (
+        <div
+          role="alert"
+          className="mt-3 rounded-xl border border-red-400/20 bg-red-950/25 px-4 py-3 text-sm text-red-100/90"
+        >
+          <p className="font-medium">Generation failed</p>
+          <p className="mt-1 text-xs text-red-100/65">{error}</p>
+        </div>
+      ) : null}
     </div>
   );
 }

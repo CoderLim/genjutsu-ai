@@ -63,6 +63,25 @@ export const apiPatch = <T = void>(url: string, body?: unknown) =>
 export const apiDelete = <T = void>(url: string) =>
   request<T>(url, { method: 'DELETE' });
 
+export async function uploadToSignedUrl(params: {
+  url: string;
+  file: File;
+  headers?: Record<string, string>;
+}) {
+  const response = await fetch(params.url, {
+    method: 'PUT',
+    headers: params.headers,
+    body: params.file,
+    credentials: 'omit',
+  });
+  if (!response.ok) {
+    throw new ApiError(
+      response.status,
+      `Upload failed with HTTP ${response.status}`
+    );
+  }
+}
+
 // Query-string builder for paginated list endpoints.
 export function pageQuery(base: string, p: PageParams) {
   const params = new URLSearchParams({
