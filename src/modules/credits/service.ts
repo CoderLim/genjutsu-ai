@@ -223,6 +223,7 @@ function affectedRows(result: any): number | null {
     result?.rowsAffected,
     result?.rowCount,
     result?.changes,
+    result?.count,
     result?.affectedRows,
     result?.[0]?.affectedRows,
     result?.[0]?.rowCount,
