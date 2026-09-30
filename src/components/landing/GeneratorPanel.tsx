@@ -9,7 +9,6 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 
-import { Link } from '@/core/i18n/navigation';
 import { cn } from '@/lib/cn';
 import {
   ChevronDownIcon,
@@ -576,6 +575,104 @@ function ResolutionPanel({
   );
 }
 
+type GenerationStatus = 'idle' | 'generating' | 'done';
+
+type GenerationResult = {
+  id: string;
+  mode: GeneratorMode;
+  resolution: Resolution;
+  prompt: string;
+  /** Mock preview — uses the uploaded source video until real API is wired */
+  previewUrl: string;
+  imageCount: number;
+  createdAt: number;
+};
+
+function ResultPanel({
+  status,
+  result,
+  onDismiss,
+}: {
+  status: GenerationStatus;
+  result: GenerationResult | null;
+  onDismiss: () => void;
+}) {
+  if (status === 'idle') return null;
+
+  const modeLabel =
+    result?.mode === 'objects-swap' ? 'Objects swap' : 'Motion transfer';
+
+  return (
+    <div
+      id="generation-result"
+      className="mt-4 scroll-mt-24 overflow-hidden rounded-xl border border-white/8 bg-[rgba(41,30,23,0.92)] shadow-[0_24px_64px_-40px_rgba(0,0,0,0.68)]"
+    >
+      <div className="flex items-center justify-between gap-3 border-b border-white/8 px-4 py-3">
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-[rgb(237,234,222)]">
+            {status === 'generating' ? 'Generating…' : 'Result'}
+          </p>
+          {result ? (
+            <p className="mt-0.5 truncate text-[11px] text-white/45">
+              {modeLabel} · {result.resolution} · {result.imageCount} reference
+              {result.imageCount === 1 ? '' : 's'}
+              {result.prompt ? ` · ${result.prompt}` : ''}
+            </p>
+          ) : (
+            <p className="mt-0.5 text-[11px] text-white/45">
+              Mock run — no API yet. Preview uses your uploaded video.
+            </p>
+          )}
+        </div>
+        {status === 'done' ? (
+          <button
+            type="button"
+            aria-label="Dismiss result"
+            onClick={onDismiss}
+            className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg text-white/45 hover:bg-white/8 hover:text-white"
+          >
+            <CloseIcon className="size-4" />
+          </button>
+        ) : null}
+      </div>
+
+      <div className="relative flex min-h-[220px] items-center justify-center bg-black/35 p-3 sm:min-h-[320px] sm:p-4">
+        {status === 'generating' ? (
+          <div className="flex flex-col items-center gap-3 py-10">
+            <span className="border-primary size-9 animate-spin rounded-full border-2 border-t-transparent" />
+            <p className="text-sm text-white/55">
+              Running Genjutsu ({result?.resolution ?? '…'})…
+            </p>
+          </div>
+        ) : result ? (
+          <video
+            key={result.id}
+            src={result.previewUrl}
+            controls
+            playsInline
+            className="max-h-[min(70vh,520px)] w-full rounded-lg object-contain"
+          />
+        ) : null}
+      </div>
+
+      {status === 'done' && result ? (
+        <div className="flex flex-wrap items-center gap-2 border-t border-white/8 px-4 py-3">
+          <a
+            href={result.previewUrl}
+            download={`genjutsu-${result.mode}-${result.resolution}.mp4`}
+            className="inline-flex h-8 items-center rounded-lg bg-[rgb(204,144,92)] px-3 text-sm font-semibold text-[rgb(247,246,243)] hover:brightness-105"
+          >
+            Download
+          </a>
+          <span className="text-[11px] text-white/40">
+            Placeholder preview (source video) — wire Higgsfield API next
+          </span>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function GeneratorPanel({
   mode: modeProp,
   className,
@@ -596,8 +693,11 @@ export function GeneratorPanel({
   const [resolution, setResolution] = useState<Resolution>('720p');
   const [video, setVideo] = useState<MediaItem | null>(null);
   const [images, setImages] = useState<MediaItem[]>([]);
+  const [status, setStatus] = useState<GenerationStatus>('idle');
+  const [result, setResult] = useState<GenerationResult | null>(null);
 
   const settingsRef = useRef<HTMLDivElement>(null);
+  const generateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setSettingsOpen(false);
@@ -607,6 +707,7 @@ export function GeneratorPanel({
     return () => {
       revokeItem(video);
       revokeAll(images);
+      if (generateTimerRef.current) clearTimeout(generateTimerRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- revoke only on unmount
   }, []);
@@ -634,9 +735,38 @@ export function GeneratorPanel({
       ? 'Describe what to swap in the video (optional)...'
       : 'Describe the new scene or character (optional)...';
 
-  const canGenerate = Boolean(video && images.length > 0);
+  const canGenerate =
+    Boolean(video && images.length > 0) && status !== 'generating';
   const creditCost =
     resolution === '1080p' ? 20 : resolution === '720p' ? 12 : 8;
+
+  const handleGenerate = () => {
+    if (!video || images.length === 0 || status === 'generating') return;
+
+    const draft: GenerationResult = {
+      id: `${Date.now()}`,
+      mode,
+      resolution,
+      prompt: prompt.trim(),
+      previewUrl: video.url,
+      imageCount: images.length,
+      createdAt: Date.now(),
+    };
+
+    setResult(draft);
+    setStatus('generating');
+
+    requestAnimationFrame(() => {
+      document
+        .getElementById('generation-result')
+        ?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+
+    if (generateTimerRef.current) clearTimeout(generateTimerRef.current);
+    generateTimerRef.current = setTimeout(() => {
+      setStatus('done');
+    }, 2200);
+  };
 
   return (
     <div
@@ -705,24 +835,34 @@ export function GeneratorPanel({
             ) : null}
           </div>
 
-          <Link
-            href="/sign-in"
+          <button
+            type="button"
+            disabled={!canGenerate}
+            onClick={handleGenerate}
             className={cn(
               'relative ml-auto inline-flex h-8 w-full items-center justify-center rounded-lg px-3.5 text-sm font-semibold tracking-wide shadow-none transition-all duration-200 active:scale-95 sm:w-auto',
               canGenerate
                 ? 'bg-[rgb(204,144,92)] text-[rgb(247,246,243)] hover:brightness-105'
-                : 'pointer-events-none bg-[rgba(126,128,132,0.28)] text-[rgb(237,234,222)]/38'
+                : 'bg-[rgba(126,128,132,0.28)] text-[rgb(237,234,222)]/38'
             )}
-            aria-disabled={!canGenerate}
           >
-            Generate
+            {status === 'generating' ? 'Generating…' : 'Generate'}
             <span className="ml-1.5 inline-flex items-center gap-0.5 text-[11px] font-medium opacity-80">
               <ZapIcon className="size-3" />
               {creditCost}
             </span>
-          </Link>
+          </button>
         </div>
       </div>
+
+      <ResultPanel
+        status={status}
+        result={result}
+        onDismiss={() => {
+          setStatus('idle');
+          setResult(null);
+        }}
+      />
     </div>
   );
 }
