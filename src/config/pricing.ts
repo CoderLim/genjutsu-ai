@@ -5,12 +5,12 @@
  * payment type are always resolved again on the server from this file.
  */
 
-import { PaymentType } from '@/core/payment/types';
+import { PaymentInterval, PaymentType } from '@/core/payment/types';
 import { GENJUTSU_CREDIT_PACKS } from '@/modules/genjutsu/pricing';
 
 export type PricingPlanInfo = {
   name: string;
-  interval: string;
+  interval: PaymentInterval;
   intervalCount: number;
 };
 
