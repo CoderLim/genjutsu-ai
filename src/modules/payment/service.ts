@@ -6,6 +6,7 @@ import {
   CreemProvider,
   PaymentManager,
   StripeProvider,
+  WaffoProvider,
   WechatPayProvider,
 } from '@/core/payment';
 import {
@@ -52,6 +53,12 @@ async function getPaymentManager(): Promise<PaymentManager> {
     c('stripe_secret_key') || c('stripe_api_key'),
     c('creem_enabled'),
     c('creem_api_key'),
+    c('waffo_enabled'),
+    c('waffo_merchant_id'),
+    c('waffo_private_key'),
+    c('waffo_environment'),
+    c('waffo_store_id'),
+    c('waffo_product_ids_mapping'),
     c('alipay_app_id'),
     c('wechat_mch_id'),
     c('default_payment_provider'),
@@ -87,6 +94,23 @@ async function getPaymentManager(): Promise<PaymentManager> {
         signingSecret: c('creem_signing_secret') || undefined,
         environment:
           c('creem_environment') === 'production' ? 'production' : 'sandbox',
+      }),
+      isDefault
+    );
+  }
+
+  if (
+    (c('waffo_enabled') === 'true' || c('waffo_merchant_id')) &&
+    c('waffo_merchant_id') &&
+    c('waffo_private_key')
+  ) {
+    const isDefault = c('default_payment_provider') === 'waffo';
+    manager.addProvider(
+      new WaffoProvider({
+        merchantId: c('waffo_merchant_id'),
+        privateKey: c('waffo_private_key'),
+        storeId: c('waffo_store_id') || undefined,
+        environment: c('waffo_environment') === 'prod' ? 'prod' : 'test',
       }),
       isDefault
     );
@@ -151,11 +175,18 @@ export async function createCheckout(params: {
   const configs = await getAllConfigs();
   const appUrl = configs.app_url || 'http://localhost:3000';
 
-  // Resolve provider-specific product ID (e.g. Creem product_ids_mapping)
+  // Resolve provider-specific product ID (e.g. Creem/Waffo product_ids_mapping)
   const resolvedProvider = provider || pm.getDefaultProvider()?.name;
   let resolvedProductId = paymentOrder.productId;
-  if (resolvedProvider === 'creem' && paymentOrder.productId) {
-    const mapping = configs.creem_product_ids_mapping;
+  if (
+    (resolvedProvider === 'creem' || resolvedProvider === 'waffo') &&
+    paymentOrder.productId
+  ) {
+    const mappingKey =
+      resolvedProvider === 'waffo'
+        ? 'waffo_product_ids_mapping'
+        : 'creem_product_ids_mapping';
+    const mapping = configs[mappingKey];
     if (mapping) {
       try {
         const map = JSON.parse(mapping) as Record<string, string>;

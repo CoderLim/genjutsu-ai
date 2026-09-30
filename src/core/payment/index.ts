@@ -126,6 +126,7 @@ export const paymentManager = new PaymentManager();
 // Export all providers
 export * from './stripe';
 export * from './creem';
+export * from './waffo';
 export * from './paypal';
 export * from './alipay';
 export * from './wechat';

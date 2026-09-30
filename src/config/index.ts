@@ -37,6 +37,15 @@ export const envConfigs: Record<string, string> = {
   stripe_publishable_key: procEnv.STRIPE_PUBLISHABLE_KEY ?? '',
   stripe_signing_secret: procEnv.STRIPE_SIGNING_SECRET ?? '',
 
+  // Payment - Waffo Pancake
+  waffo_enabled: procEnv.WAFFO_ENABLED ?? '',
+  waffo_merchant_id: procEnv.WAFFO_MERCHANT_ID ?? '',
+  waffo_private_key: procEnv.WAFFO_PRIVATE_KEY ?? '',
+  waffo_store_id: procEnv.WAFFO_STORE_ID ?? '',
+  waffo_environment: procEnv.WAFFO_ENVIRONMENT ?? 'test',
+  waffo_product_ids_mapping: procEnv.WAFFO_PRODUCT_IDS_MAPPING ?? '',
+  default_payment_provider: procEnv.DEFAULT_PAYMENT_PROVIDER ?? '',
+
   // Payment - PayPal
   paypal_client_id: procEnv.PAYPAL_CLIENT_ID ?? '',
   paypal_client_secret: procEnv.PAYPAL_CLIENT_SECRET ?? '',

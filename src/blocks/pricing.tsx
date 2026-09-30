@@ -35,6 +35,7 @@ import {
 const ALL_PROVIDERS: PaymentProvider[] = [
   'stripe',
   'creem',
+  'waffo',
   'paypal',
   'alipay',
   'wechat',
@@ -274,9 +275,20 @@ export function Pricing({ title }: { title?: string } = {}) {
     }
 
     const selectEnabled = configs.select_payment_enabled === 'true';
-    const defaultProvider = (configs.default_payment_provider ||
-      enabledProviders[0] ||
-      'stripe') as PaymentProvider;
+    const preferred = configs.default_payment_provider as
+      | PaymentProvider
+      | undefined;
+    const defaultProvider =
+      (preferred && enabledProviders.includes(preferred)
+        ? preferred
+        : undefined) || enabledProviders[0];
+
+    if (!defaultProvider) {
+      toast.error(
+        'No payment provider configured. Enable Waffo in Admin → Settings.'
+      );
+      return;
+    }
 
     if (selectEnabled && enabledProviders.length > 1) {
       setPendingPlan(plan);
@@ -318,7 +330,7 @@ export function Pricing({ title }: { title?: string } = {}) {
             setLoadingProvider(null);
           }
         }}
-        providers={enabledProviders.length ? enabledProviders : ['stripe']}
+        providers={enabledProviders.length ? enabledProviders : ['waffo']}
         loadingProvider={loadingProvider}
         onSelect={handleProviderSelect}
         planName={pendingPlan?.name}

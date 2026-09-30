@@ -106,6 +106,12 @@ export function getSettingGroups(): SettingGroup[] {
       tab: 'payment',
     },
     {
+      name: 'waffo',
+      title: 'Waffo Pancake',
+      description: 'Waffo Pancake payment gateway',
+      tab: 'payment',
+    },
+    {
       name: 'paypal',
       title: 'PayPal',
       description: 'PayPal payment gateway',
@@ -397,6 +403,7 @@ export function getSettings(): Setting[] {
       options: [
         { label: 'Stripe', value: 'stripe' },
         { label: 'Creem', value: 'creem' },
+        { label: 'Waffo Pancake', value: 'waffo' },
         { label: 'PayPal', value: 'paypal' },
         { label: 'Alipay', value: 'alipay' },
         { label: 'WeChat Pay', value: 'wechat' },
@@ -489,6 +496,64 @@ export function getSettings(): Setting[] {
       type: 'number',
       placeholder: '留空使用实际金额，填 1 则支付 $0.01',
       group: 'creem',
+      tab: 'payment',
+    },
+
+    // ─── Payment / Waffo Pancake ──────────────────────────────────────
+    {
+      name: 'waffo_enabled',
+      title: 'Enable Waffo Pancake',
+      type: 'switch',
+      group: 'waffo',
+      tab: 'payment',
+    },
+    {
+      name: 'waffo_environment',
+      title: 'Environment',
+      type: 'select',
+      options: [
+        { label: 'Test', value: 'test' },
+        { label: 'Production', value: 'prod' },
+      ],
+      group: 'waffo',
+      tab: 'payment',
+      defaultValue: 'test',
+    },
+    {
+      name: 'waffo_merchant_id',
+      title: 'Merchant ID',
+      type: 'text',
+      placeholder: 'MER_xxx',
+      tip: 'From Dashboard → Integration (API & Development)',
+      group: 'waffo',
+      tab: 'payment',
+    },
+    {
+      name: 'waffo_private_key',
+      title: 'Private Key',
+      type: 'password',
+      placeholder: 'RSA private key (PEM or base64)',
+      tip: 'Never expose to the browser. Server-side only.',
+      group: 'waffo',
+      tab: 'payment',
+    },
+    {
+      name: 'waffo_store_id',
+      title: 'Store ID',
+      type: 'text',
+      placeholder: 'STO_xxx',
+      tip: 'Used for GraphQL order lookups and webhook registration',
+      group: 'waffo',
+      tab: 'payment',
+    },
+    {
+      name: 'waffo_product_ids_mapping',
+      title: 'Product IDs Mapping',
+      type: 'textarea',
+      placeholder:
+        '{"starter_monthly":"PROD_xxx","pro_monthly":"PROD_xxx","starter_lifetime":"PROD_xxx"}',
+      tip: 'Map pricing catalog product_id to Waffo Product ID. Must be valid JSON.',
+      group: 'waffo',
       tab: 'payment',
     },
 
