@@ -139,6 +139,7 @@ export async function reserveGenjutsuCredits(params: {
       options: JSON.stringify({
         mode: params.mode,
         resolution: params.resolution,
+        prompt: params.prompt,
         videoUrl: params.videoUrl,
         imageUrls: params.imageUrls,
       }),
@@ -171,6 +172,7 @@ function mutationCount(result: any): number | null {
     result?.rowsAffected,
     result?.rowCount,
     result?.changes,
+    result?.count,
     result?.affectedRows,
     result?.[0]?.affectedRows,
     result?.[0]?.rowCount,
