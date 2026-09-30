@@ -21,6 +21,8 @@ export const envConfigs: Record<string, string> = {
     publicEnv('VITE_APP_DESCRIPTION') ??
     'Genjutsu AI swaps characters, outfits and scenes in any video while keeping the original motion.',
   app_logo: publicEnv('VITE_APP_LOGO') ?? '/logo.webp',
+  app_support_email:
+    publicEnv('VITE_APP_SUPPORT_EMAIL') ?? 'support@genjutsuai.net',
 
   // Database
   database_url: procEnv.DATABASE_URL ?? '',

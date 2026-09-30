@@ -41,7 +41,19 @@ function HomePage() {
         <FaqSection
           items={GENJUTSU_FAQS}
           title="Genjutsu AI FAQ"
-          description="Answers about video-to-video, credits, and how Genjutsu preserves motion."
+          description={
+            <>
+              Answers about video-to-video, credits, and how Genjutsu preserves
+              motion. Contact{' '}
+              <a
+                href={`mailto:${envConfigs.app_support_email}`}
+                className="text-primary underline-offset-2 hover:underline"
+              >
+                {envConfigs.app_support_email}
+              </a>{' '}
+              if you need help.
+            </>
+          }
         />
         <BackToToolCta />
       </main>

@@ -580,7 +580,7 @@ export const FAQ_ITEMS: FaqItem[] = [
   {
     question: 'How can I provide feedback or report issues?',
     answer:
-      'We welcome your feedback! You can reach our support team at support@raphael.app. Your input helps us improve and maintain the best free AI image generation service.',
+      'We welcome your feedback! You can reach our support team at support@genjutsuai.net.',
   },
   {
     question: 'What AI models does Raphael AI support?',

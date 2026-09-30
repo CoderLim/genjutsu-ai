@@ -1,5 +1,7 @@
+import type { ReactNode } from 'react';
 import type { FaqItem } from '@/types/landing';
 
+import { envConfigs } from '@/config';
 import { cn } from '@/lib/cn';
 import { FAQ_ITEMS } from '@/components/landing/content';
 import {
@@ -13,15 +15,17 @@ type FaqSectionProps = {
   items?: FaqItem[];
   title?: string;
   className?: string;
-  description?: string;
+  description?: ReactNode;
 };
 
 export function FaqSection({
   items = FAQ_ITEMS,
-  title = 'Frequently Asked Questions — Free AI Image Generator',
+  title = 'Frequently Asked Questions',
   className,
   description,
 }: FaqSectionProps) {
+  const supportEmail = envConfigs.app_support_email;
+
   return (
     <section id="faq" className={cn('py-16', className)}>
       <div className="container mx-auto px-4">
@@ -46,10 +50,10 @@ export function FaqSection({
             <p className="text-foreground/70 mt-6 text-base font-medium">
               Have another question? Contact us at{' '}
               <a
-                href="mailto:support@raphael.app"
+                href={`mailto:${supportEmail}`}
                 className="text-primary underline-offset-2 hover:underline"
               >
-                support@raphael.app
+                {supportEmail}
               </a>
             </p>
           )}

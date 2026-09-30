@@ -102,6 +102,12 @@ export function SiteFooter() {
           >
             <p>© 2026 • {envConfigs.app_name} All rights reserved.</p>
             <div className="flex flex-wrap items-center justify-center gap-4 lg:justify-end">
+              <a
+                href={`mailto:${envConfigs.app_support_email}`}
+                className="hover:text-foreground transition-colors"
+              >
+                {envConfigs.app_support_email}
+              </a>
               <Link
                 href="/privacy-policy"
                 className="hover:text-foreground transition-colors"
