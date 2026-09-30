@@ -92,7 +92,7 @@ export function resolveAfterAuthUrl(params: {
   callbackUrl?: string | null;
   fallback?: string;
 }): string {
-  const { redirect, callbackUrl, fallback = '/settings' } = params;
+  const { redirect, callbackUrl, fallback = '/' } = params;
   if (isAppProtocolUrl(redirect)) {
     // Scheme allow-listing happens on /auth-callback, which is the only place
     // that can hand out a token.
