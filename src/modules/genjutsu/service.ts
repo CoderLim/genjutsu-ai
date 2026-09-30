@@ -189,6 +189,16 @@ export async function estimateGenjutsuProviderCost(input: {
   };
 }
 
+function getGenjutsuWebhookUrl() {
+  const appUrl = envConfigs.app_url?.trim();
+  if (!appUrl || !appUrl.startsWith('https://')) return null;
+  try {
+    return new URL('/api/genjutsu/webhook', appUrl).toString();
+  } catch {
+    return null;
+  }
+}
+
 export async function submitGenjutsu(input: {
   mode: GenjutsuMode;
   resolution: GenjutsuResolution;
@@ -197,7 +207,13 @@ export async function submitGenjutsu(input: {
   imageUrls: string[];
 }) {
   const { model, body } = buildGenjutsuPayload(input);
-  const payload = await providerFetch(`/${model.replace(/^\/+/, '')}`, {
+  const modelPath = model.replace(/^\/+/, '');
+  const webhookUrl = getGenjutsuWebhookUrl();
+  const path = webhookUrl
+    ? `/${modelPath}?hf_webhook=${encodeURIComponent(webhookUrl)}`
+    : `/${modelPath}`;
+
+  const payload = await providerFetch(path, {
     method: 'POST',
     body: JSON.stringify(body),
   });
