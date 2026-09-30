@@ -192,10 +192,23 @@ export async function createCheckout(params: {
         const map = JSON.parse(mapping) as Record<string, string>;
         if (map[paymentOrder.productId]) {
           resolvedProductId = map[paymentOrder.productId];
+        } else if (resolvedProvider === 'waffo') {
+          throw new Error(
+            `Waffo product mapping missing for ${paymentOrder.productId}`
+          );
         }
-      } catch {
-        // invalid JSON — fall through with original productId
+      } catch (error) {
+        if (resolvedProvider === 'waffo') {
+          throw error instanceof Error
+            ? error
+            : new Error('Invalid Waffo product mapping');
+        }
+        // Invalid Creem JSON keeps its existing fallback behavior.
       }
+    } else if (resolvedProvider === 'waffo') {
+      throw new Error(
+        `Waffo product mapping missing for ${paymentOrder.productId}`
+      );
     }
   }
 
@@ -343,6 +356,26 @@ async function handleCheckoutSuccess(session: any, provider: string) {
   const subscriptionInfo = session.subscriptionInfo;
 
   if (session.paymentStatus === PaymentStatus.SUCCESS) {
+    // Waffo prices live on the mapped provider product. Fail closed if a
+    // stale/misconfigured mapping charges a different amount than our
+    // authoritative catalog order; never grant credits for the wrong SKU.
+    if (provider === 'waffo') {
+      const expectedAmount = existingOrder.amount || 0;
+      const expectedCurrency = (existingOrder.currency || 'usd').toLowerCase();
+      const paidAmount = paymentInfo?.paymentAmount;
+      const paidCurrency = (paymentInfo?.paymentCurrency || '').toLowerCase();
+
+      if (
+        typeof paidAmount !== 'number' ||
+        paidAmount !== expectedAmount ||
+        paidCurrency !== expectedCurrency
+      ) {
+        throw new Error(
+          `Waffo payment mismatch for order ${existingOrder.orderNo}: expected ${expectedAmount} ${expectedCurrency}, got ${paidAmount ?? 'unknown'} ${paidCurrency || 'unknown'}`
+        );
+      }
+    }
+
     // Prepare order update
     const orderUpdate: Record<string, any> = {
       status: OrderStatus.PAID,
