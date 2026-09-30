@@ -11,7 +11,7 @@ import {
   settleGenjutsuGeneration,
 } from '@/modules/genjutsu/billing';
 import { enforceMinIntervalRateLimit } from '@/lib/rate-limit';
-import { respData, respErr } from '@/lib/resp';
+import { respData, respErr, respJson } from '@/lib/resp';
 
 async function GET({ request }: { request: Request }) {
   const limited = enforceMinIntervalRateLimit(request, {
@@ -42,7 +42,12 @@ async function GET({ request }: { request: Request }) {
         });
 
     if (!task) {
-      return respErr('Generation not found', { status: 404 });
+      return respJson(
+        -1,
+        'Generation not found',
+        { code: 'GENERATION_NOT_FOUND' },
+        { status: 404 }
+      );
     }
 
     const parsed = parseGenjutsuTaskInfo(task);
@@ -69,11 +74,12 @@ async function GET({ request }: { request: Request }) {
 
     if (task.status === 'submission_unknown') {
       return respData({
-        status: 'failed',
+        status: 'processing',
         providerStatus: 'submission_unknown',
         videoUrl: null,
         error:
           'The provider submission result is uncertain. Credits are still reserved to avoid double-spending; do not submit the same generation again.',
+        reservedCredits: task.costCredits || 0,
       });
     }
 
