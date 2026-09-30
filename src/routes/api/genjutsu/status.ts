@@ -3,6 +3,10 @@ import { createFileRoute } from '@tanstack/react-router';
 import { getAuth } from '@/core/auth';
 import { getGenjutsuStatus } from '@/modules/genjutsu/service';
 import {
+  isGenjutsuE2EMockEnabled,
+  readGenjutsuE2EVideoUrl,
+} from '@/modules/genjutsu/e2e-mock';
+import {
   assertGenerationId,
   getGenjutsuTaskById,
   getGenjutsuTaskByRequestId,
@@ -88,6 +92,29 @@ async function GET({ request }: { request: Request }) {
         status: 'processing',
         providerStatus: task.status,
         videoUrl: null,
+        reservedCredits: task.costCredits || 0,
+      });
+    }
+
+    if (isGenjutsuE2EMockEnabled()) {
+      const videoUrl = readGenjutsuE2EVideoUrl(task.options);
+      if (!videoUrl) {
+        return respErr('E2E generation is missing its source video', {
+          status: 500,
+        });
+      }
+
+      await settleGenjutsuGeneration({
+        generationId: task.id,
+        userId: session.user.id,
+        providerStatus: 'completed',
+        videoUrl,
+      });
+
+      return respData({
+        status: 'completed',
+        providerStatus: 'completed',
+        videoUrl,
         reservedCredits: task.costCredits || 0,
       });
     }
