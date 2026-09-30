@@ -24,6 +24,7 @@ export enum CreditTransactionScene {
   GIFT = 'gift',
   REWARD = 'reward',
   GENJUTSU = 'genjutsu',
+  GENJUTSU_E2E = 'genjutsu_e2e',
 }
 
 type NewCredit = typeof credit.$inferInsert;
