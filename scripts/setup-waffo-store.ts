@@ -178,19 +178,26 @@ async function main() {
     upsertEnv('WAFFO_STORE_ID', storeId);
   }
 
-  let mapping: Record<string, string> = {};
+  let previousMapping: Record<string, string> = {};
   try {
-    mapping = JSON.parse(process.env.WAFFO_PRODUCT_IDS_MAPPING || '{}');
+    previousMapping = JSON.parse(
+      process.env.WAFFO_PRODUCT_IDS_MAPPING || '{}'
+    );
   } catch {
-    mapping = {};
+    previousMapping = {};
   }
+
+  // Rebuild the mapping from the current catalog only. This deliberately
+  // drops stale ShipAny demo SKU keys after the catalog migration.
+  const mapping: Record<string, string> = {};
 
   for (const product of Object.values(pricingCatalog)) {
     const catalogId = product.productId;
-    const existingId = mapping[catalogId];
+    const existingId = previousMapping[catalogId];
 
     if (existingId && (await verifyCheckout(client, existingId))) {
       console.log(`✓ ${catalogId} already works -> ${existingId}`);
+      mapping[catalogId] = existingId;
       continue;
     }
 
@@ -201,8 +208,8 @@ async function main() {
       },
     };
 
-    const name = `Genjutsu ${product.description}`;
-    const description = `${product.credits} credits — ${product.description}`;
+    const name = product.productName;
+    const description = `${product.credits.toLocaleString()} Genjutsu credits — one-time purchase`;
 
     console.log(`Creating ${catalogId} (${product.type})...`);
 
