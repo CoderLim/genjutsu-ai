@@ -1,6 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router';
 
 import { getAuth } from '@/core/auth';
+import {
+  createGenjutsuE2EUploadDescriptor,
+  isGenjutsuE2EMockEnabled,
+} from '@/modules/genjutsu/e2e-mock';
 import { createHiggsfieldUploadUrl } from '@/modules/genjutsu/service';
 import { enforceMinIntervalRateLimit } from '@/lib/rate-limit';
 import { respData, respErr } from '@/lib/resp';
@@ -36,7 +40,11 @@ async function POST({ request }: { request: Request }) {
 
     const uploads = [];
     for (const contentType of contentTypes) {
-      uploads.push(await createHiggsfieldUploadUrl(contentType));
+      uploads.push(
+        isGenjutsuE2EMockEnabled()
+          ? createGenjutsuE2EUploadDescriptor(request, contentType)
+          : await createHiggsfieldUploadUrl(contentType)
+      );
     }
 
     return respData({ uploads });
