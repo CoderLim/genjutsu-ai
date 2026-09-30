@@ -2,6 +2,7 @@ import { and, eq } from 'drizzle-orm';
 
 import { db } from '@/core/db';
 import { aiTask } from '@/config/db/schema';
+import { getUuid } from '@/lib/hash';
 import {
   consume,
   getBalance,
@@ -181,28 +182,18 @@ export async function reserveGenjutsuCredits(params: {
   return result.task;
 }
 
-function mutationCount(result: any): number | null {
-  const candidates = [
-    result?.rowsAffected,
-    result?.rowCount,
-    result?.changes,
-    result?.count,
-    result?.affectedRows,
-    result?.[0]?.affectedRows,
-    result?.[0]?.rowCount,
-    result?.[0]?.changes,
-  ];
-  const found = candidates.find((value) => typeof value === 'number');
-  return typeof found === 'number' ? found : null;
-}
-
 export async function claimGenjutsuSubmission(params: {
   generationId: string;
   userId: string;
 }) {
-  const result = await db()
+  const claimToken = getUuid();
+
+  await db()
     .update(aiTask)
-    .set({ status: 'submitting' })
+    .set({
+      status: 'submitting',
+      taskResult: JSON.stringify({ submissionClaim: claimToken }),
+    })
     .where(
       and(
         eq(aiTask.id, params.generationId),
@@ -212,11 +203,20 @@ export async function claimGenjutsuSubmission(params: {
       )
     );
 
-  const count = mutationCount(result);
-  if (count == null) {
-    throw new Error('Unable to verify Genjutsu submission claim');
+  // Verify ownership of the state transition by reading back the unique claim
+  // token. This is portable across Drizzle drivers whose mutation result
+  // shapes expose affected-row counts differently.
+  const current = await getGenjutsuTaskById(params);
+  if (!current || current.status !== 'submitting' || !current.taskResult) {
+    return false;
   }
-  return count === 1;
+
+  try {
+    const parsed = JSON.parse(current.taskResult);
+    return parsed?.submissionClaim === claimToken;
+  } catch {
+    return false;
+  }
 }
 
 export async function markGenjutsuSubmitted(params: {
@@ -229,6 +229,7 @@ export async function markGenjutsuSubmitted(params: {
     .set({
       status: 'submitted',
       taskId: params.requestId,
+      taskResult: null,
     })
     .where(
       and(
