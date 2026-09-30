@@ -78,6 +78,21 @@ export const envConfigs: Record<string, string> = {
   // to them would let the admin "Test" silently pass on the machine's own key.
   replicate_api_token: procEnv.REPLICATE_API_TOKEN ?? '',
 
+  // Higgsfield (server-only)
+  higgsfield_api_key:
+    procEnv.HF_API_KEY ??
+    procEnv.HIGGSFIELD_API_KEY ??
+    procEnv.HF_CREDENTIALS ??
+    '',
+  higgsfield_api_base_url:
+    procEnv.HF_API_BASE_URL ?? 'https://api.higgsfield.ai',
+  higgsfield_genjutsu_motion_model:
+    procEnv.HIGGSFIELD_GENJUTSU_MOTION_MODEL ??
+    'higgsfield/genjutsu/motion-transfer/v1.0',
+  higgsfield_genjutsu_object_swap_model:
+    procEnv.HIGGSFIELD_GENJUTSU_OBJECT_SWAP_MODEL ??
+    'higgsfiled/genjutsu/object-swap/v1.0',
+
   // Locale (public)
   locale: publicEnv('VITE_DEFAULT_LOCALE') ?? 'en',
 };
