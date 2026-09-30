@@ -23,7 +23,9 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "node --import tsx --test 'src/**/*.test.ts'",
-    "prepare": "husky"
+    "prepare": "husky",
+    "dev:e2e": "GENJUTSU_E2E_MOCK=true pnpm dev",
+    "e2e:genjutsu": "node scripts/e2e-genjutsu.mjs"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx,mjs,cjs}": "prettier --write",
