@@ -14,6 +14,10 @@
  *
  * Env required: WAFFO_MERCHANT_ID, WAFFO_PRIVATE_KEY
  * Optional: WAFFO_STORE_ID (reuse), WAFFO_PRODUCT_IDS_MAPPING (skip existing)
+ *
+ * The generated mapping is written to .env.development and, when the app
+ * database is configured, synchronized to DB-backed Admin settings because DB
+ * config takes precedence over environment values at runtime.
  */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -251,6 +255,23 @@ async function main() {
   upsertEnv('DEFAULT_PAYMENT_PROVIDER', 'waffo');
   upsertEnv('WAFFO_ENVIRONMENT', 'test');
   upsertEnv('WAFFO_STORE_ID', storeId);
+
+  // DB-backed Admin settings override env at runtime. Keep the active Waffo
+  // mapping in sync when this script is run against a configured app DB.
+  if (
+    process.env.DATABASE_URL ||
+    process.env.DATABASE_PROVIDER === 'd1'
+  ) {
+    const { saveConfigs } = await import('../src/modules/config/service.js');
+    await saveConfigs({
+      waffo_product_ids_mapping: mappingJson,
+      waffo_enabled: 'true',
+      default_payment_provider: 'waffo',
+      waffo_environment: 'test',
+      waffo_store_id: storeId,
+    });
+    console.log('Updated DB-backed Waffo app config.');
+  }
 
   const appUrl = process.env.VITE_APP_URL || 'http://localhost:3000';
   await ensureWebhook(client, storeId, appUrl);
