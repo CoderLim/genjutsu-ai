@@ -1,7 +1,6 @@
 import { Link } from '@/core/i18n/navigation';
 import { envConfigs } from '@/config';
 import { cn } from '@/lib/cn';
-import { BuiltWithShipAny } from '@/components/built-with-shipany';
 import { RaphaelLogo } from '@/components/icons';
 import { FOOTER_COLUMNS } from '@/components/landing/content';
 
@@ -65,13 +64,14 @@ export function SiteFooter() {
                   </p>
                 </div>
                 <p className="text-md text-muted-foreground mt-6">
-                  {envConfigs.app_description ||
-                    'Genjutsu AI swaps characters, outfits and scenes in any video while keeping the original motion.'}
+                  Swap characters, outfits, and scenes in any video while
+                  keeping the original camera movement and timing — powered by
+                  Higgsfield Genjutsu.
                 </p>
               </div>
             </div>
 
-            <div className="grid w-full max-w-3xl grid-cols-2 gap-8 sm:grid-cols-3">
+            <div className="grid w-full max-w-md grid-cols-2 gap-8">
               {FOOTER_COLUMNS.map((column) => (
                 <div key={column.title}>
                   <p className="text-foreground mb-6 font-bold">
@@ -100,7 +100,7 @@ export function SiteFooter() {
               'lg:flex-row lg:items-center lg:text-left'
             )}
           >
-            <p>© 2025 • {envConfigs.app_name} All rights reserved.</p>
+            <p>© 2026 • {envConfigs.app_name} All rights reserved.</p>
             <div className="flex flex-wrap items-center justify-center gap-4 lg:justify-end">
               <Link
                 href="/privacy-policy"
@@ -114,7 +114,6 @@ export function SiteFooter() {
               >
                 Terms of Service
               </Link>
-              <BuiltWithShipAny />
             </div>
           </div>
         </footer>

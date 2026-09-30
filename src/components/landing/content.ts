@@ -641,33 +641,14 @@ export const FOOTER_COLUMNS: FooterColumn[] = [
   {
     title: 'Tools',
     links: [
-      { label: 'AI Photo Editor', href: '/ai-image-editor' },
-      { label: 'Expand Image', href: '/uncrop' },
-      { label: 'Remove Background', href: '/background-remover' },
-      { label: 'Text to Image', href: '/text-to-image' },
-      { label: 'Image to Image', href: '/image-to-image' },
-      { label: 'Image Templates', href: '/image-templates' },
-      { label: 'Text to Video', href: '/text-to-video' },
-      { label: 'Image to Video', href: '/image-to-video' },
-      { label: 'AI Lip Sync Video', href: 'https://fameo.ai/' },
-    ],
-  },
-  {
-    title: 'AI Models',
-    links: [
       {
-        label: '🍌Nano Banana 2 Lite',
-        href: '/nano-banana-2-lite',
-        badge: 'NEW',
+        label: 'Person Remover',
+        href: 'https://personremover.org',
       },
-      { label: 'Seedream 5.0 Pro', href: '/seedream-5-pro', badge: 'NEW' },
-      { label: 'Seedance 2.0 Mini', href: '/seedance-2-mini', badge: 'NEW' },
-      { label: 'Kling 3.0 Turbo', href: '/kling-3-turbo', badge: 'NEW' },
-      { label: '🍌Nano Banana 2', href: '/nano-banana-2' },
-      { label: 'GPT Image 2', href: '/gpt-image-2' },
-      { label: 'Seedance 2.0', href: '/seedance-2' },
-      { label: 'Veo 3.1', href: '/veo-3-1' },
-      { label: 'All AI Models', href: '/ai-models' },
+      {
+        label: 'Video Text Remover',
+        href: 'https://videotextremover.org',
+      },
     ],
   },
 ];
