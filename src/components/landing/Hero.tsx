@@ -24,9 +24,9 @@ export function Hero({ className }: { className?: string }) {
       </h1>
 
       <p className="mx-auto mt-3 max-w-3xl text-base leading-relaxed text-white/82 sm:mt-4 sm:text-lg">
-        Restyle the shot, keep the motion. Genjutsu is a video-to-video model
-        by Higgsfield that restyles selected products, outfits, objects, and
-        scenes while preserving the original camera movement and timing.
+        Keep your subject, change the world around them. Genjutsu transfers the
+        original motion and timing into a new scene, style, or set of objects —
+        without swapping who or what is in the shot.
       </p>
 
       <div className="mt-4 flex flex-wrap items-center justify-center gap-2">

@@ -234,7 +234,7 @@ export function getSettings(): Setting[] {
       title: 'App Description',
       type: 'textarea',
       placeholder:
-        'Genjutsu AI swaps characters, outfits and scenes in any video while keeping the original motion.',
+        'Genjutsu AI restyles any video without changing who or what is in it — new scenes, styles, and objects while keeping the original motion.',
       group: 'appinfo',
       tab: 'general',
     },

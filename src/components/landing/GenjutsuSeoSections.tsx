@@ -2,7 +2,7 @@ import {
   Clapperboard,
   MapPin,
   Package,
-  Shirt,
+  Palette,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -17,7 +17,7 @@ import {
   GENJUTSU_VS_ROWS,
 } from '@/components/landing/content';
 
-const CHANGE_ICONS: LucideIcon[] = [Package, Shirt, MapPin, Clapperboard];
+const CHANGE_ICONS: LucideIcon[] = [Package, Palette, MapPin, Clapperboard];
 
 function SectionHeading({
   title,
@@ -47,11 +47,12 @@ export function WhatIsGenjutsu({ className }: { className?: string }) {
         <SectionHeading title="What Is Genjutsu AI?" />
         <p className="text-foreground/70 mx-auto mt-8 max-w-3xl text-center text-base leading-relaxed sm:text-lg">
           Genjutsu is a video-to-video model by Higgsfield. You upload an
-          existing clip; this site uses the model to restyle products, outfits,
-          scenes, and props while preserving the original motion, camera
-          movement, and timing. It is not a from-scratch text-to-video generator
-          — the source take provides the motion and Genjutsu changes selected
-          visual elements around it.
+          existing clip; this site uses the model to restyle scenes, styles,
+          products, and props around the same subject while preserving the
+          original motion, camera movement, and timing. It is not a from-scratch
+          text-to-video generator — and it is not a face-swap or identity-swap
+          tool. The source take provides the motion; Genjutsu changes the world
+          around it.
         </p>
       </div>
     </section>
@@ -64,7 +65,7 @@ export function HowGenjutsuWorks({ className }: { className?: string }) {
       <div className="container mx-auto px-4">
         <SectionHeading
           title="How Genjutsu Works"
-          description="Three steps: keep the move, rewrite the subject."
+          description="Three steps: keep the subject, rewrite the world around them."
         />
         <ol className="mx-auto mt-12 grid max-w-[1180px] gap-8 sm:grid-cols-3">
           {GENJUTSU_HOW_IT_WORKS.map((item) => (
@@ -100,7 +101,7 @@ export function WhatYouCanChange({ className }: { className?: string }) {
       <div className="container mx-auto px-4">
         <SectionHeading
           title="What You Can Change"
-          description="Full restage or a local swap — product, wardrobe, location, or a single object."
+          description="Same subject — new scene, style, product, or a single object."
         />
         <div className="mx-auto mt-12 grid max-w-[1180px] gap-10 sm:grid-cols-2 lg:grid-cols-4">
           {GENJUTSU_CHANGE_ITEMS.map((item, index) => {
@@ -184,10 +185,10 @@ export function PromptIdeas({
       <div className="container mx-auto px-4">
         <SectionHeading
           title="Genjutsu Prompt Ideas"
-          description="Start with a concrete rewrite, then say what motion must stay."
+          description="Scene, style, and object rewrites — keep the original subject and motion."
         />
         <div className="mx-auto mt-12 grid max-w-[1180px] gap-8 sm:grid-cols-2">
-          {GENJUTSU_PROMPT_IDEAS.map((item) => (
+          {GENJUTSU_PROMPT_IDEAS.slice(0, 8).map((item) => (
             <article
               key={item.title}
               className="rounded-2xl border border-white/8 bg-white/[0.03] p-6"

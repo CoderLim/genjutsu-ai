@@ -23,7 +23,7 @@ import { Testimonials } from '@/components/landing/Testimonials';
 
 const PAGE_TITLE = 'Genjutsu AI Video Generator — Video Restyling';
 const PAGE_DESCRIPTION =
-  'Genjutsu AI restyles products, outfits, objects and scenes in video while keeping the original motion. Upload a clip, write a prompt, get your new video in minutes.';
+  'Genjutsu AI restyles any video without changing who or what is in it. Transfer motion into a new scene, style, or objects — upload a clip, write a prompt, get your new video in minutes.';
 
 function HomePage() {
   return (

@@ -889,7 +889,7 @@ export function GeneratorPanel({
   const placeholder =
     mode === 'objects-swap'
       ? 'Describe what to swap in the video (optional)...'
-      : 'Describe the new scene, product, outfit, or object (optional)...';
+      : 'Describe the new scene, style, product, or object (optional)...';
 
   const pollGeneration = useCallback(
     async (active: PersistedGeneration, runId: number) => {

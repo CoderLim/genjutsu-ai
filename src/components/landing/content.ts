@@ -424,7 +424,7 @@ export const TESTIMONIALS: Testimonial[] = [
   },
   {
     quote:
-      'Object Swap let us restage a product in a new outfit without reshooting. Original timing stayed intact — that is the whole point of video-to-video.',
+      'Object Swap let us restage a product in a new scene without reshooting. Original timing stayed intact — that is the whole point of video-to-video.',
     name: 'Michael Chen',
     role: 'Creative Director',
     avatarSrc: '/testimonials/emma-zhang.webp',
@@ -445,7 +445,7 @@ export const TESTIMONIALS: Testimonial[] = [
   },
   {
     quote:
-      'Minutes, not overnight renders. I restyle products, wardrobe, and scenes, download, and post. Motion transfer keeps it feeling like the same shot.',
+      'Minutes, not overnight renders. I restyle products, styles, and scenes, download, and post. Motion transfer keeps it feeling like the same shot.',
     name: 'Emma Zhang',
     role: 'Short-form Creator',
     avatarSrc: '/testimonials/tom-anderson.webp',
@@ -1065,13 +1065,13 @@ export const GENJUTSU_HOW_IT_WORKS = [
     step: '2',
     title: 'Describe the result',
     description:
-      'Write what should change — product, outfit, scene, or prop.',
+      'Write what should change — scene, style, product, or prop. Keep the original subject.',
   },
   {
     step: '3',
     title: 'The model restyles the shot',
     description:
-      'Genjutsu restyles selected visual elements while preserving the original movement and shot timing.',
+      'Genjutsu restyles the world around the subject while preserving the original movement and shot timing.',
   },
 ] as const;
 
@@ -1082,9 +1082,9 @@ export const GENJUTSU_CHANGE_ITEMS = [
       'Replace a featured product while preserving the original camera move, framing, and timing.',
   },
   {
-    title: 'Outfits',
+    title: 'Styles',
     description:
-      'Keep the performance, change the wardrobe — full costume swap or a single garment.',
+      'Keep the same subject — restyle the look: anime, cinematic, vintage, or material treatments.',
   },
   {
     title: 'Scenes',
@@ -1094,17 +1094,17 @@ export const GENJUTSU_CHANGE_ITEMS = [
   {
     title: 'Props',
     description:
-      'Swap the object in hand or in frame without rebuilding the take.',
+      'Swap an object in frame (cup, vase, package) without rebuilding the take or changing the subject.',
   },
 ] as const;
 
 export const GENJUTSU_CHANGE_EXAMPLES = [
-  'Swap a generic bottle for a premium glass bottle while keeping the same camera move.',
-  'Replace a plain jacket on a mannequin with a tailored evening jacket while the original camera move stays intact.',
-  'Turn a bright studio background into a rainy Tokyo alley at night while keeping the original camera move.',
-  'Swap a coffee cup for a glowing crystal orb without changing the hand path.',
-  'Restyle a product package with an illustrated anime-inspired design and keep the original cut timing.',
-  'Replace a modern car in a tracking shot with a vintage motorcycle.',
+  'Same subject, new scene: turn a bright studio into a rainy Tokyo alley while keeping the original camera move.',
+  'Same subject, new era: restage a modern living room as a 1980s neon lounge without changing who is in frame.',
+  'Object replacement: swap a coffee cup on the table for a ceramic vase; keep the camera path.',
+  'Object replacement: replace a modern car in a tracking shot with a vintage motorcycle.',
+  'Style without identity change: restyle the clip as anime illustration while keeping the same subject and timing.',
+  'Style without identity change: apply a cinematic film-look grade and keep the original performance locked.',
 ] as const;
 
 export const GENJUTSU_HOWTO_STEPS = [
@@ -1118,13 +1118,13 @@ export const GENJUTSU_HOWTO_STEPS = [
     step: '2',
     title: 'Pick Motion Transfer or Objects Swap',
     description:
-      'Motion Transfer preserves the source motion while restaging products, wardrobe, props, or scenes. Objects Swap targets specific objects in the frame.',
+      'Motion Transfer preserves the source motion while restaging scenes, styles, products, or props around the same subject. Objects Swap targets specific objects in the frame.',
   },
   {
     step: '3',
     title: 'Write the result you want',
     description:
-      'Prompt the new product, outfit, location, or object. Be specific about what changes and what must stay.',
+      'Prompt the new scene, style, product, or object. Be specific about what changes and that the original subject must stay.',
   },
   {
     step: '4',
@@ -1147,19 +1147,19 @@ export const GENJUTSU_PROMPT_IDEAS = [
       'Replace the plain bottle with a premium glass bottle. Keep the original tracking motion and camera path.',
   },
   {
-    title: 'Armor over street clothes',
+    title: 'Same subject, cyberpunk street',
     prompt:
-      'Swap the street clothes for full samurai armor. Preserve handheld camera movement and timing.',
+      'Keep the same subject. Change the daytime street to a cyberpunk night with neon signs. Preserve handheld camera movement and timing.',
   },
   {
     title: 'Night alley restage',
     prompt:
-      'Change the living room to a rainy Tokyo alley at night. Keep the talking-head framing and head turns.',
+      'Keep the same subject. Change the living room to a rainy Tokyo alley at night. Preserve framing and head turns.',
   },
   {
-    title: 'Prop swap',
+    title: 'Cup to vase on the table',
     prompt:
-      'Replace the coffee cup in her hand with a glowing crystal orb. Do not change the arm motion.',
+      'Replace the coffee cup on the table with a glowing crystal orb. Do not change the subject or camera path.',
   },
   {
     title: 'Package restyle',
@@ -1167,19 +1167,54 @@ export const GENJUTSU_PROMPT_IDEAS = [
       'Restyle the product packaging with an anime-inspired illustration. Keep the original cut timing.',
   },
   {
-    title: 'Empty landscape',
+    title: 'Empty landscape background',
     prompt:
-      'Replace the background crowd with empty snowy mountains. Keep the original tracking shot.',
+      'Keep the same subject. Replace the busy background with empty snowy mountains. Keep the original tracking shot.',
   },
   {
-    title: 'Disco wardrobe',
+    title: '1980s era restage',
     prompt:
-      'Outfit swap to 1970s disco sequins. Keep the original dance choreography.',
+      'Keep the same subject. Restage the modern interior as a 1980s neon lounge. Change era and décor only.',
   },
   {
     title: 'Vehicle swap',
     prompt:
-      'Replace the car with a vintage motorcycle. Keep the tracking shot and speed.',
+      'Replace the car with a vintage motorcycle. Keep the tracking shot and speed. Do not alter any subjects in frame.',
+  },
+  {
+    title: 'Anime filter',
+    prompt:
+      'Restyle the clip as anime illustration. Keep the same subject and motion — change only the art style.',
+  },
+  {
+    title: 'Cinematic filter',
+    prompt:
+      'Apply a cinematic film look. Do not change who or what is in the shot; keep the original timing.',
+  },
+  {
+    title: 'Vintage film filter',
+    prompt:
+      'Give the clip a vintage film grade with light grain. Preserve the original subject and camera path.',
+  },
+  {
+    title: 'Watercolor material',
+    prompt:
+      'Restyle surfaces as watercolor. Keep the same subject, objects, and motion path.',
+  },
+  {
+    title: 'Mannequin wardrobe restyle',
+    prompt:
+      'Replace a plain jacket on a mannequin with a tailored evening jacket. Keep the original camera move; do not change the mannequin identity.',
+  },
+  {
+    title: 'Day to night scene',
+    prompt:
+      'Keep the same subject. Turn a sunny park into a moonlit night scene. Preserve the original walk cycle and framing.',
+  },
+  {
+    title: 'Clay material look',
+    prompt:
+      'Restyle the scene with clay stop-motion materials. Keep the same subject and original timing.',
   },
 ] as const;
 
@@ -1210,7 +1245,12 @@ export const GENJUTSU_FAQS: FaqItem[] = [
   {
     question: 'What is Genjutsu AI?',
     answer:
-      'Genjutsu is a Higgsfield video-to-video model. This site uses it to restyle products, outfits, scenes, and props while keeping the original camera movement and timing.',
+      'Genjutsu is a Higgsfield video-to-video model. This site uses it to restyle scenes, styles, products, and props around the same subject while keeping the original camera movement and timing — without changing who or what is in the shot.',
+  },
+  {
+    question: 'Does Genjutsu AI support face swapping?',
+    answer:
+      'No. Genjutsu AI does not support face swapping or identity replacement. If a reference image contains a real human face, it is rejected before generation. Anime, cartoon, illustration, and 3D characters are allowed. See our Terms of Service (/terms-of-service) for prohibited categories, detection, reporting, and enforcement.',
   },
   {
     question: 'How is this different from text-to-video?',
@@ -1220,7 +1260,7 @@ export const GENJUTSU_FAQS: FaqItem[] = [
   {
     question: 'What can I change in a clip?',
     answer:
-      'Products, outfits, scenes, and props. You can aim for a full restage or a local swap (one object or one garment) depending on the mode and prompt.',
+      'Scenes, styles, products, and props. Aim for a full environment restage, a style filter, or a local object swap — while keeping the original subject intact.',
   },
   {
     question: 'Do I need a Higgsfield subscription?',

@@ -64,9 +64,9 @@ export function SiteFooter() {
                   </p>
                 </div>
                 <p className="text-md text-muted-foreground mt-6">
-                  Swap characters, outfits, and scenes in any video while
-                  keeping the original camera movement and timing — powered by
-                  Higgsfield Genjutsu.
+                  Restyle any video without changing who or what is in it — new
+                  scenes, styles, and objects while keeping the original motion.
+                  Powered by Higgsfield Genjutsu.
                 </p>
               </div>
             </div>

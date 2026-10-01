@@ -7,9 +7,9 @@ import { GENJUTSU_PROMPT_IDEAS } from '@/components/landing/content';
 import { SiteFooter } from '@/components/landing/SiteFooter';
 import { SiteHeader } from '@/components/landing/SiteHeader';
 
-const PAGE_TITLE = 'Genjutsu Prompt Ideas — Product, Outfit & Scene Swaps';
+const PAGE_TITLE = 'Genjutsu Prompt Ideas — Scene, Style & Object Restyles';
 const PAGE_DESCRIPTION =
-  'Ready-to-use Genjutsu prompts for swapping products, outfits, scenes, and props while keeping the original video motion.';
+  'Ready-to-use Genjutsu prompts for restyling scenes, styles, products, and props without changing who or what is in the shot.';
 
 function GenjutsuPromptsPage() {
   return (
@@ -38,8 +38,8 @@ function GenjutsuPromptsPage() {
             >
               homepage generator
             </Link>
-            , and rewrite products, outfits, objects, or scenes while keeping the original
-            motion.
+            , and restyle scenes, styles, products, or props while keeping the
+            original subject and motion. Face swapping is not supported.
           </p>
 
           <div className="mx-auto mt-12 grid max-w-[1180px] gap-8 sm:grid-cols-2">
