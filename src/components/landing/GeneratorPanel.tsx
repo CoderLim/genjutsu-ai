@@ -373,11 +373,9 @@ async function assertReferenceImageSafe(file: File) {
 function ImageUploadSlot({
   items,
   onChange,
-  signedIn,
 }: {
   items: MediaItem[];
   onChange: (items: MediaItem[]) => void;
-  signedIn: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [previewId, setPreviewId] = useState<string | null>(null);
@@ -396,13 +394,6 @@ function ImageUploadSlot({
       if (incoming.length === 0) return;
       const room = IMAGE_MAX - items.length;
       if (room <= 0) return;
-
-      if (!signedIn) {
-        setRejectMessage(
-          'Sign in to verify reference images before adding them.'
-        );
-        return;
-      }
 
       const candidates = incoming.slice(0, room);
       setChecking(true);
@@ -438,7 +429,7 @@ function ImageUploadSlot({
         setChecking(false);
       }
     },
-    [items, onChange, signedIn]
+    [items, onChange]
   );
 
   const removeAt = (id: string) => {
@@ -1188,11 +1179,7 @@ export function GeneratorPanel({
         <div className="flex min-h-[124px] flex-col items-stretch gap-2 sm:min-h-[144px] sm:flex-row sm:gap-3">
           <div className="flex shrink-0 flex-wrap gap-2 self-start pt-1 sm:pt-2">
             <VideoUploadSlot item={video} onChange={setVideo} />
-            <ImageUploadSlot
-              items={images}
-              onChange={setImages}
-              signedIn={Boolean(session?.user)}
-            />
+            <ImageUploadSlot items={images} onChange={setImages} />
           </div>
 
           <div className="relative flex min-w-0 flex-1 flex-col">
