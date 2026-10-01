@@ -10,7 +10,9 @@ test('Fal face detection accepts an empty objects list as safe', () => {
 test('Fal face detection blocks when at least one face object is returned', () => {
   assert.equal(
     falPayloadHasFace({
-      objects: [{ bbox: [0.1, 0.1, 0.4, 0.4], label: 'human face' }],
+      objects: [
+        { x_min: 0.1, y_min: 0.1, x_max: 0.4, y_max: 0.4 },
+      ],
     }),
     true
   );
