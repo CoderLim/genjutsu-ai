@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from 'react';
 import { createPortal } from 'react-dom';
+import { toast } from 'sonner';
 
 import { useSession } from '@/core/auth/client';
 import {
@@ -370,6 +371,27 @@ async function assertReferenceImageSafe(file: File) {
   await apiPostForm<{ safe: true }>('/api/genjutsu/check-reference', formData);
 }
 
+function toastReferenceReject(cause: unknown) {
+  const code =
+    cause instanceof ApiError &&
+    cause.data &&
+    typeof cause.data === 'object' &&
+    'code' in cause.data
+      ? String((cause.data as { code?: unknown }).code)
+      : '';
+  const message = cause instanceof ApiError ? cause.message : '';
+
+  if (code === 'REFERENCE_FACE_DETECTED' || /human face/i.test(message)) {
+    toast.error('不允许上传真人');
+    return;
+  }
+  if (code === 'FACE_DETECTION_UNAVAILABLE') {
+    toast.error('安全检测暂时不可用，请稍后再试');
+    return;
+  }
+  toast.error('参考图校验失败，请换一张再试');
+}
+
 function redirectToSignIn() {
   const callbackUrl = encodeURIComponent(
     `${window.location.pathname}${window.location.search}`
@@ -389,7 +411,6 @@ function ImageUploadSlot({
   const inputRef = useRef<HTMLInputElement>(null);
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
-  const [rejectMessage, setRejectMessage] = useState('');
   const { dragging, setDragging, onDragOver, onDragLeave } = useDragHighlight();
   const previewItem = items.find((i) => i.id === previewId) ?? null;
   const canAdd = items.length < IMAGE_MAX;
@@ -419,10 +440,9 @@ function ImageUploadSlot({
 
       const candidates = incoming.slice(0, room);
       setChecking(true);
-      setRejectMessage('');
 
       const accepted: MediaItem[] = [];
-      const rejected: string[] = [];
+      let rejectedOnce = false;
 
       try {
         for (const file of candidates) {
@@ -430,22 +450,15 @@ function ImageUploadSlot({
             await assertReferenceImageSafe(file);
             accepted.push(createMediaItem(file));
           } catch (cause) {
-            const message =
-              cause instanceof ApiError
-                ? cause.message
-                : 'Could not verify this reference image.';
-            rejected.push(message);
+            if (!rejectedOnce) {
+              toastReferenceReject(cause);
+              rejectedOnce = true;
+            }
           }
         }
 
         if (accepted.length > 0) {
           onChange([...items, ...accepted]);
-        }
-        if (rejected.length > 0) {
-          // Prefer the face-specific copy when any image was blocked for that reason.
-          setRejectMessage(
-            rejected.find((msg) => /human face/i.test(msg)) ?? rejected[0]!
-          );
         }
       } finally {
         setChecking(false);
@@ -460,122 +473,109 @@ function ImageUploadSlot({
     onChange(items.filter((i) => i.id !== id));
     if (previewId === id) setPreviewId(null);
     if (inputRef.current) inputRef.current.value = '';
-    setRejectMessage('');
   };
 
   return (
     <>
-      <div className="flex min-w-0 flex-col gap-1.5">
-        <div
-          className={cn(
-            'relative flex shrink-0 flex-wrap gap-2',
-            checking && 'pointer-events-none opacity-70'
-          )}
-          aria-busy={checking}
-          onDragOver={onDragOver}
-          onDragLeave={onDragLeave}
-          onDrop={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            setDragging(false);
-            void mergeFiles(e.dataTransfer.files);
+      <div
+        className={cn(
+          'relative flex shrink-0 flex-wrap gap-2',
+          checking && 'pointer-events-none opacity-70'
+        )}
+        aria-busy={checking}
+        onDragOver={onDragOver}
+        onDragLeave={onDragLeave}
+        onDrop={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setDragging(false);
+          void mergeFiles(e.dataTransfer.files);
+        }}
+      >
+        <input
+          ref={inputRef}
+          type="file"
+          className="hidden"
+          accept="image/*"
+          multiple
+          disabled={checking}
+          aria-label="Add products, clothes, objects, or scenes"
+          onChange={(e: ChangeEvent<HTMLInputElement>) => {
+            void mergeFiles(e.target.files);
+            e.target.value = '';
           }}
-        >
-          <input
-            ref={inputRef}
-            type="file"
-            className="hidden"
-            accept="image/*"
-            multiple
-            disabled={checking}
-            aria-label="Add products, clothes, objects, or scenes"
-            onChange={(e: ChangeEvent<HTMLInputElement>) => {
-              void mergeFiles(e.target.files);
-              e.target.value = '';
-            }}
-          />
+        />
 
-          {items.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => setPreviewId(item.id)}
-              aria-label={`Preview ${item.file.name}`}
-              className="group relative block h-[96px] w-[68px] overflow-hidden rounded-[4px] border border-[rgba(204,144,92,0.35)] shadow-[0_10px_28px_-12px_rgba(0,0,0,0.75)] focus:outline-none"
-            >
-              <img
-                src={item.url}
-                alt={item.file.name}
-                className="h-full w-full object-cover"
-                draggable={false}
-              />
-              <span
-                role="button"
-                tabIndex={0}
-                aria-label="Remove image"
-                onClick={(e) => {
+        {items.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => setPreviewId(item.id)}
+            aria-label={`Preview ${item.file.name}`}
+            className="group relative block h-[96px] w-[68px] overflow-hidden rounded-[4px] border border-[rgba(204,144,92,0.35)] shadow-[0_10px_28px_-12px_rgba(0,0,0,0.75)] focus:outline-none"
+          >
+            <img
+              src={item.url}
+              alt={item.file.name}
+              className="h-full w-full object-cover"
+              draggable={false}
+            />
+            <span
+              role="button"
+              tabIndex={0}
+              aria-label="Remove image"
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                removeAt(item.id);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
                   e.stopPropagation();
                   e.preventDefault();
                   removeAt(item.id);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.stopPropagation();
-                    e.preventDefault();
-                    removeAt(item.id);
-                  }
-                }}
-                className="absolute -top-1.5 -right-1.5 flex size-5 items-center justify-center rounded-full border border-[rgba(204,144,92,0.35)] bg-[rgba(41,30,23,0.92)] text-[rgb(204,144,92)] opacity-0 shadow-md transition-opacity group-hover:opacity-100"
-              >
-                <CloseIcon className="size-3" />
-              </span>
-            </button>
-          ))}
-
-          {items.length === 0 ? (
-            <EmptyUploadButton
-              title={
-                checking
-                  ? 'Checking reference…'
-                  : 'Add products, clothes, objects, or scenes'
-              }
-              hint="No real human faces · up to 8 images"
-              icon={
-                <ImageModeIcon className="text-primary/78 size-5 shrink-0" />
-              }
-              dragging={dragging}
-              onClick={openPicker}
-              ariaLabel="Add products, clothes, objects, or scenes"
-            />
-          ) : canAdd ? (
-            <button
-              type="button"
-              onClick={openPicker}
-              aria-label="Add more images"
-              disabled={checking}
-              className="relative block h-[96px] w-[68px] focus:ring-0 focus:outline-none disabled:opacity-60"
+                }
+              }}
+              className="absolute -top-1.5 -right-1.5 flex size-5 items-center justify-center rounded-full border border-[rgba(204,144,92,0.35)] bg-[rgba(41,30,23,0.92)] text-[rgb(204,144,92)] opacity-0 shadow-md transition-opacity group-hover:opacity-100"
             >
-              <span
-                className={cn(
-                  'border-primary/35 bg-primary/5 hover:border-primary/45 absolute inset-0 flex flex-col items-center justify-center gap-1 border-2 border-dashed text-[rgb(204,144,92)] transition-all duration-200',
-                  dragging && 'border-primary/55 bg-primary/10'
-                )}
-              >
-                <PlusIcon className="text-primary/78 size-5" />
-                <span className="text-foreground/44 text-[9px] leading-tight">
-                  {checking ? '…' : `${items.length}/${IMAGE_MAX}`}
-                </span>
-              </span>
-            </button>
-          ) : null}
-        </div>
-        {rejectMessage ? (
-          <p
-            role="alert"
-            className="max-w-[220px] text-[11px] leading-snug text-[rgb(232,160,120)]"
+              <CloseIcon className="size-3" />
+            </span>
+          </button>
+        ))}
+
+        {items.length === 0 ? (
+          <EmptyUploadButton
+            title={
+              checking
+                ? 'Checking reference…'
+                : 'Add products, clothes, objects, or scenes'
+            }
+            hint="No real human faces · up to 8 images"
+            icon={<ImageModeIcon className="text-primary/78 size-5 shrink-0" />}
+            dragging={dragging}
+            onClick={openPicker}
+            ariaLabel="Add products, clothes, objects, or scenes"
+          />
+        ) : canAdd ? (
+          <button
+            type="button"
+            onClick={openPicker}
+            aria-label="Add more images"
+            disabled={checking}
+            className="relative block h-[96px] w-[68px] focus:ring-0 focus:outline-none disabled:opacity-60"
           >
-            {rejectMessage}
-          </p>
+            <span
+              className={cn(
+                'border-primary/35 bg-primary/5 hover:border-primary/45 absolute inset-0 flex flex-col items-center justify-center gap-1 border-2 border-dashed text-[rgb(204,144,92)] transition-all duration-200',
+                dragging && 'border-primary/55 bg-primary/10'
+              )}
+            >
+              <PlusIcon className="text-primary/78 size-5" />
+              <span className="text-foreground/44 text-[9px] leading-tight">
+                {checking ? '…' : `${items.length}/${IMAGE_MAX}`}
+              </span>
+            </span>
+          </button>
         ) : null}
       </div>
       {previewItem ? (
