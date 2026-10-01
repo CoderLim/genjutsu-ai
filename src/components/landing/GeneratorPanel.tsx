@@ -468,7 +468,7 @@ function ImageUploadSlot({
         {items.length === 0 ? (
           <EmptyUploadButton
             title="Add products, clothes, objects, or scenes"
-            hint="Up to 8 images"
+            hint="No human faces · up to 8 images"
             icon={<ImageModeIcon className="text-primary/78 size-5 shrink-0" />}
             dragging={dragging}
             onClick={() => inputRef.current?.click()}
