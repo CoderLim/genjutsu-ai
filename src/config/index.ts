@@ -90,6 +90,7 @@ export const envConfigs: Record<string, string> = {
   // OPENAI_API_KEY / ANTHROPIC_API_KEY are common ambient vars, and falling back
   // to them would let the admin "Test" silently pass on the machine's own key.
   replicate_api_token: procEnv.REPLICATE_API_TOKEN ?? '',
+  fal_api_key: procEnv.FAL_KEY ?? '',
 
   // Higgsfield (server-only)
   higgsfield_api_key:
