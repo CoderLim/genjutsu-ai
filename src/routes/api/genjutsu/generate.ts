@@ -20,6 +20,10 @@ import {
 import { isGenjutsuE2EMockEnabled } from '@/modules/genjutsu/e2e-mock';
 import { calculateGenjutsuCredits } from '@/modules/genjutsu/pricing';
 import {
+  assertGenjutsuReferenceImagesSafe,
+  GenjutsuSafetyError,
+} from '@/modules/genjutsu/safety';
+import {
   HiggsfieldHttpError,
   resolveGenjutsuProviderCost,
   submitGenjutsu,
@@ -109,7 +113,41 @@ async function POST({ request }: { request: Request }) {
       input = inputFromTask(task);
     } else {
       input = inputFromBody(body);
+    }
 
+    // Defense in depth: the normal UI checks local reference files before
+    // uploading them to Higgsfield, and this server-side gate checks the final
+    // provider URLs again so direct API calls cannot bypass the restriction.
+    try {
+      await assertGenjutsuReferenceImagesSafe(input.imageUrls);
+    } catch (error) {
+      if (error instanceof GenjutsuSafetyError) {
+        let refundedCredits = 0;
+        if (task?.status === 'reserved') {
+          const refunded = await refundGenjutsuGeneration({
+            generationId,
+            userId: session.user.id,
+            providerStatus: 'safety_rejected',
+            error: error.message,
+          });
+          refundedCredits = refunded?.costCredits || 0;
+        }
+
+        return respJson(
+          -1,
+          error.message,
+          {
+            code: error.code,
+            generationId,
+            refundedCredits,
+          },
+          { status: error.status }
+        );
+      }
+      throw error;
+    }
+
+    if (!task) {
       // Prefer live /estimate USD, but never block generation on a missing or
       // non-numeric estimate (Genjutsu may return pricing_description only).
       // Client-supplied credit amounts are still ignored.
