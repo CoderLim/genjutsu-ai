@@ -841,5 +841,10 @@
   "landing.blog.title": "From the blog",
   "landing.blog.description": "Product updates, guides, and engineering notes from the team.",
   "landing.blog.view_all": "View all posts",
-  "landing.footer.blog": "Blog"
+  "landing.footer.blog": "Blog",
+  "genjutsu.safety.face_rejected": "Real people are not allowed",
+  "genjutsu.safety.unavailable": "Safety check is temporarily unavailable. Please try again later.",
+  "genjutsu.safety.check_failed": "Reference check failed. Please try another image.",
+  "genjutsu.safety.upload_hint": "No real faces · up to 8 images",
+  "genjutsu.safety.checking_aria": "Checking reference image"
 }

@@ -115,7 +115,7 @@ export async function assertGenjutsuReferenceImagesSafe(
   if (detections.some(Boolean)) {
     throw new GenjutsuSafetyError(
       'REFERENCE_FACE_DETECTED',
-      '不允许上传真人。动漫、卡通、插画和 3D 角色参考图可以使用。',
+      'Real people are not allowed. Anime, cartoon, illustration, and 3D character references are fine.',
       422
     );
   }

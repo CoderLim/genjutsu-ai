@@ -20,6 +20,7 @@ import {
   uploadToSignedUrl,
 } from '@/lib/api-client';
 import { cn } from '@/lib/cn';
+import { m } from '@/paraglide/messages.js';
 import {
   ChevronDownIcon,
   CloseIcon,
@@ -387,14 +388,14 @@ function referenceSafetyUiMessage(cause: unknown): string {
   const message = cause instanceof ApiError ? cause.message : '';
 
   if (code === 'REFERENCE_FACE_DETECTED' || /human face/i.test(message)) {
-    return '不允许上传真人';
+    return m['genjutsu.safety.face_rejected']();
   }
   if (code === 'FACE_DETECTION_UNAVAILABLE') {
-    return '安全检测暂时不可用，请稍后再试';
+    return m['genjutsu.safety.unavailable']();
   }
   return cause instanceof Error
     ? cause.message
-    : '参考图校验失败，请换一张再试';
+    : m['genjutsu.safety.check_failed']();
 }
 
 function toastReferenceReject(cause: unknown) {
@@ -555,7 +556,7 @@ function ImageUploadSlot({
         {items.length === 0 ? (
           <EmptyUploadButton
             title={checking ? '' : 'Add products, clothes, objects, or scenes'}
-            hint={checking ? '' : '不支持真人脸 · 最多 8 张'}
+            hint={checking ? '' : m['genjutsu.safety.upload_hint']()}
             icon={
               checking ? (
                 <Loader2 className="text-primary/90 size-5 shrink-0 animate-spin" />
@@ -571,7 +572,11 @@ function ImageUploadSlot({
           <button
             type="button"
             onClick={openPicker}
-            aria-label={checking ? '检测参考图中' : 'Add more images'}
+            aria-label={
+              checking
+                ? m['genjutsu.safety.checking_aria']()
+                : 'Add more images'
+            }
             disabled={checking}
             className="relative block h-[96px] w-[68px] focus:ring-0 focus:outline-none disabled:opacity-100"
           >
