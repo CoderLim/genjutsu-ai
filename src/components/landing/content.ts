@@ -417,7 +417,7 @@ export const ADVANCED_TABS: AdvancedTab[] = [
 export const TESTIMONIALS: Testimonial[] = [
   {
     quote:
-      'I swapped the actor in a walk-and-talk and the camera still tracked the same path. Genjutsu kept the motion so the edit dropped straight into the cut.',
+      'I swapped the featured product in a tracking shot and the camera still followed the same path. Genjutsu kept the motion so the edit dropped straight into the cut.',
     name: 'Sophie Miller',
     role: 'Freelance Editor',
     avatarSrc: '/testimonials/david-liu.webp',
@@ -445,14 +445,14 @@ export const TESTIMONIALS: Testimonial[] = [
   },
   {
     quote:
-      'Minutes, not overnight renders. I rewrite who is in the clip, download, and post. Motion transfer is what makes it feel like the same shot.',
+      'Minutes, not overnight renders. I restyle products, wardrobe, and scenes, download, and post. Motion transfer keeps it feeling like the same shot.',
     name: 'Emma Zhang',
     role: 'Short-form Creator',
     avatarSrc: '/testimonials/tom-anderson.webp',
   },
   {
     quote:
-      'We use it for animatic stand-ins: same camera move, different character. Concept reviews got faster because the timing is already locked.',
+      'We use it for product previsualization: same camera move, different product treatment. Concept reviews got faster because the timing is already locked.',
     name: 'Kevin Wu',
     role: 'Game Cinematic Artist',
     avatarSrc: '/testimonials/nina-patel.webp',
@@ -1065,21 +1065,21 @@ export const GENJUTSU_HOW_IT_WORKS = [
     step: '2',
     title: 'Describe the result',
     description:
-      'Write who or what should appear instead — character, outfit, scene, or prop.',
+      'Write what should change — product, outfit, scene, or prop.',
   },
   {
     step: '3',
-    title: 'The model rewrites the subject',
+    title: 'The model restyles the shot',
     description:
-      'Genjutsu swaps the subject while preserving the original movement and shot timing.',
+      'Genjutsu restyles selected visual elements while preserving the original movement and shot timing.',
   },
 ] as const;
 
 export const GENJUTSU_CHANGE_ITEMS = [
   {
-    title: 'Characters',
+    title: 'Products',
     description:
-      'Replace the person on screen with another identity while they still walk, turn, and hit the same marks.',
+      'Replace a featured product while preserving the original camera move, framing, and timing.',
   },
   {
     title: 'Outfits',
@@ -1099,11 +1099,11 @@ export const GENJUTSU_CHANGE_ITEMS = [
 ] as const;
 
 export const GENJUTSU_CHANGE_EXAMPLES = [
-  'Swap a man in a black jacket for a woman in a red evening dress on the same sidewalk walk.',
-  'Replace street clothes with samurai armor while the original handheld camera still breathes.',
-  'Turn a living-room talking-head into a rainy Tokyo alley at night, keeping the head turns.',
+  'Swap a generic bottle for a premium glass bottle while keeping the same camera move.',
+  'Replace a plain jacket on a mannequin with a tailored evening jacket while the original camera move stays intact.',
+  'Turn a bright studio background into a rainy Tokyo alley at night while keeping the original camera move.',
   'Swap a coffee cup for a glowing crystal orb without changing the hand path.',
-  'Restyle the subject as an anime character and keep the original cut timing.',
+  'Restyle a product package with an illustrated anime-inspired design and keep the original cut timing.',
   'Replace a modern car in a tracking shot with a vintage motorcycle.',
 ] as const;
 
@@ -1118,13 +1118,13 @@ export const GENJUTSU_HOWTO_STEPS = [
     step: '2',
     title: 'Pick Motion Transfer or Objects Swap',
     description:
-      'Motion Transfer rewrites the performer against the original move. Objects Swap targets clothing, props, or other objects in the frame.',
+      'Motion Transfer preserves the source motion while restaging products, wardrobe, props, or scenes. Objects Swap targets specific objects in the frame.',
   },
   {
     step: '3',
     title: 'Write the result you want',
     description:
-      'Prompt the new identity, outfit, location, or object. Be specific about what changes and what must stay.',
+      'Prompt the new product, outfit, location, or object. Be specific about what changes and what must stay.',
   },
   {
     step: '4',
@@ -1142,9 +1142,9 @@ export const GENJUTSU_HOWTO_STEPS = [
 
 export const GENJUTSU_PROMPT_IDEAS = [
   {
-    title: 'Cast swap on a walk',
+    title: 'Product swap on a tracking shot',
     prompt:
-      'Replace the man in the black jacket with a woman in a red evening dress. Keep the original walking motion and camera path.',
+      'Replace the plain bottle with a premium glass bottle. Keep the original tracking motion and camera path.',
   },
   {
     title: 'Armor over street clothes',
@@ -1162,9 +1162,9 @@ export const GENJUTSU_PROMPT_IDEAS = [
       'Replace the coffee cup in her hand with a glowing crystal orb. Do not change the arm motion.',
   },
   {
-    title: 'Anime restyle',
+    title: 'Package restyle',
     prompt:
-      'Turn the subject into an anime character with the same hairstyle color. Keep the original cut timing.',
+      'Restyle the product packaging with an anime-inspired illustration. Keep the original cut timing.',
   },
   {
     title: 'Empty landscape',
@@ -1210,7 +1210,7 @@ export const GENJUTSU_FAQS: FaqItem[] = [
   {
     question: 'What is Genjutsu AI?',
     answer:
-      'Genjutsu is a Higgsfield video-to-video model. It rewrites who and what is in your clip — character, outfit, scene, or prop — while keeping the original camera movement and timing.',
+      'Genjutsu is a Higgsfield video-to-video model. This site uses it to restyle products, outfits, scenes, and props while keeping the original camera movement and timing.',
   },
   {
     question: 'How is this different from text-to-video?',
@@ -1220,7 +1220,7 @@ export const GENJUTSU_FAQS: FaqItem[] = [
   {
     question: 'What can I change in a clip?',
     answer:
-      'Characters, outfits, scenes, and props. You can aim for a full restage or a local swap (one object, one garment) depending on the mode and prompt.',
+      'Products, outfits, scenes, and props. You can aim for a full restage or a local swap (one object or one garment) depending on the mode and prompt.',
   },
   {
     question: 'Do I need a Higgsfield subscription?',

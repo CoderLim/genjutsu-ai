@@ -21,9 +21,9 @@ import { SiteHeader } from '@/components/landing/SiteHeader';
 import { StickyComposer } from '@/components/landing/StickyComposer';
 import { Testimonials } from '@/components/landing/Testimonials';
 
-const PAGE_TITLE = 'Genjutsu AI Video Generator — Reality Manipulation';
+const PAGE_TITLE = 'Genjutsu AI Video Generator — Video Restyling';
 const PAGE_DESCRIPTION =
-  'Genjutsu AI swaps characters, outfits and scenes in any video while keeping the original motion. Upload a clip, write a prompt, get your new video in minutes.';
+  'Genjutsu AI restyles products, outfits, objects and scenes in video while keeping the original motion. Upload a clip, write a prompt, get your new video in minutes.';
 
 function HomePage() {
   return (

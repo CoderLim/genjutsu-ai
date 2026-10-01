@@ -1,7 +1,7 @@
 export const meta = {
   title: 'Privacy Policy',
   description: 'How Genjutsu AI collects, uses, shares, and protects personal information.',
-  updated_at: '2026-09-30',
+  updated_at: '2026-10-01',
 };
 
 ## Introduction
@@ -37,9 +37,9 @@ We use information to:
 
 ## AI Providers and Uploaded Media
 
-Genjutsu AI uses third-party AI infrastructure, including Higgsfield, to perform generation tasks.
+Genjutsu AI uses third-party AI infrastructure, including Higgsfield for generation and Fal for automated reference-image safety checks.
 
-When you request a generation, media, prompts, reference images, model parameters, and related generation data may be transmitted directly or indirectly to Higgsfield or another disclosed AI provider as necessary to complete the request.
+Before generation, reference images may be transmitted to Fal for automated real-human-face detection. Images that pass applicable safety checks, together with media, prompts, model parameters, and related generation data, may then be transmitted directly or indirectly to Higgsfield or another disclosed AI provider as necessary to complete the request.
 
 You should not upload content that you do not have the right to process or content containing sensitive personal information unless it is necessary and lawful for your intended use.
 
@@ -57,7 +57,7 @@ We do not sell personal information.
 
 We may share information with service providers only where reasonably necessary to operate the service, including:
 
-- AI model and generation providers such as Higgsfield.
+- AI model, generation, and content-safety providers such as Higgsfield and Fal.
 - Payment processors such as Waffo Pancake.
 - Hosting, storage, database, authentication, email, analytics, monitoring, and security providers.
 - Professional advisers or authorities where required by law or reasonably necessary to protect legal rights, users, or the service.

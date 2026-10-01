@@ -102,7 +102,7 @@ export function StickyComposer({
           </button>
           <div className="min-w-0 flex-1 text-left">
             <p className="text-foreground/35 truncate text-base font-medium sm:text-sm">
-              Add a reference video and characters to start...
+              Add a reference video and product, clothing, object, or scene images to start...
             </p>
           </div>
           <button

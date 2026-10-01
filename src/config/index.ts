@@ -19,7 +19,7 @@ export const envConfigs: Record<string, string> = {
   app_name: publicEnv('VITE_APP_NAME') ?? 'Genjutsu AI',
   app_description:
     publicEnv('VITE_APP_DESCRIPTION') ??
-    'Genjutsu AI swaps characters, outfits and scenes in any video while keeping the original motion.',
+    'Genjutsu AI restyles products, outfits, objects and scenes in video while keeping the original motion.',
   app_logo: publicEnv('VITE_APP_LOGO') ?? '/logo.webp',
   app_support_email:
     publicEnv('VITE_APP_SUPPORT_EMAIL') ?? 'support@genjutsuai.net',
@@ -90,6 +90,7 @@ export const envConfigs: Record<string, string> = {
   // OPENAI_API_KEY / ANTHROPIC_API_KEY are common ambient vars, and falling back
   // to them would let the admin "Test" silently pass on the machine's own key.
   replicate_api_token: procEnv.REPLICATE_API_TOKEN ?? '',
+  fal_api_key: procEnv.FAL_KEY ?? '',
 
   // Higgsfield (server-only)
   higgsfield_api_key:
