@@ -1,13 +1,33 @@
 import { envConfigs } from '@/config';
 
 import {
+  estimateSeedanceProviderCost,
+  getSeedanceStatus,
+  SeedanceHttpError,
+  submitSeedance,
+} from './seedance';
+import { probeSeedanceSourceDurationSeconds } from './video-metadata';
+import {
+  resolveGenjutsuProviderTarget,
+} from './workflow';
+import type {
+  GenjutsuMode,
+  GenjutsuProvider,
+  GenjutsuResolution,
+} from './types';
+
+import {
   createGenjutsuE2ERequestId,
   isGenjutsuE2EMockEnabled,
 } from './e2e-mock';
 import { estimateGenjutsuListCost } from './pricing';
 
-export type GenjutsuMode = 'motion-transfer' | 'objects-swap';
-export type GenjutsuResolution = '480p' | '720p' | '1080p';
+export type {
+  GenjutsuMode,
+  GenjutsuProvider,
+  GenjutsuResolution,
+} from './types';
+export { SeedanceHttpError, resolveGenjutsuProviderTarget };
 
 const VALID_RESOLUTIONS = new Set<GenjutsuResolution>([
   '480p',
@@ -154,6 +174,7 @@ export async function createHiggsfieldUploadUrl(contentType: string) {
 
 function buildGenjutsuPayload(input: {
   mode: GenjutsuMode;
+  model?: string;
   resolution: GenjutsuResolution;
   prompt?: string;
   videoUrl: string;
@@ -183,7 +204,7 @@ function buildGenjutsuPayload(input: {
   }
 
   return {
-    model: getGenjutsuModel(input.mode),
+    model: input.model?.trim() || getGenjutsuModel(input.mode),
     body: {
       prompt,
       video_url: input.videoUrl,
@@ -206,6 +227,7 @@ export type GenjutsuCostEstimate = {
  */
 export async function estimateGenjutsuProviderCost(input: {
   mode: GenjutsuMode;
+  model?: string;
   resolution: GenjutsuResolution;
   prompt?: string;
   videoUrl: string;
@@ -244,8 +266,9 @@ export async function estimateGenjutsuProviderCost(input: {
  * Prefer live `/estimate` USD; on timeout, HTTP error, or description-only
  * payloads, fall back to published list rates so generation can proceed.
  */
-export async function resolveGenjutsuProviderCost(input: {
+async function resolveHiggsfieldProviderCost(input: {
   mode: GenjutsuMode;
+  model?: string;
   resolution: GenjutsuResolution;
   prompt?: string;
   videoUrl: string;
@@ -296,8 +319,9 @@ function getGenjutsuWebhookUrl() {
   }
 }
 
-export async function submitGenjutsu(input: {
+async function submitHiggsfield(input: {
   mode: GenjutsuMode;
+  model?: string;
   resolution: GenjutsuResolution;
   prompt?: string;
   videoUrl: string;
@@ -332,7 +356,7 @@ export async function submitGenjutsu(input: {
   };
 }
 
-export async function getGenjutsuStatus(requestId: string) {
+async function getHiggsfieldStatus(requestId: string) {
   const normalized = requestId.trim();
   if (!/^[A-Za-z0-9._:-]{6,200}$/.test(normalized)) {
     throw new Error('Invalid request ID');
@@ -403,4 +427,68 @@ function isHttpUrl(value: string) {
   } catch {
     return false;
   }
+}
+
+
+export type GenjutsuProviderCostInput = {
+  provider: GenjutsuProvider;
+  model: string;
+  mode: GenjutsuMode;
+  resolution: GenjutsuResolution;
+  prompt?: string;
+  videoUrl: string;
+  imageUrls: string[];
+  durationSeconds?: number;
+};
+
+export async function resolveGenjutsuProviderCost(
+  input: GenjutsuProviderCostInput
+): Promise<GenjutsuCostEstimate> {
+  if (input.provider === 'seedance') {
+    const sourceDurationSeconds =
+      await probeSeedanceSourceDurationSeconds(input.videoUrl);
+    return estimateSeedanceProviderCost({
+      resolution: input.resolution,
+      sourceDurationSeconds,
+    });
+  }
+
+  return resolveHiggsfieldProviderCost(input);
+}
+
+export async function submitGenjutsu(input: {
+  provider: GenjutsuProvider;
+  model: string;
+  mode: GenjutsuMode;
+  resolution: GenjutsuResolution;
+  prompt?: string;
+  videoUrl: string;
+  imageUrls: string[];
+  endUserId: string;
+}) {
+  if (input.provider === 'seedance') {
+    const sourceDurationSeconds =
+      await probeSeedanceSourceDurationSeconds(input.videoUrl);
+    return submitSeedance({
+      ...input,
+      sourceDurationSeconds,
+    });
+  }
+
+  return submitHiggsfield(input);
+}
+
+export async function getGenjutsuStatus(input: {
+  provider: GenjutsuProvider | string;
+  model: string;
+  requestId: string;
+}) {
+  if (input.provider === 'seedance') {
+    return getSeedanceStatus({
+      model: input.model,
+      requestId: input.requestId,
+    });
+  }
+
+  return getHiggsfieldStatus(input.requestId);
 }
