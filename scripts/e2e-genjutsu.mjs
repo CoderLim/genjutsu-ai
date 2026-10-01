@@ -187,17 +187,26 @@ async function main() {
 
     console.log('\n[5/6] Uploading source media through the app upload API...');
     const generationId = `e2e-${randomUUID()}`;
-    const uploadBatch = await appPost('/api/genjutsu/upload-url', cookie, {
-      generationId,
-      contentTypes: ['video/mp4', 'image/png'],
-    });
-    assert.equal(uploadBatch.uploads.length, 2);
-
-    const [videoUpload, imageUpload] = uploadBatch.uploads;
     const videoBytes = Buffer.from('genjutsu-e2e-source-video');
     const imageBytes = Buffer.from(
       'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
       'base64'
+    );
+    const uploadBatch = await appPost('/api/genjutsu/upload-url', cookie, {
+      generationId,
+      contentTypes: ['video/mp4', 'image/png'],
+      contentLengths: [videoBytes.byteLength, imageBytes.byteLength],
+    });
+    assert.equal(uploadBatch.uploads.length, 2);
+
+    const [videoUpload, imageUpload] = uploadBatch.uploads;
+    assert.match(
+      videoUpload.storageKey,
+      /\/source\.mp4$/
+    );
+    assert.match(
+      imageUpload.storageKey,
+      /\/reference-01\.png$/
     );
 
     for (const [upload, bytes, type] of [
@@ -221,8 +230,8 @@ async function main() {
       mode: 'motion-transfer',
       resolution: '720p',
       prompt: 'E2E smoke test',
-      videoUrl: videoUpload.publicUrl,
-      imageUrls: [imageUpload.publicUrl],
+      videoKey: videoUpload.storageKey,
+      imageKeys: [imageUpload.storageKey],
       price: 1,
       credits: 0,
       providerCostUsd: 0,
@@ -237,19 +246,27 @@ async function main() {
       cookie
     );
     assert.equal(completed.status, 'completed');
-    assert.equal(completed.videoUrl, videoUpload.publicUrl);
+    assert.equal(
+      completed.videoUrl,
+      `/api/genjutsu/result/${encodeURIComponent(generationId)}`
+    );
     assert.equal(completed.reservedCredits, started.reservedCredits);
 
-    const resultResponse = await fetch(completed.videoUrl, {
-      headers: { Range: 'bytes=0-9' },
+    const resultResponse = await fetch(`${baseUrl}${completed.videoUrl}`, {
+      headers: {
+        Cookie: cookie,
+        Origin: baseUrl,
+        Range: 'bytes=0-9',
+      },
+      redirect: 'follow',
     });
     assert.equal(resultResponse.status, 206);
     const returned = Buffer.from(await resultResponse.arrayBuffer());
     assert.deepEqual(returned, videoBytes.subarray(0, 10));
 
     console.log('\n✅ Genjutsu E2E passed');
-    console.log('   auth → local upload → server quote → credit reserve →');
-    console.log('   mock provider submit → settle → source video returned');
+    console.log('   auth → storageKey upload → safety/quote → credit reserve →');
+    console.log('   mock provider submit → durable result key → stable result URL');
   } finally {
     stop();
     await new Promise((resolve) => setTimeout(resolve, 300));
