@@ -788,7 +788,7 @@ function ResultPanel({
             </p>
           ) : (
             <p className="mt-0.5 text-[11px] text-white/45">
-              Uploading references and starting Higgsfield…
+              Uploading references and starting generation…
             </p>
           )}
         </div>
