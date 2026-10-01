@@ -221,8 +221,8 @@ export async function consume(params: {
 
 // --- Revoke (idempotently restore credits from a consumed record) ---
 
-export async function revoke(consumeCreditId: string) {
-  return db().transaction(async (tx: any) => {
+export async function revoke(consumeCreditId: string, tx?: any) {
+  const execute = async (tx: any) => {
     const [consumeRecord] = await tx
       .select()
       .from(credit)
@@ -295,7 +295,10 @@ export async function revoke(consumeCreditId: string) {
     }
 
     return true;
-  });
+  };
+
+  if (tx) return execute(tx);
+  return db().transaction(execute);
 }
 
 // --- Auto-grant for new user ---

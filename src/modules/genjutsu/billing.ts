@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 
 import { db } from '@/core/db';
 import { aiTask } from '@/config/db/schema';
@@ -17,6 +17,7 @@ export type GenjutsuTaskStatus =
   | 'reserved'
   | 'submitting'
   | 'submitted'
+  | 'refunding'
   | 'completed'
   | 'submission_unknown'
   | 'refunded';
@@ -259,7 +260,8 @@ export async function markGenjutsuSubmitted(params: {
       and(
         eq(aiTask.id, params.generationId),
         eq(aiTask.userId, params.userId),
-        eq(aiTask.scene, GENJUTSU_SCENE)
+        eq(aiTask.scene, GENJUTSU_SCENE),
+        eq(aiTask.status, 'submitting')
       )
     );
 }
@@ -279,7 +281,8 @@ export async function markGenjutsuSubmissionUnknown(params: {
       and(
         eq(aiTask.id, params.generationId),
         eq(aiTask.userId, params.userId),
-        eq(aiTask.scene, GENJUTSU_SCENE)
+        eq(aiTask.scene, GENJUTSU_SCENE),
+        eq(aiTask.status, 'submitting')
       )
     );
 }
@@ -290,7 +293,6 @@ export async function settleGenjutsuGeneration(params: {
   providerStatus: string;
   videoKey?: string;
   videoUrl?: string;
-  providerVideoUrl?: string;
 }) {
   if (!params.videoKey && !params.videoUrl) {
     throw new Error('Completed Genjutsu generation is missing a result');
@@ -304,18 +306,21 @@ export async function settleGenjutsuGeneration(params: {
         providerStatus: params.providerStatus,
         ...(params.videoKey ? { videoKey: params.videoKey } : {}),
         ...(params.videoUrl ? { videoUrl: params.videoUrl } : {}),
-        ...(params.providerVideoUrl
-          ? { providerVideoUrl: params.providerVideoUrl }
-          : {}),
       }),
     })
     .where(
       and(
         eq(aiTask.id, params.generationId),
         eq(aiTask.userId, params.userId),
-        eq(aiTask.scene, GENJUTSU_SCENE)
+        eq(aiTask.scene, GENJUTSU_SCENE),
+        eq(aiTask.status, 'submitted')
       )
     );
+
+  return getGenjutsuTaskById({
+    generationId: params.generationId,
+    userId: params.userId,
+  });
 }
 
 export async function refundGenjutsuGeneration(params: {
@@ -324,45 +329,106 @@ export async function refundGenjutsuGeneration(params: {
   providerStatus?: string;
   error: string;
 }) {
-  const task = await getGenjutsuTaskById({
-    generationId: params.generationId,
-    userId: params.userId,
-  });
-  if (!task) return null;
-
-  if (task.status === 'refunded' || task.status === 'completed') return task;
-
-  if (task.creditId) {
-    await revoke(task.creditId);
-  }
-
-  await db()
-    .update(aiTask)
-    .set({
-      status: 'refunded',
-      taskResult: JSON.stringify({
-        providerStatus: params.providerStatus ?? null,
-        error: params.error,
-        refundedCredits: task.costCredits,
-      }),
-    })
-    .where(
-      and(
-        eq(aiTask.id, params.generationId),
-        eq(aiTask.userId, params.userId),
-        eq(aiTask.scene, GENJUTSU_SCENE)
+  return db().transaction(async (tx: any) => {
+    const [task] = await tx
+      .select()
+      .from(aiTask)
+      .where(
+        and(
+          eq(aiTask.id, params.generationId),
+          eq(aiTask.userId, params.userId),
+          eq(aiTask.scene, GENJUTSU_SCENE)
+        )
       )
-    );
+      .limit(1);
 
-  return {
-    ...task,
-    status: 'refunded',
-    taskResult: JSON.stringify({
+    if (!task) return null;
+    if (task.status === 'refunded' || task.status === 'completed') return task;
+
+    const refundableStatuses = [
+      'reserved',
+      'submitting',
+      'submitted',
+      'submission_unknown',
+    ];
+    if (!refundableStatuses.includes(task.status)) return task;
+
+    const refundClaim = getUuid();
+    await tx
+      .update(aiTask)
+      .set({
+        status: 'refunding',
+        taskResult: JSON.stringify({ refundClaim }),
+      })
+      .where(
+        and(
+          eq(aiTask.id, params.generationId),
+          eq(aiTask.userId, params.userId),
+          eq(aiTask.scene, GENJUTSU_SCENE),
+          inArray(aiTask.status, refundableStatuses)
+        )
+      );
+
+    const [claimed] = await tx
+      .select()
+      .from(aiTask)
+      .where(
+        and(
+          eq(aiTask.id, params.generationId),
+          eq(aiTask.userId, params.userId),
+          eq(aiTask.scene, GENJUTSU_SCENE)
+        )
+      )
+      .limit(1);
+
+    let claimedToken: string | null = null;
+    if (claimed?.taskResult) {
+      try {
+        claimedToken = JSON.parse(claimed.taskResult)?.refundClaim ?? null;
+      } catch {
+        claimedToken = null;
+      }
+    }
+
+    if (
+      !claimed ||
+      claimed.status !== 'refunding' ||
+      claimedToken !== refundClaim
+    ) {
+      return claimed ?? task;
+    }
+
+    if (claimed.creditId) {
+      await revoke(claimed.creditId, tx);
+    }
+
+    const taskResult = JSON.stringify({
       providerStatus: params.providerStatus ?? null,
       error: params.error,
-      refundedCredits: task.costCredits,
-    }),
-  };
+      refundedCredits: claimed.costCredits,
+    });
+
+    await tx
+      .update(aiTask)
+      .set({
+        status: 'refunded',
+        taskResult,
+      })
+      .where(
+        and(
+          eq(aiTask.id, params.generationId),
+          eq(aiTask.userId, params.userId),
+          eq(aiTask.scene, GENJUTSU_SCENE),
+          eq(aiTask.status, 'refunding')
+        )
+      );
+
+    return {
+      ...claimed,
+      status: 'refunded',
+      taskResult,
+    };
+  });
 }
 
 export function parseGenjutsuTaskInfo(task: {

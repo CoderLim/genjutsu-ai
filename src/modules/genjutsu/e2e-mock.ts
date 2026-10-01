@@ -9,6 +9,7 @@ type E2EUpload = {
 
 type E2EGlobal = typeof globalThis & {
   __genjutsuE2EUploads?: Map<string, E2EUpload>;
+  __genjutsuE2EStorageKeys?: Map<string, string>;
 };
 
 const MAX_E2E_UPLOAD_BYTES = 128 * 1024 * 1024;
@@ -22,11 +23,28 @@ function store() {
   return global.__genjutsuE2EUploads;
 }
 
+function storageKeys() {
+  const global = globalThis as E2EGlobal;
+  if (!global.__genjutsuE2EStorageKeys) {
+    global.__genjutsuE2EStorageKeys = new Map<string, string>();
+  }
+  return global.__genjutsuE2EStorageKeys;
+}
+
 function cleanupExpiredUploads() {
   const now = Date.now();
+  const expiredTokens = new Set<string>();
+
   for (const [token, upload] of store()) {
     if (now - upload.createdAt > E2E_UPLOAD_TTL_MS) {
+      expiredTokens.add(token);
       store().delete(token);
+    }
+  }
+
+  if (expiredTokens.size > 0) {
+    for (const [key, token] of storageKeys()) {
+      if (expiredTokens.has(token)) storageKeys().delete(key);
     }
   }
 }
@@ -37,7 +55,7 @@ export function isGenjutsuE2EMockEnabled() {
 
 export function createGenjutsuE2EUploadDescriptor(
   request: Request,
-  contentType: string
+  params: { contentType: string; storageKey: string }
 ) {
   if (!isGenjutsuE2EMockEnabled()) {
     throw new Error('Genjutsu E2E mock is disabled');
@@ -46,13 +64,14 @@ export function createGenjutsuE2EUploadDescriptor(
   const token = getUuid();
   const origin = new URL(request.url).origin;
   const publicUrl = `${origin}/api/genjutsu/e2e-upload/${encodeURIComponent(token)}`;
+  storageKeys().set(params.storageKey, token);
 
   return {
     uploadUrl: publicUrl,
     uploadHeaders: {
-      'Content-Type': contentType,
+      'Content-Type': params.contentType,
     },
-    publicUrl,
+    storageKey: params.storageKey,
   };
 }
 
@@ -87,15 +106,62 @@ export function getGenjutsuE2EUpload(token: string) {
   return store().get(token) ?? null;
 }
 
+export function getGenjutsuE2EUrlForStorageKey(storageKey: string) {
+  if (!isGenjutsuE2EMockEnabled()) return null;
+  cleanupExpiredUploads();
+
+  const token = storageKeys().get(storageKey);
+  if (!token || !store().has(token)) return null;
+
+  const origin = envConfigs.app_url.replace(/\/$/, '');
+  return `${origin}/api/genjutsu/e2e-upload/${encodeURIComponent(token)}`;
+}
+
+export function resolveGenjutsuE2EInputUrls(params: {
+  videoKey: string;
+  imageKeys: string[];
+}) {
+  const videoUrl = getGenjutsuE2EUrlForStorageKey(params.videoKey);
+  const imageUrls = params.imageKeys.map((key) =>
+    getGenjutsuE2EUrlForStorageKey(key)
+  );
+
+  if (!videoUrl || imageUrls.some((url) => !url)) {
+    throw new Error('E2E generation is missing uploaded storage objects');
+  }
+
+  return {
+    videoUrl,
+    imageUrls: imageUrls as string[],
+  };
+}
+
+export function copyGenjutsuE2EStorageObject(
+  sourceKey: string,
+  destinationKey: string
+) {
+  if (!isGenjutsuE2EMockEnabled()) {
+    throw new Error('Genjutsu E2E mock is disabled');
+  }
+
+  cleanupExpiredUploads();
+  const token = storageKeys().get(sourceKey);
+  if (!token || !store().has(token)) {
+    throw new Error('E2E source storage object is missing');
+  }
+
+  storageKeys().set(destinationKey, token);
+}
+
 export function createGenjutsuE2ERequestId() {
   return `e2e-${getUuid()}`;
 }
 
-export function readGenjutsuE2EVideoUrl(options: string | null | undefined) {
+export function readGenjutsuE2EVideoKey(options: string | null | undefined) {
   if (!options) return null;
   try {
     const parsed = JSON.parse(options);
-    return typeof parsed?.videoUrl === 'string' ? parsed.videoUrl : null;
+    return typeof parsed?.videoKey === 'string' ? parsed.videoKey : null;
   } catch {
     return null;
   }
