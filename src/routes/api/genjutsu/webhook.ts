@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 
 import { getGenjutsuStatus } from '@/modules/genjutsu/service';
+import { persistGenjutsuResultToR2 } from '@/modules/genjutsu/storage';
 import {
   getGenjutsuTaskByRequestIdAnyUser,
   refundGenjutsuGeneration,
@@ -39,11 +40,18 @@ async function POST({ request }: { request: Request }) {
     const provider = await getGenjutsuStatus(requestId);
 
     if (provider.status === 'completed' && provider.videoUrl) {
+      const durable = await persistGenjutsuResultToR2({
+        generationId: task.id,
+        userId: task.userId,
+        sourceUrl: provider.videoUrl,
+      });
+
       await settleGenjutsuGeneration({
         generationId: task.id,
         userId: task.userId,
         providerStatus: provider.providerStatus,
-        videoUrl: provider.videoUrl,
+        videoKey: durable.videoKey,
+        providerVideoUrl: provider.videoUrl,
       });
     } else if (provider.status === 'failed') {
       await refundGenjutsuGeneration({

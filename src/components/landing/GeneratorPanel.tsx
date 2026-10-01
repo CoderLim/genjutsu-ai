@@ -704,7 +704,8 @@ type GenerationResult = {
 type SignedUpload = {
   uploadUrl: string;
   uploadHeaders: Record<string, string>;
-  publicUrl: string;
+  storageKey?: string;
+  publicUrl?: string;
 };
 
 type GenerationStart = {
@@ -1068,10 +1069,10 @@ export function GeneratorPanel({
     });
 
     try {
-      // Check reference images before requesting Higgsfield upload URLs, so
-      // blocked human-face references never reach the generation provider in
-      // the normal UI flow. The /generate route repeats this check as a
-      // server-side anti-bypass gate.
+      // Check reference images before requesting R2 upload URLs, so blocked
+      // human-face references are rejected before we persist them. The
+      // /generate route repeats this check against fresh signed R2 read URLs
+      // as a server-side anti-bypass gate.
       for (const image of images) {
         const formData = new FormData();
         formData.append('image', image.file, image.file.name);
@@ -1089,16 +1090,16 @@ export function GeneratorPanel({
       );
       const uploadBatch = await apiPost<{ uploads: SignedUpload[] }>(
         '/api/genjutsu/upload-url',
-        { contentTypes }
+        { generationId, contentTypes }
       );
 
       if (uploadBatch.uploads.length !== media.length) {
-        throw new Error('Higgsfield returned an incomplete upload batch');
+        throw new Error('Storage returned an incomplete upload batch');
       }
 
       for (let index = 0; index < media.length; index += 1) {
         const upload = uploadBatch.uploads[index];
-        if (!upload) throw new Error('Missing Higgsfield upload URL');
+        if (!upload) throw new Error('Missing storage upload URL');
         await uploadToSignedUrl({
           url: upload.uploadUrl,
           file: media[index].file,
@@ -1109,7 +1110,29 @@ export function GeneratorPanel({
       if (generationRunRef.current !== runId) return;
 
       const [videoUpload, ...imageUploads] = uploadBatch.uploads;
-      if (!videoUpload) throw new Error('Missing uploaded video URL');
+      if (!videoUpload) throw new Error('Missing uploaded video');
+
+      const usesR2Keys =
+        typeof videoUpload.storageKey === 'string' &&
+        imageUploads.every((item) => typeof item.storageKey === 'string');
+
+      const mediaPayload = usesR2Keys
+        ? {
+            videoKey: videoUpload.storageKey as string,
+            imageKeys: imageUploads.map((item) => item.storageKey as string),
+          }
+        : (() => {
+            if (
+              typeof videoUpload.publicUrl !== 'string' ||
+              imageUploads.some((item) => typeof item.publicUrl !== 'string')
+            ) {
+              throw new Error('Uploaded media is missing a readable URL');
+            }
+            return {
+              videoUrl: videoUpload.publicUrl,
+              imageUrls: imageUploads.map((item) => item.publicUrl as string),
+            };
+          })();
 
       // Persist before the paid POST. If the browser loses the response after
       // the server accepted it, refresh/resume will reconcile by generationId
@@ -1130,8 +1153,7 @@ export function GeneratorPanel({
         mode,
         resolution,
         prompt: prompt.trim(),
-        videoUrl: videoUpload.publicUrl,
-        imageUrls: imageUploads.map((item) => item.publicUrl),
+        ...mediaPayload,
       });
 
       active.generationId = started.generationId;

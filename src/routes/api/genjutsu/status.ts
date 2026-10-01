@@ -7,6 +7,10 @@ import {
   readGenjutsuE2EVideoUrl,
 } from '@/modules/genjutsu/e2e-mock';
 import {
+  createGenjutsuR2ReadUrl,
+  persistGenjutsuResultToR2,
+} from '@/modules/genjutsu/storage';
+import {
   assertGenerationId,
   getGenjutsuTaskById,
   getGenjutsuTaskByRequestId,
@@ -57,10 +61,15 @@ async function GET({ request }: { request: Request }) {
     const parsed = parseGenjutsuTaskInfo(task);
 
     if (task.status === 'completed') {
+      const videoUrl =
+        typeof parsed.result?.videoKey === 'string'
+          ? await createGenjutsuR2ReadUrl(parsed.result.videoKey)
+          : parsed.result?.videoUrl || null;
+
       return respData({
         status: 'completed',
         providerStatus: parsed.result?.providerStatus || 'completed',
-        videoUrl: parsed.result?.videoUrl || null,
+        videoUrl,
         reservedCredits: task.costCredits || 0,
       });
     }
@@ -122,15 +131,23 @@ async function GET({ request }: { request: Request }) {
     const provider = await getGenjutsuStatus(task.taskId);
 
     if (provider.status === 'completed' && provider.videoUrl) {
+      const durable = await persistGenjutsuResultToR2({
+        generationId: task.id,
+        userId: session.user.id,
+        sourceUrl: provider.videoUrl,
+      });
+
       await settleGenjutsuGeneration({
         generationId: task.id,
         userId: session.user.id,
         providerStatus: provider.providerStatus,
-        videoUrl: provider.videoUrl,
+        videoKey: durable.videoKey,
+        providerVideoUrl: provider.videoUrl,
       });
 
       return respData({
         ...provider,
+        videoUrl: durable.videoUrl,
         reservedCredits: task.costCredits || 0,
       });
     }
