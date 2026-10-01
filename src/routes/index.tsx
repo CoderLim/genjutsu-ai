@@ -28,9 +28,13 @@ const PAGE_DESCRIPTION =
 function HomePage() {
   return (
     <div className="bg-background text-foreground flex min-h-screen flex-col">
-      <SiteHeader />
-      <main className="mx-auto w-full max-w-7xl flex-1 px-4 md:px-5">
+      <div className="relative">
+        <div className="absolute inset-x-0 top-0 z-[260]">
+          <SiteHeader />
+        </div>
         <Hero />
+      </div>
+      <main className="mx-auto w-full max-w-7xl flex-1 px-4 md:px-5">
         <WhatIsGenjutsu />
         <HowGenjutsuWorks />
         <WhatYouCanChange />
