@@ -10,7 +10,13 @@ import {
 import { createPortal } from 'react-dom';
 
 import { useSession } from '@/core/auth/client';
-import { ApiError, apiGet, apiPost, uploadToSignedUrl } from '@/lib/api-client';
+import {
+  ApiError,
+  apiGet,
+  apiPost,
+  apiPostForm,
+  uploadToSignedUrl,
+} from '@/lib/api-client';
 import { cn } from '@/lib/cn';
 import {
   ChevronDownIcon,
@@ -415,7 +421,7 @@ function ImageUploadSlot({
           className="hidden"
           accept="image/*"
           multiple
-          aria-label="Add your characters, products, or clothes"
+          aria-label="Add products, clothes, objects, or scenes"
           onChange={(e: ChangeEvent<HTMLInputElement>) => {
             mergeFiles(e.target.files);
             e.target.value = '';
@@ -461,12 +467,12 @@ function ImageUploadSlot({
 
         {items.length === 0 ? (
           <EmptyUploadButton
-            title="Add your characters, products, or clothes"
+            title="Add products, clothes, objects, or scenes"
             hint="Up to 8 images"
             icon={<ImageModeIcon className="text-primary/78 size-5 shrink-0" />}
             dragging={dragging}
             onClick={() => inputRef.current?.click()}
-            ariaLabel="Add your characters, products, or clothes"
+            ariaLabel="Add products, clothes, objects, or scenes"
           />
         ) : canAdd ? (
           <button
@@ -777,7 +783,7 @@ export function GeneratorPanel({
   const placeholder =
     mode === 'objects-swap'
       ? 'Describe what to swap in the video (optional)...'
-      : 'Describe the new scene or character (optional)...';
+      : 'Describe the new scene, product, outfit, or object (optional)...';
 
   const pollGeneration = useCallback(
     async (active: PersistedGeneration, runId: number) => {
@@ -959,6 +965,20 @@ export function GeneratorPanel({
     });
 
     try {
+      // Check reference images before requesting Higgsfield upload URLs, so
+      // blocked human-face references never reach the generation provider in
+      // the normal UI flow. The /generate route repeats this check as a
+      // server-side anti-bypass gate.
+      for (const image of images) {
+        const formData = new FormData();
+        formData.append('image', image.file, image.file.name);
+        await apiPostForm<{ safe: true }>(
+          '/api/genjutsu/check-reference',
+          formData
+        );
+        if (generationRunRef.current !== runId) return;
+      }
+
       const media = [video, ...images];
       const contentTypes = media.map(
         (item, index) =>
