@@ -186,7 +186,9 @@ async function main() {
     await seedSmokeTestCredits(cookie, email);
 
     console.log('\n[5/6] Uploading source media through the app upload API...');
+    const generationId = `e2e-${randomUUID()}`;
     const uploadBatch = await appPost('/api/genjutsu/upload-url', cookie, {
+      generationId,
       contentTypes: ['video/mp4', 'image/png'],
     });
     assert.equal(uploadBatch.uploads.length, 2);
@@ -214,7 +216,6 @@ async function main() {
     }
 
     console.log('\n[6/6] Running Generate → Status → source-video result...');
-    const generationId = `e2e-${randomUUID()}`;
     const started = await appPost('/api/genjutsu/generate', cookie, {
       generationId,
       mode: 'motion-transfer',
