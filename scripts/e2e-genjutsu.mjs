@@ -120,7 +120,7 @@ async function seedSmokeTestCredits(cookie, email) {
       id, user_id, user_email, order_no, subscription_no, transaction_no,
       transaction_type, transaction_scene, credits, remaining_credits,
       description, expires_at, status, created_at, updated_at
-    ) VALUES (?, ?, ?, '', '', ?, 'grant', 'genjutsu_e2e', 1000, 1000,
+    ) VALUES (?, ?, ?, '', '', ?, 'grant', 'genjutsu_e2e', 10000, 10000,
       'E2E smoke test credits', NULL, 'active', ?, ?)`,
     args: [randomUUID(), info.id, email, `e2e-${randomUUID()}`, now, now],
   });
