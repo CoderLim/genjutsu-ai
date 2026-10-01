@@ -371,7 +371,7 @@ async function assertReferenceImageSafe(file: File) {
   await apiPostForm<{ safe: true }>('/api/genjutsu/check-reference', formData);
 }
 
-function toastReferenceReject(cause: unknown) {
+function referenceSafetyUiMessage(cause: unknown): string {
   const code =
     cause instanceof ApiError &&
     cause.data &&
@@ -382,14 +382,18 @@ function toastReferenceReject(cause: unknown) {
   const message = cause instanceof ApiError ? cause.message : '';
 
   if (code === 'REFERENCE_FACE_DETECTED' || /human face/i.test(message)) {
-    toast.error('不允许上传真人');
-    return;
+    return '不允许上传真人';
   }
   if (code === 'FACE_DETECTION_UNAVAILABLE') {
-    toast.error('安全检测暂时不可用，请稍后再试');
-    return;
+    return '安全检测暂时不可用，请稍后再试';
   }
-  toast.error('参考图校验失败，请换一张再试');
+  return cause instanceof Error
+    ? cause.message
+    : '参考图校验失败，请换一张再试';
+}
+
+function toastReferenceReject(cause: unknown) {
+  toast.error(referenceSafetyUiMessage(cause));
 }
 
 function redirectToSignIn() {
@@ -546,11 +550,9 @@ function ImageUploadSlot({
         {items.length === 0 ? (
           <EmptyUploadButton
             title={
-              checking
-                ? 'Checking reference…'
-                : 'Add products, clothes, objects, or scenes'
+              checking ? '检测中…' : 'Add products, clothes, objects, or scenes'
             }
-            hint="No real human faces · up to 8 images"
+            hint="不支持真人脸 · 最多 8 张"
             icon={<ImageModeIcon className="text-primary/78 size-5 shrink-0" />}
             dragging={dragging}
             onClick={openPicker}
@@ -1142,7 +1144,16 @@ export function GeneratorPanel({
         setStatus('idle');
         setResult(null);
         setNeedsCredits(insufficient);
-        setError(cause.message);
+        const faceOrSafety =
+          apiData?.code === 'REFERENCE_FACE_DETECTED' ||
+          apiData?.code === 'FACE_DETECTION_UNAVAILABLE' ||
+          (typeof cause.message === 'string' &&
+            /human face/i.test(cause.message));
+        const uiMessage = faceOrSafety
+          ? referenceSafetyUiMessage(cause)
+          : cause.message;
+        if (faceOrSafety) toast.error(uiMessage);
+        setError(uiMessage);
         return;
       }
 

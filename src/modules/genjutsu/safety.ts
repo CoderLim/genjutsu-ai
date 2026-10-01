@@ -1,4 +1,5 @@
 import { getConfig } from '@/modules/config/service';
+
 import { isGenjutsuE2EMockEnabled } from './e2e-mock';
 
 const FAL_FACE_DETECTION_URL =
@@ -102,7 +103,11 @@ export async function assertGenjutsuReferenceImagesSafe(
 ): Promise<void> {
   if (isGenjutsuE2EMockEnabled()) return;
 
-  if (!Array.isArray(imageUrls) || imageUrls.length < 1 || imageUrls.length > 8) {
+  if (
+    !Array.isArray(imageUrls) ||
+    imageUrls.length < 1 ||
+    imageUrls.length > 8
+  ) {
     throw new Error('Provide between 1 and 8 reference images');
   }
 
@@ -110,7 +115,7 @@ export async function assertGenjutsuReferenceImagesSafe(
   if (detections.some(Boolean)) {
     throw new GenjutsuSafetyError(
       'REFERENCE_FACE_DETECTED',
-      'Reference images containing real human faces are not supported. Anime, cartoon, illustration, and 3D character references are allowed.',
+      '不允许上传真人。动漫、卡通、插画和 3D 角色参考图可以使用。',
       422
     );
   }
