@@ -5,6 +5,9 @@ const FAL_FACE_DETECTION_URL =
   'https://fal.run/fal-ai/moondream3-preview/detect';
 const FACE_DETECTION_TIMEOUT_MS = 15_000;
 
+export const REAL_HUMAN_FACE_DETECTION_PROMPT =
+  'real human face, photorealistic human face, actual person face; exclude anime, cartoon, illustration, 3D character, game character';
+
 export type GenjutsuSafetyCode =
   | 'REFERENCE_FACE_DETECTED'
   | 'FACE_DETECTION_UNAVAILABLE';
@@ -61,7 +64,7 @@ async function detectHumanFace(imageUrl: string): Promise<boolean> {
       },
       body: JSON.stringify({
         image_url: imageUrl,
-        prompt: 'human face',
+        prompt: REAL_HUMAN_FACE_DETECTION_PROMPT,
         preview: false,
       }),
       signal: controller.signal,
@@ -107,7 +110,7 @@ export async function assertGenjutsuReferenceImagesSafe(
   if (detections.some(Boolean)) {
     throw new GenjutsuSafetyError(
       'REFERENCE_FACE_DETECTED',
-      'Reference images containing human faces are not supported. Use product, clothing, object, or scene references instead.',
+      'Reference images containing real human faces are not supported. Anime, cartoon, illustration, and 3D character references are allowed.',
       422
     );
   }
