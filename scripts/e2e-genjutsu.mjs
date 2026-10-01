@@ -91,7 +91,7 @@ async function ensureSession() {
 
   await readJson(signUpResponse);
   let cookie = cookiesFromResponse(signUpResponse);
-  if (cookie) return cookie;
+  if (cookie) return { cookie, email };
 
   const signInResponse = await fetch(`${baseUrl}/api/auth/sign-in/email`, {
     method: 'POST',
@@ -104,7 +104,26 @@ async function ensureSession() {
   await readJson(signInResponse);
   cookie = cookiesFromResponse(signInResponse);
   assert.ok(cookie, 'auth response did not set a session cookie');
-  return cookie;
+  return { cookie, email };
+}
+
+/** Smoke-test only: seed credits so reserve can succeed without generate auto-grant. */
+async function seedSmokeTestCredits(cookie, email) {
+  const info = await appGet('/api/user/info', cookie);
+  assert.ok(info.id, 'user info missing id');
+
+  const { createClient } = await import('@libsql/client');
+  const client = createClient({ url: childEnv.DATABASE_URL });
+  const now = Date.now();
+  await client.execute({
+    sql: `INSERT INTO credit (
+      id, user_id, user_email, order_no, subscription_no, transaction_no,
+      transaction_type, transaction_scene, credits, remaining_credits,
+      description, expires_at, status, created_at, updated_at
+    ) VALUES (?, ?, ?, '', '', ?, 'grant', 'genjutsu_e2e', 1000, 1000,
+      'E2E smoke test credits', NULL, 'active', ?, ?)`,
+    args: [randomUUID(), info.id, email, `e2e-${randomUUID()}`, now, now],
+  });
 }
 
 async function appPost(path, cookie, body) {
@@ -163,7 +182,8 @@ async function main() {
     await waitForServer();
 
     console.log('\n[4/6] Creating an authenticated E2E user...');
-    const cookie = await ensureSession();
+    const { cookie, email } = await ensureSession();
+    await seedSmokeTestCredits(cookie, email);
 
     console.log('\n[5/6] Uploading source media through the app upload API...');
     const uploadBatch = await appPost('/api/genjutsu/upload-url', cookie, {

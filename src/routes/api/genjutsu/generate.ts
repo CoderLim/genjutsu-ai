@@ -2,11 +2,6 @@ import { createFileRoute } from '@tanstack/react-router';
 
 import { getAuth } from '@/core/auth';
 import {
-  CreditTransactionScene,
-  getBalance,
-  grant,
-} from '@/modules/credits/service';
-import {
   assertGenerationId,
   claimGenjutsuSubmission,
   getGenjutsuTaskById,
@@ -17,7 +12,6 @@ import {
   refundGenjutsuGeneration,
   reserveGenjutsuCredits,
 } from '@/modules/genjutsu/billing';
-import { isGenjutsuE2EMockEnabled } from '@/modules/genjutsu/e2e-mock';
 import { calculateGenjutsuCredits } from '@/modules/genjutsu/pricing';
 import {
   assertGenjutsuReferenceImagesSafe,
@@ -159,19 +153,6 @@ async function POST({ request }: { request: Request }) {
             : undefined,
       });
       const credits = calculateGenjutsuCredits(estimate.providerCostUsd);
-
-      if (isGenjutsuE2EMockEnabled()) {
-        const balance = await getBalance(session.user.id);
-        if (balance < credits) {
-          await grant({
-            userId: session.user.id,
-            userEmail: session.user.email,
-            credits: Math.max(1000 - balance, credits - balance),
-            description: 'Genjutsu E2E test credits',
-            scene: CreditTransactionScene.GENJUTSU_E2E,
-          });
-        }
-      }
 
       task = await reserveGenjutsuCredits({
         generationId,
