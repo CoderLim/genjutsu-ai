@@ -98,12 +98,29 @@ export async function reserveGenjutsuCredits(params: {
   mode: GenjutsuMode;
   resolution: GenjutsuResolution;
   prompt: string;
-  videoUrl: string;
-  imageUrls: string[];
+  videoKey?: string;
+  imageKeys?: string[];
+  videoUrl?: string;
+  imageUrls?: string[];
   providerCostUsd: number;
   credits: number;
   providerEstimate?: unknown;
 }) {
+  const hasStorageInput =
+    typeof params.videoKey === 'string' &&
+    params.videoKey.length > 0 &&
+    Array.isArray(params.imageKeys) &&
+    params.imageKeys.length > 0;
+  const hasLegacyUrlInput =
+    typeof params.videoUrl === 'string' &&
+    params.videoUrl.length > 0 &&
+    Array.isArray(params.imageUrls) &&
+    params.imageUrls.length > 0;
+
+  if (!hasStorageInput && !hasLegacyUrlInput) {
+    throw new Error('Genjutsu generation input is missing');
+  }
+
   const existing = await getGenjutsuTaskById({
     generationId: params.generationId,
     userId: params.userId,
@@ -155,8 +172,15 @@ export async function reserveGenjutsuCredits(params: {
         mode: params.mode,
         resolution: params.resolution,
         prompt: params.prompt,
-        videoUrl: params.videoUrl,
-        imageUrls: params.imageUrls,
+        ...(hasStorageInput
+          ? {
+              videoKey: params.videoKey,
+              imageKeys: params.imageKeys,
+            }
+          : {
+              videoUrl: params.videoUrl,
+              imageUrls: params.imageUrls,
+            }),
       }),
       status: 'reserved',
       taskId: null,
@@ -264,15 +288,25 @@ export async function settleGenjutsuGeneration(params: {
   generationId: string;
   userId: string;
   providerStatus: string;
-  videoUrl: string;
+  videoKey?: string;
+  videoUrl?: string;
+  providerVideoUrl?: string;
 }) {
+  if (!params.videoKey && !params.videoUrl) {
+    throw new Error('Completed Genjutsu generation is missing a result');
+  }
+
   await db()
     .update(aiTask)
     .set({
       status: 'completed',
       taskResult: JSON.stringify({
         providerStatus: params.providerStatus,
-        videoUrl: params.videoUrl,
+        ...(params.videoKey ? { videoKey: params.videoKey } : {}),
+        ...(params.videoUrl ? { videoUrl: params.videoUrl } : {}),
+        ...(params.providerVideoUrl
+          ? { providerVideoUrl: params.providerVideoUrl }
+          : {}),
       }),
     })
     .where(
