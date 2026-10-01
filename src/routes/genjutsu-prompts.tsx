@@ -7,9 +7,9 @@ import { GENJUTSU_PROMPT_IDEAS } from '@/components/landing/content';
 import { SiteFooter } from '@/components/landing/SiteFooter';
 import { SiteHeader } from '@/components/landing/SiteHeader';
 
-const PAGE_TITLE = 'Genjutsu Prompt Ideas — Character, Outfit & Scene Swaps';
+const PAGE_TITLE = 'Genjutsu Prompt Ideas — Product, Outfit & Scene Swaps';
 const PAGE_DESCRIPTION =
-  'Ready-to-use Genjutsu prompts for swapping characters, outfits, scenes, and props while keeping the original video motion.';
+  'Ready-to-use Genjutsu prompts for swapping products, outfits, scenes, and props while keeping the original video motion.';
 
 function GenjutsuPromptsPage() {
   return (
@@ -38,7 +38,7 @@ function GenjutsuPromptsPage() {
             >
               homepage generator
             </Link>
-            , and rewrite who or what is in the shot while keeping the original
+            , and rewrite products, outfits, objects, or scenes while keeping the original
             motion.
           </p>
 
