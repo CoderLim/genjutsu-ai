@@ -12,8 +12,14 @@ import {
   refundGenjutsuGeneration,
   reserveGenjutsuCredits,
 } from '@/modules/genjutsu/billing';
-import { calculateGenjutsuCredits } from '@/modules/genjutsu/pricing';
-import { isGenjutsuE2EMockEnabled } from '@/modules/genjutsu/e2e-mock';
+import {
+  calculateGenjutsuCredits,
+  estimateGenjutsuCredits,
+} from '@/modules/genjutsu/pricing';
+import {
+  isGenjutsuE2EMockEnabled,
+  resolveGenjutsuE2EInputUrls,
+} from '@/modules/genjutsu/e2e-mock';
 import { resolveGenjutsuInputUrls } from '@/modules/genjutsu/storage';
 import {
   assertGenjutsuReferenceImagesSafe,
@@ -26,6 +32,7 @@ import {
   type GenjutsuMode,
   type GenjutsuResolution,
 } from '@/modules/genjutsu/service';
+import { getBalance } from '@/modules/credits/service';
 import { enforceMinIntervalRateLimit } from '@/lib/rate-limit';
 import { respData, respErr, respJson } from '@/lib/resp';
 
@@ -112,12 +119,17 @@ async function resolveProviderInput(params: {
     Array.isArray(input.imageKeys) &&
     input.imageKeys.length > 0
   ) {
-    const urls = await resolveGenjutsuInputUrls({
-      userId: params.userId,
-      generationId: params.generationId,
-      videoKey: input.videoKey,
-      imageKeys: input.imageKeys,
-    });
+    const urls = params.allowLegacyUrls && isGenjutsuE2EMockEnabled()
+      ? resolveGenjutsuE2EInputUrls({
+          videoKey: input.videoKey,
+          imageKeys: input.imageKeys,
+        })
+      : await resolveGenjutsuInputUrls({
+          userId: params.userId,
+          generationId: params.generationId,
+          videoKey: input.videoKey,
+          imageKeys: input.imageKeys,
+        });
     return {
       mode: input.mode,
       resolution: input.resolution,
@@ -195,9 +207,32 @@ async function POST({ request }: { request: Request }) {
       allowLegacyUrls: Boolean(task) || isGenjutsuE2EMockEnabled(),
     });
 
+    let pendingQuote:
+      | {
+          providerCostUsd: number;
+          credits: number;
+          providerEstimate: unknown;
+        }
+      | null = null;
+
+    if (!task) {
+      // Cheap preflight before Fal: if the user cannot afford even the
+      // minimum 4-second clip at this resolution, fail without paying for a
+      // face-detection request. Exact provider pricing still happens only
+      // after the server-side safety gate.
+      const minimumCredits = estimateGenjutsuCredits({
+        durationSeconds: 4,
+        resolution: input.resolution,
+      });
+      const balance = await getBalance(session.user.id);
+      if (balance < minimumCredits) {
+        throw new InsufficientCreditsError(minimumCredits, balance);
+      }
+    }
+
     // Defense in depth: the normal UI checks local reference files before
-    // uploading them to R2, and this server-side gate checks fresh signed R2
-    // read URLs again so direct API calls cannot bypass the restriction.
+    // uploading them to R2, and this server-side gate checks the uploaded
+    // objects again so direct API calls cannot bypass the restriction.
     try {
       await assertGenjutsuReferenceImagesSafe(providerInput.imageUrls);
     } catch (error) {
@@ -228,9 +263,9 @@ async function POST({ request }: { request: Request }) {
     }
 
     if (!task) {
-      // Prefer live /estimate USD, but never block generation on a missing or
-      // non-numeric estimate (Genjutsu may return pricing_description only).
-      // Client-supplied credit amounts are still ignored.
+      // Prefer live /estimate USD after safety validation. Client-supplied
+      // credit amounts are ignored; reserveGenjutsuCredits remains the final
+      // atomic balance check.
       const estimate = await resolveGenjutsuProviderCost({
         ...providerInput,
         durationSeconds:
@@ -239,15 +274,20 @@ async function POST({ request }: { request: Request }) {
             : undefined,
       });
       const credits = calculateGenjutsuCredits(estimate.providerCostUsd);
+      pendingQuote = {
+        providerCostUsd: estimate.providerCostUsd,
+        credits,
+        providerEstimate: estimate.payload,
+      };
 
       task = await reserveGenjutsuCredits({
         generationId,
         userId: session.user.id,
         userEmail: session.user.email,
         ...input,
-        providerCostUsd: estimate.providerCostUsd,
-        credits,
-        providerEstimate: estimate.payload,
+        providerCostUsd: pendingQuote.providerCostUsd,
+        credits: pendingQuote.credits,
+        providerEstimate: pendingQuote.providerEstimate,
       });
 
       if (task.status !== 'reserved') {
