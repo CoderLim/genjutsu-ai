@@ -13,6 +13,8 @@ import {
   reserveGenjutsuCredits,
 } from '@/modules/genjutsu/billing';
 import { calculateGenjutsuCredits } from '@/modules/genjutsu/pricing';
+import { isGenjutsuE2EMockEnabled } from '@/modules/genjutsu/e2e-mock';
+import { resolveGenjutsuInputUrls } from '@/modules/genjutsu/storage';
 import {
   assertGenjutsuReferenceImagesSafe,
   GenjutsuSafetyError,
@@ -31,6 +33,16 @@ type GenerationInput = {
   mode: GenjutsuMode;
   resolution: GenjutsuResolution;
   prompt: string;
+  videoKey?: string;
+  imageKeys?: string[];
+  videoUrl?: string;
+  imageUrls?: string[];
+};
+
+type ProviderGenerationInput = {
+  mode: GenjutsuMode;
+  resolution: GenjutsuResolution;
+  prompt: string;
   videoUrl: string;
   imageUrls: string[];
 };
@@ -40,8 +52,18 @@ function inputFromBody(body: any): GenerationInput {
     mode: body.mode as GenjutsuMode,
     resolution: body.resolution as GenjutsuResolution,
     prompt: typeof body.prompt === 'string' ? body.prompt : '',
-    videoUrl: typeof body.videoUrl === 'string' ? body.videoUrl : '',
-    imageUrls: Array.isArray(body.imageUrls) ? body.imageUrls : [],
+    videoKey: typeof body.videoKey === 'string' ? body.videoKey : undefined,
+    imageKeys: Array.isArray(body.imageKeys)
+      ? body.imageKeys.filter(
+          (value: unknown): value is string => typeof value === 'string'
+        )
+      : undefined,
+    videoUrl: typeof body.videoUrl === 'string' ? body.videoUrl : undefined,
+    imageUrls: Array.isArray(body.imageUrls)
+      ? body.imageUrls.filter(
+          (value: unknown): value is string => typeof value === 'string'
+        )
+      : undefined,
   };
 }
 
@@ -60,9 +82,66 @@ function inputFromTask(task: {
         : typeof task.prompt === 'string'
           ? task.prompt
           : '',
-    videoUrl: typeof parsed.videoUrl === 'string' ? parsed.videoUrl : '',
-    imageUrls: Array.isArray(parsed.imageUrls) ? parsed.imageUrls : [],
+    videoKey:
+      typeof parsed.videoKey === 'string' ? parsed.videoKey : undefined,
+    imageKeys: Array.isArray(parsed.imageKeys)
+      ? parsed.imageKeys.filter(
+          (value: unknown): value is string => typeof value === 'string'
+        )
+      : undefined,
+    videoUrl:
+      typeof parsed.videoUrl === 'string' ? parsed.videoUrl : undefined,
+    imageUrls: Array.isArray(parsed.imageUrls)
+      ? parsed.imageUrls.filter(
+          (value: unknown): value is string => typeof value === 'string'
+        )
+      : undefined,
   };
+}
+
+async function resolveProviderInput(params: {
+  input: GenerationInput;
+  userId: string;
+  generationId: string;
+  allowLegacyUrls: boolean;
+}): Promise<ProviderGenerationInput> {
+  const { input } = params;
+
+  if (
+    typeof input.videoKey === 'string' &&
+    Array.isArray(input.imageKeys) &&
+    input.imageKeys.length > 0
+  ) {
+    const urls = await resolveGenjutsuInputUrls({
+      userId: params.userId,
+      generationId: params.generationId,
+      videoKey: input.videoKey,
+      imageKeys: input.imageKeys,
+    });
+    return {
+      mode: input.mode,
+      resolution: input.resolution,
+      prompt: input.prompt,
+      ...urls,
+    };
+  }
+
+  if (
+    params.allowLegacyUrls &&
+    typeof input.videoUrl === 'string' &&
+    Array.isArray(input.imageUrls) &&
+    input.imageUrls.length > 0
+  ) {
+    return {
+      mode: input.mode,
+      resolution: input.resolution,
+      prompt: input.prompt,
+      videoUrl: input.videoUrl,
+      imageUrls: input.imageUrls,
+    };
+  }
+
+  throw new Error('Upload the source media to R2 before starting Genjutsu');
 }
 
 function taskResponse(task: any) {
@@ -109,11 +188,18 @@ async function POST({ request }: { request: Request }) {
       input = inputFromBody(body);
     }
 
+    const providerInput = await resolveProviderInput({
+      input,
+      userId: session.user.id,
+      generationId,
+      allowLegacyUrls: Boolean(task) || isGenjutsuE2EMockEnabled(),
+    });
+
     // Defense in depth: the normal UI checks local reference files before
-    // uploading them to Higgsfield, and this server-side gate checks the final
-    // provider URLs again so direct API calls cannot bypass the restriction.
+    // uploading them to R2, and this server-side gate checks fresh signed R2
+    // read URLs again so direct API calls cannot bypass the restriction.
     try {
-      await assertGenjutsuReferenceImagesSafe(input.imageUrls);
+      await assertGenjutsuReferenceImagesSafe(providerInput.imageUrls);
     } catch (error) {
       if (error instanceof GenjutsuSafetyError) {
         let refundedCredits = 0;
@@ -146,7 +232,7 @@ async function POST({ request }: { request: Request }) {
       // non-numeric estimate (Genjutsu may return pricing_description only).
       // Client-supplied credit amounts are still ignored.
       const estimate = await resolveGenjutsuProviderCost({
-        ...input,
+        ...providerInput,
         durationSeconds:
           typeof body.durationSeconds === 'number'
             ? body.durationSeconds
@@ -184,7 +270,7 @@ async function POST({ request }: { request: Request }) {
     }
 
     try {
-      const result = await submitGenjutsu(input);
+      const result = await submitGenjutsu(providerInput);
 
       await markGenjutsuSubmitted({
         generationId,
