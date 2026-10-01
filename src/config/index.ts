@@ -106,6 +106,19 @@ export const envConfigs: Record<string, string> = {
   higgsfield_genjutsu_object_swap_model:
     procEnv.HIGGSFIELD_GENJUTSU_OBJECT_SWAP_MODEL ??
     'higgsfield/genjutsu/object-swap/v1.0',
+
+  // Genjutsu workflow routing. Keep Higgsfield as the safe default; Seedance
+  // can be enabled independently per workflow for controlled rollout/A-B tests.
+  genjutsu_motion_provider:
+    procEnv.GENJUTSU_MOTION_PROVIDER ?? 'higgsfield',
+  genjutsu_object_swap_provider:
+    procEnv.GENJUTSU_OBJECT_SWAP_PROVIDER ?? 'higgsfield',
+  seedance_genjutsu_model:
+    procEnv.SEEDANCE_GENJUTSU_MODEL ??
+    'bytedance/seedance-2.5/us/reference-to-video',
+  seedance_genjutsu_generate_audio:
+    procEnv.SEEDANCE_GENJUTSU_GENERATE_AUDIO ?? 'true',
+
   genjutsu_e2e_mock: procEnv.GENJUTSU_E2E_MOCK ?? 'false',
 
   // Locale (public)
