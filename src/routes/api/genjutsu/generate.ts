@@ -28,8 +28,11 @@ import {
 import {
   HiggsfieldHttpError,
   resolveGenjutsuProviderCost,
+  resolveGenjutsuProviderTarget,
+  SeedanceHttpError,
   submitGenjutsu,
   type GenjutsuMode,
+  type GenjutsuProvider,
   type GenjutsuResolution,
 } from '@/modules/genjutsu/service';
 import { getBalance } from '@/modules/credits/service';
@@ -200,6 +203,15 @@ async function POST({ request }: { request: Request }) {
       input = inputFromBody(body);
     }
 
+    const target = task
+      ? {
+          provider: (task.provider || 'higgsfield') as GenjutsuProvider,
+          model:
+            task.model ||
+            resolveGenjutsuProviderTarget(input.mode).model,
+        }
+      : resolveGenjutsuProviderTarget(input.mode);
+
     const providerInput = await resolveProviderInput({
       input,
       userId: session.user.id,
@@ -215,8 +227,8 @@ async function POST({ request }: { request: Request }) {
         }
       | null = null;
 
-    if (!task) {
-      // Cheap preflight before Fal: if the user cannot afford even the
+    if (!task && target.provider === 'higgsfield') {
+      // Cheap preflight before Fal safety: if the user cannot afford even the
       // minimum 4-second clip at this resolution, fail without paying for a
       // face-detection request. Exact provider pricing still happens only
       // after the server-side safety gate.
@@ -268,6 +280,7 @@ async function POST({ request }: { request: Request }) {
       // atomic balance check.
       const estimate = await resolveGenjutsuProviderCost({
         ...providerInput,
+        ...target,
         durationSeconds:
           typeof body.durationSeconds === 'number'
             ? body.durationSeconds
@@ -285,6 +298,7 @@ async function POST({ request }: { request: Request }) {
         userId: session.user.id,
         userEmail: session.user.email,
         ...input,
+        ...target,
         providerCostUsd: pendingQuote.providerCostUsd,
         credits: pendingQuote.credits,
         providerEstimate: pendingQuote.providerEstimate,
@@ -310,7 +324,11 @@ async function POST({ request }: { request: Request }) {
     }
 
     try {
-      const result = await submitGenjutsu(providerInput);
+      const result = await submitGenjutsu({
+        ...providerInput,
+        ...target,
+        endUserId: session.user.id,
+      });
 
       await markGenjutsuSubmitted({
         generationId,
@@ -334,7 +352,10 @@ async function POST({ request }: { request: Request }) {
             }
       );
     } catch (error: any) {
-      if (error instanceof HiggsfieldHttpError) {
+      if (
+        error instanceof HiggsfieldHttpError ||
+        error instanceof SeedanceHttpError
+      ) {
         await refundGenjutsuGeneration({
           generationId,
           userId: session.user.id,
@@ -343,7 +364,7 @@ async function POST({ request }: { request: Request }) {
         });
         return respJson(
           -1,
-          error.message || 'Higgsfield rejected the generation',
+          error.message || 'The video provider rejected the generation',
           {
             code: 'PROVIDER_REJECTED',
             generationId,
@@ -353,7 +374,7 @@ async function POST({ request }: { request: Request }) {
         );
       }
 
-      // A transport error can happen after Higgsfield accepted the request but
+      // A transport error can happen after the provider accepted the request but
       // before we received request_id. Retrying automatically could create a
       // second billable generation, so keep the reservation and flag it.
       const message =
