@@ -104,6 +104,27 @@ export default defineConfig({
       srcDirectory: 'src',
     }),
     viteReact(),
+    // Nitro's vite-dev middleware treats Sec-Fetch-Dest: video|image|audio as
+    // static assets and skips the API handler (#4270). That breaks <video src>
+    // / <img src> against /api/* in local mock (e2e-upload). Force those
+    // requests through Nitro by normalizing the dest before Nitro's pre-hook.
+    {
+      name: 'force-api-through-nitro',
+      configureServer(server) {
+        server.middlewares.use((req, _res, next) => {
+          const url = req.url || '';
+          const dest = req.headers['sec-fetch-dest'];
+          if (
+            url.startsWith('/api/') &&
+            typeof dest === 'string' &&
+            dest !== 'empty'
+          ) {
+            req.headers['sec-fetch-dest'] = 'empty';
+          }
+          next();
+        });
+      },
+    },
     nitro(),
   ],
 });
