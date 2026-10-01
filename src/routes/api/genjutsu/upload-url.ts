@@ -5,7 +5,8 @@ import {
   createGenjutsuE2EUploadDescriptor,
   isGenjutsuE2EMockEnabled,
 } from '@/modules/genjutsu/e2e-mock';
-import { createHiggsfieldUploadUrl } from '@/modules/genjutsu/service';
+import { assertGenerationId } from '@/modules/genjutsu/billing';
+import { createGenjutsuR2UploadDescriptor } from '@/modules/genjutsu/storage';
 import { enforceMinIntervalRateLimit } from '@/lib/rate-limit';
 import { respData, respErr } from '@/lib/resp';
 
@@ -24,6 +25,7 @@ async function POST({ request }: { request: Request }) {
     }
 
     const body = await request.json().catch(() => ({}));
+    const generationId = assertGenerationId(body.generationId);
     const contentTypes = Array.isArray(body.contentTypes)
       ? body.contentTypes.filter(
           (value: unknown): value is string => typeof value === 'string'
@@ -39,11 +41,17 @@ async function POST({ request }: { request: Request }) {
     }
 
     const uploads = [];
-    for (const contentType of contentTypes) {
+    for (let index = 0; index < contentTypes.length; index += 1) {
+      const contentType = contentTypes[index];
       uploads.push(
         isGenjutsuE2EMockEnabled()
           ? createGenjutsuE2EUploadDescriptor(request, contentType)
-          : await createHiggsfieldUploadUrl(contentType)
+          : await createGenjutsuR2UploadDescriptor({
+              userId: session.user.id,
+              generationId,
+              index,
+              contentType,
+            })
       );
     }
 
