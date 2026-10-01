@@ -370,12 +370,21 @@ async function assertReferenceImageSafe(file: File) {
   await apiPostForm<{ safe: true }>('/api/genjutsu/check-reference', formData);
 }
 
+function redirectToSignIn() {
+  const callbackUrl = encodeURIComponent(
+    `${window.location.pathname}${window.location.search}`
+  );
+  window.location.href = `/sign-in?callbackUrl=${callbackUrl}`;
+}
+
 function ImageUploadSlot({
   items,
   onChange,
+  signedIn,
 }: {
   items: MediaItem[];
   onChange: (items: MediaItem[]) => void;
+  signedIn: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [previewId, setPreviewId] = useState<string | null>(null);
@@ -385,9 +394,22 @@ function ImageUploadSlot({
   const previewItem = items.find((i) => i.id === previewId) ?? null;
   const canAdd = items.length < IMAGE_MAX;
 
+  const openPicker = useCallback(() => {
+    if (!signedIn) {
+      redirectToSignIn();
+      return;
+    }
+    inputRef.current?.click();
+  }, [signedIn]);
+
   const mergeFiles = useCallback(
     async (list: FileList | File[] | null) => {
       if (!list || list.length === 0) return;
+      if (!signedIn) {
+        redirectToSignIn();
+        return;
+      }
+
       const incoming = Array.from(list).filter((f) =>
         f.type.startsWith('image/')
       );
@@ -429,7 +451,7 @@ function ImageUploadSlot({
         setChecking(false);
       }
     },
-    [items, onChange]
+    [items, onChange, signedIn]
   );
 
   const removeAt = (id: string) => {
@@ -522,13 +544,13 @@ function ImageUploadSlot({
                 <ImageModeIcon className="text-primary/78 size-5 shrink-0" />
               }
               dragging={dragging}
-              onClick={() => inputRef.current?.click()}
+              onClick={openPicker}
               ariaLabel="Add products, clothes, objects, or scenes"
             />
           ) : canAdd ? (
             <button
               type="button"
-              onClick={() => inputRef.current?.click()}
+              onClick={openPicker}
               aria-label="Add more images"
               disabled={checking}
               className="relative block h-[96px] w-[68px] focus:ring-0 focus:outline-none disabled:opacity-60"
@@ -992,10 +1014,7 @@ export function GeneratorPanel({
     if (!video || images.length === 0 || status === 'generating') return;
 
     if (!session?.user) {
-      const callbackUrl = encodeURIComponent(
-        `${window.location.pathname}${window.location.search}`
-      );
-      window.location.href = `/sign-in?callbackUrl=${callbackUrl}`;
+      redirectToSignIn();
       return;
     }
 
@@ -1179,7 +1198,11 @@ export function GeneratorPanel({
         <div className="flex min-h-[124px] flex-col items-stretch gap-2 sm:min-h-[144px] sm:flex-row sm:gap-3">
           <div className="flex shrink-0 flex-wrap gap-2 self-start pt-1 sm:pt-2">
             <VideoUploadSlot item={video} onChange={setVideo} />
-            <ImageUploadSlot items={images} onChange={setImages} />
+            <ImageUploadSlot
+              items={images}
+              onChange={setImages}
+              signedIn={Boolean(session?.user)}
+            />
           </div>
 
           <div className="relative flex min-w-0 flex-1 flex-col">

@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
 
+import { getAuth } from '@/core/auth';
 import {
   assertGenjutsuReferenceImagesSafe,
   GenjutsuSafetyError,
@@ -26,15 +27,19 @@ async function fileToDataUri(file: File) {
 }
 
 async function POST({ request }: { request: Request }) {
-  // Public so guests get upload-time face feedback before sign-in. IP rate
-  // limit keeps the Fal proxy from being freely abused.
   const limited = enforceMinIntervalRateLimit(request, {
-    intervalMs: 800,
+    intervalMs: 250,
     keyPrefix: 'genjutsu-reference-safety',
   });
   if (limited) return limited;
 
   try {
+    const auth = getAuth();
+    const session = await auth.api.getSession({ headers: request.headers });
+    if (!session?.user) {
+      return respErr('Unauthorized', { status: 401 });
+    }
+
     const formData = await request.formData();
     const image = formData.get('image');
 
