@@ -24,7 +24,7 @@ export function Hero({ className }: { className?: string }) {
       </h1>
 
       <p className="mx-auto mt-3 max-w-3xl text-base leading-relaxed text-white/82 sm:mt-4 sm:text-lg">
-        Swap the character, keep the motion. Genjutsu is a video-to-video model
+        Restyle the shot, keep the motion. Genjutsu is a video-to-video model
         by Higgsfield that rewrites who and what is in your clip while
         preserving the original camera movement and timing.
       </p>
