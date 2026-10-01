@@ -86,6 +86,8 @@ function createMediaItem(file: File): MediaItem {
 }
 
 const IMAGE_MAX = 8;
+const MAX_SOURCE_VIDEO_BYTES = 200 * 1024 * 1024;
+const MAX_REFERENCE_IMAGE_BYTES = 12 * 1024 * 1024;
 
 function revokeItem(item: MediaItem | null) {
   if (item) URL.revokeObjectURL(item.url);
@@ -274,6 +276,10 @@ function VideoUploadSlot({
       if (!list || list.length === 0) return;
       const file = Array.from(list).find((f) => f.type.startsWith('video/'));
       if (!file) return;
+      if (file.size <= 0 || file.size > MAX_SOURCE_VIDEO_BYTES) {
+        toast.error('Source video must be 200 MB or smaller');
+        return;
+      }
       revokeItem(item);
       onChange(createMediaItem(file));
     },
@@ -448,7 +454,16 @@ function ImageUploadSlot({
       const room = IMAGE_MAX - items.length;
       if (room <= 0) return;
 
-      const candidates = incoming.slice(0, room);
+      const candidates = incoming
+        .slice(0, room)
+        .filter((file) => {
+          if (file.size <= 0 || file.size > MAX_REFERENCE_IMAGE_BYTES) {
+            toast.error(`"${file.name}" must be 12 MB or smaller`);
+            return false;
+          }
+          return true;
+        });
+      if (candidates.length === 0) return;
       setChecking(true);
 
       const accepted: MediaItem[] = [];
@@ -1088,9 +1103,10 @@ export function GeneratorPanel({
         (item, index) =>
           item.file.type || (index === 0 ? 'video/mp4' : 'image/jpeg')
       );
+      const contentLengths = media.map((item) => item.file.size);
       const uploadBatch = await apiPost<{ uploads: SignedUpload[] }>(
         '/api/genjutsu/upload-url',
-        { generationId, contentTypes }
+        { generationId, contentTypes, contentLengths }
       );
 
       if (uploadBatch.uploads.length !== media.length) {
