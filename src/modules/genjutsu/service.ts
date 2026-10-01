@@ -218,7 +218,7 @@ export type GenjutsuCostEstimate = {
   providerCostUsd: number;
   providerCredits: unknown;
   payload: unknown;
-  source: 'estimate' | 'list_fallback';
+  source: 'estimate' | 'list_fallback' | 'seedance_list_estimate';
 };
 
 /**
