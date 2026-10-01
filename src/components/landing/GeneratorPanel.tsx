@@ -7,6 +7,7 @@ import {
   type DragEvent,
   type ReactNode,
 } from 'react';
+import { Loader2 } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { toast } from 'sonner';
 
@@ -552,8 +553,14 @@ function ImageUploadSlot({
             title={
               checking ? '检测中…' : 'Add products, clothes, objects, or scenes'
             }
-            hint="不支持真人脸 · 最多 8 张"
-            icon={<ImageModeIcon className="text-primary/78 size-5 shrink-0" />}
+            hint={checking ? '请稍候' : '不支持真人脸 · 最多 8 张'}
+            icon={
+              checking ? (
+                <Loader2 className="text-primary/90 size-5 shrink-0 animate-spin" />
+              ) : (
+                <ImageModeIcon className="text-primary/78 size-5 shrink-0" />
+              )
+            }
             dragging={dragging}
             onClick={openPicker}
             ariaLabel="Add products, clothes, objects, or scenes"
@@ -562,20 +569,32 @@ function ImageUploadSlot({
           <button
             type="button"
             onClick={openPicker}
-            aria-label="Add more images"
+            aria-label={checking ? '检测参考图中' : 'Add more images'}
             disabled={checking}
-            className="relative block h-[96px] w-[68px] focus:ring-0 focus:outline-none disabled:opacity-60"
+            className="relative block h-[96px] w-[68px] focus:ring-0 focus:outline-none disabled:opacity-100"
           >
             <span
               className={cn(
                 'border-primary/35 bg-primary/5 hover:border-primary/45 absolute inset-0 flex flex-col items-center justify-center gap-1 border-2 border-dashed text-[rgb(204,144,92)] transition-all duration-200',
-                dragging && 'border-primary/55 bg-primary/10'
+                dragging && 'border-primary/55 bg-primary/10',
+                checking && 'border-primary/50 bg-primary/10'
               )}
             >
-              <PlusIcon className="text-primary/78 size-5" />
-              <span className="text-foreground/44 text-[9px] leading-tight">
-                {checking ? '…' : `${items.length}/${IMAGE_MAX}`}
-              </span>
+              {checking ? (
+                <>
+                  <Loader2 className="text-primary/90 size-5 animate-spin" />
+                  <span className="text-foreground/70 text-[9px] leading-tight">
+                    检测中
+                  </span>
+                </>
+              ) : (
+                <>
+                  <PlusIcon className="text-primary/78 size-5" />
+                  <span className="text-foreground/44 text-[9px] leading-tight">
+                    {items.length}/{IMAGE_MAX}
+                  </span>
+                </>
+              )}
             </span>
           </button>
         ) : null}
