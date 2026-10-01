@@ -128,6 +128,23 @@ export function SiteFooter() {
               </Link>
             </div>
           </div>
+
+          <div className="border-border mt-6 flex items-center justify-center border-t pt-6">
+            <a
+              href="https://submito.net"
+              target="_blank"
+              rel="nofollow sponsored noopener noreferrer"
+              title="Listed on Submito"
+            >
+              <img
+                src="https://submito.net/badge/listed-light.svg"
+                alt="Listed on Submito"
+                loading="lazy"
+                decoding="async"
+                className="h-[27px] w-auto"
+              />
+            </a>
+          </div>
         </footer>
       </div>
     </section>
