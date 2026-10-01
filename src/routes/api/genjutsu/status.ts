@@ -3,11 +3,12 @@ import { createFileRoute } from '@tanstack/react-router';
 import { getAuth } from '@/core/auth';
 import { getGenjutsuStatus } from '@/modules/genjutsu/service';
 import {
+  copyGenjutsuE2EStorageObject,
   isGenjutsuE2EMockEnabled,
-  readGenjutsuE2EVideoUrl,
+  readGenjutsuE2EVideoKey,
 } from '@/modules/genjutsu/e2e-mock';
 import {
-  createGenjutsuR2ReadUrl,
+  getGenjutsuResultKey,
   persistGenjutsuResultToR2,
 } from '@/modules/genjutsu/storage';
 import {
@@ -20,6 +21,10 @@ import {
 } from '@/modules/genjutsu/billing';
 import { enforceMinIntervalRateLimit } from '@/lib/rate-limit';
 import { respData, respErr, respJson } from '@/lib/resp';
+
+function stableResultUrl(generationId: string) {
+  return `/api/genjutsu/result/${encodeURIComponent(generationId)}`;
+}
 
 async function GET({ request }: { request: Request }) {
   const limited = enforceMinIntervalRateLimit(request, {
@@ -61,15 +66,10 @@ async function GET({ request }: { request: Request }) {
     const parsed = parseGenjutsuTaskInfo(task);
 
     if (task.status === 'completed') {
-      const videoUrl =
-        typeof parsed.result?.videoKey === 'string'
-          ? await createGenjutsuR2ReadUrl(parsed.result.videoKey)
-          : parsed.result?.videoUrl || null;
-
       return respData({
         status: 'completed',
         providerStatus: parsed.result?.providerStatus || 'completed',
-        videoUrl,
+        videoUrl: stableResultUrl(task.id),
         reservedCredits: task.costCredits || 0,
       });
     }
@@ -106,24 +106,39 @@ async function GET({ request }: { request: Request }) {
     }
 
     if (isGenjutsuE2EMockEnabled()) {
-      const videoUrl = readGenjutsuE2EVideoUrl(task.options);
-      if (!videoUrl) {
-        return respErr('E2E generation is missing its source video', {
+      const sourceVideoKey = readGenjutsuE2EVideoKey(task.options);
+      if (!sourceVideoKey) {
+        return respErr('E2E generation is missing its source video key', {
           status: 500,
         });
       }
 
-      await settleGenjutsuGeneration({
+      const videoKey = getGenjutsuResultKey({
+        generationId: task.id,
+        userId: session.user.id,
+      });
+      copyGenjutsuE2EStorageObject(sourceVideoKey, videoKey);
+
+      const settled = await settleGenjutsuGeneration({
         generationId: task.id,
         userId: session.user.id,
         providerStatus: 'completed',
-        videoUrl,
+        videoKey,
       });
+
+      if (settled?.status !== 'completed') {
+        return respData({
+          status: settled?.status === 'refunded' ? 'failed' : 'processing',
+          providerStatus: settled?.status || 'processing',
+          videoUrl: null,
+          reservedCredits: task.costCredits || 0,
+        });
+      }
 
       return respData({
         status: 'completed',
         providerStatus: 'completed',
-        videoUrl,
+        videoUrl: stableResultUrl(task.id),
         reservedCredits: task.costCredits || 0,
       });
     }
@@ -137,32 +152,57 @@ async function GET({ request }: { request: Request }) {
         sourceUrl: provider.videoUrl,
       });
 
-      await settleGenjutsuGeneration({
+      const settled = await settleGenjutsuGeneration({
         generationId: task.id,
         userId: session.user.id,
         providerStatus: provider.providerStatus,
         videoKey: durable.videoKey,
-        providerVideoUrl: provider.videoUrl,
       });
 
+      if (settled?.status === 'completed') {
+        return respData({
+          ...provider,
+          videoUrl: stableResultUrl(task.id),
+          reservedCredits: task.costCredits || 0,
+        });
+      }
+
+      const settledParsed = settled ? parseGenjutsuTaskInfo(settled) : null;
       return respData({
-        ...provider,
-        videoUrl: durable.videoUrl,
+        status: settled?.status === 'refunded' ? 'failed' : 'processing',
+        providerStatus:
+          settledParsed?.result?.providerStatus || settled?.status || 'processing',
+        videoUrl: null,
+        error: settledParsed?.result?.error,
         reservedCredits: task.costCredits || 0,
+        refundedCredits:
+          settled?.status === 'refunded'
+            ? settledParsed?.result?.refundedCredits ?? settled.costCredits ?? 0
+            : undefined,
       });
     }
 
     if (provider.status === 'failed') {
-      await refundGenjutsuGeneration({
+      const refunded = await refundGenjutsuGeneration({
         generationId: task.id,
         userId: session.user.id,
         providerStatus: provider.providerStatus,
         error: provider.error || 'Generation failed',
       });
 
+      if (refunded?.status === 'completed') {
+        const completed = parseGenjutsuTaskInfo(refunded);
+        return respData({
+          status: 'completed',
+          providerStatus: completed.result?.providerStatus || 'completed',
+          videoUrl: stableResultUrl(refunded.id),
+          reservedCredits: refunded.costCredits || 0,
+        });
+      }
+
       return respData({
         ...provider,
-        refundedCredits: task.costCredits || 0,
+        refundedCredits: refunded?.costCredits ?? task.costCredits ?? 0,
       });
     }
 
