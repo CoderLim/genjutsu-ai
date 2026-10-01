@@ -8,6 +8,7 @@ import { Link } from '@/core/i18n/navigation';
 import { apiGet, type PageResult } from '@/lib/api-client';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
+import { useUserCredits } from '@/hooks/use-user-credits';
 import { DataTable, type Column } from '@/components/data-table';
 import { Badge } from '@/components/ui/badge';
 import { buttonVariants } from '@/components/ui/button';
@@ -46,10 +47,7 @@ function CreditsPage() {
     setPage(1);
   }, [tab, debouncedSearch]);
 
-  const balanceQuery = useQuery({
-    queryKey: ['user-credits', 'balance'],
-    queryFn: () => apiGet<{ balance: number }>('/api/credits'),
-  });
+  const balanceQuery = useUserCredits();
   const balance = balanceQuery.data?.balance ?? null;
   const balanceLoaded = !balanceQuery.isPending;
 

@@ -5,6 +5,7 @@ import { Activity, CreditCard, Key, TrendingUp } from 'lucide-react';
 import { useSession } from '@/core/auth/client';
 import { apiGet } from '@/lib/api-client';
 import { m } from '@/paraglide/messages.js';
+import { useUserCredits } from '@/hooks/use-user-credits';
 import {
   Card,
   CardContent,
@@ -22,10 +23,7 @@ type Subscription = {
 function DashboardPage() {
   const { data: session } = useSession();
 
-  const { data: creditsData } = useQuery({
-    queryKey: ['user-credits'],
-    queryFn: () => apiGet<{ balance: number }>('/api/credits'),
-  });
+  const { data: creditsData } = useUserCredits();
   const { data: apiKeysData } = useQuery({
     queryKey: ['user-apikeys'],
     queryFn: () => apiGet<unknown[]>('/api/apikeys'),

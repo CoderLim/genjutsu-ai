@@ -85,6 +85,7 @@
   "common.nav.billing": "Billing",
   "common.nav.apikeys": "API Keys",
   "common.nav.profile": "Profile",
+  "common.nav.credits_remaining": "{count} credits remaining",
   "common.nav.sign_in": "Sign In",
   "common.nav.get_started": "Get Started",
   "common.nav.theme_light": "Light",

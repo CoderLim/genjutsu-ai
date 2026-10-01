@@ -85,6 +85,7 @@
   "common.nav.billing": "账单",
   "common.nav.apikeys": "API 密钥",
   "common.nav.profile": "个人资料",
+  "common.nav.credits_remaining": "剩余 {count} 积分",
   "common.nav.sign_in": "登录",
   "common.nav.get_started": "开始使用",
   "common.nav.theme_light": "浅色模式",
