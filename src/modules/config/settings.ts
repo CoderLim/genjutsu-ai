@@ -527,6 +527,7 @@ export function getSettings(): Setting[] {
       group: 'waffo',
       tab: 'payment',
       defaultValue: 'test',
+      tip: 'Controls checkout mode via Store Slug X-Environment. Production means real charges.',
     },
     {
       name: 'waffo_merchant_id',
