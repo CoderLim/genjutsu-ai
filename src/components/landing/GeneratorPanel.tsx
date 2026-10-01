@@ -539,7 +539,7 @@ function ImageUploadSlot({
                   ? 'Checking reference…'
                   : 'Add products, clothes, objects, or scenes'
               }
-              hint="No human faces · up to 8 images"
+              hint="No real human faces · up to 8 images"
               icon={
                 <ImageModeIcon className="text-primary/78 size-5 shrink-0" />
               }
