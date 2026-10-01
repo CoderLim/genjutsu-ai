@@ -242,12 +242,16 @@ function EmptyUploadButton({
         )}
       >
         {icon}
-        <span className="text-foreground/78 text-center text-[10px] leading-snug font-medium">
-          {title}
-        </span>
-        <span className="text-foreground/44 text-center text-[9px] leading-tight">
-          {hint}
-        </span>
+        {title ? (
+          <span className="text-foreground/78 text-center text-[10px] leading-snug font-medium">
+            {title}
+          </span>
+        ) : null}
+        {hint ? (
+          <span className="text-foreground/44 text-center text-[9px] leading-tight">
+            {hint}
+          </span>
+        ) : null}
       </span>
     </button>
   );
@@ -550,10 +554,8 @@ function ImageUploadSlot({
 
         {items.length === 0 ? (
           <EmptyUploadButton
-            title={
-              checking ? '检测中…' : 'Add products, clothes, objects, or scenes'
-            }
-            hint={checking ? '请稍候' : '不支持真人脸 · 最多 8 张'}
+            title={checking ? '' : 'Add products, clothes, objects, or scenes'}
+            hint={checking ? '' : '不支持真人脸 · 最多 8 张'}
             icon={
               checking ? (
                 <Loader2 className="text-primary/90 size-5 shrink-0 animate-spin" />
@@ -581,12 +583,7 @@ function ImageUploadSlot({
               )}
             >
               {checking ? (
-                <>
-                  <Loader2 className="text-primary/90 size-5 animate-spin" />
-                  <span className="text-foreground/70 text-[9px] leading-tight">
-                    检测中
-                  </span>
-                </>
+                <Loader2 className="text-primary/90 size-5 animate-spin" />
               ) : (
                 <>
                   <PlusIcon className="text-primary/78 size-5" />
