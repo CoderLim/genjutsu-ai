@@ -1,0 +1,47 @@
+name: Match Waffo Paid Orders
+
+on:
+  push:
+    branches: ['main']
+    paths:
+      - '.github/workflows/match-waffo-paid-orders.yaml'
+
+jobs:
+  match:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN || secrets.CF_API_TOKEN }}
+      CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_API_KEY }}
+      CF_API_KEY_FALLBACK: ${{ secrets.CF_API_KEY }}
+      CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL || secrets.CF_EMAIL }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID || secrets.CF_ACCOUNT_ID || vars.CLOUDFLARE_ACCOUNT_ID || vars.CF_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Enable Corepack
+        run: corepack enable
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Match paid Waffo orders
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${CLOUDFLARE_API_TOKEN:-}" ] && [ -n "${CLOUDFLARE_API_KEY:-}" ] && [ -z "${CLOUDFLARE_EMAIL:-}" ]; then
+            export CLOUDFLARE_API_TOKEN="$CLOUDFLARE_API_KEY"
+            unset CLOUDFLARE_API_KEY
+          fi
+          if [ -z "${CLOUDFLARE_API_TOKEN:-}" ] && [ -n "${CF_API_KEY_FALLBACK:-}" ]; then
+            if [ -n "${CLOUDFLARE_EMAIL:-}" ]; then
+              export CLOUDFLARE_API_KEY="${CLOUDFLARE_API_KEY:-$CF_API_KEY_FALLBACK}"
+            else
+              export CLOUDFLARE_API_TOKEN="$CF_API_KEY_FALLBACK"
+            fi
+          fi
+
+          npx wrangler d1 execute genjutsu-ai-db --remote --json --command="
+            SELECT order_no, user_id, user_email, status, amount, currency,
+                   product_id, credits_amount, created_at, paid_at, transaction_id
+            FROM \"order\"
+            WHERE payment_provider='waffo'
+              AND lower(user_email) IN ('punyaprakash1@gmail.com','map.am.73@gmail.com')
+            ORDER BY created_at DESC;
+          "
