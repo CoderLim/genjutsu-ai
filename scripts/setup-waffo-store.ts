@@ -6,7 +6,9 @@
  *   - One Store per product app (do NOT reuse another app's STO_*)
  *   - Merchant + private key can be shared across apps
  *   - Test vs prod product IDs differ — WAFFO_ENVIRONMENT selects the target
- *   - Prices live on the Waffo product; checkout maps via WAFFO_PRODUCT_IDS_MAPPING
+ *   - Prices live on the Waffo product (currency from catalog product.currency)
+ *   - checkout maps via WAFFO_PRODUCT_IDS_MAPPING
+ *   - Verify/create use the catalog currency (USD/CNY/…) — do not hardcode USD
  *   - Webhook: {APP_URL}/api/payment/notify/waffo (HTTPS public URL required)
  *
  * Usage:
@@ -81,12 +83,13 @@ function mapBillingPeriod(
 
 async function verifyCheckout(
   client: WaffoPancake,
-  productId: string
+  productId: string,
+  currency: string
 ): Promise<boolean> {
   try {
     await client.checkout.createSession({
       productId,
-      currency: 'USD',
+      currency: currency.toUpperCase(),
       buyerEmail: 'test@example.com',
       orderMerchantExternalId: `VERIFY_${Date.now()}`,
       successUrl: 'http://localhost:3000/settings/billing?success=1',
@@ -191,9 +194,7 @@ async function main() {
 
   let previousMapping: Record<string, string> = {};
   try {
-    previousMapping = JSON.parse(
-      process.env.WAFFO_PRODUCT_IDS_MAPPING || '{}'
-    );
+    previousMapping = JSON.parse(process.env.WAFFO_PRODUCT_IDS_MAPPING || '{}');
   } catch {
     previousMapping = {};
   }
@@ -205,15 +206,16 @@ async function main() {
   for (const product of Object.values(pricingCatalog)) {
     const catalogId = product.productId;
     const existingId = previousMapping[catalogId];
+    const currency = (product.currency || 'usd').toUpperCase();
 
-    if (existingId && (await verifyCheckout(client, existingId))) {
+    if (existingId && (await verifyCheckout(client, existingId, currency))) {
       console.log(`✓ ${catalogId} already works -> ${existingId}`);
       mapping[catalogId] = existingId;
       continue;
     }
 
     const prices: Prices = {
-      USD: {
+      [currency]: {
         amount: centsToAmount(product.priceInCents),
         taxCategory: TaxCategory.SaaS,
       },
@@ -222,7 +224,7 @@ async function main() {
     const name = product.productName;
     const description = `${product.credits.toLocaleString()} Genjutsu credits — one-time purchase`;
 
-    console.log(`Creating ${catalogId} (${product.type})...`);
+    console.log(`Creating ${catalogId} (${product.type}, ${currency})...`);
 
     let productId: string;
     if (product.type === PaymentType.SUBSCRIPTION) {
@@ -246,7 +248,7 @@ async function main() {
       productId = created.id;
     }
 
-    const ok = await verifyCheckout(client, productId);
+    const ok = await verifyCheckout(client, productId, currency);
     console.log(`  -> ${productId} (test checkout: ${ok ? 'ok' : 'FAILED'})`);
     if (!ok) {
       throw new Error(
@@ -265,10 +267,7 @@ async function main() {
 
   // DB-backed Admin settings override env at runtime. Keep the active Waffo
   // mapping in sync when this script is run against a configured app DB.
-  if (
-    process.env.DATABASE_URL ||
-    process.env.DATABASE_PROVIDER === 'd1'
-  ) {
+  if (process.env.DATABASE_URL || process.env.DATABASE_PROVIDER === 'd1') {
     const { saveConfigs } = await import('../src/modules/config/service.js');
     await saveConfigs({
       waffo_product_ids_mapping: mappingJson,
