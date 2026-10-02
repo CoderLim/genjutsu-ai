@@ -93,6 +93,7 @@ async function POST({ request }: { request: Request }) {
         successUrl,
         cancelUrl,
         customer: {
+          id: session.user.id,
           email: session.user.email,
           name: session.user.name,
         },
