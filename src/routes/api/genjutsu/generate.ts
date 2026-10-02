@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 
 import { getAuth } from '@/core/auth';
+import { getBalance } from '@/modules/credits/service';
 import {
   assertGenerationId,
   claimGenjutsuSubmission,
@@ -13,26 +14,25 @@ import {
   reserveGenjutsuCredits,
 } from '@/modules/genjutsu/billing';
 import {
+  isGenjutsuE2EMockEnabled,
+  resolveGenjutsuE2EInputUrls,
+} from '@/modules/genjutsu/e2e-mock';
+import {
   calculateGenjutsuCredits,
   estimateGenjutsuCredits,
 } from '@/modules/genjutsu/pricing';
 import {
-  isGenjutsuE2EMockEnabled,
-  resolveGenjutsuE2EInputUrls,
-} from '@/modules/genjutsu/e2e-mock';
-import { resolveGenjutsuInputUrls } from '@/modules/genjutsu/storage';
-import {
-  assertGenjutsuReferenceImagesSafe,
-  GenjutsuSafetyError,
-} from '@/modules/genjutsu/safety';
-import {
   HiggsfieldHttpError,
+  isSeedanceLikenessRejection,
   resolveGenjutsuProviderCost,
+  resolveGenjutsuProviderTarget,
+  SeedanceHttpError,
   submitGenjutsu,
   type GenjutsuMode,
+  type GenjutsuProvider,
   type GenjutsuResolution,
 } from '@/modules/genjutsu/service';
-import { getBalance } from '@/modules/credits/service';
+import { resolveGenjutsuInputUrls } from '@/modules/genjutsu/storage';
 import { enforceMinIntervalRateLimit } from '@/lib/rate-limit';
 import { respData, respErr, respJson } from '@/lib/resp';
 
@@ -53,6 +53,28 @@ type ProviderGenerationInput = {
   videoUrl: string;
   imageUrls: string[];
 };
+
+function hasStorageInput(input: GenerationInput) {
+  return (
+    typeof input.videoKey === 'string' &&
+    input.videoKey.length > 0 &&
+    Array.isArray(input.imageKeys) &&
+    input.imageKeys.length > 0
+  );
+}
+
+function taskSourceDurationSeconds(task: any) {
+  const { info } = parseGenjutsuTaskInfo(task);
+  const direct = info?.sourceDurationSeconds;
+  if (typeof direct === 'number' && Number.isFinite(direct) && direct > 0) {
+    return direct;
+  }
+
+  const quoted = info?.providerEstimate?.sourceDurationSeconds;
+  return typeof quoted === 'number' && Number.isFinite(quoted) && quoted > 0
+    ? quoted
+    : undefined;
+}
 
 function inputFromBody(body: any): GenerationInput {
   return {
@@ -89,15 +111,13 @@ function inputFromTask(task: {
         : typeof task.prompt === 'string'
           ? task.prompt
           : '',
-    videoKey:
-      typeof parsed.videoKey === 'string' ? parsed.videoKey : undefined,
+    videoKey: typeof parsed.videoKey === 'string' ? parsed.videoKey : undefined,
     imageKeys: Array.isArray(parsed.imageKeys)
       ? parsed.imageKeys.filter(
           (value: unknown): value is string => typeof value === 'string'
         )
       : undefined,
-    videoUrl:
-      typeof parsed.videoUrl === 'string' ? parsed.videoUrl : undefined,
+    videoUrl: typeof parsed.videoUrl === 'string' ? parsed.videoUrl : undefined,
     imageUrls: Array.isArray(parsed.imageUrls)
       ? parsed.imageUrls.filter(
           (value: unknown): value is string => typeof value === 'string'
@@ -119,17 +139,18 @@ async function resolveProviderInput(params: {
     Array.isArray(input.imageKeys) &&
     input.imageKeys.length > 0
   ) {
-    const urls = params.allowLegacyUrls && isGenjutsuE2EMockEnabled()
-      ? resolveGenjutsuE2EInputUrls({
-          videoKey: input.videoKey,
-          imageKeys: input.imageKeys,
-        })
-      : await resolveGenjutsuInputUrls({
-          userId: params.userId,
-          generationId: params.generationId,
-          videoKey: input.videoKey,
-          imageKeys: input.imageKeys,
-        });
+    const urls =
+      params.allowLegacyUrls && isGenjutsuE2EMockEnabled()
+        ? resolveGenjutsuE2EInputUrls({
+            videoKey: input.videoKey,
+            imageKeys: input.imageKeys,
+          })
+        : await resolveGenjutsuInputUrls({
+            userId: params.userId,
+            generationId: params.generationId,
+            videoKey: input.videoKey,
+            imageKeys: input.imageKeys,
+          });
     return {
       mode: input.mode,
       resolution: input.resolution,
@@ -200,6 +221,23 @@ async function POST({ request }: { request: Request }) {
       input = inputFromBody(body);
     }
 
+    const target = task
+      ? {
+          provider: (task.provider || 'higgsfield') as GenjutsuProvider,
+          model: task.model || resolveGenjutsuProviderTarget(input.mode).model,
+        }
+      : resolveGenjutsuProviderTarget(input.mode);
+
+    if (target.provider === 'seedance' && !hasStorageInput(input)) {
+      throw new Error(
+        'Seedance generations must use server-owned R2 storage keys'
+      );
+    }
+
+    let sourceDurationSeconds = task
+      ? taskSourceDurationSeconds(task)
+      : undefined;
+
     const providerInput = await resolveProviderInput({
       input,
       userId: session.user.id,
@@ -207,19 +245,16 @@ async function POST({ request }: { request: Request }) {
       allowLegacyUrls: Boolean(task) || isGenjutsuE2EMockEnabled(),
     });
 
-    let pendingQuote:
-      | {
-          providerCostUsd: number;
-          credits: number;
-          providerEstimate: unknown;
-        }
-      | null = null;
+    let pendingQuote: {
+      providerCostUsd: number;
+      credits: number;
+      providerEstimate: unknown;
+      sourceDurationSeconds?: number;
+    } | null = null;
 
-    if (!task) {
-      // Cheap preflight before Fal: if the user cannot afford even the
-      // minimum 4-second clip at this resolution, fail without paying for a
-      // face-detection request. Exact provider pricing still happens only
-      // after the server-side safety gate.
+    if (!task && target.provider === 'higgsfield') {
+      // Cheap preflight: if the user cannot afford even the minimum 4-second
+      // clip at this resolution, fail before live /estimate or submit.
       const minimumCredits = estimateGenjutsuCredits({
         durationSeconds: 4,
         resolution: input.resolution,
@@ -228,66 +263,61 @@ async function POST({ request }: { request: Request }) {
       if (balance < minimumCredits) {
         throw new InsufficientCreditsError(minimumCredits, balance);
       }
-    }
-
-    // Defense in depth: the normal UI checks local reference files before
-    // uploading them to R2, and this server-side gate checks the uploaded
-    // objects again so direct API calls cannot bypass the restriction.
-    try {
-      await assertGenjutsuReferenceImagesSafe(providerInput.imageUrls);
-    } catch (error) {
-      if (error instanceof GenjutsuSafetyError) {
-        let refundedCredits = 0;
-        if (task?.status === 'reserved') {
-          const refunded = await refundGenjutsuGeneration({
-            generationId,
-            userId: session.user.id,
-            providerStatus: 'safety_rejected',
-            error: error.message,
-          });
-          refundedCredits = refunded?.costCredits || 0;
-        }
-
-        return respJson(
-          -1,
-          error.message,
-          {
-            code: error.code,
-            generationId,
-            refundedCredits,
-          },
-          { status: error.status }
-        );
-      }
-      throw error;
-    }
-
-    if (!task) {
-      // Prefer live /estimate USD after safety validation. Client-supplied
-      // credit amounts are ignored; reserveGenjutsuCredits remains the final
-      // atomic balance check.
+    } else if (!task && target.provider === 'seedance') {
+      // Seedance has no free /estimate endpoint. Probe the server-owned R2
+      // source once, build the list-rate quote, and reject an obviously
+      // insufficient wallet before submit. Provider likeness policy is
+      // enforced by Seedance after submit and surfaced on status/refund.
       const estimate = await resolveGenjutsuProviderCost({
         ...providerInput,
-        durationSeconds:
-          typeof body.durationSeconds === 'number'
-            ? body.durationSeconds
-            : undefined,
+        ...target,
       });
       const credits = calculateGenjutsuCredits(estimate.providerCostUsd);
+      const balance = await getBalance(session.user.id);
+      if (balance < credits) {
+        throw new InsufficientCreditsError(credits, balance);
+      }
+
+      sourceDurationSeconds = estimate.sourceDurationSeconds;
       pendingQuote = {
         providerCostUsd: estimate.providerCostUsd,
         credits,
         providerEstimate: estimate.payload,
+        sourceDurationSeconds,
       };
+    }
+
+    if (!task) {
+      if (!pendingQuote) {
+        // Higgsfield's live /estimate; client-supplied credit amounts ignored.
+        const estimate = await resolveGenjutsuProviderCost({
+          ...providerInput,
+          ...target,
+          durationSeconds:
+            typeof body.durationSeconds === 'number'
+              ? body.durationSeconds
+              : undefined,
+        });
+        const credits = calculateGenjutsuCredits(estimate.providerCostUsd);
+        sourceDurationSeconds = estimate.sourceDurationSeconds;
+        pendingQuote = {
+          providerCostUsd: estimate.providerCostUsd,
+          credits,
+          providerEstimate: estimate.payload,
+          sourceDurationSeconds,
+        };
+      }
 
       task = await reserveGenjutsuCredits({
         generationId,
         userId: session.user.id,
         userEmail: session.user.email,
         ...input,
+        ...target,
         providerCostUsd: pendingQuote.providerCostUsd,
         credits: pendingQuote.credits,
         providerEstimate: pendingQuote.providerEstimate,
+        sourceDurationSeconds: pendingQuote.sourceDurationSeconds,
       });
 
       if (task.status !== 'reserved') {
@@ -310,7 +340,12 @@ async function POST({ request }: { request: Request }) {
     }
 
     try {
-      const result = await submitGenjutsu(providerInput);
+      const result = await submitGenjutsu({
+        ...providerInput,
+        ...target,
+        endUserId: session.user.id,
+        sourceDurationSeconds,
+      });
 
       await markGenjutsuSubmitted({
         generationId,
@@ -334,18 +369,24 @@ async function POST({ request }: { request: Request }) {
             }
       );
     } catch (error: any) {
-      if (error instanceof HiggsfieldHttpError) {
+      if (
+        error instanceof HiggsfieldHttpError ||
+        error instanceof SeedanceHttpError
+      ) {
         await refundGenjutsuGeneration({
           generationId,
           userId: session.user.id,
           providerStatus: `http_${error.status}`,
           error: error.message,
         });
+        const likeness =
+          error instanceof SeedanceHttpError &&
+          isSeedanceLikenessRejection(error.message);
         return respJson(
           -1,
-          error.message || 'Higgsfield rejected the generation',
+          error.message || 'The video provider rejected the generation',
           {
-            code: 'PROVIDER_REJECTED',
+            code: likeness ? 'PROVIDER_LIKENESS_REJECTED' : 'PROVIDER_REJECTED',
             generationId,
             refundedCredits: task.costCredits || 0,
           },
@@ -353,7 +394,7 @@ async function POST({ request }: { request: Request }) {
         );
       }
 
-      // A transport error can happen after Higgsfield accepted the request but
+      // A transport error can happen after the provider accepted the request but
       // before we received request_id. Retrying automatically could create a
       // second billable generation, so keep the reservation and flag it.
       const message =

@@ -7,18 +7,11 @@ import {
   type DragEvent,
   type ReactNode,
 } from 'react';
-import { Loader2 } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { toast } from 'sonner';
 
 import { useSession } from '@/core/auth/client';
-import {
-  ApiError,
-  apiGet,
-  apiPost,
-  apiPostForm,
-  uploadToSignedUrl,
-} from '@/lib/api-client';
+import { ApiError, apiGet, apiPost, uploadToSignedUrl } from '@/lib/api-client';
 import { cn } from '@/lib/cn';
 import { m } from '@/paraglide/messages.js';
 import {
@@ -88,6 +81,12 @@ function createMediaItem(file: File): MediaItem {
 const IMAGE_MAX = 8;
 const MAX_SOURCE_VIDEO_BYTES = 200 * 1024 * 1024;
 const MAX_REFERENCE_IMAGE_BYTES = 12 * 1024 * 1024;
+// Seedance Objects Swap uses task=editing. Clips shorter than 4s are rejected
+// by Seedance with a misleading "set aspect_ratio/duration to auto" error
+// (Fal's generic reference-video floor is ~1.8s, but editing requires >= 4s).
+// Keep the upload gate on that editing floor and match the UI "4–30s" hint.
+const MIN_SOURCE_VIDEO_SECONDS = 4;
+const MAX_SOURCE_VIDEO_SECONDS = 30;
 
 function revokeItem(item: MediaItem | null) {
   if (item) URL.revokeObjectURL(item.url);
@@ -95,6 +94,34 @@ function revokeItem(item: MediaItem | null) {
 
 function revokeAll(items: MediaItem[]) {
   for (const item of items) URL.revokeObjectURL(item.url);
+}
+
+/** Read duration from a local video File via browser metadata. */
+function readLocalVideoDurationSeconds(file: File): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const video = document.createElement('video');
+    video.preload = 'metadata';
+    const cleanup = () => {
+      video.removeAttribute('src');
+      video.load();
+      URL.revokeObjectURL(url);
+    };
+    video.onloadedmetadata = () => {
+      const duration = video.duration;
+      cleanup();
+      if (!Number.isFinite(duration) || duration <= 0) {
+        reject(new Error('Could not read video duration'));
+        return;
+      }
+      resolve(duration);
+    };
+    video.onerror = () => {
+      cleanup();
+      reject(new Error('Could not read video duration'));
+    };
+    video.src = url;
+  });
 }
 
 function ModeToggle({
@@ -280,8 +307,28 @@ function VideoUploadSlot({
         toast.error('Source video must be 200 MB or smaller');
         return;
       }
-      revokeItem(item);
-      onChange(createMediaItem(file));
+
+      void (async () => {
+        try {
+          const durationSeconds = await readLocalVideoDurationSeconds(file);
+          // See MIN_SOURCE_VIDEO_SECONDS: Seedance editing rejects <4s clips.
+          if (
+            durationSeconds < MIN_SOURCE_VIDEO_SECONDS ||
+            durationSeconds > MAX_SOURCE_VIDEO_SECONDS
+          ) {
+            toast.error(
+              `Source video must be ${MIN_SOURCE_VIDEO_SECONDS}–${MAX_SOURCE_VIDEO_SECONDS} seconds (got ${durationSeconds.toFixed(1)}s)`
+            );
+            return;
+          }
+          revokeItem(item);
+          onChange(createMediaItem(file));
+        } catch {
+          toast.error(
+            'Could not read video duration. Please use an MP4/MOV between 4 and 30 seconds.'
+          );
+        }
+      })();
     },
     [item, onChange]
   );
@@ -358,7 +405,7 @@ function VideoUploadSlot({
         ) : (
           <EmptyUploadButton
             title="Add a reference video to edit"
-            hint="Video duration: 4-30 seconds"
+            hint="4–30s · no real people in the source video"
             icon={<FilmIcon className="text-primary/78 size-5 shrink-0" />}
             dragging={dragging}
             onClick={() => inputRef.current?.click()}
@@ -377,13 +424,13 @@ function VideoUploadSlot({
   );
 }
 
-async function assertReferenceImageSafe(file: File) {
-  const formData = new FormData();
-  formData.append('image', file, file.name);
-  await apiPostForm<{ safe: true }>('/api/genjutsu/check-reference', formData);
+function isLikenessRejectionMessage(message: string) {
+  return /images and videos cannot contain real people|likenesses of real people|real people|private information that cannot be processed|human face|真人|肖像/i.test(
+    message
+  );
 }
 
-function referenceSafetyUiMessage(cause: unknown): string {
+function likenessRejectionUiMessage(cause: unknown): string {
   const code =
     cause instanceof ApiError &&
     cause.data &&
@@ -391,21 +438,29 @@ function referenceSafetyUiMessage(cause: unknown): string {
     'code' in cause.data
       ? String((cause.data as { code?: unknown }).code)
       : '';
-  const message = cause instanceof ApiError ? cause.message : '';
+  const message =
+    cause instanceof ApiError
+      ? cause.message
+      : cause instanceof Error
+        ? cause.message
+        : typeof cause === 'string'
+          ? cause
+          : '';
 
-  if (code === 'REFERENCE_FACE_DETECTED' || /human face/i.test(message)) {
+  if (
+    code === 'PROVIDER_LIKENESS_REJECTED' ||
+    isLikenessRejectionMessage(message)
+  ) {
     return m['genjutsu.safety.face_rejected']();
   }
-  if (code === 'FACE_DETECTION_UNAVAILABLE') {
-    return m['genjutsu.safety.unavailable']();
-  }
-  return cause instanceof Error
-    ? cause.message
-    : m['genjutsu.safety.check_failed']();
+  return message;
 }
 
-function toastReferenceReject(cause: unknown) {
-  toast.error(referenceSafetyUiMessage(cause));
+function generationFailureUiMessage(error?: string | null) {
+  if (error && isLikenessRejectionMessage(error)) {
+    return m['genjutsu.safety.face_rejected']();
+  }
+  return error || '';
 }
 
 function redirectToSignIn() {
@@ -426,7 +481,6 @@ function ImageUploadSlot({
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [previewId, setPreviewId] = useState<string | null>(null);
-  const [checking, setChecking] = useState(false);
   const { dragging, setDragging, onDragOver, onDragLeave } = useDragHighlight();
   const previewItem = items.find((i) => i.id === previewId) ?? null;
   const canAdd = items.length < IMAGE_MAX;
@@ -440,7 +494,7 @@ function ImageUploadSlot({
   }, [signedIn]);
 
   const mergeFiles = useCallback(
-    async (list: FileList | File[] | null) => {
+    (list: FileList | File[] | null) => {
       if (!list || list.length === 0) return;
       if (!signedIn) {
         redirectToSignIn();
@@ -454,7 +508,7 @@ function ImageUploadSlot({
       const room = IMAGE_MAX - items.length;
       if (room <= 0) return;
 
-      const candidates = incoming
+      const accepted = incoming
         .slice(0, room)
         .filter((file) => {
           if (file.size <= 0 || file.size > MAX_REFERENCE_IMAGE_BYTES) {
@@ -462,31 +516,11 @@ function ImageUploadSlot({
             return false;
           }
           return true;
-        });
-      if (candidates.length === 0) return;
-      setChecking(true);
+        })
+        .map((file) => createMediaItem(file));
 
-      const accepted: MediaItem[] = [];
-      let rejectedOnce = false;
-
-      try {
-        for (const file of candidates) {
-          try {
-            await assertReferenceImageSafe(file);
-            accepted.push(createMediaItem(file));
-          } catch (cause) {
-            if (!rejectedOnce) {
-              toastReferenceReject(cause);
-              rejectedOnce = true;
-            }
-          }
-        }
-
-        if (accepted.length > 0) {
-          onChange([...items, ...accepted]);
-        }
-      } finally {
-        setChecking(false);
+      if (accepted.length > 0) {
+        onChange([...items, ...accepted]);
       }
     },
     [items, onChange, signedIn]
@@ -503,18 +537,14 @@ function ImageUploadSlot({
   return (
     <>
       <div
-        className={cn(
-          'relative flex shrink-0 flex-wrap gap-2',
-          checking && 'pointer-events-none opacity-70'
-        )}
-        aria-busy={checking}
+        className="relative flex shrink-0 flex-wrap gap-2"
         onDragOver={onDragOver}
         onDragLeave={onDragLeave}
         onDrop={(e) => {
           e.preventDefault();
           e.stopPropagation();
           setDragging(false);
-          void mergeFiles(e.dataTransfer.files);
+          mergeFiles(e.dataTransfer.files);
         }}
       >
         <input
@@ -523,20 +553,19 @@ function ImageUploadSlot({
           className="hidden"
           accept="image/*"
           multiple
-          disabled={checking}
           aria-label="Add products, clothes, objects, or scenes"
           onChange={(e: ChangeEvent<HTMLInputElement>) => {
-            void mergeFiles(e.target.files);
+            mergeFiles(e.target.files);
             e.target.value = '';
           }}
         />
 
-        {items.map((item) => (
+        {items.map((item, index) => (
           <button
             key={item.id}
             type="button"
             onClick={() => setPreviewId(item.id)}
-            aria-label={`Preview ${item.file.name}`}
+            aria-label={`Preview Reference ${index + 1}: ${item.file.name}`}
             className="group relative block h-[96px] w-[68px] overflow-hidden rounded-[4px] border border-[rgba(204,144,92,0.35)] shadow-[0_10px_28px_-12px_rgba(0,0,0,0.75)] focus:outline-none"
           >
             <img
@@ -545,6 +574,9 @@ function ImageUploadSlot({
               className="h-full w-full object-cover"
               draggable={false}
             />
+            <span className="absolute inset-x-0 bottom-0 bg-black/60 px-1 py-0.5 text-center text-[8px] font-medium text-white/90">
+              Reference {index + 1}
+            </span>
             <span
               role="button"
               tabIndex={0}
@@ -570,15 +602,9 @@ function ImageUploadSlot({
 
         {items.length === 0 ? (
           <EmptyUploadButton
-            title={checking ? '' : 'Add products, clothes, objects, or scenes'}
-            hint={checking ? '' : m['genjutsu.safety.upload_hint']()}
-            icon={
-              checking ? (
-                <Loader2 className="text-primary/90 size-5 shrink-0 animate-spin" />
-              ) : (
-                <ImageModeIcon className="text-primary/78 size-5 shrink-0" />
-              )
-            }
+            title="Add products, clothes, objects, or scenes"
+            hint={m['genjutsu.safety.upload_hint']()}
+            icon={<ImageModeIcon className="text-primary/78 size-5 shrink-0" />}
             dragging={dragging}
             onClick={openPicker}
             ariaLabel="Add products, clothes, objects, or scenes"
@@ -587,31 +613,19 @@ function ImageUploadSlot({
           <button
             type="button"
             onClick={openPicker}
-            aria-label={
-              checking
-                ? m['genjutsu.safety.checking_aria']()
-                : 'Add more images'
-            }
-            disabled={checking}
-            className="relative block h-[96px] w-[68px] focus:ring-0 focus:outline-none disabled:opacity-100"
+            aria-label="Add more images"
+            className="relative block h-[96px] w-[68px] focus:ring-0 focus:outline-none"
           >
             <span
               className={cn(
                 'border-primary/35 bg-primary/5 hover:border-primary/45 absolute inset-0 flex flex-col items-center justify-center gap-1 border-2 border-dashed text-[rgb(204,144,92)] transition-all duration-200',
-                dragging && 'border-primary/55 bg-primary/10',
-                checking && 'border-primary/50 bg-primary/10'
+                dragging && 'border-primary/55 bg-primary/10'
               )}
             >
-              {checking ? (
-                <Loader2 className="text-primary/90 size-5 animate-spin" />
-              ) : (
-                <>
-                  <PlusIcon className="text-primary/78 size-5" />
-                  <span className="text-foreground/44 text-[9px] leading-tight">
-                    {items.length}/{IMAGE_MAX}
-                  </span>
-                </>
-              )}
+              <PlusIcon className="text-primary/78 size-5" />
+              <span className="text-foreground/44 text-[9px] leading-tight">
+                {items.length}/{IMAGE_MAX}
+              </span>
             </span>
           </button>
         ) : null}
@@ -788,7 +802,7 @@ function ResultPanel({
             </p>
           ) : (
             <p className="mt-0.5 text-[11px] text-white/45">
-              Uploading references and starting Higgsfield…
+              Uploading references and starting generation…
             </p>
           )}
         </div>
@@ -834,7 +848,7 @@ function ResultPanel({
             Download
           </a>
           <span className="text-[11px] text-white/40">
-            Generated with Higgsfield Genjutsu
+            Generated with Genjutsu AI
           </span>
         </div>
       ) : null}
@@ -904,8 +918,12 @@ export function GeneratorPanel({
 
   const placeholder =
     mode === 'objects-swap'
-      ? 'Describe what to swap in the video (optional)...'
-      : 'Describe the new scene, style, product, or object (optional)...';
+      ? images.length > 1
+        ? 'e.g. Replace the man with Reference 1 and the phone with Reference 2 (optional)...'
+        : 'Describe what to swap in the video (optional)...'
+      : images.length > 1
+        ? 'e.g. Use Reference 1 for the main character and Reference 2 for the outfit (optional)...'
+        : 'Describe the new scene, style, product, or object (optional)...';
 
   const pollGeneration = useCallback(
     async (active: PersistedGeneration, runId: number) => {
@@ -994,10 +1012,10 @@ export function GeneratorPanel({
           localStorage.removeItem(activeGenerationKey(active.userId));
           setStatus('idle');
           setResult(null);
-          setError(
-            polled.error ||
-              `Higgsfield generation failed (${polled.providerStatus})`
-          );
+          const uiError =
+            generationFailureUiMessage(polled.error) ||
+            `Generation failed (${polled.providerStatus})`;
+          setError(uiError);
           return;
         }
 
@@ -1084,20 +1102,6 @@ export function GeneratorPanel({
     });
 
     try {
-      // Check reference images before requesting R2 upload URLs, so blocked
-      // human-face references are rejected before we persist them. The
-      // /generate route repeats this check against fresh signed R2 read URLs
-      // as a server-side anti-bypass gate.
-      for (const image of images) {
-        const formData = new FormData();
-        formData.append('image', image.file, image.file.name);
-        await apiPostForm<{ safe: true }>(
-          '/api/genjutsu/check-reference',
-          formData
-        );
-        if (generationRunRef.current !== runId) return;
-      }
-
       const media = [video, ...images];
       const contentTypes = media.map(
         (item, index) =>
@@ -1203,21 +1207,20 @@ export function GeneratorPanel({
         setStatus('idle');
         setResult(null);
         setNeedsCredits(insufficient);
-        const faceOrSafety =
-          apiData?.code === 'REFERENCE_FACE_DETECTED' ||
-          apiData?.code === 'FACE_DETECTION_UNAVAILABLE' ||
+        const likenessRejected =
+          apiData?.code === 'PROVIDER_LIKENESS_REJECTED' ||
           (typeof cause.message === 'string' &&
-            /human face/i.test(cause.message));
-        const uiMessage = faceOrSafety
-          ? referenceSafetyUiMessage(cause)
+            isLikenessRejectionMessage(cause.message));
+        const uiMessage = likenessRejected
+          ? likenessRejectionUiMessage(cause)
           : cause.message;
-        if (faceOrSafety) toast.error(uiMessage);
+        if (likenessRejected) toast.error(uiMessage);
         setError(uiMessage);
         return;
       }
 
       // Network failure or SUBMISSION_UNKNOWN: the paid POST may have reached
-      // Higgsfield. Keep the generation locked and reconcile by generationId.
+      // the configured provider. Keep the generation locked and reconcile by generationId.
       const raw = localStorage.getItem(activeGenerationKey(session.user.id));
       if (raw) {
         try {
@@ -1284,8 +1287,18 @@ export function GeneratorPanel({
               className="placeholder:text-muted-foreground/70 min-h-[96px] w-full resize-none border-0 bg-transparent p-0 text-sm leading-relaxed text-[rgb(237,234,222)] shadow-none outline-none sm:min-h-[124px] sm:text-[14px]"
             />
 
-            <div className="mt-auto flex items-center justify-end pb-1 text-[11px] text-white/45">
-              <span className="tabular-nums">{prompt.length} / 2,000</span>
+            <div className="mt-auto flex items-end justify-between gap-3 pb-1 text-[11px] text-white/45">
+              {images.length > 1 ? (
+                <span className="max-w-[75%] leading-snug">
+                  Use Reference 1, Reference 2, etc. to map each image to a
+                  target.
+                </span>
+              ) : (
+                <span />
+              )}
+              <span className="shrink-0 tabular-nums">
+                {prompt.length} / 2,000
+              </span>
             </div>
           </div>
         </div>

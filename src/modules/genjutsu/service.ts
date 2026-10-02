@@ -5,9 +5,31 @@ import {
   isGenjutsuE2EMockEnabled,
 } from './e2e-mock';
 import { estimateGenjutsuListCost } from './pricing';
+import {
+  estimateSeedanceProviderCost,
+  getSeedanceStatus,
+  isSeedanceLikenessRejection,
+  SeedanceHttpError,
+  submitSeedance,
+} from './seedance';
+import type {
+  GenjutsuMode,
+  GenjutsuProvider,
+  GenjutsuResolution,
+} from './types';
+import { probeSeedanceSourceDurationSeconds } from './video-metadata';
+import { resolveGenjutsuProviderTarget } from './workflow';
 
-export type GenjutsuMode = 'motion-transfer' | 'objects-swap';
-export type GenjutsuResolution = '480p' | '720p' | '1080p';
+export type {
+  GenjutsuMode,
+  GenjutsuProvider,
+  GenjutsuResolution,
+} from './types';
+export {
+  isSeedanceLikenessRejection,
+  SeedanceHttpError,
+  resolveGenjutsuProviderTarget,
+};
 
 const VALID_RESOLUTIONS = new Set<GenjutsuResolution>([
   '480p',
@@ -154,6 +176,7 @@ export async function createHiggsfieldUploadUrl(contentType: string) {
 
 function buildGenjutsuPayload(input: {
   mode: GenjutsuMode;
+  model?: string;
   resolution: GenjutsuResolution;
   prompt?: string;
   videoUrl: string;
@@ -183,7 +206,7 @@ function buildGenjutsuPayload(input: {
   }
 
   return {
-    model: getGenjutsuModel(input.mode),
+    model: input.model?.trim() || getGenjutsuModel(input.mode),
     body: {
       prompt,
       video_url: input.videoUrl,
@@ -197,7 +220,8 @@ export type GenjutsuCostEstimate = {
   providerCostUsd: number;
   providerCredits: unknown;
   payload: unknown;
-  source: 'estimate' | 'list_fallback';
+  source: 'estimate' | 'list_fallback' | 'seedance_list_estimate';
+  sourceDurationSeconds?: number;
 };
 
 /**
@@ -206,6 +230,7 @@ export type GenjutsuCostEstimate = {
  */
 export async function estimateGenjutsuProviderCost(input: {
   mode: GenjutsuMode;
+  model?: string;
   resolution: GenjutsuResolution;
   prompt?: string;
   videoUrl: string;
@@ -244,8 +269,9 @@ export async function estimateGenjutsuProviderCost(input: {
  * Prefer live `/estimate` USD; on timeout, HTTP error, or description-only
  * payloads, fall back to published list rates so generation can proceed.
  */
-export async function resolveGenjutsuProviderCost(input: {
+async function resolveHiggsfieldProviderCost(input: {
   mode: GenjutsuMode;
+  model?: string;
   resolution: GenjutsuResolution;
   prompt?: string;
   videoUrl: string;
@@ -296,8 +322,9 @@ function getGenjutsuWebhookUrl() {
   }
 }
 
-export async function submitGenjutsu(input: {
+async function submitHiggsfield(input: {
   mode: GenjutsuMode;
+  model?: string;
   resolution: GenjutsuResolution;
   prompt?: string;
   videoUrl: string;
@@ -332,7 +359,7 @@ export async function submitGenjutsu(input: {
   };
 }
 
-export async function getGenjutsuStatus(requestId: string) {
+async function getHiggsfieldStatus(requestId: string) {
   const normalized = requestId.trim();
   if (!/^[A-Za-z0-9._:-]{6,200}$/.test(normalized)) {
     throw new Error('Invalid request ID');
@@ -403,4 +430,85 @@ function isHttpUrl(value: string) {
   } catch {
     return false;
   }
+}
+
+export type GenjutsuProviderCostInput = {
+  provider: GenjutsuProvider;
+  model: string;
+  mode: GenjutsuMode;
+  resolution: GenjutsuResolution;
+  prompt?: string;
+  videoUrl: string;
+  imageUrls: string[];
+  durationSeconds?: number;
+};
+
+export async function resolveGenjutsuProviderCost(
+  input: GenjutsuProviderCostInput
+): Promise<GenjutsuCostEstimate> {
+  if (input.provider === 'seedance') {
+    const sourceDurationSeconds = await probeSeedanceSourceDurationSeconds(
+      input.videoUrl
+    );
+    return {
+      ...estimateSeedanceProviderCost({
+        resolution: input.resolution,
+        sourceDurationSeconds,
+      }),
+      sourceDurationSeconds,
+    };
+  }
+
+  return resolveHiggsfieldProviderCost(input);
+}
+
+export async function submitGenjutsu(input: {
+  provider: GenjutsuProvider;
+  model: string;
+  mode: GenjutsuMode;
+  resolution: GenjutsuResolution;
+  prompt?: string;
+  videoUrl: string;
+  imageUrls: string[];
+  endUserId: string;
+  sourceDurationSeconds?: number;
+}) {
+  if (input.provider === 'seedance') {
+    if (
+      typeof input.sourceDurationSeconds !== 'number' ||
+      !Number.isFinite(input.sourceDurationSeconds) ||
+      input.sourceDurationSeconds <= 0
+    ) {
+      throw new Error(
+        'Seedance submission is missing the server-validated source duration'
+      );
+    }
+
+    return submitSeedance({
+      ...input,
+      sourceDurationSeconds: input.sourceDurationSeconds,
+    });
+  }
+
+  return submitHiggsfield(input);
+}
+
+export async function getGenjutsuStatus(input: {
+  provider: GenjutsuProvider | string;
+  model?: string | null;
+  requestId: string;
+}) {
+  if (input.provider === 'seedance') {
+    const model =
+      input.model?.trim() ||
+      envConfigs.seedance_genjutsu_model?.trim() ||
+      'bytedance/seedance-2.5/us/reference-to-video';
+
+    return getSeedanceStatus({
+      model,
+      requestId: input.requestId,
+    });
+  }
+
+  return getHiggsfieldStatus(input.requestId);
 }

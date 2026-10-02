@@ -143,7 +143,11 @@ async function GET({ request }: { request: Request }) {
       });
     }
 
-    const provider = await getGenjutsuStatus(task.taskId);
+    const provider = await getGenjutsuStatus({
+      provider: task.provider || 'higgsfield',
+      model: task.model,
+      requestId: task.taskId,
+    });
 
     if (provider.status === 'completed' && provider.videoUrl) {
       const durable = await persistGenjutsuResultToR2({

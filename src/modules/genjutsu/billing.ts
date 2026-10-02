@@ -9,7 +9,11 @@ import {
   revoke,
   CreditTransactionScene,
 } from '@/modules/credits/service';
-import { getGenjutsuModel, type GenjutsuMode, type GenjutsuResolution } from './service';
+import {
+  type GenjutsuMode,
+  type GenjutsuProvider,
+  type GenjutsuResolution,
+} from './service';
 
 export const GENJUTSU_SCENE = 'genjutsu';
 
@@ -97,6 +101,8 @@ export async function reserveGenjutsuCredits(params: {
   userId: string;
   userEmail?: string;
   mode: GenjutsuMode;
+  provider: GenjutsuProvider;
+  model: string;
   resolution: GenjutsuResolution;
   prompt: string;
   videoKey?: string;
@@ -106,6 +112,7 @@ export async function reserveGenjutsuCredits(params: {
   providerCostUsd: number;
   credits: number;
   providerEstimate?: unknown;
+  sourceDurationSeconds?: number;
 }) {
   const hasStorageInput =
     typeof params.videoKey === 'string' &&
@@ -152,6 +159,8 @@ export async function reserveGenjutsuCredits(params: {
       metadata: JSON.stringify({
         generationId: params.generationId,
         mode: params.mode,
+        provider: params.provider,
+        model: params.model,
         resolution: params.resolution,
         providerCostUsd: params.providerCostUsd,
       }),
@@ -166,8 +175,8 @@ export async function reserveGenjutsuCredits(params: {
       id: params.generationId,
       userId: params.userId,
       mediaType: 'video',
-      provider: 'higgsfield',
-      model: getGenjutsuModel(params.mode),
+      provider: params.provider,
+      model: params.model,
       prompt: params.prompt,
       options: JSON.stringify({
         mode: params.mode,
@@ -188,6 +197,10 @@ export async function reserveGenjutsuCredits(params: {
       taskInfo: JSON.stringify({
         providerCostUsd: params.providerCostUsd,
         providerEstimate: params.providerEstimate ?? null,
+        sourceDurationSeconds:
+          typeof params.sourceDurationSeconds === 'number'
+            ? params.sourceDurationSeconds
+            : null,
       }),
       taskResult: null,
       costCredits: params.credits,

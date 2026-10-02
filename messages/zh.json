@@ -843,9 +843,9 @@
   "landing.blog.description": "来自团队的产品动态、使用指南与工程笔记。",
   "landing.blog.view_all": "查看全部文章",
   "landing.footer.blog": "博客",
-  "genjutsu.safety.face_rejected": "不允许上传真人",
+  "genjutsu.safety.face_rejected": "图片和视频都不能包含真人。请换用不含真人肖像的素材。",
   "genjutsu.safety.unavailable": "安全检测暂时不可用，请稍后再试",
   "genjutsu.safety.check_failed": "参考图校验失败，请换一张再试",
-  "genjutsu.safety.upload_hint": "不支持真人脸 · 最多 8 张",
+  "genjutsu.safety.upload_hint": "图片/视频不可含真人 · 最多 8 张图",
   "genjutsu.safety.checking_aria": "检测参考图中"
 }

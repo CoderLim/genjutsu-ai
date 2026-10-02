@@ -31,13 +31,17 @@ async function POST({ request }: { request: Request }) {
     const requestId = readRequestId(payload, request);
 
     // Webhook delivery is only a wake-up signal. We never trust its status or
-    // result fields; every state transition is verified against Higgsfield.
+    // result fields; every state transition is verified against the stored provider.
     if (!requestId) return respOk();
 
     const task = await getGenjutsuTaskByRequestIdAnyUser(requestId);
     if (!task) return respOk();
 
-    const provider = await getGenjutsuStatus(requestId);
+    const provider = await getGenjutsuStatus({
+      provider: task.provider || 'higgsfield',
+      model: task.model,
+      requestId,
+    });
 
     if (provider.status === 'completed' && provider.videoUrl) {
       const durable = await persistGenjutsuResultToR2({
