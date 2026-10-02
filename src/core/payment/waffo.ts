@@ -207,6 +207,83 @@ export class WaffoProvider implements PaymentProvider {
     return { sessionId, checkoutUrl, expiresAt };
   }
 
+  private webhookReady = false;
+
+  private async ensureWebhook(successUrl?: string): Promise<void> {
+    if (this.webhookReady || !this.configs.storeId || !successUrl) return;
+
+    let origin: string;
+    try {
+      origin = new URL(successUrl).origin;
+    } catch {
+      return;
+    }
+    if (!origin.startsWith('https://')) return;
+
+    const url = `${origin}/api/payment/notify/waffo`;
+    const testMode = this.apiEnvironment !== 'prod';
+    const requiredEvents = [
+      WebhookEventType.OrderCompleted,
+      WebhookEventType.SubscriptionActivated,
+      WebhookEventType.SubscriptionCanceling,
+      WebhookEventType.SubscriptionUncanceled,
+      WebhookEventType.SubscriptionUpdated,
+      WebhookEventType.SubscriptionCanceled,
+      WebhookEventType.SubscriptionPastDue,
+      WebhookEventType.RefundSucceeded,
+      WAFFO_SUBSCRIPTION_RENEWED,
+      WAFFO_SUBSCRIPTION_RECOVERED,
+    ];
+
+    const result = await this.client.graphql.query<{
+      store: {
+        storeWebhooks: Array<{
+          id: string;
+          url: string;
+          channel: string;
+          testMode: boolean;
+          events: string[];
+        }>;
+      } | null;
+    }>({
+      query: `query ($storeId: String!) {
+        store(id: $storeId) {
+          storeWebhooks { id url channel testMode events }
+        }
+      }`,
+      variables: { storeId: this.configs.storeId },
+    });
+
+    const existing = result.data?.store?.storeWebhooks?.find(
+      (item) =>
+        item.channel === 'http' &&
+        item.url === url &&
+        item.testMode === testMode
+    );
+
+    if (!existing) {
+      await this.client.webhooks.add({
+        storeId: this.configs.storeId,
+        channel: 'http',
+        url,
+        events: requiredEvents as any,
+        testMode,
+      });
+    } else {
+      const missing = requiredEvents.filter(
+        (event) => !existing.events.includes(event)
+      );
+      if (missing.length > 0) {
+        await this.client.webhooks.update({
+          id: existing.id,
+          events: [...existing.events, ...missing] as any,
+        });
+      }
+    }
+
+    this.webhookReady = true;
+  }
+
   async createPayment({
     order,
   }: {
@@ -237,14 +314,33 @@ export class WaffoProvider implements PaymentProvider {
       },
     };
 
-    // Prefer Store Slug + X-Environment so checkout matches waffo_environment
-    // even when the configured RSA API key is test-bound.
-    const session = this.configs.storeId
-      ? await this.createSessionViaStoreSlug(params)
-      : await this.client.checkout.createSession(params);
+    // Merchant-authenticated checkout is required here. Waffo's visitor /
+    // Store Slug flow accepts orderMerchantExternalId on the wire but does not
+    // persist it, which makes the resulting payment impossible to reconcile
+    // safely back to our local order. Authenticated checkout preserves the
+    // merchant order reference in GraphQL and webhook payloads.
+    const buyerIdentity =
+      order.customer?.id || order.customer?.email || orderNo;
+    if (!buyerIdentity) {
+      throw new Error('buyer identity is required for Waffo checkout');
+    }
 
-    // Store our orderNo as sessionId so webhook/callback lookup matches
-    // orderMerchantExternalId (same pattern as Alipay out_trade_no).
+    // Webhook delivery is the primary settlement path. Keep checkout usable
+    // when webhook registration is temporarily unavailable: the success
+    // callback still performs an authoritative provider lookup.
+    try {
+      await this.ensureWebhook(order.successUrl);
+    } catch (error) {
+      console.warn('Failed to ensure Waffo webhook', error);
+    }
+
+    const session = await this.client.checkout.authenticated.create({
+      ...params,
+      buyerIdentity,
+    });
+
+    // The persisted external order id is now authoritative and can be used by
+    // both synchronous return reconciliation and webhook handling.
     const lookupId = orderNo || session.sessionId;
 
     return {
