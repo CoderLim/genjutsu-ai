@@ -123,7 +123,7 @@ async function fetchRange(url: string, range: string) {
   };
 }
 
-export async function probeSeedanceSourceDurationSeconds(videoUrl: string) {
+export async function probeVideoDurationSeconds(videoUrl: string) {
   const first = await fetchRange(videoUrl, `bytes=0-${HEAD_BYTES - 1}`);
   let seconds = parseIsoBmffDurationSeconds(first.bytes);
 
@@ -135,9 +135,15 @@ export async function probeSeedanceSourceDurationSeconds(videoUrl: string) {
 
   if (seconds == null) {
     throw new Error(
-      'Could not read the source video duration. Seedance currently requires MP4 or MOV input with readable metadata.'
+      'Could not read the video duration. Seedance requires MP4 or MOV media with readable metadata.'
     );
   }
 
-  return assertSeedanceSourceDurationSeconds(seconds);
+  return seconds;
+}
+
+export async function probeSeedanceSourceDurationSeconds(videoUrl: string) {
+  return assertSeedanceSourceDurationSeconds(
+    await probeVideoDurationSeconds(videoUrl)
+  );
 }
