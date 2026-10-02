@@ -14,10 +14,10 @@ implements Higgsfield Genjutsu in the same way.
 
 ## Workflow mapping
 
-| Product workflow | Seedance 2.5 task | Intent |
-| --- | --- | --- |
-| Motion Transfer | `reference` | Use the source video for motion/camera/timing and image references for the replacement subject |
-| Objects Swap | `editing` | Modify the requested target while preserving unrelated source-video content |
+| Product workflow | Seedance 2.5 task | Intent                                                                                         |
+| ---------------- | ----------------- | ---------------------------------------------------------------------------------------------- |
+| Motion Transfer  | `reference`       | Use the source video for motion/camera/timing and image references for the replacement subject |
+| Objects Swap     | `editing`         | Modify the requested target while preserving unrelated source-video content                    |
 
 The server expands the user's prompt with workflow constraints. The browser
 does not need to know Seedance prompt syntax.
@@ -114,8 +114,11 @@ Seedance generations accept only server-owned R2 storage keys. Arbitrary legacy
 video URLs are not eligible for the Seedance path, and range requests reject
 redirects. This keeps the metadata probe away from user-controlled SSRF targets.
 
-Seedance is rejected for sources outside the provider's current 1.8–30.2 second
-reference-video range.
+Seedance is rejected for sources outside the 4–30.2 second range. The
+provider's reference floor is ~1.8s, but Objects Swap uses `task=editing`,
+which requires at least 4 seconds — shorter clips fail with a misleading
+"set aspect_ratio and duration to auto" error. Upload UI and server probe
+both enforce this editing floor.
 
 ## Billing caveat
 

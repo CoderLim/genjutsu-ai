@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { parseIsoBmffDurationSeconds } from './video-metadata';
+import {
+  assertSeedanceSourceDurationSeconds,
+  parseIsoBmffDurationSeconds,
+} from './video-metadata';
 
 function mvhdV0(timescale: number, duration: number) {
   const bytes = new Uint8Array(32);
@@ -31,4 +34,12 @@ test('finds mvhd inside a larger byte range', () => {
 
 test('returns null when mvhd metadata is absent', () => {
   assert.equal(parseIsoBmffDurationSeconds(new Uint8Array(64)), null);
+});
+
+test('rejects Seedance sources shorter than the editing floor of 4 seconds', () => {
+  assert.throws(
+    () => assertSeedanceSourceDurationSeconds(3.9),
+    /between 4 and 30\.2 seconds/
+  );
+  assert.equal(assertSeedanceSourceDurationSeconds(4), 4);
 });

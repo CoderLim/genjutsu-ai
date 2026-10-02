@@ -81,6 +81,12 @@ function createMediaItem(file: File): MediaItem {
 const IMAGE_MAX = 8;
 const MAX_SOURCE_VIDEO_BYTES = 200 * 1024 * 1024;
 const MAX_REFERENCE_IMAGE_BYTES = 12 * 1024 * 1024;
+// Seedance Objects Swap uses task=editing. Clips shorter than 4s are rejected
+// by Seedance with a misleading "set aspect_ratio/duration to auto" error
+// (Fal's generic reference-video floor is ~1.8s, but editing requires >= 4s).
+// Keep the upload gate on that editing floor and match the UI "4–30s" hint.
+const MIN_SOURCE_VIDEO_SECONDS = 4;
+const MAX_SOURCE_VIDEO_SECONDS = 30;
 
 function revokeItem(item: MediaItem | null) {
   if (item) URL.revokeObjectURL(item.url);
@@ -88,6 +94,34 @@ function revokeItem(item: MediaItem | null) {
 
 function revokeAll(items: MediaItem[]) {
   for (const item of items) URL.revokeObjectURL(item.url);
+}
+
+/** Read duration from a local video File via browser metadata. */
+function readLocalVideoDurationSeconds(file: File): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const video = document.createElement('video');
+    video.preload = 'metadata';
+    const cleanup = () => {
+      video.removeAttribute('src');
+      video.load();
+      URL.revokeObjectURL(url);
+    };
+    video.onloadedmetadata = () => {
+      const duration = video.duration;
+      cleanup();
+      if (!Number.isFinite(duration) || duration <= 0) {
+        reject(new Error('Could not read video duration'));
+        return;
+      }
+      resolve(duration);
+    };
+    video.onerror = () => {
+      cleanup();
+      reject(new Error('Could not read video duration'));
+    };
+    video.src = url;
+  });
 }
 
 function ModeToggle({
@@ -273,8 +307,28 @@ function VideoUploadSlot({
         toast.error('Source video must be 200 MB or smaller');
         return;
       }
-      revokeItem(item);
-      onChange(createMediaItem(file));
+
+      void (async () => {
+        try {
+          const durationSeconds = await readLocalVideoDurationSeconds(file);
+          // See MIN_SOURCE_VIDEO_SECONDS: Seedance editing rejects <4s clips.
+          if (
+            durationSeconds < MIN_SOURCE_VIDEO_SECONDS ||
+            durationSeconds > MAX_SOURCE_VIDEO_SECONDS
+          ) {
+            toast.error(
+              `Source video must be ${MIN_SOURCE_VIDEO_SECONDS}–${MAX_SOURCE_VIDEO_SECONDS} seconds (got ${durationSeconds.toFixed(1)}s)`
+            );
+            return;
+          }
+          revokeItem(item);
+          onChange(createMediaItem(file));
+        } catch {
+          toast.error(
+            'Could not read video duration. Please use an MP4/MOV between 4 and 30 seconds.'
+          );
+        }
+      })();
     },
     [item, onChange]
   );

@@ -1,7 +1,25 @@
 const HEAD_BYTES = 2 * 1024 * 1024;
 const TAIL_BYTES = 4 * 1024 * 1024;
 const MAX_SEEDANCE_SOURCE_SECONDS = 30.2;
-const MIN_SEEDANCE_SOURCE_SECONDS = 1.8;
+// Seedance reference-to-video accepts ~1.8–30.2s for task=reference, but
+// task=editing (Objects Swap) requires source clips of at least 4 seconds.
+// Shorter videos are rejected with a misleading provider error asking to set
+// aspect_ratio/duration to "auto". Enforce the editing floor for all Genjutsu
+// Seedance sources so upload UI ("4–30s") and server quote stay aligned.
+export const MIN_SEEDANCE_SOURCE_SECONDS = 4;
+
+export function assertSeedanceSourceDurationSeconds(seconds: number) {
+  if (
+    !Number.isFinite(seconds) ||
+    seconds < MIN_SEEDANCE_SOURCE_SECONDS ||
+    seconds > MAX_SEEDANCE_SOURCE_SECONDS
+  ) {
+    throw new Error(
+      `Seedance source video must be between ${MIN_SEEDANCE_SOURCE_SECONDS} and ${MAX_SEEDANCE_SOURCE_SECONDS} seconds`
+    );
+  }
+  return seconds;
+}
 
 function readUint32(bytes: Uint8Array, offset: number) {
   if (offset < 0 || offset + 4 > bytes.byteLength) return null;
@@ -31,7 +49,11 @@ function isMvhd(bytes: Uint8Array, offset: number) {
 }
 
 export function parseIsoBmffDurationSeconds(bytes: Uint8Array) {
-  for (let typeOffset = 4; typeOffset + 24 < bytes.byteLength; typeOffset += 1) {
+  for (
+    let typeOffset = 4;
+    typeOffset + 24 < bytes.byteLength;
+    typeOffset += 1
+  ) {
     if (!isMvhd(bytes, typeOffset)) continue;
 
     const declaredSize = readUint32(bytes, typeOffset - 4);
@@ -117,14 +139,5 @@ export async function probeSeedanceSourceDurationSeconds(videoUrl: string) {
     );
   }
 
-  if (
-    seconds < MIN_SEEDANCE_SOURCE_SECONDS ||
-    seconds > MAX_SEEDANCE_SOURCE_SECONDS
-  ) {
-    throw new Error(
-      `Seedance source video must be between ${MIN_SEEDANCE_SOURCE_SECONDS} and ${MAX_SEEDANCE_SOURCE_SECONDS} seconds`
-    );
-  }
-
-  return seconds;
+  return assertSeedanceSourceDurationSeconds(seconds);
 }
