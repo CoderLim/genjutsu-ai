@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import {
   buildSeedancePayload,
+  calculateSeedanceActualProviderCost,
   estimateSeedanceProviderCost,
   falQueueAppPath,
   isSeedanceLikenessRejection,
@@ -77,4 +78,28 @@ test('object swap uses editing with explicit auto duration and aspect ratio', ()
   assert.equal(payload.duration, 'auto');
   assert.equal(payload.aspect_ratio, 'auto');
   assert.match(payload.prompt, /Replace the red bottle/);
+});
+
+
+test('Seedance actual cost bills exact source plus output duration', () => {
+  const actual = calculateSeedanceActualProviderCost({
+    resolution: '720p',
+    sourceDurationSeconds: 5,
+    outputDurationSeconds: 4.2,
+  });
+
+  assert.equal(actual.billedSeconds, 9.2);
+  assert.equal(actual.providerCostUsd, 9.2 * 0.34056);
+});
+
+test('Seedance actual cost rejects invalid output duration instead of silently estimating', () => {
+  assert.throws(
+    () =>
+      calculateSeedanceActualProviderCost({
+        resolution: '480p',
+        sourceDurationSeconds: 5,
+        outputDurationSeconds: 0,
+      }),
+    /output duration must be a positive number/
+  );
 });
