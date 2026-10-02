@@ -22,10 +22,6 @@ import {
   estimateGenjutsuCredits,
 } from '@/modules/genjutsu/pricing';
 import {
-  assertGenjutsuReferenceImagesSafe,
-  GenjutsuSafetyError,
-} from '@/modules/genjutsu/safety';
-import {
   HiggsfieldHttpError,
   isSeedanceLikenessRejection,
   resolveGenjutsuProviderCost,
@@ -257,10 +253,8 @@ async function POST({ request }: { request: Request }) {
     } | null = null;
 
     if (!task && target.provider === 'higgsfield') {
-      // Cheap preflight before Fal safety: if the user cannot afford even the
-      // minimum 4-second clip at this resolution, fail without paying for a
-      // face-detection request. Exact provider pricing still happens only
-      // after the server-side safety gate.
+      // Cheap preflight: if the user cannot afford even the minimum 4-second
+      // clip at this resolution, fail before live /estimate or submit.
       const minimumCredits = estimateGenjutsuCredits({
         durationSeconds: 4,
         resolution: input.resolution,
@@ -270,9 +264,10 @@ async function POST({ request }: { request: Request }) {
         throw new InsufficientCreditsError(minimumCredits, balance);
       }
     } else if (!task && target.provider === 'seedance') {
-      // Seedance has no Higgsfield-style free /estimate endpoint. Probe the
-      // server-owned R2 source once, build the list-rate quote, and reject an
-      // obviously insufficient wallet before paying for Fal face detection.
+      // Seedance has no free /estimate endpoint. Probe the server-owned R2
+      // source once, build the list-rate quote, and reject an obviously
+      // insufficient wallet before submit. Provider likeness policy is
+      // enforced by Seedance after submit and surfaced on status/refund.
       const estimate = await resolveGenjutsuProviderCost({
         ...providerInput,
         ...target,
@@ -292,42 +287,9 @@ async function POST({ request }: { request: Request }) {
       };
     }
 
-    // Defense in depth: the normal UI checks local reference files before
-    // uploading them to R2, and this server-side gate checks the uploaded
-    // objects again so direct API calls cannot bypass the restriction.
-    try {
-      await assertGenjutsuReferenceImagesSafe(providerInput.imageUrls);
-    } catch (error) {
-      if (error instanceof GenjutsuSafetyError) {
-        let refundedCredits = 0;
-        if (task?.status === 'reserved') {
-          const refunded = await refundGenjutsuGeneration({
-            generationId,
-            userId: session.user.id,
-            providerStatus: 'safety_rejected',
-            error: error.message,
-          });
-          refundedCredits = refunded?.costCredits || 0;
-        }
-
-        return respJson(
-          -1,
-          error.message,
-          {
-            code: error.code,
-            generationId,
-            refundedCredits,
-          },
-          { status: error.status }
-        );
-      }
-      throw error;
-    }
-
     if (!task) {
       if (!pendingQuote) {
-        // Higgsfield's live /estimate runs only after safety validation.
-        // Client-supplied credit amounts are ignored.
+        // Higgsfield's live /estimate; client-supplied credit amounts ignored.
         const estimate = await resolveGenjutsuProviderCost({
           ...providerInput,
           ...target,

@@ -7,18 +7,11 @@ import {
   type DragEvent,
   type ReactNode,
 } from 'react';
-import { Loader2 } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { toast } from 'sonner';
 
 import { useSession } from '@/core/auth/client';
-import {
-  ApiError,
-  apiGet,
-  apiPost,
-  apiPostForm,
-  uploadToSignedUrl,
-} from '@/lib/api-client';
+import { ApiError, apiGet, apiPost, uploadToSignedUrl } from '@/lib/api-client';
 import { cn } from '@/lib/cn';
 import { m } from '@/paraglide/messages.js';
 import {
@@ -377,58 +370,13 @@ function VideoUploadSlot({
   );
 }
 
-/**
- * Face detection only needs a modest preview. Downscaling before the safety
- * POST avoids huge data-URI bodies that often fail as bare "fetch failed"
- * through local proxies / fake-IP DNS.
- */
-async function downscaleImageForSafetyCheck(file: File): Promise<File> {
-  if (typeof createImageBitmap !== 'function') return file;
-
-  let bitmap: ImageBitmap | null = null;
-  try {
-    bitmap = await createImageBitmap(file);
-    const maxEdge = 1280;
-    const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
-    if (scale >= 1 && file.size <= 800_000) return file;
-
-    const width = Math.max(1, Math.round(bitmap.width * scale));
-    const height = Math.max(1, Math.round(bitmap.height * scale));
-    const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return file;
-    ctx.drawImage(bitmap, 0, 0, width, height);
-
-    const blob = await new Promise<Blob | null>((resolve) =>
-      canvas.toBlob(resolve, 'image/jpeg', 0.85)
-    );
-    if (!blob) return file;
-
-    const baseName = file.name.replace(/\.[^.]+$/, '') || 'reference';
-    return new File([blob], `${baseName}.jpg`, { type: 'image/jpeg' });
-  } catch {
-    return file;
-  } finally {
-    bitmap?.close();
-  }
-}
-
-async function assertReferenceImageSafe(file: File) {
-  const safetyImage = await downscaleImageForSafetyCheck(file);
-  const formData = new FormData();
-  formData.append('image', safetyImage, safetyImage.name);
-  await apiPostForm<{ safe: true }>('/api/genjutsu/check-reference', formData);
-}
-
 function isLikenessRejectionMessage(message: string) {
   return /images and videos cannot contain real people|likenesses of real people|real people|private information that cannot be processed|human face|真人|肖像/i.test(
     message
   );
 }
 
-function referenceSafetyUiMessage(cause: unknown): string {
+function likenessRejectionUiMessage(cause: unknown): string {
   const code =
     cause instanceof ApiError &&
     cause.data &&
@@ -446,16 +394,12 @@ function referenceSafetyUiMessage(cause: unknown): string {
           : '';
 
   if (
-    code === 'REFERENCE_FACE_DETECTED' ||
     code === 'PROVIDER_LIKENESS_REJECTED' ||
     isLikenessRejectionMessage(message)
   ) {
     return m['genjutsu.safety.face_rejected']();
   }
-  if (code === 'FACE_DETECTION_UNAVAILABLE') {
-    return m['genjutsu.safety.unavailable']();
-  }
-  return message || m['genjutsu.safety.check_failed']();
+  return message;
 }
 
 function generationFailureUiMessage(error?: string | null) {
@@ -463,10 +407,6 @@ function generationFailureUiMessage(error?: string | null) {
     return m['genjutsu.safety.face_rejected']();
   }
   return error || '';
-}
-
-function toastReferenceReject(cause: unknown) {
-  toast.error(referenceSafetyUiMessage(cause));
 }
 
 function redirectToSignIn() {
@@ -487,7 +427,6 @@ function ImageUploadSlot({
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [previewId, setPreviewId] = useState<string | null>(null);
-  const [checking, setChecking] = useState(false);
   const { dragging, setDragging, onDragOver, onDragLeave } = useDragHighlight();
   const previewItem = items.find((i) => i.id === previewId) ?? null;
   const canAdd = items.length < IMAGE_MAX;
@@ -501,7 +440,7 @@ function ImageUploadSlot({
   }, [signedIn]);
 
   const mergeFiles = useCallback(
-    async (list: FileList | File[] | null) => {
+    (list: FileList | File[] | null) => {
       if (!list || list.length === 0) return;
       if (!signedIn) {
         redirectToSignIn();
@@ -515,37 +454,19 @@ function ImageUploadSlot({
       const room = IMAGE_MAX - items.length;
       if (room <= 0) return;
 
-      const candidates = incoming.slice(0, room).filter((file) => {
-        if (file.size <= 0 || file.size > MAX_REFERENCE_IMAGE_BYTES) {
-          toast.error(`"${file.name}" must be 12 MB or smaller`);
-          return false;
-        }
-        return true;
-      });
-      if (candidates.length === 0) return;
-      setChecking(true);
-
-      const accepted: MediaItem[] = [];
-      let rejectedOnce = false;
-
-      try {
-        for (const file of candidates) {
-          try {
-            await assertReferenceImageSafe(file);
-            accepted.push(createMediaItem(file));
-          } catch (cause) {
-            if (!rejectedOnce) {
-              toastReferenceReject(cause);
-              rejectedOnce = true;
-            }
+      const accepted = incoming
+        .slice(0, room)
+        .filter((file) => {
+          if (file.size <= 0 || file.size > MAX_REFERENCE_IMAGE_BYTES) {
+            toast.error(`"${file.name}" must be 12 MB or smaller`);
+            return false;
           }
-        }
+          return true;
+        })
+        .map((file) => createMediaItem(file));
 
-        if (accepted.length > 0) {
-          onChange([...items, ...accepted]);
-        }
-      } finally {
-        setChecking(false);
+      if (accepted.length > 0) {
+        onChange([...items, ...accepted]);
       }
     },
     [items, onChange, signedIn]
@@ -562,18 +483,14 @@ function ImageUploadSlot({
   return (
     <>
       <div
-        className={cn(
-          'relative flex shrink-0 flex-wrap gap-2',
-          checking && 'pointer-events-none opacity-70'
-        )}
-        aria-busy={checking}
+        className="relative flex shrink-0 flex-wrap gap-2"
         onDragOver={onDragOver}
         onDragLeave={onDragLeave}
         onDrop={(e) => {
           e.preventDefault();
           e.stopPropagation();
           setDragging(false);
-          void mergeFiles(e.dataTransfer.files);
+          mergeFiles(e.dataTransfer.files);
         }}
       >
         <input
@@ -582,10 +499,9 @@ function ImageUploadSlot({
           className="hidden"
           accept="image/*"
           multiple
-          disabled={checking}
           aria-label="Add products, clothes, objects, or scenes"
           onChange={(e: ChangeEvent<HTMLInputElement>) => {
-            void mergeFiles(e.target.files);
+            mergeFiles(e.target.files);
             e.target.value = '';
           }}
         />
@@ -632,15 +548,9 @@ function ImageUploadSlot({
 
         {items.length === 0 ? (
           <EmptyUploadButton
-            title={checking ? '' : 'Add products, clothes, objects, or scenes'}
-            hint={checking ? '' : m['genjutsu.safety.upload_hint']()}
-            icon={
-              checking ? (
-                <Loader2 className="text-primary/90 size-5 shrink-0 animate-spin" />
-              ) : (
-                <ImageModeIcon className="text-primary/78 size-5 shrink-0" />
-              )
-            }
+            title="Add products, clothes, objects, or scenes"
+            hint={m['genjutsu.safety.upload_hint']()}
+            icon={<ImageModeIcon className="text-primary/78 size-5 shrink-0" />}
             dragging={dragging}
             onClick={openPicker}
             ariaLabel="Add products, clothes, objects, or scenes"
@@ -649,31 +559,19 @@ function ImageUploadSlot({
           <button
             type="button"
             onClick={openPicker}
-            aria-label={
-              checking
-                ? m['genjutsu.safety.checking_aria']()
-                : 'Add more images'
-            }
-            disabled={checking}
-            className="relative block h-[96px] w-[68px] focus:ring-0 focus:outline-none disabled:opacity-100"
+            aria-label="Add more images"
+            className="relative block h-[96px] w-[68px] focus:ring-0 focus:outline-none"
           >
             <span
               className={cn(
                 'border-primary/35 bg-primary/5 hover:border-primary/45 absolute inset-0 flex flex-col items-center justify-center gap-1 border-2 border-dashed text-[rgb(204,144,92)] transition-all duration-200',
-                dragging && 'border-primary/55 bg-primary/10',
-                checking && 'border-primary/50 bg-primary/10'
+                dragging && 'border-primary/55 bg-primary/10'
               )}
             >
-              {checking ? (
-                <Loader2 className="text-primary/90 size-5 animate-spin" />
-              ) : (
-                <>
-                  <PlusIcon className="text-primary/78 size-5" />
-                  <span className="text-foreground/44 text-[9px] leading-tight">
-                    {items.length}/{IMAGE_MAX}
-                  </span>
-                </>
-              )}
+              <PlusIcon className="text-primary/78 size-5" />
+              <span className="text-foreground/44 text-[9px] leading-tight">
+                {items.length}/{IMAGE_MAX}
+              </span>
             </span>
           </button>
         ) : null}
@@ -1150,15 +1048,6 @@ export function GeneratorPanel({
     });
 
     try {
-      // Check reference images before requesting R2 upload URLs, so blocked
-      // human-face references are rejected before we persist them. The
-      // /generate route repeats this check against fresh signed R2 read URLs
-      // as a server-side anti-bypass gate.
-      for (const image of images) {
-        await assertReferenceImageSafe(image.file);
-        if (generationRunRef.current !== runId) return;
-      }
-
       const media = [video, ...images];
       const contentTypes = media.map(
         (item, index) =>
@@ -1264,16 +1153,14 @@ export function GeneratorPanel({
         setStatus('idle');
         setResult(null);
         setNeedsCredits(insufficient);
-        const faceOrSafety =
-          apiData?.code === 'REFERENCE_FACE_DETECTED' ||
+        const likenessRejected =
           apiData?.code === 'PROVIDER_LIKENESS_REJECTED' ||
-          apiData?.code === 'FACE_DETECTION_UNAVAILABLE' ||
           (typeof cause.message === 'string' &&
             isLikenessRejectionMessage(cause.message));
-        const uiMessage = faceOrSafety
-          ? referenceSafetyUiMessage(cause)
+        const uiMessage = likenessRejected
+          ? likenessRejectionUiMessage(cause)
           : cause.message;
-        if (faceOrSafety) toast.error(uiMessage);
+        if (likenessRejected) toast.error(uiMessage);
         setError(uiMessage);
         return;
       }
