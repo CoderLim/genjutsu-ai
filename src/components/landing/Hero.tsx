@@ -1,4 +1,5 @@
 import { cn } from '@/lib/cn';
+import { DemoVideoGallery } from '@/components/landing/DemoVideoGallery';
 import { GeneratorPanel } from '@/components/landing/GeneratorPanel';
 
 const BADGES = ['Motion Transfer', 'Objects Swap', 'Up to 1080p'] as const;
@@ -68,6 +69,7 @@ export function Hero({ className }: { className?: string }) {
 
         <div id="hero-generator" className="mt-5 scroll-mt-24 text-left">
           <GeneratorPanel />
+          <DemoVideoGallery />
         </div>
       </div>
     </section>
