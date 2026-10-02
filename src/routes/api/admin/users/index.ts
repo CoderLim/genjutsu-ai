@@ -4,7 +4,7 @@ import { and, count, desc, like, or, type SQL } from 'drizzle-orm';
 import { getAuth } from '@/core/auth';
 import { db } from '@/core/db';
 import { user } from '@/config/db/schema';
-import { getBalance } from '@/modules/credits/service';
+import { getBalances } from '@/modules/credits/service';
 import { hasPermission } from '@/modules/rbac/service';
 import { respErr, respPage } from '@/lib/resp';
 
@@ -34,13 +34,15 @@ async function GET({ request }: { request: Request }) {
     }
     const where = conditions.length > 0 ? and(...conditions) : undefined;
 
-    const [totalResult] = await db()
+    const database = db();
+
+    const [totalResult] = await database
       .select({ count: count() })
       .from(user)
       .where(where);
     const total = totalResult.count;
 
-    const users = await db()
+    const users = await database
       .select({
         id: user.id,
         name: user.name,
@@ -56,12 +58,14 @@ async function GET({ request }: { request: Request }) {
       .limit(pageSize)
       .offset(offset);
 
-    const withCredits = await Promise.all(
-      users.map(async (u: (typeof users)[number]) => ({
-        ...u,
-        credits: await getBalance(u.id),
-      }))
+    const balances = await getBalances(
+      users.map((u) => u.id),
+      database
     );
+    const withCredits = users.map((u) => ({
+      ...u,
+      credits: balances.get(u.id) ?? 0,
+    }));
 
     return respPage(withCredits, total);
   } catch (error: any) {
