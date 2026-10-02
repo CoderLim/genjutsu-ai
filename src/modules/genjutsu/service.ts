@@ -493,7 +493,7 @@ export async function submitGenjutsu(input: {
 
 export async function getGenjutsuStatus(input: {
   provider: GenjutsuProvider | string;
-  model: string;
+  model?: string | null;
   requestId: string;
 }) {
   if (input.provider === 'seedance') {
