@@ -219,6 +219,7 @@ export type GenjutsuCostEstimate = {
   providerCredits: unknown;
   payload: unknown;
   source: 'estimate' | 'list_fallback' | 'seedance_list_estimate';
+  sourceDurationSeconds?: number;
 };
 
 /**
@@ -447,10 +448,13 @@ export async function resolveGenjutsuProviderCost(
   if (input.provider === 'seedance') {
     const sourceDurationSeconds =
       await probeSeedanceSourceDurationSeconds(input.videoUrl);
-    return estimateSeedanceProviderCost({
-      resolution: input.resolution,
+    return {
+      ...estimateSeedanceProviderCost({
+        resolution: input.resolution,
+        sourceDurationSeconds,
+      }),
       sourceDurationSeconds,
-    });
+    };
   }
 
   return resolveHiggsfieldProviderCost(input);
@@ -465,13 +469,22 @@ export async function submitGenjutsu(input: {
   videoUrl: string;
   imageUrls: string[];
   endUserId: string;
+  sourceDurationSeconds?: number;
 }) {
   if (input.provider === 'seedance') {
-    const sourceDurationSeconds =
-      await probeSeedanceSourceDurationSeconds(input.videoUrl);
+    if (
+      typeof input.sourceDurationSeconds !== 'number' ||
+      !Number.isFinite(input.sourceDurationSeconds) ||
+      input.sourceDurationSeconds <= 0
+    ) {
+      throw new Error(
+        'Seedance submission is missing the server-validated source duration'
+      );
+    }
+
     return submitSeedance({
       ...input,
-      sourceDurationSeconds,
+      sourceDurationSeconds: input.sourceDurationSeconds,
     });
   }
 
@@ -484,8 +497,13 @@ export async function getGenjutsuStatus(input: {
   requestId: string;
 }) {
   if (input.provider === 'seedance') {
+    const model =
+      input.model?.trim() ||
+      envConfigs.seedance_genjutsu_model?.trim() ||
+      'bytedance/seedance-2.5/us/reference-to-video';
+
     return getSeedanceStatus({
-      model: input.model,
+      model,
       requestId: input.requestId,
     });
   }
