@@ -350,7 +350,6 @@ test('recovered without period fields throws', () => {
   );
 });
 
-
 test('createPayment uses authenticated checkout and preserves merchant order reference', async () => {
   const provider = createWaffoProvider({
     merchantId: 'MER_abcdefghijklmnopqrstuv',
@@ -392,4 +391,30 @@ test('createPayment uses authenticated checkout and preserves merchant order ref
   assert.deepEqual(received?.metadata, { orderNo: 'ORD_local_1' });
   assert.equal(session.checkoutInfo.sessionId, 'ORD_local_1');
   assert.equal(session.metadata.checkoutSessionId, 'SES_provider_1');
+  assert.equal(session.metadata.waffoEnvironment, 'prod');
+  assert.equal(session.checkoutResult.waffoEnvironment, 'prod');
+});
+
+test('prod provider rejects test_mode webhook settlement', () => {
+  const provider = createWaffoProvider({
+    merchantId: 'MER_abcdefghijklmnopqrstuv',
+    privateKey: TEST_PRIVATE_KEY,
+    environment: 'prod',
+  }) as any;
+
+  assert.throws(
+    () => provider.rejectTestModeInProduction('test'),
+    /test_mode settlement in production/
+  );
+  assert.doesNotThrow(() => provider.rejectTestModeInProduction('prod'));
+  assert.doesNotThrow(() => provider.rejectTestModeInProduction(undefined));
+});
+
+test('webhook session carries waffoMode for settlement guards', () => {
+  const internals = providerInternals();
+  const session = internals.buildPaymentSessionFromWebhook(
+    baseEvent(WebhookEventType.OrderCompleted, baseData(), { mode: 'test' })
+  );
+  assert.equal(session.metadata?.waffoMode, 'test');
+  assert.equal(session.paymentResult?.mode, 'test');
 });

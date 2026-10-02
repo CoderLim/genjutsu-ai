@@ -360,6 +360,17 @@ async function handleCheckoutSuccess(session: any, provider: string) {
     // stale/misconfigured mapping charges a different amount than our
     // authoritative catalog order; never grant credits for the wrong SKU.
     if (provider === 'waffo') {
+      const configs = await getAllConfigs();
+      const waffoMode =
+        session.metadata?.waffoMode ||
+        session.paymentResult?.mode ||
+        session.paymentResult?.waffoMode;
+      if (configs.waffo_environment === 'prod' && waffoMode === 'test') {
+        throw new Error(
+          `Rejecting Waffo test_mode settlement in production for order ${existingOrder.orderNo}`
+        );
+      }
+
       const expectedAmount = existingOrder.amount || 0;
       const expectedCurrency = (existingOrder.currency || 'usd').toLowerCase();
       const paidAmount = paymentInfo?.paymentAmount;

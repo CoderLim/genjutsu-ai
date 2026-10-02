@@ -105,6 +105,19 @@ export class WaffoProvider implements PaymentProvider {
     return this.configs.environment === 'prod' ? 'prod' : 'test';
   }
 
+  /**
+   * Production must never settle Waffo test_mode traffic. API keys are
+   * environment-bound: a Test key still yields mode=test even when
+   * waffo_environment is set to prod.
+   */
+  private rejectTestModeInProduction(mode: string | undefined): void {
+    if (this.apiEnvironment === 'prod' && mode === 'test') {
+      throw new Error(
+        'Rejecting Waffo test_mode settlement in production — use a Production API Key'
+      );
+    }
+  }
+
   private webhookReady = false;
 
   private async ensureWebhook(successUrl?: string): Promise<void> {
@@ -240,6 +253,7 @@ export class WaffoProvider implements PaymentProvider {
     // The persisted external order id is now authoritative and can be used by
     // both synchronous return reconciliation and webhook handling.
     const lookupId = orderNo || session.sessionId;
+    const waffoEnvironment = this.apiEnvironment;
 
     return {
       provider: this.name,
@@ -248,12 +262,14 @@ export class WaffoProvider implements PaymentProvider {
         sessionId: lookupId,
         checkoutUrl: session.checkoutUrl,
       },
-      checkoutResult: session,
+      // Persist configured environment on the stored checkout payload so
+      // callback reconciliation can audit expected mode.
+      checkoutResult: { ...session, waffoEnvironment },
       metadata: {
         ...(order.metadata || {}),
         orderNo,
         checkoutSessionId: session.sessionId,
-        waffoEnvironment: this.apiEnvironment,
+        waffoEnvironment,
       },
     };
   }
@@ -423,7 +439,13 @@ export class WaffoProvider implements PaymentProvider {
       eventType: event.eventType,
       eventId: event.eventId || event.id,
       orderId: event.data?.orderId,
+      mode: event.mode,
     });
+
+    // Fail closed: a production app must never settle Waffo test_mode events.
+    // API keys are environment-bound; a Test key + waffo_environment=prod still
+    // emits mode=test webhooks that would otherwise grant real credits.
+    this.rejectTestModeInProduction(event.mode);
 
     const eventType = this.mapWaffoEventType(event.eventType);
     const paymentSession = this.buildPaymentSessionFromWebhook(event);
@@ -542,11 +564,13 @@ export class WaffoProvider implements PaymentProvider {
         id: orderNo || data.orderId,
         orderMerchantExternalId: orderNo,
         orderId: data.orderId,
+        mode: event.mode,
       },
       metadata: {
         ...(data.orderMetadata || {}),
         orderNo,
         webhookEventId: event.eventId || event.id,
+        waffoMode: event.mode,
       },
     };
 
