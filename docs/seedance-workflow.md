@@ -70,6 +70,31 @@ The adapter sends:
 - H.264 output for broad browser compatibility
 - the authenticated user ID as Fal `end_user_id`
 
+## Multi-reference semantics
+
+Reference images are independent inputs, not automatically alternate views of
+one subject.
+
+The UI labels uploaded images as `Reference 1`, `Reference 2`, and so on.
+The Seedance prompt maps those labels to provider references explicitly:
+
+- `Reference 1 = @Image1`
+- `Reference 2 = @Image2`
+- etc.
+
+A user can therefore write instructions such as:
+
+`Replace the man with Reference 1, his jacket with Reference 2, and the phone with Reference 3.`
+
+References may represent different characters, products, clothes, props, or
+other visual elements. The system prompt tells Seedance to apply each reference
+only to its matching target and not to blend unrelated references together.
+
+When several different references are uploaded without an explicit mapping, the
+model is instructed to infer conservatively from visual correspondence and
+modify only clearly matching targets. Explicit Reference N instructions are
+recommended when multiple different subjects are present.
+
 ## Server-authoritative source duration
 
 Fal prices Seedance video-reference generations using input and output video
