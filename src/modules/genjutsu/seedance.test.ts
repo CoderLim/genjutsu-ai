@@ -62,7 +62,7 @@ test('short motion transfer uses auto duration with reference task', () => {
   assert.equal(payload.aspect_ratio, 'auto');
 });
 
-test('object swap uses editing and omits source-locked output fields', () => {
+test('object swap uses editing with explicit auto duration and aspect ratio', () => {
   const payload = buildSeedancePayload({
     mode: 'objects-swap',
     resolution: '720p',
@@ -74,7 +74,7 @@ test('object swap uses editing and omits source-locked output fields', () => {
   });
 
   assert.equal(payload.task, 'editing');
-  assert.equal('duration' in payload, false);
-  assert.equal('aspect_ratio' in payload, false);
+  assert.equal(payload.duration, 'auto');
+  assert.equal(payload.aspect_ratio, 'auto');
   assert.match(payload.prompt, /Replace the red bottle/);
 });

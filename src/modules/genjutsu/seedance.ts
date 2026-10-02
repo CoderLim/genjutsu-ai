@@ -213,21 +213,15 @@ export function buildSeedancePayload(input: {
   }
 
   const task = getSeedanceTask(input.mode);
-  const adaptiveOutputFields =
-    task === 'editing'
-      ? {}
-      : {
-          duration:
-            input.sourceDurationSeconds >= 4
-              ? String(
-                  Math.min(
-                    30,
-                    Math.max(4, Math.round(input.sourceDurationSeconds))
-                  )
-                )
-              : 'auto',
-          aspect_ratio: 'auto' as const,
-        };
+  // Objects Swap (task=editing): Seedance requires duration + aspect_ratio to
+  // be explicitly "auto". Motion Transfer keeps a source-length duration when
+  // the clip is long enough for Seedance's 4–30s enum.
+  const duration =
+    task === 'editing' || input.sourceDurationSeconds < 4
+      ? 'auto'
+      : String(
+          Math.min(30, Math.max(4, Math.round(input.sourceDurationSeconds)))
+        );
 
   return {
     prompt: buildSeedanceWorkflowPrompt({
@@ -239,11 +233,8 @@ export function buildSeedancePayload(input: {
     image_urls: input.imageUrls,
     video_urls: [input.videoUrl],
     resolution: input.resolution,
-    // Seedance editing locks output duration/aspect ratio to the source video.
-    // Omit both fields instead of sending them explicitly: Fal applies its
-    // editing defaults and avoids the provider's "video editing" validation
-    // path rejecting an otherwise valid object-swap request.
-    ...adaptiveOutputFields,
+    duration,
+    aspect_ratio: 'auto' as const,
     generate_audio: envConfigs.seedance_genjutsu_generate_audio !== 'false',
     bitrate_mode: 'standard',
     codec: 'H264',
