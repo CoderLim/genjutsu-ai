@@ -1,19 +1,23 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type ChangeEvent,
   type DragEvent,
   type ReactNode,
 } from 'react';
+import { CircleHelp } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { toast } from 'sonner';
 
 import { useSession } from '@/core/auth/client';
+import { estimateGenjutsuCredits } from '@/modules/genjutsu/pricing';
 import { ApiError, apiGet, apiPost, uploadToSignedUrl } from '@/lib/api-client';
 import { cn } from '@/lib/cn';
 import { m } from '@/paraglide/messages.js';
+import { useUserCredits } from '@/hooks/use-user-credits';
 import {
   ChevronDownIcon,
   CloseIcon,
@@ -23,6 +27,12 @@ import {
   ObjectsSwapIcon,
   PlusIcon,
 } from '@/components/icons';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 export type GeneratorMode = 'motion-transfer' | 'objects-swap';
 
@@ -39,6 +49,8 @@ type MediaItem = {
   id: string;
   file: File;
   url: string;
+  /** Present on validated source videos (seconds from browser metadata). */
+  durationSeconds?: number;
 };
 
 const RESOLUTIONS = ['480p', '720p', '1080p'] as const;
@@ -322,7 +334,10 @@ function VideoUploadSlot({
             return;
           }
           revokeItem(item);
-          onChange(createMediaItem(file));
+          onChange({
+            ...createMediaItem(file),
+            durationSeconds,
+          });
         } catch {
           toast.error(
             'Could not read video duration. Please use an MP4/MOV between 4 and 30 seconds.'
@@ -863,6 +878,7 @@ export function GeneratorPanel({
   onModeChange,
 }: GeneratorPanelProps) {
   const { data: session } = useSession();
+  const creditsQuery = useUserCredits(Boolean(session?.user));
   const [internalMode, setInternalMode] =
     useState<GeneratorMode>('motion-transfer');
   const mode = modeProp ?? internalMode;
@@ -1066,6 +1082,30 @@ export function GeneratorPanel({
 
   const canGenerate =
     Boolean(video && images.length > 0) && status !== 'generating';
+
+  const estimatedCredits = useMemo(() => {
+    const durationSeconds = video?.durationSeconds;
+    if (
+      typeof durationSeconds !== 'number' ||
+      !Number.isFinite(durationSeconds) ||
+      durationSeconds <= 0
+    ) {
+      return null;
+    }
+    try {
+      return estimateGenjutsuCredits({
+        durationSeconds,
+        resolution,
+      });
+    } catch {
+      return null;
+    }
+  }, [resolution, video?.durationSeconds]);
+
+  const estimateExceedsBalance =
+    estimatedCredits != null &&
+    typeof creditsQuery.data?.balance === 'number' &&
+    creditsQuery.data.balance < estimatedCredits;
 
   const handleGenerate = async () => {
     if (!video || images.length === 0 || status === 'generating') return;
@@ -1337,19 +1377,55 @@ export function GeneratorPanel({
             ) : null}
           </div>
 
-          <button
-            type="button"
-            disabled={!canGenerate}
-            onClick={handleGenerate}
-            className={cn(
-              'relative ml-auto inline-flex h-8 w-full items-center justify-center rounded-lg px-3.5 text-sm font-semibold tracking-wide shadow-none transition-all duration-200 active:scale-95 sm:w-auto',
-              canGenerate
-                ? 'bg-[rgb(204,144,92)] text-[rgb(247,246,243)] hover:brightness-105'
-                : 'bg-[rgba(126,128,132,0.28)] text-[rgb(237,234,222)]/38'
-            )}
-          >
-            {status === 'generating' ? 'Generating…' : 'Generate'}
-          </button>
+          <div className="ml-auto flex w-full items-center justify-end gap-2 sm:w-auto">
+            {estimatedCredits != null ? (
+              <div
+                className={cn(
+                  'flex shrink-0 items-center gap-1 text-[12px] tabular-nums',
+                  estimateExceedsBalance
+                    ? 'text-[rgb(220,120,90)]'
+                    : 'text-white/50'
+                )}
+              >
+                <span>
+                  {m['genjutsu.estimate.credits']({
+                    count: estimatedCredits.toLocaleString(),
+                  })}
+                </span>
+                <TooltipProvider delay={200}>
+                  <Tooltip>
+                    <TooltipTrigger
+                      type="button"
+                      className="inline-flex size-4 items-center justify-center rounded-full text-current/70 transition-colors hover:text-current"
+                      aria-label={m['genjutsu.estimate.help_aria']()}
+                    >
+                      <CircleHelp className="size-3.5" aria-hidden />
+                    </TooltipTrigger>
+                    <TooltipContent
+                      side="top"
+                      align="end"
+                      className="max-w-[240px] text-left leading-snug"
+                    >
+                      {m['genjutsu.estimate.tooltip']()}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+            ) : null}
+            <button
+              type="button"
+              disabled={!canGenerate}
+              onClick={handleGenerate}
+              className={cn(
+                'relative inline-flex h-8 flex-1 items-center justify-center rounded-lg px-3.5 text-sm font-semibold tracking-wide shadow-none transition-all duration-200 active:scale-95 sm:w-auto sm:flex-none',
+                canGenerate
+                  ? 'bg-[rgb(204,144,92)] text-[rgb(247,246,243)] hover:brightness-105'
+                  : 'bg-[rgba(126,128,132,0.28)] text-[rgb(237,234,222)]/38'
+              )}
+            >
+              {status === 'generating' ? 'Generating…' : 'Generate'}
+            </button>
+          </div>
         </div>
       </div>
 
