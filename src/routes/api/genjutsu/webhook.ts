@@ -1,7 +1,11 @@
 import { createFileRoute } from '@tanstack/react-router';
 
 import { getGenjutsuStatus } from '@/modules/genjutsu/service';
-import { persistGenjutsuResultToR2 } from '@/modules/genjutsu/storage';
+import {
+  createGenjutsuR2ReadUrl,
+  persistGenjutsuResultToR2,
+} from '@/modules/genjutsu/storage';
+import { probeVideoDurationSeconds } from '@/modules/genjutsu/video-metadata';
 import {
   getGenjutsuTaskByRequestIdAnyUser,
   refundGenjutsuGeneration,
@@ -50,11 +54,19 @@ async function POST({ request }: { request: Request }) {
         sourceUrl: provider.videoUrl,
       });
 
+      const outputDurationSeconds =
+        task.provider === 'seedance'
+          ? await probeVideoDurationSeconds(
+              await createGenjutsuR2ReadUrl(durable.videoKey)
+            )
+          : undefined;
+
       await settleGenjutsuGeneration({
         generationId: task.id,
         userId: task.userId,
         providerStatus: provider.providerStatus,
         videoKey: durable.videoKey,
+        outputDurationSeconds,
       });
     } else if (provider.status === 'failed') {
       await refundGenjutsuGeneration({
