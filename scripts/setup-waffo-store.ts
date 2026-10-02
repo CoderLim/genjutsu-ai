@@ -1,11 +1,11 @@
 /**
  * Create (or reuse) the Waffo store named after this repo, then create
- * test-environment products for every entry in the pricing catalog.
+ * products for every entry in the pricing catalog in WAFFO_ENVIRONMENT.
  *
  * Pitfalls already learned from person-remover / video-text-remover:
  *   - One Store per product app (do NOT reuse another app's STO_*)
  *   - Merchant + private key can be shared across apps
- *   - Test vs prod product IDs differ — this script creates TEST products
+ *   - Test vs prod product IDs differ — WAFFO_ENVIRONMENT selects the target
  *   - Prices live on the Waffo product; checkout maps via WAFFO_PRODUCT_IDS_MAPPING
  *   - Webhook: {APP_URL}/api/payment/notify/waffo (HTTPS public URL required)
  *
@@ -112,7 +112,8 @@ async function findStoreByName(
 async function ensureWebhook(
   client: WaffoPancake,
   storeId: string,
-  appUrl: string
+  appUrl: string,
+  testMode: boolean
 ) {
   if (!appUrl.startsWith('https://')) {
     console.log(
@@ -136,7 +137,7 @@ async function ensureWebhook(
   });
 
   const existing = result.data?.store?.storeWebhooks?.find(
-    (w) => w.url === url && w.testMode === true
+    (w) => w.url === url && w.testMode === testMode
   );
   if (existing) {
     console.log(`Webhook already registered: ${url}`);
@@ -148,7 +149,7 @@ async function ensureWebhook(
     channel: 'http',
     url,
     events: WEBHOOK_EVENTS,
-    testMode: true,
+    testMode,
   });
   console.log(`Webhook registered: ${webhook.url} (${webhook.id})`);
 }
@@ -160,10 +161,16 @@ async function main() {
     throw new Error('WAFFO_MERCHANT_ID and WAFFO_PRIVATE_KEY are required');
   }
 
+  const waffoEnvironment =
+    process.env.WAFFO_ENVIRONMENT === 'prod'
+      ? Environment.Prod
+      : Environment.Test;
+  const environmentName =
+    waffoEnvironment === Environment.Prod ? 'prod' : 'test';
   const client = new WaffoPancake({
     merchantId,
     privateKey,
-    environment: Environment.Test,
+    environment: waffoEnvironment,
   });
 
   let storeId = process.env.WAFFO_STORE_ID || '';
@@ -253,7 +260,7 @@ async function main() {
   upsertEnv('WAFFO_PRODUCT_IDS_MAPPING', mappingJson);
   upsertEnv('WAFFO_ENABLED', 'true');
   upsertEnv('DEFAULT_PAYMENT_PROVIDER', 'waffo');
-  upsertEnv('WAFFO_ENVIRONMENT', 'test');
+  upsertEnv('WAFFO_ENVIRONMENT', environmentName);
   upsertEnv('WAFFO_STORE_ID', storeId);
 
   // DB-backed Admin settings override env at runtime. Keep the active Waffo
@@ -267,14 +274,19 @@ async function main() {
       waffo_product_ids_mapping: mappingJson,
       waffo_enabled: 'true',
       default_payment_provider: 'waffo',
-      waffo_environment: 'test',
+      waffo_environment: environmentName,
       waffo_store_id: storeId,
     });
     console.log('Updated DB-backed Waffo app config.');
   }
 
   const appUrl = process.env.VITE_APP_URL || 'http://localhost:3000';
-  await ensureWebhook(client, storeId, appUrl);
+  await ensureWebhook(
+    client,
+    storeId,
+    appUrl,
+    waffoEnvironment !== Environment.Prod
+  );
 
   console.log('\nDone. Mapping:');
   console.log(JSON.stringify(mapping, null, 2));
