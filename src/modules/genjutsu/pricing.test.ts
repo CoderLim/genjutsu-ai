@@ -3,9 +3,12 @@ import test from 'node:test';
 
 import {
   calculateGenjutsuCredits,
+  canSeeSmokeCreditPack,
   estimateGenjutsuCredits,
   estimateGenjutsuListCost,
   GENJUTSU_CREDIT_PACKS,
+  GENJUTSU_SMOKE_CREDIT_PACK,
+  listVisibleCreditPacks,
 } from './pricing';
 
 test('launch credit packs match the approved catalog', () => {
@@ -21,6 +24,22 @@ test('launch credit packs match the approved catalog', () => {
       ['pro', 1999, 2400],
       ['studio', 3999, 5000],
     ]
+  );
+});
+
+test('smoke pack is only visible to gengliming emails', () => {
+  assert.equal(GENJUTSU_SMOKE_CREDIT_PACK.priceCents, 50);
+  assert.equal(GENJUTSU_SMOKE_CREDIT_PACK.credits, 50);
+  assert.equal(canSeeSmokeCreditPack('alice@example.com'), false);
+  assert.equal(canSeeSmokeCreditPack('gengliming110@gmail.com'), true);
+  assert.equal(canSeeSmokeCreditPack('dev+GENGLIMING@x.com'), true);
+  assert.deepEqual(
+    listVisibleCreditPacks('alice@example.com').map((p) => p.id),
+    ['starter', 'creator', 'pro', 'studio']
+  );
+  assert.deepEqual(
+    listVisibleCreditPacks('gengliming110@gmail.com').map((p) => p.id),
+    ['starter', 'creator', 'pro', 'studio', 'smoke']
   );
 });
 

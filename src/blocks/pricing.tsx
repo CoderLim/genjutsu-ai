@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 
 import { useSession } from '@/core/auth/client';
 import { useRouter } from '@/core/i18n/navigation';
-import { GENJUTSU_CREDIT_PACKS } from '@/modules/genjutsu/pricing';
+import { listVisibleCreditPacks } from '@/modules/genjutsu/pricing';
 import { apiPost } from '@/lib/api-client';
 import { currentPathWithQuery } from '@/lib/redirect';
 import { usePublicConfig } from '@/hooks/use-public-config';
@@ -49,13 +49,18 @@ export function Pricing({ title }: { title?: string } = {}) {
     {
       key: 'credits',
       label: 'Credit Packs',
-      plans: GENJUTSU_CREDIT_PACKS.map((pack) => ({
+      plans: listVisibleCreditPacks(session?.user?.email).map((pack) => ({
         id: pack.id,
         name: pack.name,
         description: `${pack.credits.toLocaleString()} credits · one-time purchase`,
         price: `$${(pack.priceCents / 100).toFixed(2)}`,
         featured: pack.highlighted,
-        badge: pack.highlighted ? 'Popular' : undefined,
+        badge:
+          pack.id === 'smoke'
+            ? 'Dev only'
+            : pack.highlighted
+              ? 'Popular'
+              : undefined,
         features: [
           `${pack.credits.toLocaleString()} Genjutsu credits`,
           'One-time purchase',

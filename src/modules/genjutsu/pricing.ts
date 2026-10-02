@@ -1,12 +1,46 @@
 export type GenjutsuBillableResolution = '480p' | '720p' | '1080p';
 
+export type GenjutsuPublicCreditPackId =
+  | 'starter'
+  | 'creator'
+  | 'pro'
+  | 'studio';
+
+export type GenjutsuCreditPackId = GenjutsuPublicCreditPackId | 'smoke';
+
 export type GenjutsuCreditPack = {
-  id: 'starter' | 'creator' | 'pro' | 'studio';
+  id: GenjutsuCreditPackId;
   name: string;
   priceCents: number;
   credits: number;
   highlighted?: boolean;
 };
+
+/** Internal smoke pack — UI + checkout only for emails containing this needle. */
+export const SMOKE_PACK_EMAIL_NEEDLE = 'gengliming';
+
+export const GENJUTSU_SMOKE_CREDIT_PACK: GenjutsuCreditPack = {
+  id: 'smoke',
+  name: 'Smoke',
+  // $0.50 USD smoke charge (catalog is USD; ~¥0.5-scale real-money probe).
+  priceCents: 50,
+  credits: 50,
+};
+
+export function canSeeSmokeCreditPack(email?: string | null): boolean {
+  return Boolean(
+    email && email.toLowerCase().includes(SMOKE_PACK_EMAIL_NEEDLE)
+  );
+}
+
+export function listVisibleCreditPacks(
+  email?: string | null
+): readonly GenjutsuCreditPack[] {
+  if (canSeeSmokeCreditPack(email)) {
+    return [...GENJUTSU_CREDIT_PACKS, GENJUTSU_SMOKE_CREDIT_PACK];
+  }
+  return GENJUTSU_CREDIT_PACKS;
+}
 
 /**
  * Customer-wallet conversion and markup.
@@ -98,7 +132,8 @@ export function estimateGenjutsuCredits(input: {
   return calculateGenjutsuCredits(estimateGenjutsuListCost(input));
 }
 
-export function getCreditPack(id: GenjutsuCreditPack['id']) {
+export function getCreditPack(id: GenjutsuCreditPackId) {
+  if (id === GENJUTSU_SMOKE_CREDIT_PACK.id) return GENJUTSU_SMOKE_CREDIT_PACK;
   return GENJUTSU_CREDIT_PACKS.find((pack) => pack.id === id) ?? null;
 }
 

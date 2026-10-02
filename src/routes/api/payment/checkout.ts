@@ -1,7 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router';
 
 import { getAuth } from '@/core/auth';
-import { getPricingProduct } from '@/config/pricing';
+import {
+  assertCheckoutProductAllowed,
+  getPricingProduct,
+} from '@/config/pricing';
 import { getAllConfigs } from '@/modules/config/service';
 import { createCheckout } from '@/modules/payment/service';
 import { enforceMinIntervalRateLimit } from '@/lib/rate-limit';
@@ -50,6 +53,12 @@ async function POST({ request }: { request: Request }) {
     const product = getPricingProduct(product_id);
     if (!product) {
       return respErr('Unknown product');
+    }
+
+    try {
+      assertCheckoutProductAllowed(product_id, session.user.email);
+    } catch (error: any) {
+      return respErr(error.message || 'Product not available');
     }
 
     // Optional per-provider "test amount" override (admin-configured).

@@ -6,7 +6,12 @@
  */
 
 import { PaymentInterval, PaymentType } from '@/core/payment/types';
-import { GENJUTSU_CREDIT_PACKS } from '@/modules/genjutsu/pricing';
+import {
+  canSeeSmokeCreditPack,
+  GENJUTSU_CREDIT_PACKS,
+  GENJUTSU_SMOKE_CREDIT_PACK,
+  type GenjutsuCreditPack,
+} from '@/modules/genjutsu/pricing';
 
 export type PricingPlanInfo = {
   name: string;
@@ -27,20 +32,24 @@ export type PricingProduct = {
   plan?: PricingPlanInfo;
 };
 
+function toPricingProduct(pack: GenjutsuCreditPack): PricingProduct {
+  return {
+    productId: pack.id,
+    productName: `${pack.name} Credits`,
+    planName: pack.name,
+    description: `${pack.credits.toLocaleString()} Genjutsu credits`,
+    type: PaymentType.ONE_TIME,
+    priceInCents: pack.priceCents,
+    currency: 'usd',
+    credits: pack.credits,
+  };
+}
+
 export const pricingCatalog: Record<string, PricingProduct> =
   Object.fromEntries(
-    GENJUTSU_CREDIT_PACKS.map((pack) => [
+    [...GENJUTSU_CREDIT_PACKS, GENJUTSU_SMOKE_CREDIT_PACK].map((pack) => [
       pack.id,
-      {
-        productId: pack.id,
-        productName: `${pack.name} Credits`,
-        planName: pack.name,
-        description: `${pack.credits.toLocaleString()} Genjutsu credits`,
-        type: PaymentType.ONE_TIME,
-        priceInCents: pack.priceCents,
-        currency: 'usd',
-        credits: pack.credits,
-      },
+      toPricingProduct(pack),
     ])
   );
 
@@ -49,6 +58,21 @@ export function getPricingProduct(productId: string): PricingProduct | null {
   return pricingCatalog[productId] ?? null;
 }
 
-export function listPricingProducts(): PricingProduct[] {
-  return Object.values(pricingCatalog);
+export function listPricingProducts(email?: string | null): PricingProduct[] {
+  return Object.values(pricingCatalog).filter((product) => {
+    if (product.productId !== GENJUTSU_SMOKE_CREDIT_PACK.id) return true;
+    return canSeeSmokeCreditPack(email);
+  });
+}
+
+export function assertCheckoutProductAllowed(
+  productId: string,
+  email?: string | null
+): void {
+  if (
+    productId === GENJUTSU_SMOKE_CREDIT_PACK.id &&
+    !canSeeSmokeCreditPack(email)
+  ) {
+    throw new Error('Product not available');
+  }
 }
