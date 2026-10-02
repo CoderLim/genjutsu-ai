@@ -14,6 +14,8 @@ import {
   type GenjutsuProvider,
   type GenjutsuResolution,
 } from './service';
+import { calculateSeedanceActualProviderCost } from './seedance';
+import { planGenjutsuCreditSettlement } from './settlement';
 
 export const GENJUTSU_SCENE = 'genjutsu';
 
@@ -21,6 +23,7 @@ export type GenjutsuTaskStatus =
   | 'reserved'
   | 'submitting'
   | 'submitted'
+  | 'settling'
   | 'refunding'
   | 'completed'
   | 'submission_unknown'
@@ -306,33 +309,226 @@ export async function settleGenjutsuGeneration(params: {
   providerStatus: string;
   videoKey?: string;
   videoUrl?: string;
+  outputDurationSeconds?: number;
 }) {
   if (!params.videoKey && !params.videoUrl) {
     throw new Error('Completed Genjutsu generation is missing a result');
   }
 
-  await db()
-    .update(aiTask)
-    .set({
-      status: 'completed',
-      taskResult: JSON.stringify({
-        providerStatus: params.providerStatus,
-        ...(params.videoKey ? { videoKey: params.videoKey } : {}),
-        ...(params.videoUrl ? { videoUrl: params.videoUrl } : {}),
-      }),
-    })
-    .where(
-      and(
-        eq(aiTask.id, params.generationId),
-        eq(aiTask.userId, params.userId),
-        eq(aiTask.scene, GENJUTSU_SCENE),
-        eq(aiTask.status, 'submitted')
+  return db().transaction(async (tx: any) => {
+    const [task] = await tx
+      .select()
+      .from(aiTask)
+      .where(
+        and(
+          eq(aiTask.id, params.generationId),
+          eq(aiTask.userId, params.userId),
+          eq(aiTask.scene, GENJUTSU_SCENE)
+        )
       )
-    );
+      .limit(1);
 
-  return getGenjutsuTaskById({
-    generationId: params.generationId,
-    userId: params.userId,
+    if (!task) return null;
+    if (task.status === 'completed' || task.status === 'refunded') return task;
+    if (task.status !== 'submitted') return task;
+
+    const settlementClaim = getUuid();
+    await tx
+      .update(aiTask)
+      .set({
+        status: 'settling',
+        taskResult: JSON.stringify({ settlementClaim }),
+      })
+      .where(
+        and(
+          eq(aiTask.id, params.generationId),
+          eq(aiTask.userId, params.userId),
+          eq(aiTask.scene, GENJUTSU_SCENE),
+          eq(aiTask.status, 'submitted')
+        )
+      );
+
+    const [claimed] = await tx
+      .select()
+      .from(aiTask)
+      .where(
+        and(
+          eq(aiTask.id, params.generationId),
+          eq(aiTask.userId, params.userId),
+          eq(aiTask.scene, GENJUTSU_SCENE)
+        )
+      )
+      .limit(1);
+
+    let claimedToken: string | null = null;
+    if (claimed?.taskResult) {
+      try {
+        claimedToken = JSON.parse(claimed.taskResult)?.settlementClaim ?? null;
+      } catch {
+        claimedToken = null;
+      }
+    }
+
+    if (
+      !claimed ||
+      claimed.status !== 'settling' ||
+      claimedToken !== settlementClaim
+    ) {
+      return claimed ?? task;
+    }
+
+    const reservedCredits = claimed.costCredits || 0;
+    let finalCredits = reservedCredits;
+    let finalCreditId = claimed.creditId;
+    let providerCostUsd: number | null = null;
+    let refundCredits = 0;
+    let additionalCredits = 0;
+    let additionalCreditsCharged = 0;
+    let unbilledCredits = 0;
+    let supplementalCreditId: string | null = null;
+
+    if (
+      claimed.provider === 'seedance' &&
+      typeof params.outputDurationSeconds === 'number'
+    ) {
+      let info: any = null;
+      let options: any = null;
+      try {
+        info = claimed.taskInfo ? JSON.parse(claimed.taskInfo) : null;
+      } catch {
+        info = null;
+      }
+      try {
+        options = claimed.options ? JSON.parse(claimed.options) : null;
+      } catch {
+        options = null;
+      }
+
+      const sourceDurationSeconds = Number(info?.sourceDurationSeconds);
+      const resolution = options?.resolution as GenjutsuResolution | undefined;
+      if (
+        !Number.isFinite(sourceDurationSeconds) ||
+        sourceDurationSeconds <= 0 ||
+        (resolution !== '480p' &&
+          resolution !== '720p' &&
+          resolution !== '1080p')
+      ) {
+        throw new Error('Seedance settlement is missing quote metadata');
+      }
+
+      const actual = calculateSeedanceActualProviderCost({
+        resolution,
+        sourceDurationSeconds,
+        outputDurationSeconds: params.outputDurationSeconds,
+      });
+      providerCostUsd = actual.providerCostUsd;
+
+      const plan = planGenjutsuCreditSettlement({
+        reservedCredits,
+        actualProviderCostUsd: actual.providerCostUsd,
+      });
+      refundCredits = plan.refundCredits;
+      additionalCredits = plan.additionalCredits;
+
+      if (plan.refundCredits > 0) {
+        if (!claimed.creditId) {
+          throw new Error('Seedance reservation is missing its credit record');
+        }
+        const revoked = await revoke(claimed.creditId, tx);
+        if (!revoked) {
+          throw new Error('Could not release the Seedance credit reservation');
+        }
+
+        const replacement = await consume({
+          userId: claimed.userId,
+          credits: plan.actualCredits,
+          scene: CreditTransactionScene.GENJUTSU,
+          description: 'Settle Seedance generation credits',
+          metadata: JSON.stringify({
+            generationId: claimed.id,
+            provider: 'seedance',
+            providerCostUsd: actual.providerCostUsd,
+            outputDurationSeconds: params.outputDurationSeconds,
+          }),
+          tx,
+        });
+        if (!replacement.success || !replacement.consumedCredit) {
+          throw new Error('Could not apply the final Seedance credit charge');
+        }
+
+        finalCredits = plan.actualCredits;
+        finalCreditId = replacement.consumedCredit.id;
+      } else if (plan.additionalCredits > 0) {
+        const extra = await consume({
+          userId: claimed.userId,
+          credits: plan.additionalCredits,
+          scene: CreditTransactionScene.GENJUTSU,
+          description: 'Settle additional Seedance generation credits',
+          metadata: JSON.stringify({
+            generationId: claimed.id,
+            provider: 'seedance',
+            providerCostUsd: actual.providerCostUsd,
+            outputDurationSeconds: params.outputDurationSeconds,
+          }),
+          tx,
+        });
+
+        if (extra.success && extra.consumedCredit) {
+          finalCredits = plan.actualCredits;
+          additionalCreditsCharged = plan.additionalCredits;
+          supplementalCreditId = extra.consumedCredit.id;
+        } else {
+          // The provider job is already complete, so never hide a paid result
+          // because the final duration exceeded the estimate. Record the
+          // shortfall explicitly for accounting/telemetry.
+          unbilledCredits = plan.additionalCredits;
+        }
+      } else {
+        finalCredits = plan.actualCredits;
+      }
+    }
+
+    const taskResult = JSON.stringify({
+      providerStatus: params.providerStatus,
+      ...(params.videoKey ? { videoKey: params.videoKey } : {}),
+      ...(params.videoUrl ? { videoUrl: params.videoUrl } : {}),
+      ...(typeof params.outputDurationSeconds === 'number'
+        ? { outputDurationSeconds: params.outputDurationSeconds }
+        : {}),
+      ...(providerCostUsd != null ? { providerCostUsd } : {}),
+      reservedCredits,
+      finalCredits,
+      refundCredits,
+      additionalCredits,
+      additionalCreditsCharged,
+      unbilledCredits,
+      ...(supplementalCreditId ? { supplementalCreditId } : {}),
+    });
+
+    await tx
+      .update(aiTask)
+      .set({
+        status: 'completed',
+        taskResult,
+        costCredits: finalCredits,
+        creditId: finalCreditId,
+      })
+      .where(
+        and(
+          eq(aiTask.id, params.generationId),
+          eq(aiTask.userId, params.userId),
+          eq(aiTask.scene, GENJUTSU_SCENE),
+          eq(aiTask.status, 'settling')
+        )
+      );
+
+    return {
+      ...claimed,
+      status: 'completed',
+      taskResult,
+      costCredits: finalCredits,
+      creditId: finalCreditId,
+    };
   });
 }
 
