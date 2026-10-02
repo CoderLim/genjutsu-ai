@@ -78,8 +78,14 @@ function parseTotalBytes(contentRange: string | null) {
 }
 
 async function fetchRange(url: string, range: string) {
-  const response = await fetch(url, {
+  const parsed = new URL(url);
+  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+    throw new Error('Invalid source-video URL protocol');
+  }
+
+  const response = await fetch(parsed, {
     headers: { Range: range },
+    redirect: 'error',
   });
 
   if (response.status !== 206) {
