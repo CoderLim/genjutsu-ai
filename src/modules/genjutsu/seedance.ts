@@ -1,8 +1,8 @@
 import { envConfigs } from '@/config';
 import { getConfig } from '@/modules/config/service';
 
-import { buildSeedanceWorkflowPrompt, getSeedanceTask } from './workflow';
 import type { GenjutsuMode, GenjutsuResolution } from './types';
+import { buildSeedanceWorkflowPrompt, getSeedanceTask } from './workflow';
 
 const FAL_QUEUE_BASE_URL = 'https://queue.fal.run';
 
@@ -46,35 +46,102 @@ function modelPath(model: string) {
   return value;
 }
 
-async function falFetch(
-  path: string,
-  init?: RequestInit
-): Promise<any> {
+/**
+ * Queue status/result live on `/{owner}/{app}/requests/{id}`.
+ * Submit-only suffixes such as `/us/reference-to-video` accept POST only
+ * (GET returns 405; POST would enqueue a second job).
+ */
+export function falQueueAppPath(model: string) {
+  const parts = modelPath(model).split('/').filter(Boolean);
+  if (parts[0] === 'bytedance' && parts.length > 2) {
+    return `${parts[0]}/${parts[1]}`;
+  }
+  return parts.join('/');
+}
+
+export const SEEDANCE_LIKENESS_REJECTION_MESSAGE =
+  'Images and videos cannot contain real people. Please use media without real human likenesses.';
+
+function falErrorMessage(payload: unknown, fallback: string) {
+  if (typeof payload === 'string' && payload.trim()) return payload;
+  if (!payload || typeof payload !== 'object') return fallback;
+  const record = payload as Record<string, unknown>;
+  const candidates = [
+    record.error,
+    record.message,
+    record.detail,
+    record.payload,
+  ];
+
+  for (const candidate of candidates) {
+    if (typeof candidate === 'string' && candidate.trim()) return candidate;
+    if (Array.isArray(candidate)) {
+      const parts = candidate
+        .map((item) => {
+          if (typeof item === 'string') return item;
+          if (item && typeof item === 'object' && 'msg' in item) {
+            return String((item as { msg?: unknown }).msg || '');
+          }
+          return '';
+        })
+        .filter(Boolean);
+      if (parts.length) return parts.join('; ');
+    }
+    if (candidate && typeof candidate === 'object') {
+      const nested = falErrorMessage(candidate, '');
+      if (nested) return nested;
+    }
+  }
+
+  return fallback;
+}
+
+export function isSeedanceLikenessRejection(value: unknown): boolean {
+  const text = falErrorMessage(value, '').toLowerCase();
+  if (!text) return false;
+  return (
+    text.includes('likenesses of real people') ||
+    text.includes('real people') ||
+    text.includes('private information that cannot be processed') ||
+    text.includes('human face') ||
+    text.includes('真人')
+  );
+}
+
+export function normalizeSeedanceUserError(
+  value: unknown,
+  fallback: string
+): string {
+  if (isSeedanceLikenessRejection(value)) {
+    return SEEDANCE_LIKENESS_REJECTION_MESSAGE;
+  }
+  const message = falErrorMessage(value, fallback);
+  return message || fallback;
+}
+
+async function falFetch(path: string, init?: RequestInit): Promise<any> {
   const apiKey = await getFalApiKey();
-  const response = await fetch(`${FAL_QUEUE_BASE_URL}/${path.replace(/^\/+/, '')}`, {
-    ...init,
-    headers: {
-      Authorization: `Key ${apiKey}`,
-      ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
-      ...init?.headers,
-    },
-  });
+  const response = await fetch(
+    `${FAL_QUEUE_BASE_URL}/${path.replace(/^\/+/, '')}`,
+    {
+      ...init,
+      headers: {
+        Authorization: `Key ${apiKey}`,
+        ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
+        ...init?.headers,
+      },
+    }
+  );
 
   const payload = await response.json().catch(() => null);
   if (response.ok) return payload;
 
-  const detail =
-    payload?.detail?.message ||
-    payload?.detail ||
-    payload?.message ||
-    payload?.error ||
-    `Fal request failed with HTTP ${response.status}`;
-
-  throw new SeedanceHttpError(
-    response.status,
-    typeof detail === 'string' ? detail : JSON.stringify(detail),
-    payload
+  const detail = normalizeSeedanceUserError(
+    payload,
+    `Fal request failed with HTTP ${response.status}`
   );
+
+  throw new SeedanceHttpError(response.status, detail, payload);
 }
 
 function getWebhookUrl() {
@@ -149,10 +216,7 @@ export function buildSeedancePayload(input: {
   const duration =
     task === 'reference' && input.sourceDurationSeconds >= 4
       ? String(
-          Math.min(
-            30,
-            Math.max(4, Math.round(input.sourceDurationSeconds))
-          )
+          Math.min(30, Math.max(4, Math.round(input.sourceDurationSeconds)))
         )
       : 'auto';
 
@@ -215,14 +279,15 @@ export async function getSeedanceStatus(input: {
   model: string;
   requestId: string;
 }) {
-  const model = modelPath(input.model);
+  const queueApp = falQueueAppPath(input.model);
   const requestId = input.requestId.trim();
   if (!/^[A-Za-z0-9._:-]{6,200}$/.test(requestId)) {
     throw new Error('Invalid request ID');
   }
 
   const statusPayload = await falFetch(
-    `${model}/requests/${encodeURIComponent(requestId)}/status`
+    `${queueApp}/requests/${encodeURIComponent(requestId)}/status`,
+    { method: 'GET' }
   );
   const providerStatus =
     typeof statusPayload?.status === 'string'
@@ -230,21 +295,42 @@ export async function getSeedanceStatus(input: {
       : 'in_progress';
 
   if (providerStatus === 'completed') {
-    const result = await falFetch(
-      `${model}/requests/${encodeURIComponent(requestId)}`
-    );
-    const videoUrl =
-      typeof result?.video?.url === 'string' ? result.video.url : null;
+    try {
+      const result = await falFetch(
+        `${queueApp}/requests/${encodeURIComponent(requestId)}`,
+        { method: 'GET' }
+      );
+      const videoUrl =
+        typeof result?.video?.url === 'string' ? result.video.url : null;
 
-    if (!videoUrl) {
-      throw new Error('Fal completed the request without a video URL');
+      if (!videoUrl) {
+        return {
+          status: 'failed' as const,
+          providerStatus: 'failed',
+          videoUrl: null,
+          error: normalizeSeedanceUserError(
+            result,
+            'Fal completed the request without a video URL'
+          ),
+        };
+      }
+
+      return {
+        status: 'completed' as const,
+        providerStatus,
+        videoUrl,
+      };
+    } catch (error) {
+      if (error instanceof SeedanceHttpError) {
+        return {
+          status: 'failed' as const,
+          providerStatus: 'failed',
+          videoUrl: null,
+          error: normalizeSeedanceUserError(error.message, error.message),
+        };
+      }
+      throw error;
     }
-
-    return {
-      status: 'completed' as const,
-      providerStatus,
-      videoUrl,
-    };
   }
 
   if (
@@ -253,17 +339,14 @@ export async function getSeedanceStatus(input: {
     providerStatus === 'cancelled' ||
     providerStatus === 'canceled'
   ) {
-    const message =
-      statusPayload?.error?.message ||
-      statusPayload?.error ||
-      statusPayload?.message ||
-      `Generation ended with status: ${providerStatus}`;
-
     return {
       status: 'failed' as const,
       providerStatus,
       videoUrl: null,
-      error: typeof message === 'string' ? message : JSON.stringify(message),
+      error: normalizeSeedanceUserError(
+        statusPayload,
+        `Generation ended with status: ${providerStatus}`
+      ),
     };
   }
 

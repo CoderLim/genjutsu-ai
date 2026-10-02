@@ -4,7 +4,8 @@ import { isGenjutsuE2EMockEnabled } from './e2e-mock';
 
 const FAL_FACE_DETECTION_URL =
   'https://fal.run/fal-ai/moondream3-preview/detect';
-const FACE_DETECTION_TIMEOUT_MS = 15_000;
+const FACE_DETECTION_TIMEOUT_MS = 25_000;
+const FACE_DETECTION_MAX_ATTEMPTS = 2;
 
 export const REAL_HUMAN_FACE_DETECTION_PROMPT =
   'real human face, photorealistic human face, actual person face; exclude anime, cartoon, illustration, 3D character, game character';
@@ -49,10 +50,38 @@ async function getFalApiKey() {
   return apiKey;
 }
 
-async function detectHumanFace(imageUrl: string): Promise<boolean> {
-  if (isGenjutsuE2EMockEnabled()) return false;
+function describeFetchError(error: unknown) {
+  if (!(error instanceof Error)) return String(error);
+  const cause = (error as Error & { cause?: unknown }).cause;
+  if (cause instanceof Error) {
+    const code =
+      'code' in cause && typeof (cause as { code?: unknown }).code === 'string'
+        ? (cause as { code: string }).code
+        : undefined;
+    return code
+      ? `${error.message} (${cause.message}; ${code})`
+      : `${error.message} (${cause.message})`;
+  }
+  return error.message;
+}
 
-  const apiKey = await getFalApiKey();
+function isTransientFaceDetectionError(error: unknown) {
+  if (!(error instanceof Error)) return false;
+  if (error.name === 'AbortError' || error.name === 'TimeoutError') return true;
+  const message = describeFetchError(error).toLowerCase();
+  return (
+    message.includes('fetch failed') ||
+    message.includes('network') ||
+    message.includes('econnreset') ||
+    message.includes('etimedout') ||
+    message.includes('socket')
+  );
+}
+
+async function detectHumanFaceOnce(
+  imageUrl: string,
+  apiKey: string
+): Promise<boolean> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FACE_DETECTION_TIMEOUT_MS);
 
@@ -82,20 +111,43 @@ async function detectHumanFace(imageUrl: string): Promise<boolean> {
     }
 
     return falPayloadHasFace(await response.json());
-  } catch (error) {
-    if (error instanceof GenjutsuSafetyError) throw error;
-    console.warn(
-      'Genjutsu face detection unavailable:',
-      error instanceof Error ? error.message : error
-    );
-    throw new GenjutsuSafetyError(
-      'FACE_DETECTION_UNAVAILABLE',
-      'Reference-image safety check is temporarily unavailable. Please try again later.',
-      503
-    );
   } finally {
     clearTimeout(timer);
   }
+}
+
+async function detectHumanFace(imageUrl: string): Promise<boolean> {
+  if (isGenjutsuE2EMockEnabled()) return false;
+
+  const apiKey = await getFalApiKey();
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= FACE_DETECTION_MAX_ATTEMPTS; attempt += 1) {
+    try {
+      return await detectHumanFaceOnce(imageUrl, apiKey);
+    } catch (error) {
+      if (error instanceof GenjutsuSafetyError) throw error;
+      lastError = error;
+      const transient = isTransientFaceDetectionError(error);
+      console.warn(
+        'Genjutsu face detection unavailable:',
+        describeFetchError(error),
+        `(attempt ${attempt}/${FACE_DETECTION_MAX_ATTEMPTS})`
+      );
+      if (!transient || attempt >= FACE_DETECTION_MAX_ATTEMPTS) break;
+      await new Promise((resolve) => setTimeout(resolve, 400 * attempt));
+    }
+  }
+
+  console.warn(
+    'Genjutsu face detection gave up:',
+    describeFetchError(lastError)
+  );
+  throw new GenjutsuSafetyError(
+    'FACE_DETECTION_UNAVAILABLE',
+    'Reference-image safety check is temporarily unavailable. Please try again later.',
+    503
+  );
 }
 
 export async function assertGenjutsuReferenceImagesSafe(
@@ -115,7 +167,7 @@ export async function assertGenjutsuReferenceImagesSafe(
   if (detections.some(Boolean)) {
     throw new GenjutsuSafetyError(
       'REFERENCE_FACE_DETECTED',
-      'Real people are not allowed. Anime, cartoon, illustration, and 3D character references are fine.',
+      'Images and videos cannot contain real people. Please use media without real human likenesses.',
       422
     );
   }

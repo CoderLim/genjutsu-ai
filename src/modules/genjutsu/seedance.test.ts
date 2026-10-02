@@ -4,7 +4,36 @@ import test from 'node:test';
 import {
   buildSeedancePayload,
   estimateSeedanceProviderCost,
+  falQueueAppPath,
+  isSeedanceLikenessRejection,
+  normalizeSeedanceUserError,
+  SEEDANCE_LIKENESS_REJECTION_MESSAGE,
 } from './seedance';
+
+test('Seedance queue status uses the Fal app path, not the submit suffix', () => {
+  assert.equal(
+    falQueueAppPath('bytedance/seedance-2.5/us/reference-to-video'),
+    'bytedance/seedance-2.5'
+  );
+  assert.equal(falQueueAppPath('fal-ai/flux/dev'), 'fal-ai/flux/dev');
+});
+
+test('Seedance likeness rejection tells users images and videos cannot include real people', () => {
+  assert.equal(
+    normalizeSeedanceUserError(
+      {
+        detail:
+          'The images or videos provided may contain likenesses of real people or other private information that cannot be processed.',
+      },
+      'fallback'
+    ),
+    SEEDANCE_LIKENESS_REJECTION_MESSAGE
+  );
+  assert.equal(
+    isSeedanceLikenessRejection(SEEDANCE_LIKENESS_REJECTION_MESSAGE),
+    true
+  );
+});
 
 test('Seedance estimate bills source plus a four-second minimum output', () => {
   const quote = estimateSeedanceProviderCost({

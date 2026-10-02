@@ -358,7 +358,7 @@ function VideoUploadSlot({
         ) : (
           <EmptyUploadButton
             title="Add a reference video to edit"
-            hint="Video duration: 4-30 seconds"
+            hint="4–30s · no real people in the source video"
             icon={<FilmIcon className="text-primary/78 size-5 shrink-0" />}
             dragging={dragging}
             onClick={() => inputRef.current?.click()}
@@ -377,10 +377,55 @@ function VideoUploadSlot({
   );
 }
 
+/**
+ * Face detection only needs a modest preview. Downscaling before the safety
+ * POST avoids huge data-URI bodies that often fail as bare "fetch failed"
+ * through local proxies / fake-IP DNS.
+ */
+async function downscaleImageForSafetyCheck(file: File): Promise<File> {
+  if (typeof createImageBitmap !== 'function') return file;
+
+  let bitmap: ImageBitmap | null = null;
+  try {
+    bitmap = await createImageBitmap(file);
+    const maxEdge = 1280;
+    const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
+    if (scale >= 1 && file.size <= 800_000) return file;
+
+    const width = Math.max(1, Math.round(bitmap.width * scale));
+    const height = Math.max(1, Math.round(bitmap.height * scale));
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return file;
+    ctx.drawImage(bitmap, 0, 0, width, height);
+
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, 'image/jpeg', 0.85)
+    );
+    if (!blob) return file;
+
+    const baseName = file.name.replace(/\.[^.]+$/, '') || 'reference';
+    return new File([blob], `${baseName}.jpg`, { type: 'image/jpeg' });
+  } catch {
+    return file;
+  } finally {
+    bitmap?.close();
+  }
+}
+
 async function assertReferenceImageSafe(file: File) {
+  const safetyImage = await downscaleImageForSafetyCheck(file);
   const formData = new FormData();
-  formData.append('image', file, file.name);
+  formData.append('image', safetyImage, safetyImage.name);
   await apiPostForm<{ safe: true }>('/api/genjutsu/check-reference', formData);
+}
+
+function isLikenessRejectionMessage(message: string) {
+  return /images and videos cannot contain real people|likenesses of real people|real people|private information that cannot be processed|human face|真人|肖像/i.test(
+    message
+  );
 }
 
 function referenceSafetyUiMessage(cause: unknown): string {
@@ -391,17 +436,33 @@ function referenceSafetyUiMessage(cause: unknown): string {
     'code' in cause.data
       ? String((cause.data as { code?: unknown }).code)
       : '';
-  const message = cause instanceof ApiError ? cause.message : '';
+  const message =
+    cause instanceof ApiError
+      ? cause.message
+      : cause instanceof Error
+        ? cause.message
+        : typeof cause === 'string'
+          ? cause
+          : '';
 
-  if (code === 'REFERENCE_FACE_DETECTED' || /human face/i.test(message)) {
+  if (
+    code === 'REFERENCE_FACE_DETECTED' ||
+    code === 'PROVIDER_LIKENESS_REJECTED' ||
+    isLikenessRejectionMessage(message)
+  ) {
     return m['genjutsu.safety.face_rejected']();
   }
   if (code === 'FACE_DETECTION_UNAVAILABLE') {
     return m['genjutsu.safety.unavailable']();
   }
-  return cause instanceof Error
-    ? cause.message
-    : m['genjutsu.safety.check_failed']();
+  return message || m['genjutsu.safety.check_failed']();
+}
+
+function generationFailureUiMessage(error?: string | null) {
+  if (error && isLikenessRejectionMessage(error)) {
+    return m['genjutsu.safety.face_rejected']();
+  }
+  return error || '';
 }
 
 function toastReferenceReject(cause: unknown) {
@@ -454,15 +515,13 @@ function ImageUploadSlot({
       const room = IMAGE_MAX - items.length;
       if (room <= 0) return;
 
-      const candidates = incoming
-        .slice(0, room)
-        .filter((file) => {
-          if (file.size <= 0 || file.size > MAX_REFERENCE_IMAGE_BYTES) {
-            toast.error(`"${file.name}" must be 12 MB or smaller`);
-            return false;
-          }
-          return true;
-        });
+      const candidates = incoming.slice(0, room).filter((file) => {
+        if (file.size <= 0 || file.size > MAX_REFERENCE_IMAGE_BYTES) {
+          toast.error(`"${file.name}" must be 12 MB or smaller`);
+          return false;
+        }
+        return true;
+      });
       if (candidates.length === 0) return;
       setChecking(true);
 
@@ -1001,10 +1060,10 @@ export function GeneratorPanel({
           localStorage.removeItem(activeGenerationKey(active.userId));
           setStatus('idle');
           setResult(null);
-          setError(
-            polled.error ||
-              `Generation failed (${polled.providerStatus})`
-          );
+          const uiError =
+            generationFailureUiMessage(polled.error) ||
+            `Generation failed (${polled.providerStatus})`;
+          setError(uiError);
           return;
         }
 
@@ -1096,12 +1155,7 @@ export function GeneratorPanel({
       // /generate route repeats this check against fresh signed R2 read URLs
       // as a server-side anti-bypass gate.
       for (const image of images) {
-        const formData = new FormData();
-        formData.append('image', image.file, image.file.name);
-        await apiPostForm<{ safe: true }>(
-          '/api/genjutsu/check-reference',
-          formData
-        );
+        await assertReferenceImageSafe(image.file);
         if (generationRunRef.current !== runId) return;
       }
 
@@ -1212,9 +1266,10 @@ export function GeneratorPanel({
         setNeedsCredits(insufficient);
         const faceOrSafety =
           apiData?.code === 'REFERENCE_FACE_DETECTED' ||
+          apiData?.code === 'PROVIDER_LIKENESS_REJECTED' ||
           apiData?.code === 'FACE_DETECTION_UNAVAILABLE' ||
           (typeof cause.message === 'string' &&
-            /human face/i.test(cause.message));
+            isLikenessRejectionMessage(cause.message));
         const uiMessage = faceOrSafety
           ? referenceSafetyUiMessage(cause)
           : cause.message;
@@ -1294,12 +1349,15 @@ export function GeneratorPanel({
             <div className="mt-auto flex items-end justify-between gap-3 pb-1 text-[11px] text-white/45">
               {images.length > 1 ? (
                 <span className="max-w-[75%] leading-snug">
-                  Use Reference 1, Reference 2, etc. to map each image to a target.
+                  Use Reference 1, Reference 2, etc. to map each image to a
+                  target.
                 </span>
               ) : (
                 <span />
               )}
-              <span className="shrink-0 tabular-nums">{prompt.length} / 2,000</span>
+              <span className="shrink-0 tabular-nums">
+                {prompt.length} / 2,000
+              </span>
             </div>
           </div>
         </div>

@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 
 import { getAuth } from '@/core/auth';
+import { getBalance } from '@/modules/credits/service';
 import {
   assertGenerationId,
   claimGenjutsuSubmission,
@@ -13,20 +14,20 @@ import {
   reserveGenjutsuCredits,
 } from '@/modules/genjutsu/billing';
 import {
-  calculateGenjutsuCredits,
-  estimateGenjutsuCredits,
-} from '@/modules/genjutsu/pricing';
-import {
   isGenjutsuE2EMockEnabled,
   resolveGenjutsuE2EInputUrls,
 } from '@/modules/genjutsu/e2e-mock';
-import { resolveGenjutsuInputUrls } from '@/modules/genjutsu/storage';
+import {
+  calculateGenjutsuCredits,
+  estimateGenjutsuCredits,
+} from '@/modules/genjutsu/pricing';
 import {
   assertGenjutsuReferenceImagesSafe,
   GenjutsuSafetyError,
 } from '@/modules/genjutsu/safety';
 import {
   HiggsfieldHttpError,
+  isSeedanceLikenessRejection,
   resolveGenjutsuProviderCost,
   resolveGenjutsuProviderTarget,
   SeedanceHttpError,
@@ -35,7 +36,7 @@ import {
   type GenjutsuProvider,
   type GenjutsuResolution,
 } from '@/modules/genjutsu/service';
-import { getBalance } from '@/modules/credits/service';
+import { resolveGenjutsuInputUrls } from '@/modules/genjutsu/storage';
 import { enforceMinIntervalRateLimit } from '@/lib/rate-limit';
 import { respData, respErr, respJson } from '@/lib/resp';
 
@@ -114,15 +115,13 @@ function inputFromTask(task: {
         : typeof task.prompt === 'string'
           ? task.prompt
           : '',
-    videoKey:
-      typeof parsed.videoKey === 'string' ? parsed.videoKey : undefined,
+    videoKey: typeof parsed.videoKey === 'string' ? parsed.videoKey : undefined,
     imageKeys: Array.isArray(parsed.imageKeys)
       ? parsed.imageKeys.filter(
           (value: unknown): value is string => typeof value === 'string'
         )
       : undefined,
-    videoUrl:
-      typeof parsed.videoUrl === 'string' ? parsed.videoUrl : undefined,
+    videoUrl: typeof parsed.videoUrl === 'string' ? parsed.videoUrl : undefined,
     imageUrls: Array.isArray(parsed.imageUrls)
       ? parsed.imageUrls.filter(
           (value: unknown): value is string => typeof value === 'string'
@@ -144,17 +143,18 @@ async function resolveProviderInput(params: {
     Array.isArray(input.imageKeys) &&
     input.imageKeys.length > 0
   ) {
-    const urls = params.allowLegacyUrls && isGenjutsuE2EMockEnabled()
-      ? resolveGenjutsuE2EInputUrls({
-          videoKey: input.videoKey,
-          imageKeys: input.imageKeys,
-        })
-      : await resolveGenjutsuInputUrls({
-          userId: params.userId,
-          generationId: params.generationId,
-          videoKey: input.videoKey,
-          imageKeys: input.imageKeys,
-        });
+    const urls =
+      params.allowLegacyUrls && isGenjutsuE2EMockEnabled()
+        ? resolveGenjutsuE2EInputUrls({
+            videoKey: input.videoKey,
+            imageKeys: input.imageKeys,
+          })
+        : await resolveGenjutsuInputUrls({
+            userId: params.userId,
+            generationId: params.generationId,
+            videoKey: input.videoKey,
+            imageKeys: input.imageKeys,
+          });
     return {
       mode: input.mode,
       resolution: input.resolution,
@@ -228,9 +228,7 @@ async function POST({ request }: { request: Request }) {
     const target = task
       ? {
           provider: (task.provider || 'higgsfield') as GenjutsuProvider,
-          model:
-            task.model ||
-            resolveGenjutsuProviderTarget(input.mode).model,
+          model: task.model || resolveGenjutsuProviderTarget(input.mode).model,
         }
       : resolveGenjutsuProviderTarget(input.mode);
 
@@ -251,14 +249,12 @@ async function POST({ request }: { request: Request }) {
       allowLegacyUrls: Boolean(task) || isGenjutsuE2EMockEnabled(),
     });
 
-    let pendingQuote:
-      | {
-          providerCostUsd: number;
-          credits: number;
-          providerEstimate: unknown;
-          sourceDurationSeconds?: number;
-        }
-      | null = null;
+    let pendingQuote: {
+      providerCostUsd: number;
+      credits: number;
+      providerEstimate: unknown;
+      sourceDurationSeconds?: number;
+    } | null = null;
 
     if (!task && target.provider === 'higgsfield') {
       // Cheap preflight before Fal safety: if the user cannot afford even the
@@ -421,11 +417,14 @@ async function POST({ request }: { request: Request }) {
           providerStatus: `http_${error.status}`,
           error: error.message,
         });
+        const likeness =
+          error instanceof SeedanceHttpError &&
+          isSeedanceLikenessRejection(error.message);
         return respJson(
           -1,
           error.message || 'The video provider rejected the generation',
           {
-            code: 'PROVIDER_REJECTED',
+            code: likeness ? 'PROVIDER_LIKENESS_REJECTED' : 'PROVIDER_REJECTED',
             generationId,
             refundedCredits: task.costCredits || 0,
           },
