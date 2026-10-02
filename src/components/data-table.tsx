@@ -6,6 +6,7 @@ import {
   type ColumnDef,
 } from '@tanstack/react-table';
 import { ChevronLeft, ChevronRight, RefreshCw, Search } from 'lucide-react';
+import { toast } from 'sonner';
 
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
@@ -90,6 +91,9 @@ export function DataTable<T>({
     setRefreshing(true);
     try {
       await onRefresh();
+    } catch (error) {
+      console.error('Table refresh failed', error);
+      toast.error(error instanceof Error ? error.message : 'Refresh failed');
     } finally {
       setRefreshing(false);
     }
