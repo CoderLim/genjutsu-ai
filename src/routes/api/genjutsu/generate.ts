@@ -57,6 +57,28 @@ type ProviderGenerationInput = {
   imageUrls: string[];
 };
 
+function hasStorageInput(input: GenerationInput) {
+  return (
+    typeof input.videoKey === 'string' &&
+    input.videoKey.length > 0 &&
+    Array.isArray(input.imageKeys) &&
+    input.imageKeys.length > 0
+  );
+}
+
+function taskSourceDurationSeconds(task: any) {
+  const { info } = parseGenjutsuTaskInfo(task);
+  const direct = info?.sourceDurationSeconds;
+  if (typeof direct === 'number' && Number.isFinite(direct) && direct > 0) {
+    return direct;
+  }
+
+  const quoted = info?.providerEstimate?.sourceDurationSeconds;
+  return typeof quoted === 'number' && Number.isFinite(quoted) && quoted > 0
+    ? quoted
+    : undefined;
+}
+
 function inputFromBody(body: any): GenerationInput {
   return {
     mode: body.mode as GenjutsuMode,
@@ -212,6 +234,16 @@ async function POST({ request }: { request: Request }) {
         }
       : resolveGenjutsuProviderTarget(input.mode);
 
+    if (target.provider === 'seedance' && !hasStorageInput(input)) {
+      throw new Error(
+        'Seedance generations must use server-owned R2 storage keys'
+      );
+    }
+
+    let sourceDurationSeconds = task
+      ? taskSourceDurationSeconds(task)
+      : undefined;
+
     const providerInput = await resolveProviderInput({
       input,
       userId: session.user.id,
@@ -224,6 +256,7 @@ async function POST({ request }: { request: Request }) {
           providerCostUsd: number;
           credits: number;
           providerEstimate: unknown;
+          sourceDurationSeconds?: number;
         }
       | null = null;
 
@@ -240,6 +273,27 @@ async function POST({ request }: { request: Request }) {
       if (balance < minimumCredits) {
         throw new InsufficientCreditsError(minimumCredits, balance);
       }
+    } else if (!task && target.provider === 'seedance') {
+      // Seedance has no Higgsfield-style free /estimate endpoint. Probe the
+      // server-owned R2 source once, build the list-rate quote, and reject an
+      // obviously insufficient wallet before paying for Fal face detection.
+      const estimate = await resolveGenjutsuProviderCost({
+        ...providerInput,
+        ...target,
+      });
+      const credits = calculateGenjutsuCredits(estimate.providerCostUsd);
+      const balance = await getBalance(session.user.id);
+      if (balance < credits) {
+        throw new InsufficientCreditsError(credits, balance);
+      }
+
+      sourceDurationSeconds = estimate.sourceDurationSeconds;
+      pendingQuote = {
+        providerCostUsd: estimate.providerCostUsd,
+        credits,
+        providerEstimate: estimate.payload,
+        sourceDurationSeconds,
+      };
     }
 
     // Defense in depth: the normal UI checks local reference files before
@@ -275,23 +329,26 @@ async function POST({ request }: { request: Request }) {
     }
 
     if (!task) {
-      // Prefer live /estimate USD after safety validation. Client-supplied
-      // credit amounts are ignored; reserveGenjutsuCredits remains the final
-      // atomic balance check.
-      const estimate = await resolveGenjutsuProviderCost({
-        ...providerInput,
-        ...target,
-        durationSeconds:
-          typeof body.durationSeconds === 'number'
-            ? body.durationSeconds
-            : undefined,
-      });
-      const credits = calculateGenjutsuCredits(estimate.providerCostUsd);
-      pendingQuote = {
-        providerCostUsd: estimate.providerCostUsd,
-        credits,
-        providerEstimate: estimate.payload,
-      };
+      if (!pendingQuote) {
+        // Higgsfield's live /estimate runs only after safety validation.
+        // Client-supplied credit amounts are ignored.
+        const estimate = await resolveGenjutsuProviderCost({
+          ...providerInput,
+          ...target,
+          durationSeconds:
+            typeof body.durationSeconds === 'number'
+              ? body.durationSeconds
+              : undefined,
+        });
+        const credits = calculateGenjutsuCredits(estimate.providerCostUsd);
+        sourceDurationSeconds = estimate.sourceDurationSeconds;
+        pendingQuote = {
+          providerCostUsd: estimate.providerCostUsd,
+          credits,
+          providerEstimate: estimate.payload,
+          sourceDurationSeconds,
+        };
+      }
 
       task = await reserveGenjutsuCredits({
         generationId,
@@ -302,6 +359,7 @@ async function POST({ request }: { request: Request }) {
         providerCostUsd: pendingQuote.providerCostUsd,
         credits: pendingQuote.credits,
         providerEstimate: pendingQuote.providerEstimate,
+        sourceDurationSeconds: pendingQuote.sourceDurationSeconds,
       });
 
       if (task.status !== 'reserved') {
@@ -328,6 +386,7 @@ async function POST({ request }: { request: Request }) {
         ...providerInput,
         ...target,
         endUserId: session.user.id,
+        sourceDurationSeconds,
       });
 
       await markGenjutsuSubmitted({
