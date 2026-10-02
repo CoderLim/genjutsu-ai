@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, isNull, or, sql, sum } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray, isNull, or, sql, sum } from 'drizzle-orm';
 
 import { db } from '@/core/db';
 import { credit } from '@/config/db/schema';
@@ -70,6 +70,39 @@ export async function getBalance(userId: string): Promise<number> {
     .where(validCreditConditions(userId));
 
   return parseInt(result?.total || '0');
+}
+
+export async function getBalances(
+  userIds: string[],
+  database: ReturnType<typeof db> = db()
+): Promise<Map<string, number>> {
+  const balances = new Map<string, number>();
+  for (const userId of userIds) balances.set(userId, 0);
+  if (userIds.length === 0) return balances;
+
+  const now = new Date();
+  const rows = await database
+    .select({
+      userId: credit.userId,
+      total: sum(credit.remainingCredits),
+    })
+    .from(credit)
+    .where(
+      and(
+        inArray(credit.userId, userIds),
+        eq(credit.transactionType, CreditTransactionType.GRANT),
+        eq(credit.status, CreditStatus.ACTIVE),
+        gt(credit.remainingCredits, 0),
+        or(isNull(credit.expiresAt), gt(credit.expiresAt, now))
+      )
+    )
+    .groupBy(credit.userId);
+
+  for (const row of rows) {
+    balances.set(row.userId, parseInt(row.total || '0'));
+  }
+
+  return balances;
 }
 
 // --- Grant ---
