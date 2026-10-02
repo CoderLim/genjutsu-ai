@@ -6,7 +6,6 @@ import {
   LayoutDashboard,
   Settings,
   Shield,
-  WandSparkles,
 } from 'lucide-react';
 
 import { envConfigs } from '@/config';
@@ -39,12 +38,6 @@ function AdminLayout() {
       ],
     },
     {
-      href: '/admin/generations',
-      label: m['admin.nav.generations'](),
-      icon: WandSparkles,
-      group,
-    },
-    {
       href: '/admin/payments',
       label: m['admin.nav.billing'](),
       icon: CreditCard,
@@ -64,6 +57,7 @@ function AdminLayout() {
         { href: '/admin/categories', label: m['admin.nav.categories']() },
         { href: '/admin/posts', label: m['admin.nav.posts']() },
         { href: '/admin/tickets', label: m['admin.nav.tickets']() },
+        { href: '/admin/generations', label: m['admin.nav.generations']() },
       ],
     },
   ];
