@@ -531,12 +531,12 @@ function ImageUploadSlot({
           }}
         />
 
-        {items.map((item) => (
+        {items.map((item, index) => (
           <button
             key={item.id}
             type="button"
             onClick={() => setPreviewId(item.id)}
-            aria-label={`Preview ${item.file.name}`}
+            aria-label={`Preview Reference ${index + 1}: ${item.file.name}`}
             className="group relative block h-[96px] w-[68px] overflow-hidden rounded-[4px] border border-[rgba(204,144,92,0.35)] shadow-[0_10px_28px_-12px_rgba(0,0,0,0.75)] focus:outline-none"
           >
             <img
@@ -545,6 +545,9 @@ function ImageUploadSlot({
               className="h-full w-full object-cover"
               draggable={false}
             />
+            <span className="absolute inset-x-0 bottom-0 bg-black/60 px-1 py-0.5 text-center text-[8px] font-medium text-white/90">
+              Reference {index + 1}
+            </span>
             <span
               role="button"
               tabIndex={0}
@@ -834,7 +837,7 @@ function ResultPanel({
             Download
           </a>
           <span className="text-[11px] text-white/40">
-            Generated with Higgsfield Genjutsu
+            Generated with Genjutsu AI
           </span>
         </div>
       ) : null}
@@ -904,8 +907,12 @@ export function GeneratorPanel({
 
   const placeholder =
     mode === 'objects-swap'
-      ? 'Describe what to swap in the video (optional)...'
-      : 'Describe the new scene, style, product, or object (optional)...';
+      ? images.length > 1
+        ? 'e.g. Replace the man with Reference 1 and the phone with Reference 2 (optional)...'
+        : 'Describe what to swap in the video (optional)...'
+      : images.length > 1
+        ? 'e.g. Use Reference 1 for the main character and Reference 2 for the outfit (optional)...'
+        : 'Describe the new scene, style, product, or object (optional)...';
 
   const pollGeneration = useCallback(
     async (active: PersistedGeneration, runId: number) => {
@@ -996,7 +1003,7 @@ export function GeneratorPanel({
           setResult(null);
           setError(
             polled.error ||
-              `Higgsfield generation failed (${polled.providerStatus})`
+              `Generation failed (${polled.providerStatus})`
           );
           return;
         }
@@ -1217,7 +1224,7 @@ export function GeneratorPanel({
       }
 
       // Network failure or SUBMISSION_UNKNOWN: the paid POST may have reached
-      // Higgsfield. Keep the generation locked and reconcile by generationId.
+      // the configured provider. Keep the generation locked and reconcile by generationId.
       const raw = localStorage.getItem(activeGenerationKey(session.user.id));
       if (raw) {
         try {
@@ -1284,8 +1291,15 @@ export function GeneratorPanel({
               className="placeholder:text-muted-foreground/70 min-h-[96px] w-full resize-none border-0 bg-transparent p-0 text-sm leading-relaxed text-[rgb(237,234,222)] shadow-none outline-none sm:min-h-[124px] sm:text-[14px]"
             />
 
-            <div className="mt-auto flex items-center justify-end pb-1 text-[11px] text-white/45">
-              <span className="tabular-nums">{prompt.length} / 2,000</span>
+            <div className="mt-auto flex items-end justify-between gap-3 pb-1 text-[11px] text-white/45">
+              {images.length > 1 ? (
+                <span className="max-w-[75%] leading-snug">
+                  Use Reference 1, Reference 2, etc. to map each image to a target.
+                </span>
+              ) : (
+                <span />
+              )}
+              <span className="shrink-0 tabular-nums">{prompt.length} / 2,000</span>
             </div>
           </div>
         </div>
