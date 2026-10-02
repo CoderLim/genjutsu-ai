@@ -112,6 +112,7 @@ export async function reserveGenjutsuCredits(params: {
   providerCostUsd: number;
   credits: number;
   providerEstimate?: unknown;
+  sourceDurationSeconds?: number;
 }) {
   const hasStorageInput =
     typeof params.videoKey === 'string' &&
@@ -196,6 +197,10 @@ export async function reserveGenjutsuCredits(params: {
       taskInfo: JSON.stringify({
         providerCostUsd: params.providerCostUsd,
         providerEstimate: params.providerEstimate ?? null,
+        sourceDurationSeconds:
+          typeof params.sourceDurationSeconds === 'number'
+            ? params.sourceDurationSeconds
+            : null,
       }),
       taskResult: null,
       costCredits: params.credits,
