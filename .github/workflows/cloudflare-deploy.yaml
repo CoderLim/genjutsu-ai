@@ -1,4 +1,4 @@
-# Production deploy workflow. Waffo reconciliation fix validated 2026-10-02.
+# Production deploy workflow. Admin users refresh fix rollout 2026-10-02.
 name: Deploy Cloudflare Worker
 
 on:
