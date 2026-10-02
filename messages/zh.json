@@ -847,5 +847,20 @@
   "genjutsu.safety.unavailable": "安全检测暂时不可用，请稍后再试",
   "genjutsu.safety.check_failed": "参考图校验失败，请换一张再试",
   "genjutsu.safety.upload_hint": "图片/视频不可含真人 · 最多 8 张图",
-  "genjutsu.safety.checking_aria": "检测参考图中"
+  "genjutsu.safety.checking_aria": "检测参考图中",
+  "admin.nav.generations": "生成记录",
+  "admin.generations.title": "生成记录",
+  "admin.generations.description": "查看用户的 Genjutsu 视频生成任务与消耗",
+  "admin.generations.empty": "暂无生成记录",
+  "admin.generations.search_placeholder": "搜索用户、生成 ID、请求 ID、模型或提示词...",
+  "admin.generations.user": "用户",
+  "admin.generations.generation": "生成任务",
+  "admin.generations.mode": "模式 / 分辨率",
+  "admin.generations.provider": "Provider / 模型",
+  "admin.generations.status": "状态",
+  "admin.generations.cost": "积分 / 成本",
+  "admin.generations.duration": "源视频时长",
+  "admin.generations.created_at": "创建时间",
+  "admin.generations.all_providers": "全部 Provider",
+  "admin.generations.all_statuses": "全部状态"
 }

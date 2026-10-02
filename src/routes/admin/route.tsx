@@ -6,6 +6,7 @@ import {
   LayoutDashboard,
   Settings,
   Shield,
+  WandSparkles,
 } from 'lucide-react';
 
 import { envConfigs } from '@/config';
@@ -36,6 +37,12 @@ function AdminLayout() {
         { href: '/admin/roles', label: m['admin.nav.roles']() },
         { href: '/admin/permissions', label: m['admin.nav.permissions']() },
       ],
+    },
+    {
+      href: '/admin/generations',
+      label: m['admin.nav.generations'](),
+      icon: WandSparkles,
+      group,
     },
     {
       href: '/admin/payments',
