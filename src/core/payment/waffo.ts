@@ -90,7 +90,6 @@ export class WaffoProvider implements PaymentProvider {
   configs: WaffoConfigs;
 
   private client: WaffoPancake;
-  private storeSlugCache?: string;
 
   constructor(configs: WaffoConfigs) {
     this.configs = configs;
@@ -104,107 +103,6 @@ export class WaffoProvider implements PaymentProvider {
 
   private get apiEnvironment(): 'test' | 'prod' {
     return this.configs.environment === 'prod' ? 'prod' : 'test';
-  }
-
-  /**
-   * Resolve the public store slug used by Store Slug auth.
-   * Cached on the provider instance (rebuilt when payment configs change).
-   */
-  private async resolveStoreSlug(): Promise<string> {
-    if (this.storeSlugCache) return this.storeSlugCache;
-    const storeId = this.configs.storeId;
-    if (!storeId) {
-      throw new Error(
-        'waffo storeId is required to create checkout sessions in the configured environment'
-      );
-    }
-
-    const data = (await this.client.graphql.query({
-      query: `query ($id: String!) {
-        store(id: $id) { id slug }
-      }`,
-      variables: { id: storeId },
-    })) as { data?: { store?: { slug?: string } }; errors?: unknown[] };
-
-    const slug = data?.data?.store?.slug;
-    if (!slug) {
-      throw new Error(
-        `Failed to resolve Waffo store slug for ${storeId}${
-          data?.errors ? `: ${JSON.stringify(data.errors)}` : ''
-        }`
-      );
-    }
-    this.storeSlugCache = slug;
-    return slug;
-  }
-
-  /**
-   * Create a checkout session via Store Slug auth.
-   *
-   * Merchant API keys are bound to test or prod at creation time; the SDK's
-   * RSA-signed HttpClient does not send X-Environment, so a test key always
-   * produces test checkouts. Store Slug auth accepts X-Environment explicitly,
-   * which is what we need when waffo_environment=prod but the configured key
-   * is still the dashboard test key.
-   */
-  private async createSessionViaStoreSlug(params: {
-    productId: string;
-    currency: string;
-    buyerEmail?: string;
-    successUrl?: string;
-    orderMerchantExternalId?: string;
-    metadata?: Record<string, string>;
-  }): Promise<{
-    sessionId: string;
-    checkoutUrl: string;
-    expiresAt?: string;
-  }> {
-    const slug = await this.resolveStoreSlug();
-    const environment = this.apiEnvironment;
-    const response = await fetch(
-      'https://api.waffo.ai/v1/actions/checkout/create-session',
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Store-Slug': slug,
-          'X-Environment': environment,
-        },
-        body: JSON.stringify(params),
-      }
-    );
-
-    let envelope: {
-      data?: {
-        sessionId?: string;
-        checkoutUrl?: string;
-        expiresAt?: string;
-      };
-      errors?: Array<{ message?: string }>;
-    };
-    try {
-      envelope = (await response.json()) as typeof envelope;
-    } catch {
-      throw new Error(
-        `Waffo create-session returned non-JSON (HTTP ${response.status})`
-      );
-    }
-
-    if (!response.ok || envelope.errors?.length || !envelope.data?.sessionId) {
-      const msg =
-        envelope.errors
-          ?.map((e) => e.message)
-          .filter(Boolean)
-          .join('; ') || `HTTP ${response.status}`;
-      throw new Error(`Waffo create-session failed (${environment}): ${msg}`);
-    }
-
-    const { sessionId, checkoutUrl, expiresAt } = envelope.data;
-    if (!checkoutUrl) {
-      throw new Error('Waffo create-session missing checkoutUrl');
-    }
-
-    return { sessionId, checkoutUrl, expiresAt };
   }
 
   private webhookReady = false;
