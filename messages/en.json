@@ -847,5 +847,20 @@
   "genjutsu.safety.unavailable": "Safety check is temporarily unavailable. Please try again later.",
   "genjutsu.safety.check_failed": "Reference check failed. Please try another image.",
   "genjutsu.safety.upload_hint": "No real people in images or video · up to 8 images",
-  "genjutsu.safety.checking_aria": "Checking reference image"
+  "genjutsu.safety.checking_aria": "Checking reference image",
+  "admin.nav.generations": "Generations",
+  "admin.generations.title": "Generation Records",
+  "admin.generations.description": "View user Genjutsu video generation jobs and usage",
+  "admin.generations.empty": "No generation records yet",
+  "admin.generations.search_placeholder": "Search user, generation ID, request ID, model, or prompt...",
+  "admin.generations.user": "User",
+  "admin.generations.generation": "Generation",
+  "admin.generations.mode": "Mode / Resolution",
+  "admin.generations.provider": "Provider / Model",
+  "admin.generations.status": "Status",
+  "admin.generations.cost": "Credits / Cost",
+  "admin.generations.duration": "Source Duration",
+  "admin.generations.created_at": "Created At",
+  "admin.generations.all_providers": "All Providers",
+  "admin.generations.all_statuses": "All Statuses"
 }
