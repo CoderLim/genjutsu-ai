@@ -213,12 +213,21 @@ export function buildSeedancePayload(input: {
   }
 
   const task = getSeedanceTask(input.mode);
-  const duration =
-    task === 'reference' && input.sourceDurationSeconds >= 4
-      ? String(
-          Math.min(30, Math.max(4, Math.round(input.sourceDurationSeconds)))
-        )
-      : 'auto';
+  const adaptiveOutputFields =
+    task === 'editing'
+      ? {}
+      : {
+          duration:
+            input.sourceDurationSeconds >= 4
+              ? String(
+                  Math.min(
+                    30,
+                    Math.max(4, Math.round(input.sourceDurationSeconds))
+                  )
+                )
+              : 'auto',
+          aspect_ratio: 'auto' as const,
+        };
 
   return {
     prompt: buildSeedanceWorkflowPrompt({
@@ -230,8 +239,11 @@ export function buildSeedancePayload(input: {
     image_urls: input.imageUrls,
     video_urls: [input.videoUrl],
     resolution: input.resolution,
-    duration,
-    aspect_ratio: 'auto',
+    // Seedance editing locks output duration/aspect ratio to the source video.
+    // Omit both fields instead of sending them explicitly: Fal applies its
+    // editing defaults and avoids the provider's "video editing" validation
+    // path rejecting an otherwise valid object-swap request.
+    ...adaptiveOutputFields,
     generate_audio: envConfigs.seedance_genjutsu_generate_audio !== 'false',
     bitrate_mode: 'standard',
     codec: 'H264',
