@@ -39,7 +39,7 @@ async function POST({ request }: { request: Request }) {
 
     const provider = await getGenjutsuStatus({
       provider: task.provider || 'higgsfield',
-      model: task.model || '',
+      model: task.model,
       requestId,
     });
 
