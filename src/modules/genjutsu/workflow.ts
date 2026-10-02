@@ -49,6 +49,13 @@ function imageReferences(imageCount: number) {
   return Array.from({ length: imageCount }, (_, index) => `@Image${index + 1}`);
 }
 
+function referenceMappings(imageCount: number) {
+  const references = imageReferences(imageCount);
+  return references
+    .map((reference, index) => `Reference ${index + 1} = ${reference}`)
+    .join(', ');
+}
+
 export function buildSeedanceWorkflowPrompt(input: {
   mode: GenjutsuMode;
   userPrompt?: string;
@@ -57,20 +64,35 @@ export function buildSeedanceWorkflowPrompt(input: {
   const userPrompt = input.userPrompt?.trim() || '';
   const references = imageReferences(input.imageCount);
   const primary = references[0] || '@Image1';
-  const allReferences = references.join(', ') || '@Image1';
+  const mappings = referenceMappings(input.imageCount) || 'Reference 1 = @Image1';
+  const multiReferenceRules =
+    input.imageCount > 1
+      ? [
+          `Reference labels map to provider images as follows: ${mappings}.`,
+          'The reference images may represent different characters, products, wardrobe items, props, objects, or visual elements. Do not assume they are alternate views of the same subject.',
+          'Use the user instruction to determine which reference belongs to which target in @Video1. Apply each reference only to its matching target.',
+          'Do not blend, merge, or transfer visual traits between unrelated references unless the user explicitly asks for that.',
+        ]
+      : [
+          'Reference 1 maps to @Image1.',
+        ];
 
   if (input.mode === 'motion-transfer') {
     return [
       'Use @Video1 strictly as the motion, timing, pose, choreography, camera movement, and shot-composition reference.',
-      `Use ${primary} as the primary replacement character or subject appearance reference.`,
-      input.imageCount > 1
-        ? `Use the additional references ${allReferences} only to keep the replacement subject, outfit, props, or scene visually consistent.`
-        : '',
+      ...multiReferenceRules,
+      input.imageCount === 1
+        ? `Use ${primary} as the replacement character or subject appearance reference.`
+        : 'When several references are provided, preserve each referenced target independently according to the user instruction.',
       'Preserve the action timing, body motion, gestures, camera movement, framing, and shot progression from @Video1 as closely as possible.',
-      'Keep the replacement subject visually consistent throughout the video, including face, clothing, proportions, colors, and defining details from the image references.',
-      'Do not copy the original subject identity or appearance from @Video1.',
-      'Preserve the original environment unless the additional instruction explicitly requests a scene or style change.',
-      userPrompt ? `Additional instruction: ${userPrompt}` : '',
+      'Keep each replaced subject visually consistent throughout the video, including face or character design, clothing, proportions, colors, products, props, and other defining details from its assigned reference.',
+      'Do not copy the original replaced subject identity or appearance from @Video1.',
+      'Preserve the original environment and unrelated subjects unless the user instruction explicitly requests a scene, style, or target change.',
+      userPrompt
+        ? `User instruction: ${userPrompt}`
+        : input.imageCount > 1
+          ? 'No explicit mapping was provided. Infer roles conservatively from visual correspondence and modify only clearly matching targets; never merge unrelated references.'
+          : '',
     ]
       .filter(Boolean)
       .join('\n');
@@ -78,17 +100,19 @@ export function buildSeedanceWorkflowPrompt(input: {
 
   return [
     'Edit @Video1 instead of redesigning the whole shot.',
-    `Use ${primary} as the primary replacement reference.`,
-    input.imageCount > 1
-      ? `Use ${allReferences} as supporting references for the target replacement only.`
-      : '',
-    'Replace only the requested target object, product, outfit, character, or subject.',
-    'Preserve everything unrelated to the requested replacement from @Video1 as closely as possible: motion, camera movement, timing, background, composition, lighting, other people, and other objects.',
-    'Integrate the replacement naturally with the original perspective, scale, occlusion, lighting, shadows, reflections, and motion.',
+    ...multiReferenceRules,
+    input.imageCount === 1
+      ? `Use ${primary} as the replacement reference.`
+      : 'When several references are provided, each may control a different requested target.',
+    'Replace only the requested target objects, products, outfits, characters, subjects, or other visual elements.',
+    'Preserve everything unrelated to the requested replacements from @Video1 as closely as possible: motion, camera movement, timing, background, composition, lighting, other people, and other objects.',
+    'Integrate every replacement naturally with the original perspective, scale, occlusion, lighting, shadows, reflections, and motion.',
     'Do not regenerate or alter unrelated parts of the video.',
     userPrompt
       ? `Target replacement instruction: ${userPrompt}`
-      : 'Target replacement instruction: replace the most prominent matching target in @Video1 with the primary image reference.',
+      : input.imageCount > 1
+        ? 'No explicit mapping was provided. Infer roles conservatively from visual correspondence and replace only clearly matching targets; never merge unrelated references.'
+        : 'Target replacement instruction: replace the most prominent matching target in @Video1 with Reference 1.',
   ]
     .filter(Boolean)
     .join('\n');
