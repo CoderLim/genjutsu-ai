@@ -81,6 +81,14 @@ To avoid trusting a client-supplied duration, the server reads the MP4/MOV
 checks both the beginning and tail of the file because the `moov` atom may be
 written at either end.
 
+The duration is probed **once** during the Seedance quote, persisted with the
+generation task, and reused for provider submission. Submit must not issue a
+second duration probe.
+
+Seedance generations accept only server-owned R2 storage keys. Arbitrary legacy
+video URLs are not eligible for the Seedance path, and range requests reject
+redirects. This keeps the metadata probe away from user-controlled SSRF targets.
+
 Seedance is rejected for sources outside the provider's current 1.8–30.2 second
 reference-video range.
 
@@ -98,6 +106,11 @@ For that reason the code does **not** switch production defaults to Seedance.
 Before making Seedance the default paid provider, collect real Fal usage/cost
 samples and add a post-generation reconciliation path if Fal exposes exact
 request cost/usage.
+
+For new Seedance requests the server now computes the list-rate quote and checks
+the user's balance **before** invoking the paid Fal reference-image safety check.
+The normal atomic reserve still runs afterwards, so a concurrent balance change
+cannot bypass billing.
 
 ## Test matrix before rollout
 
