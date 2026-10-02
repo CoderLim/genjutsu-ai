@@ -349,3 +349,47 @@ test('recovered without period fields throws', () => {
     /missing subscription period/
   );
 });
+
+
+test('createPayment uses authenticated checkout and preserves merchant order reference', async () => {
+  const provider = createWaffoProvider({
+    merchantId: 'MER_abcdefghijklmnopqrstuv',
+    privateKey: TEST_PRIVATE_KEY,
+    storeId: 'STO_1',
+    environment: 'prod',
+  }) as any;
+
+  let received: Record<string, unknown> | undefined;
+  provider.client = {
+    checkout: {
+      authenticated: {
+        create: async (params: Record<string, unknown>) => {
+          received = params;
+          return {
+            sessionId: 'SES_provider_1',
+            checkoutUrl: 'https://checkout.example/session',
+            expiresAt: '2026-10-02T15:00:00.000Z',
+          };
+        },
+      },
+    },
+  };
+
+  const session = await provider.createPayment({
+    order: {
+      orderNo: 'ORD_local_1',
+      productId: 'PROD_1',
+      price: { amount: 499, currency: 'USD' },
+      customer: {
+        id: 'user-123',
+        email: 'buyer@example.com',
+      },
+    },
+  });
+
+  assert.equal(received?.buyerIdentity, 'user-123');
+  assert.equal(received?.orderMerchantExternalId, 'ORD_local_1');
+  assert.deepEqual(received?.metadata, { orderNo: 'ORD_local_1' });
+  assert.equal(session.checkoutInfo.sessionId, 'ORD_local_1');
+  assert.equal(session.metadata.checkoutSessionId, 'SES_provider_1');
+});

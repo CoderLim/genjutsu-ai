@@ -90,7 +90,6 @@ export class WaffoProvider implements PaymentProvider {
   configs: WaffoConfigs;
 
   private client: WaffoPancake;
-  private storeSlugCache?: string;
 
   constructor(configs: WaffoConfigs) {
     this.configs = configs;
@@ -106,105 +105,81 @@ export class WaffoProvider implements PaymentProvider {
     return this.configs.environment === 'prod' ? 'prod' : 'test';
   }
 
-  /**
-   * Resolve the public store slug used by Store Slug auth.
-   * Cached on the provider instance (rebuilt when payment configs change).
-   */
-  private async resolveStoreSlug(): Promise<string> {
-    if (this.storeSlugCache) return this.storeSlugCache;
-    const storeId = this.configs.storeId;
-    if (!storeId) {
-      throw new Error(
-        'waffo storeId is required to create checkout sessions in the configured environment'
-      );
-    }
+  private webhookReady = false;
 
-    const data = (await this.client.graphql.query({
-      query: `query ($id: String!) {
-        store(id: $id) { id slug }
+  private async ensureWebhook(successUrl?: string): Promise<void> {
+    if (this.webhookReady || !this.configs.storeId || !successUrl) return;
+
+    let origin: string;
+    try {
+      origin = new URL(successUrl).origin;
+    } catch {
+      return;
+    }
+    if (!origin.startsWith('https://')) return;
+
+    const url = `${origin}/api/payment/notify/waffo`;
+    const testMode = this.apiEnvironment !== 'prod';
+    const requiredEvents = [
+      WebhookEventType.OrderCompleted,
+      WebhookEventType.SubscriptionActivated,
+      WebhookEventType.SubscriptionCanceling,
+      WebhookEventType.SubscriptionUncanceled,
+      WebhookEventType.SubscriptionUpdated,
+      WebhookEventType.SubscriptionCanceled,
+      WebhookEventType.SubscriptionPastDue,
+      WebhookEventType.RefundSucceeded,
+      WAFFO_SUBSCRIPTION_RENEWED,
+      WAFFO_SUBSCRIPTION_RECOVERED,
+    ];
+
+    const result = await this.client.graphql.query<{
+      store: {
+        storeWebhooks: Array<{
+          id: string;
+          url: string;
+          channel: string;
+          testMode: boolean;
+          events: string[];
+        }>;
+      } | null;
+    }>({
+      query: `query ($storeId: String!) {
+        store(id: $storeId) {
+          storeWebhooks { id url channel testMode events }
+        }
       }`,
-      variables: { id: storeId },
-    })) as { data?: { store?: { slug?: string } }; errors?: unknown[] };
+      variables: { storeId: this.configs.storeId },
+    });
 
-    const slug = data?.data?.store?.slug;
-    if (!slug) {
-      throw new Error(
-        `Failed to resolve Waffo store slug for ${storeId}${
-          data?.errors ? `: ${JSON.stringify(data.errors)}` : ''
-        }`
-      );
-    }
-    this.storeSlugCache = slug;
-    return slug;
-  }
-
-  /**
-   * Create a checkout session via Store Slug auth.
-   *
-   * Merchant API keys are bound to test or prod at creation time; the SDK's
-   * RSA-signed HttpClient does not send X-Environment, so a test key always
-   * produces test checkouts. Store Slug auth accepts X-Environment explicitly,
-   * which is what we need when waffo_environment=prod but the configured key
-   * is still the dashboard test key.
-   */
-  private async createSessionViaStoreSlug(params: {
-    productId: string;
-    currency: string;
-    buyerEmail?: string;
-    successUrl?: string;
-    orderMerchantExternalId?: string;
-    metadata?: Record<string, string>;
-  }): Promise<{
-    sessionId: string;
-    checkoutUrl: string;
-    expiresAt?: string;
-  }> {
-    const slug = await this.resolveStoreSlug();
-    const environment = this.apiEnvironment;
-    const response = await fetch(
-      'https://api.waffo.ai/v1/actions/checkout/create-session',
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Store-Slug': slug,
-          'X-Environment': environment,
-        },
-        body: JSON.stringify(params),
-      }
+    const existing = result.data?.store?.storeWebhooks?.find(
+      (item) =>
+        item.channel === 'http' &&
+        item.url === url &&
+        item.testMode === testMode
     );
 
-    let envelope: {
-      data?: {
-        sessionId?: string;
-        checkoutUrl?: string;
-        expiresAt?: string;
-      };
-      errors?: Array<{ message?: string }>;
-    };
-    try {
-      envelope = (await response.json()) as typeof envelope;
-    } catch {
-      throw new Error(
-        `Waffo create-session returned non-JSON (HTTP ${response.status})`
+    if (!existing) {
+      await this.client.webhooks.add({
+        storeId: this.configs.storeId,
+        channel: 'http',
+        url,
+        events: requiredEvents as any,
+        testMode,
+      });
+    } else {
+      const missing = requiredEvents.filter(
+        (event) => !existing.events.includes(event)
       );
+      if (missing.length > 0) {
+        await this.client.webhooks.update({
+          id: existing.id,
+          events: [...existing.events, ...missing] as any,
+        });
+      }
     }
 
-    if (!response.ok || envelope.errors?.length || !envelope.data?.sessionId) {
-      const msg =
-        envelope.errors
-          ?.map((e) => e.message)
-          .filter(Boolean)
-          .join('; ') || `HTTP ${response.status}`;
-      throw new Error(`Waffo create-session failed (${environment}): ${msg}`);
-    }
-
-    const { sessionId, checkoutUrl, expiresAt } = envelope.data;
-    if (!checkoutUrl) {
-      throw new Error('Waffo create-session missing checkoutUrl');
-    }
-
-    return { sessionId, checkoutUrl, expiresAt };
+    this.webhookReady = true;
   }
 
   async createPayment({
@@ -237,14 +212,33 @@ export class WaffoProvider implements PaymentProvider {
       },
     };
 
-    // Prefer Store Slug + X-Environment so checkout matches waffo_environment
-    // even when the configured RSA API key is test-bound.
-    const session = this.configs.storeId
-      ? await this.createSessionViaStoreSlug(params)
-      : await this.client.checkout.createSession(params);
+    // Merchant-authenticated checkout is required here. Waffo's visitor /
+    // Store Slug flow accepts orderMerchantExternalId on the wire but does not
+    // persist it, which makes the resulting payment impossible to reconcile
+    // safely back to our local order. Authenticated checkout preserves the
+    // merchant order reference in GraphQL and webhook payloads.
+    const buyerIdentity =
+      order.customer?.id || order.customer?.email || orderNo;
+    if (!buyerIdentity) {
+      throw new Error('buyer identity is required for Waffo checkout');
+    }
 
-    // Store our orderNo as sessionId so webhook/callback lookup matches
-    // orderMerchantExternalId (same pattern as Alipay out_trade_no).
+    // Webhook delivery is the primary settlement path. Keep checkout usable
+    // when webhook registration is temporarily unavailable: the success
+    // callback still performs an authoritative provider lookup.
+    try {
+      await this.ensureWebhook(order.successUrl);
+    } catch (error) {
+      console.warn('Failed to ensure Waffo webhook', error);
+    }
+
+    const session = await this.client.checkout.authenticated.create({
+      ...params,
+      buyerIdentity,
+    });
+
+    // The persisted external order id is now authoritative and can be used by
+    // both synchronous return reconciliation and webhook handling.
     const lookupId = orderNo || session.sessionId;
 
     return {
