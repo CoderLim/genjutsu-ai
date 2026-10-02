@@ -313,7 +313,7 @@ function UsersPage() {
             emptyText={m['admin.users.no_users']()}
             search={search}
             onSearchChange={setSearch}
-            onRefresh={() => listQuery.refetch()}
+            onRefresh={() => listQuery.refetch({ throwOnError: true })}
             loading={listQuery.isFetching}
           />
         </CardContent>
