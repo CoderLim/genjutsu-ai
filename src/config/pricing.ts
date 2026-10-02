@@ -40,7 +40,7 @@ function toPricingProduct(pack: GenjutsuCreditPack): PricingProduct {
     description: `${pack.credits.toLocaleString()} Genjutsu credits`,
     type: PaymentType.ONE_TIME,
     priceInCents: pack.priceCents,
-    currency: 'usd',
+    currency: pack.currency || 'usd',
     credits: pack.credits,
   };
 }

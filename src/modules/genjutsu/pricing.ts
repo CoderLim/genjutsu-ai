@@ -12,6 +12,7 @@ export type GenjutsuCreditPack = {
   id: GenjutsuCreditPackId;
   name: string;
   priceCents: number;
+  currency?: 'usd' | 'cny';
   credits: number;
   highlighted?: boolean;
 };
@@ -22,8 +23,9 @@ export const SMOKE_PACK_EMAIL_NEEDLE = 'gengliming';
 export const GENJUTSU_SMOKE_CREDIT_PACK: GenjutsuCreditPack = {
   id: 'smoke',
   name: 'Smoke',
-  // $0.50 USD smoke charge (catalog is USD; ~¥0.5-scale real-money probe).
-  priceCents: 50,
+  // ¥1.00 CNY internal smoke charge (Waffo Live minimum).
+  priceCents: 100,
+  currency: 'cny',
   credits: 50,
 };
 

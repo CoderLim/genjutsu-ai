@@ -49,31 +49,38 @@ export function Pricing({ title }: { title?: string } = {}) {
     {
       key: 'credits',
       label: 'Credit Packs',
-      plans: listVisibleCreditPacks(session?.user?.email).map((pack) => ({
-        id: pack.id,
-        name: pack.name,
-        description: `${pack.credits.toLocaleString()} credits · one-time purchase`,
-        price: `$${(pack.priceCents / 100).toFixed(2)}`,
-        featured: pack.highlighted,
-        badge:
-          pack.id === 'smoke'
-            ? 'Dev only'
-            : pack.highlighted
-              ? 'Popular'
-              : undefined,
-        features: [
-          `${pack.credits.toLocaleString()} Genjutsu credits`,
-          'One-time purchase',
-          'No subscription',
-          'Motion Transfer & Object Swap',
-        ],
-        buttonText: 'Buy credits',
-        productId: pack.id,
-        productName: `${pack.name} Credits`,
-        priceInCents: pack.priceCents,
-        currency: 'usd',
-        credits: pack.credits,
-      })),
+      plans: listVisibleCreditPacks(session?.user?.email).map((pack) => {
+        const currency = pack.currency || 'usd';
+        const priceLabel =
+          currency === 'cny'
+            ? `¥${(pack.priceCents / 100).toFixed(2)}`
+            : `$${(pack.priceCents / 100).toFixed(2)}`;
+        return {
+          id: pack.id,
+          name: pack.name,
+          description: `${pack.credits.toLocaleString()} credits · one-time purchase`,
+          price: priceLabel,
+          featured: pack.highlighted,
+          badge:
+            pack.id === 'smoke'
+              ? 'Dev only'
+              : pack.highlighted
+                ? 'Popular'
+                : undefined,
+          features: [
+            `${pack.credits.toLocaleString()} Genjutsu credits`,
+            'One-time purchase',
+            'No subscription',
+            'Motion Transfer & Object Swap',
+          ],
+          buttonText: 'Buy credits',
+          productId: pack.id,
+          productName: `${pack.name} Credits`,
+          priceInCents: pack.priceCents,
+          currency,
+          credits: pack.credits,
+        };
+      }),
     },
   ];
 

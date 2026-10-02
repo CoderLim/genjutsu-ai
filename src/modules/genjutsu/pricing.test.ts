@@ -28,7 +28,8 @@ test('launch credit packs match the approved catalog', () => {
 });
 
 test('smoke pack is only visible to gengliming emails', () => {
-  assert.equal(GENJUTSU_SMOKE_CREDIT_PACK.priceCents, 50);
+  assert.equal(GENJUTSU_SMOKE_CREDIT_PACK.priceCents, 100);
+  assert.equal(GENJUTSU_SMOKE_CREDIT_PACK.currency, 'cny');
   assert.equal(GENJUTSU_SMOKE_CREDIT_PACK.credits, 50);
   assert.equal(canSeeSmokeCreditPack('alice@example.com'), false);
   assert.equal(canSeeSmokeCreditPack('gengliming110@gmail.com'), true);
