@@ -160,6 +160,40 @@ function estimatedOutputDurationSeconds(sourceDurationSeconds: number) {
   return Math.min(30, Math.max(4, sourceDurationSeconds));
 }
 
+export function calculateSeedanceActualProviderCost(input: {
+  resolution: GenjutsuResolution;
+  sourceDurationSeconds: number;
+  outputDurationSeconds: number;
+}) {
+  if (
+    !Number.isFinite(input.sourceDurationSeconds) ||
+    input.sourceDurationSeconds <= 0
+  ) {
+    throw new Error('Seedance source duration must be a positive number');
+  }
+  if (
+    !Number.isFinite(input.outputDurationSeconds) ||
+    input.outputDurationSeconds <= 0
+  ) {
+    throw new Error('Seedance output duration must be a positive number');
+  }
+
+  const billedSeconds =
+    input.sourceDurationSeconds + input.outputDurationSeconds;
+  const providerCostUsd =
+    billedSeconds *
+    SEEDANCE_VIDEO_REFERENCE_RATE_USD_PER_BILLED_SECOND[input.resolution];
+
+  return {
+    providerCostUsd,
+    billedSeconds,
+    sourceDurationSeconds: input.sourceDurationSeconds,
+    outputDurationSeconds: input.outputDurationSeconds,
+    rateUsdPerBilledSecond:
+      SEEDANCE_VIDEO_REFERENCE_RATE_USD_PER_BILLED_SECOND[input.resolution],
+  };
+}
+
 export function estimateSeedanceProviderCost(input: {
   resolution: GenjutsuResolution;
   sourceDurationSeconds: number;
