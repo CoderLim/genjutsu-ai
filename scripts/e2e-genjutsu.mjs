@@ -210,15 +210,12 @@ async function main() {
       'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
       'base64'
     );
-    const uploadBatch = await appPost('/api/genjutsu/upload-url', cookie, {
+    await appPost('/api/genjutsu/attempt', cookie, {
       generationId,
       mode: 'motion-transfer',
       resolution: '720p',
       prompt: 'E2E smoke test',
-      contentTypes: ['video/mp4', 'image/png'],
-      contentLengths: [videoBytes.byteLength, imageBytes.byteLength],
     });
-    assert.equal(uploadBatch.uploads.length, 2);
 
     const attempts = await appGet(
       '/api/user/generations?page=1&pageSize=12',
@@ -229,6 +226,16 @@ async function main() {
     );
     assert.ok(recordedAttempt, 'Generate click was not recorded');
     assert.equal(recordedAttempt.status, 'initiated');
+
+    const uploadBatch = await appPost('/api/genjutsu/upload-url', cookie, {
+      generationId,
+      mode: 'motion-transfer',
+      resolution: '720p',
+      prompt: 'E2E smoke test',
+      contentTypes: ['video/mp4', 'image/png'],
+      contentLengths: [videoBytes.byteLength, imageBytes.byteLength],
+    });
+    assert.equal(uploadBatch.uploads.length, 2);
 
     const initiatedStatus = await appGet(
       `/api/genjutsu/status?generationId=${encodeURIComponent(generationId)}`,
@@ -298,9 +305,33 @@ async function main() {
       assert.ok(response.ok, `mock upload failed: HTTP ${response.status}`);
     }
 
-    console.log('\n[6/6] Running Generate → Status → source-video result...');
-    // Simulate browser recovery after a lost initial /generate request: the
-    // server must resume from the persisted attempt using only generationId.
+    const sealed = await appPost('/api/genjutsu/seal-inputs', cookie, {
+      generationId,
+    });
+    assert.equal(sealed.status, 'ready');
+    assert.match(sealed.videoKey, /\/sealed-inputs\//);
+
+    const readyStatus = await appGet(
+      `/api/genjutsu/status?generationId=${encodeURIComponent(generationId)}`,
+      cookie
+    );
+    assert.equal(readyStatus.status, 'processing');
+    assert.equal(readyStatus.providerStatus, 'ready');
+
+    // Old signed PUT URLs may still be valid, but they only target staging.
+    // Overwriting staging after seal must not alter the provider input.
+    const tamperedVideoBytes = Buffer.from('x'.repeat(videoBytes.byteLength));
+    const overwrite = await fetch(videoUpload.uploadUrl, {
+      method: 'PUT',
+      headers: {
+        ...(videoUpload.uploadHeaders || {}),
+        'Content-Type': 'video/mp4',
+      },
+      body: tamperedVideoBytes,
+    });
+    assert.ok(overwrite.ok, `staging overwrite failed: HTTP ${overwrite.status}`);
+
+    console.log('\n[6/6] Running Generate → Status → sealed source-video result...');
     const started = await appPost('/api/genjutsu/generate', cookie, {
       generationId,
     });
@@ -309,6 +340,7 @@ async function main() {
     assert.ok(started.requestId?.startsWith('e2e-'));
     assert.ok(started.reservedCredits > 0);
 
+    await sleep(1_100);
     const completed = await appGet(
       `/api/genjutsu/status?generationId=${encodeURIComponent(generationId)}`,
       cookie
@@ -351,8 +383,8 @@ async function main() {
     assert.deepEqual(returned, videoBytes.subarray(0, 10));
 
     console.log('\n✅ Genjutsu E2E passed');
-    console.log('   auth → immutable upload attempt → recovery → credit reserve →');
-    console.log('   mock provider submit → durable result key → stable result URL');
+    console.log('   auth → persisted attempt → staging upload → immutable seal →');
+    console.log('   credit reserve → mock provider submit → durable result URL');
   } finally {
     stop();
     await new Promise((resolve) => setTimeout(resolve, 300));

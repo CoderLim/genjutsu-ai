@@ -7,8 +7,10 @@ import {
 } from '@/modules/genjutsu/e2e-mock';
 import {
   assertGenerationId,
+  bindGenjutsuUploadInputs,
   createGenjutsuAttempt,
   GenjutsuAttemptConflictError,
+  markGenjutsuAttemptFailedPreflight,
 } from '@/modules/genjutsu/billing';
 import { resolveGenjutsuProviderTarget } from '@/modules/genjutsu/service';
 import {
@@ -20,6 +22,8 @@ import { enforceMinIntervalRateLimit } from '@/lib/rate-limit';
 import { respData, respErr, respJson } from '@/lib/resp';
 
 async function POST({ request }: { request: Request }) {
+  let generationIdForFailure: string | null = null;
+  let userIdForFailure: string | null = null;
   const limited = enforceMinIntervalRateLimit(request, {
     intervalMs: 1_000,
     keyPrefix: 'genjutsu-upload-url',
@@ -32,9 +36,11 @@ async function POST({ request }: { request: Request }) {
     if (!session?.user) {
       return respErr('Unauthorized', { status: 401 });
     }
+    userIdForFailure = session.user.id;
 
     const body = await request.json().catch(() => ({}));
     const generationId = assertGenerationId(body.generationId);
+    generationIdForFailure = generationId;
     const mode = body.mode;
     const resolution = body.resolution;
     const prompt = typeof body.prompt === 'string' ? body.prompt : '';
@@ -91,8 +97,18 @@ async function POST({ request }: { request: Request }) {
       resolution,
       prompt,
       ...target,
+    });
+    await bindGenjutsuUploadInputs({
+      generationId,
+      userId: session.user.id,
+      mode,
+      resolution,
+      prompt,
+      ...target,
       videoKey: normalizedInputs[0].key,
       imageKeys: normalizedInputs.slice(1).map((item) => item.key),
+      contentTypes: normalizedInputs.map((item) => item.contentType),
+      contentLengths,
     });
 
     const uploads = [];
@@ -135,6 +151,16 @@ async function POST({ request }: { request: Request }) {
         { code: error.code },
         { status: 409 }
       );
+    }
+
+    if (generationIdForFailure && userIdForFailure) {
+      await markGenjutsuAttemptFailedPreflight({
+        generationId: generationIdForFailure,
+        userId: userIdForFailure,
+        stage: 'upload_setup',
+        errorCode: 'UPLOAD_SETUP_FAILED',
+        error: error?.message || 'Failed to create upload URL',
+      }).catch(() => undefined);
     }
 
     console.error('genjutsu upload-url failed:', error);

@@ -28,6 +28,8 @@ interface Generation {
   resolution: string | null;
   status: string;
   taskId: string | null;
+  providerStatus: string | null;
+  error: string | null;
   costCredits: number;
   providerCostUsd: number | null;
   sourceDurationSeconds: number | null;
@@ -38,6 +40,9 @@ interface Generation {
 const PAGE_SIZE = 20;
 const STATUSES = [
   'initiated',
+  'sealing',
+  'ready',
+  'failed_preflight',
   'insufficient_credits',
   'reserving',
   'reserved',
@@ -51,7 +56,11 @@ const STATUSES = [
 
 function statusVariant(status: string) {
   if (status === 'completed') return 'default';
-  if (status === 'refunded' || status === 'submission_unknown') {
+  if (
+    status === 'refunded' ||
+    status === 'failed_preflight' ||
+    status === 'submission_unknown'
+  ) {
     return 'destructive';
   }
   return 'secondary';
@@ -141,7 +150,21 @@ function GenerationsPage() {
     {
       header: m['admin.generations.status'](),
       cell: (g) => (
-        <Badge variant={statusVariant(g.status)}>{g.status}</Badge>
+        <div className="max-w-[260px]">
+          <Badge variant={statusVariant(g.status)}>{g.status}</Badge>
+          {g.error ? (
+            <div
+              className="text-muted-foreground mt-1 truncate text-xs"
+              title={g.error}
+            >
+              {g.error}
+            </div>
+          ) : g.providerStatus ? (
+            <div className="text-muted-foreground mt-1 text-xs">
+              {g.providerStatus}
+            </div>
+          ) : null}
+        </div>
       ),
     },
     {

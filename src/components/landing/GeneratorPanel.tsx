@@ -987,79 +987,23 @@ export function GeneratorPanel({
 
         notFoundCount = 0;
 
-        if (polled.providerStatus === 'initiated') {
-          try {
-            // The upload finished and this attempt is persisted, but the paid
-            // /generate request never advanced it. Retrying the same
-            // generationId is safe because reservation/submission are claimed
-            // server-side and the stored upload inputs are immutable.
-            const resumed = await apiPost<GenerationStart>(
-              '/api/genjutsu/generate',
-              { generationId: active.generationId }
-            );
-
-            if (resumed.status === 'insufficient_credits') {
-              localStorage.removeItem(activeGenerationKey(active.userId));
-              setStatus('idle');
-              setResult(null);
-              setNeedsCredits(true);
-              setError('Insufficient credits');
-              return;
-            }
-
-            if (
-              typeof resumed.reservedCredits === 'number' &&
-              resumed.reservedCredits > 0 &&
-              resumed.reservedCredits !== active.reservedCredits
-            ) {
-              active.reservedCredits = resumed.reservedCredits;
-              localStorage.setItem(
-                activeGenerationKey(active.userId),
-                JSON.stringify(active)
-              );
-              setResult({
-                ...active.draft,
-                reservedCredits: resumed.reservedCredits,
-              });
-            }
-
-            setNeedsCredits(false);
-            setError('');
-          } catch (cause) {
-            const data =
-              cause instanceof ApiError &&
-              cause.data &&
-              typeof cause.data === 'object'
-                ? (cause.data as Record<string, unknown>)
-                : null;
-            const insufficient = data?.code === 'INSUFFICIENT_CREDITS';
-            const submissionUnknown = data?.code === 'SUBMISSION_UNKNOWN';
-
-            if (cause instanceof ApiError && !submissionUnknown) {
-              // The server definitively rejected this not-yet-paid attempt, so
-              // it is safe to unlock Generate instead of polling forever.
-              localStorage.removeItem(activeGenerationKey(active.userId));
-              setStatus('idle');
-              setResult(null);
-              setNeedsCredits(insufficient);
-              setError(cause.message);
-              return;
-            }
-
-            // A network failure may have happened after the retry reached the
-            // server. Keep the same attempt locked and re-check its state
-            // rather than creating a second generation.
-            setError(
-              submissionUnknown
-                ? cause instanceof Error
-                  ? cause.message
-                  : 'Generation submission result is uncertain.'
-                : 'Connection lost before generation started. Retrying the existing attempt.'
-            );
-          }
-
-          delayMs = Math.min(5_000, Math.ceil(delayMs * 1.2));
-          continue;
+        if (
+          polled.providerStatus === 'initiated' ||
+          polled.providerStatus === 'sealing' ||
+          polled.providerStatus === 'ready'
+        ) {
+          // These states are definitively before credit reservation/provider
+          // submission. Never turn a page refresh into a paid generation.
+          localStorage.removeItem(activeGenerationKey(active.userId));
+          setStatus('idle');
+          setResult(null);
+          setNeedsCredits(false);
+          setError(
+            polled.providerStatus === 'ready'
+              ? 'Upload completed, but generation was not started. Click Generate to try again.'
+              : 'The previous upload did not finish starting a generation. Click Generate to try again.'
+          );
+          return;
         }
 
         if (
@@ -1218,6 +1162,13 @@ export function GeneratorPanel({
     });
 
     try {
+      await apiPost('/api/genjutsu/attempt', {
+        generationId,
+        mode,
+        resolution,
+        prompt: prompt.trim(),
+      });
+
       const media = [video, ...images];
       const contentTypes = media.map(
         (item, index) =>
@@ -1252,34 +1203,12 @@ export function GeneratorPanel({
 
       if (generationRunRef.current !== runId) return;
 
-      const [videoUpload, ...imageUploads] = uploadBatch.uploads;
-      if (!videoUpload) throw new Error('Missing uploaded video');
+      await apiPost('/api/genjutsu/seal-inputs', {
+        generationId,
+      });
 
-      const usesR2Keys =
-        typeof videoUpload.storageKey === 'string' &&
-        imageUploads.every((item) => typeof item.storageKey === 'string');
-
-      const mediaPayload = usesR2Keys
-        ? {
-            videoKey: videoUpload.storageKey as string,
-            imageKeys: imageUploads.map((item) => item.storageKey as string),
-          }
-        : (() => {
-            if (
-              typeof videoUpload.publicUrl !== 'string' ||
-              imageUploads.some((item) => typeof item.publicUrl !== 'string')
-            ) {
-              throw new Error('Uploaded media is missing a readable URL');
-            }
-            return {
-              videoUrl: videoUpload.publicUrl,
-              imageUrls: imageUploads.map((item) => item.publicUrl as string),
-            };
-          })();
-
-      // Persist before the paid POST. If the browser loses the response after
-      // the server accepted it, refresh/resume will reconcile by generationId
-      // instead of creating a second paid request.
+      // Persist before the paid POST. A refresh may reconcile an already-paid
+      // job, but must never auto-start a still-unpaid ready attempt.
       const active: PersistedGeneration = {
         userId: session.user.id,
         generationId,
@@ -1293,10 +1222,6 @@ export function GeneratorPanel({
 
       const started = await apiPost<GenerationStart>('/api/genjutsu/generate', {
         generationId,
-        mode,
-        resolution,
-        prompt: prompt.trim(),
-        ...mediaPayload,
       });
 
       active.generationId = started.generationId;

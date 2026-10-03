@@ -10,6 +10,7 @@ import {
   getSeedanceStatus,
   isSeedanceLikenessRejection,
   SeedanceHttpError,
+  SeedancePreflightError,
   submitSeedance,
 } from './seedance';
 import type {
@@ -28,6 +29,7 @@ export type {
 export {
   isSeedanceLikenessRejection,
   SeedanceHttpError,
+  SeedancePreflightError,
   resolveGenjutsuProviderTarget,
 };
 
@@ -47,6 +49,13 @@ const ESTIMATE_TIMEOUT_MS = 8_000;
  */
 const FALLBACK_DURATION_SECONDS = 30;
 
+export class HiggsfieldPreflightError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'HiggsfieldPreflightError';
+  }
+}
+
 export class HiggsfieldHttpError extends Error {
   constructor(
     public status: number,
@@ -61,7 +70,7 @@ export class HiggsfieldHttpError extends Error {
 function getApiKey() {
   const value = envConfigs.higgsfield_api_key?.trim();
   if (!value) {
-    throw new Error(
+    throw new HiggsfieldPreflightError(
       'Higgsfield API key is not configured. Set HF_API_KEY on the server.'
     );
   }
@@ -183,18 +192,18 @@ function buildGenjutsuPayload(input: {
   imageUrls: string[];
 }) {
   if (input.mode !== 'motion-transfer' && input.mode !== 'objects-swap') {
-    throw new Error('Unsupported Genjutsu mode');
+    throw new HiggsfieldPreflightError('Unsupported Genjutsu mode');
   }
   if (!VALID_RESOLUTIONS.has(input.resolution)) {
-    throw new Error('Unsupported resolution');
+    throw new HiggsfieldPreflightError('Unsupported resolution');
   }
 
   const prompt = (input.prompt || '').trim();
   if (prompt.length > 2000) {
-    throw new Error('Prompt is too long');
+    throw new HiggsfieldPreflightError('Prompt is too long');
   }
   if (!isHttpUrl(input.videoUrl)) {
-    throw new Error('A valid uploaded video URL is required');
+    throw new HiggsfieldPreflightError('A valid uploaded video URL is required');
   }
   if (
     !Array.isArray(input.imageUrls) ||
@@ -202,7 +211,7 @@ function buildGenjutsuPayload(input: {
     input.imageUrls.length > 8 ||
     input.imageUrls.some((url) => !isHttpUrl(url))
   ) {
-    throw new Error('Provide between 1 and 8 valid reference image URLs');
+    throw new HiggsfieldPreflightError('Provide between 1 and 8 valid reference image URLs');
   }
 
   return {
@@ -278,6 +287,26 @@ async function resolveHiggsfieldProviderCost(input: {
   imageUrls: string[];
   durationSeconds?: number;
 }): Promise<GenjutsuCostEstimate> {
+  if (isGenjutsuE2EMockEnabled()) {
+    const durationSeconds = normalizeFallbackDurationSeconds(
+      input.durationSeconds ?? 4
+    );
+    const providerCostUsd = estimateGenjutsuListCost({
+      durationSeconds,
+      resolution: input.resolution,
+    });
+    return {
+      providerCostUsd,
+      providerCredits: null,
+      payload: {
+        source: 'e2e_list_estimate',
+        durationSeconds,
+        resolution: input.resolution,
+      },
+      source: 'list_fallback',
+    };
+  }
+
   try {
     const estimate = await estimateGenjutsuProviderCost(input);
     if (estimate) return estimate;
@@ -285,14 +314,33 @@ async function resolveHiggsfieldProviderCost(input: {
       'genjutsu estimate returned no usable USD; using list-rate fallback'
     );
   } catch (error) {
+    if (error instanceof HiggsfieldPreflightError) throw error;
     console.warn(
       'genjutsu estimate unavailable, using list-rate fallback:',
       error instanceof Error ? error.message : error
     );
   }
 
+  let fallbackDurationSeconds = input.durationSeconds;
+  if (
+    typeof fallbackDurationSeconds !== 'number' ||
+    !Number.isFinite(fallbackDurationSeconds) ||
+    fallbackDurationSeconds <= 0
+  ) {
+    try {
+      fallbackDurationSeconds = await probeSeedanceSourceDurationSeconds(
+        input.videoUrl
+      );
+    } catch (error) {
+      console.warn(
+        'genjutsu source duration probe unavailable, using conservative fallback:',
+        error instanceof Error ? error.message : error
+      );
+    }
+  }
+
   const durationSeconds = normalizeFallbackDurationSeconds(
-    input.durationSeconds
+    fallbackDurationSeconds
   );
   const providerCostUsd = estimateGenjutsuListCost({
     durationSeconds,
@@ -479,7 +527,7 @@ export async function submitGenjutsu(input: {
       !Number.isFinite(input.sourceDurationSeconds) ||
       input.sourceDurationSeconds <= 0
     ) {
-      throw new Error(
+      throw new SeedancePreflightError(
         'Seedance submission is missing the server-validated source duration'
       );
     }

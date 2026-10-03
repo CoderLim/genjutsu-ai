@@ -19,6 +19,9 @@ export const GENJUTSU_SCENE = 'genjutsu';
 
 export type GenjutsuTaskStatus =
   | 'initiated'
+  | 'sealing'
+  | 'ready'
+  | 'failed_preflight'
   | 'insufficient_credits'
   | 'reserving'
   | 'reserved'
@@ -43,7 +46,8 @@ export class GenjutsuAttemptConflictError extends Error {
   constructor(
     public code:
       | 'GENERATION_INPUT_CONFLICT'
-      | 'GENERATION_ALREADY_STARTED',
+      | 'GENERATION_ALREADY_STARTED'
+      | 'GENERATION_INPUT_NOT_READY',
     message: string
   ) {
     super(message);
@@ -51,7 +55,44 @@ export class GenjutsuAttemptConflictError extends Error {
   }
 }
 
-function assertReusableGenjutsuAttempt(
+function parseTaskOptions(task: { options?: string | null }) {
+  if (!task.options) return null;
+  try {
+    return JSON.parse(task.options);
+  } catch {
+    return null;
+  }
+}
+
+function assertAttemptMetadata(
+  task: any,
+  params: {
+    mode: GenjutsuMode;
+    provider: GenjutsuProvider;
+    model: string;
+    resolution: GenjutsuResolution;
+    prompt: string;
+  }
+) {
+  const options = parseTaskOptions(task);
+  const matches =
+    task.provider === params.provider &&
+    task.model === params.model &&
+    (task.prompt || '') === params.prompt &&
+    options?.mode === params.mode &&
+    options?.resolution === params.resolution &&
+    options?.prompt === params.prompt;
+
+  if (!matches) {
+    throw new GenjutsuAttemptConflictError(
+      'GENERATION_INPUT_CONFLICT',
+      'This generation ID is already bound to different generation settings'
+    );
+  }
+  return options;
+}
+
+function assertReusableUploadBinding(
   task: any,
   params: {
     mode: GenjutsuMode;
@@ -61,6 +102,8 @@ function assertReusableGenjutsuAttempt(
     prompt: string;
     videoKey: string;
     imageKeys: string[];
+    contentTypes: string[];
+    contentLengths: number[];
   }
 ) {
   if (task.status !== 'initiated') {
@@ -70,28 +113,33 @@ function assertReusableGenjutsuAttempt(
     );
   }
 
-  let options: any = null;
-  try {
-    options = task.options ? JSON.parse(task.options) : null;
-  } catch {
-    options = null;
-  }
-
-  const imageKeys = Array.isArray(options?.imageKeys)
-    ? options.imageKeys
+  const options = assertAttemptMetadata(task, params);
+  const imageKeys = Array.isArray(options?.imageKeys) ? options.imageKeys : null;
+  const contentTypes = Array.isArray(options?.contentTypes)
+    ? options.contentTypes
     : null;
+  const contentLengths = Array.isArray(options?.contentLengths)
+    ? options.contentLengths
+    : null;
+
+  if (!options?.videoKey) return task;
+
   const matches =
-    task.provider === params.provider &&
-    task.model === params.model &&
-    (task.prompt || '') === params.prompt &&
-    options?.mode === params.mode &&
-    options?.resolution === params.resolution &&
-    options?.prompt === params.prompt &&
-    options?.videoKey === params.videoKey &&
+    options.videoKey === params.videoKey &&
     imageKeys !== null &&
     imageKeys.length === params.imageKeys.length &&
     imageKeys.every(
       (key: unknown, index: number) => key === params.imageKeys[index]
+    ) &&
+    contentTypes !== null &&
+    contentTypes.length === params.contentTypes.length &&
+    contentTypes.every(
+      (value: unknown, index: number) => value === params.contentTypes[index]
+    ) &&
+    contentLengths !== null &&
+    contentLengths.length === params.contentLengths.length &&
+    contentLengths.every(
+      (value: unknown, index: number) => value === params.contentLengths[index]
     );
 
   if (!matches) {
@@ -122,14 +170,21 @@ export async function createGenjutsuAttempt(params: {
   model: string;
   resolution: GenjutsuResolution;
   prompt: string;
-  videoKey: string;
-  imageKeys: string[];
 }) {
   const existing = await getGenjutsuTaskById({
     generationId: params.generationId,
     userId: params.userId,
   });
-  if (existing) return assertReusableGenjutsuAttempt(existing, params);
+  if (existing) {
+    assertAttemptMetadata(existing, params);
+    if (existing.status !== 'initiated') {
+      throw new GenjutsuAttemptConflictError(
+        'GENERATION_ALREADY_STARTED',
+        'This generation has already started'
+      );
+    }
+    return existing;
+  }
 
   const task = {
     id: params.generationId,
@@ -142,13 +197,11 @@ export async function createGenjutsuAttempt(params: {
       mode: params.mode,
       resolution: params.resolution,
       prompt: params.prompt,
-      videoKey: params.videoKey,
-      imageKeys: params.imageKeys,
     }),
     status: 'initiated',
     taskId: null,
     taskInfo: JSON.stringify({
-      attemptStage: 'upload_requested',
+      attemptStage: 'created',
       providerCostUsd: null,
       providerEstimate: null,
       sourceDurationSeconds: null,
@@ -163,15 +216,100 @@ export async function createGenjutsuAttempt(params: {
     await db().insert(aiTask).values(task);
     return task;
   } catch (error) {
-    // A duplicate request for the same generationId may race the initial
-    // insert. Preserve idempotency by returning the row that won the race.
     const raced = await getGenjutsuTaskById({
       generationId: params.generationId,
       userId: params.userId,
     });
-    if (raced) return assertReusableGenjutsuAttempt(raced, params);
+    if (raced) {
+      assertAttemptMetadata(raced, params);
+      if (raced.status !== 'initiated') {
+        throw new GenjutsuAttemptConflictError(
+          'GENERATION_ALREADY_STARTED',
+          'This generation has already started'
+        );
+      }
+      return raced;
+    }
     throw error;
   }
+}
+
+export async function bindGenjutsuUploadInputs(params: {
+  generationId: string;
+  userId: string;
+  mode: GenjutsuMode;
+  provider: GenjutsuProvider;
+  model: string;
+  resolution: GenjutsuResolution;
+  prompt: string;
+  videoKey: string;
+  imageKeys: string[];
+  contentTypes: string[];
+  contentLengths: number[];
+}) {
+  return db().transaction(async (tx: any) => {
+    const [task] = await tx
+      .select()
+      .from(aiTask)
+      .where(
+        and(
+          eq(aiTask.id, params.generationId),
+          eq(aiTask.userId, params.userId),
+          eq(aiTask.scene, GENJUTSU_SCENE)
+        )
+      )
+      .limit(1);
+
+    if (!task) throw new Error('Generation attempt not found');
+    assertReusableUploadBinding(task, params);
+
+    const currentOptions = parseTaskOptions(task) || {};
+    if (currentOptions.videoKey) return task;
+
+    const nextOptions = JSON.stringify({
+      ...currentOptions,
+      videoKey: params.videoKey,
+      imageKeys: params.imageKeys,
+      contentTypes: params.contentTypes,
+      contentLengths: params.contentLengths,
+    });
+
+    await tx
+      .update(aiTask)
+      .set({
+        options: nextOptions,
+        taskInfo: JSON.stringify({
+          attemptStage: 'upload_requested',
+          providerCostUsd: null,
+          providerEstimate: null,
+          sourceDurationSeconds: null,
+        }),
+      })
+      .where(
+        and(
+          eq(aiTask.id, params.generationId),
+          eq(aiTask.userId, params.userId),
+          eq(aiTask.scene, GENJUTSU_SCENE),
+          eq(aiTask.status, 'initiated'),
+          eq(aiTask.options, task.options)
+        )
+      );
+
+    const [bound] = await tx
+      .select()
+      .from(aiTask)
+      .where(
+        and(
+          eq(aiTask.id, params.generationId),
+          eq(aiTask.userId, params.userId),
+          eq(aiTask.scene, GENJUTSU_SCENE)
+        )
+      )
+      .limit(1);
+
+    if (!bound) throw new Error('Generation attempt disappeared');
+    return assertReusableUploadBinding(bound, params);
+  });
 }
 
 export async function getGenjutsuTaskById(params: {
@@ -190,6 +328,132 @@ export async function getGenjutsuTaskById(params: {
     )
     .limit(1);
   return task ?? null;
+}
+
+export async function claimGenjutsuSeal(params: {
+  generationId: string;
+  userId: string;
+}) {
+  const sealClaim = getUuid();
+  await db()
+    .update(aiTask)
+    .set({
+      status: 'sealing',
+      taskResult: JSON.stringify({ sealClaim }),
+    })
+    .where(
+      and(
+        eq(aiTask.id, params.generationId),
+        eq(aiTask.userId, params.userId),
+        eq(aiTask.scene, GENJUTSU_SCENE),
+        eq(aiTask.status, 'initiated')
+      )
+    );
+
+  const current = await getGenjutsuTaskById(params);
+  if (!current || current.status !== 'sealing' || !current.taskResult) {
+    return false;
+  }
+
+  try {
+    return JSON.parse(current.taskResult)?.sealClaim === sealClaim;
+  } catch {
+    return false;
+  }
+}
+
+export async function markGenjutsuAttemptReady(params: {
+  generationId: string;
+  userId: string;
+  videoKey: string;
+  imageKeys: string[];
+}) {
+  const task = await getGenjutsuTaskById(params);
+  if (!task) throw new Error('Generation attempt not found');
+  const options = parseTaskOptions(task);
+  if (!options) throw new Error('Generation attempt options are invalid');
+
+  await db()
+    .update(aiTask)
+    .set({
+      status: 'ready',
+      options: JSON.stringify({
+        ...options,
+        stagingVideoKey: options.videoKey,
+        stagingImageKeys: options.imageKeys,
+        videoKey: params.videoKey,
+        imageKeys: params.imageKeys,
+      }),
+      taskInfo: JSON.stringify({
+        attemptStage: 'sealed',
+        providerCostUsd: null,
+        providerEstimate: null,
+        sourceDurationSeconds: null,
+      }),
+      taskResult: null,
+    })
+    .where(
+      and(
+        eq(aiTask.id, params.generationId),
+        eq(aiTask.userId, params.userId),
+        eq(aiTask.scene, GENJUTSU_SCENE),
+        eq(aiTask.status, 'sealing')
+      )
+    );
+
+  return getGenjutsuTaskById(params);
+}
+
+export async function markGenjutsuAttemptFailedPreflight(params: {
+  generationId: string;
+  userId: string;
+  stage: string;
+  error: string;
+  errorCode?: string;
+}) {
+  await db()
+    .update(aiTask)
+    .set({
+      status: 'failed_preflight',
+      taskResult: JSON.stringify({
+        stage: params.stage,
+        errorCode: params.errorCode ?? null,
+        error: params.error,
+      }),
+    })
+    .where(
+      and(
+        eq(aiTask.id, params.generationId),
+        eq(aiTask.userId, params.userId),
+        eq(aiTask.scene, GENJUTSU_SCENE),
+        inArray(aiTask.status, ['initiated', 'sealing', 'ready'])
+      )
+    );
+}
+
+export async function recordGenjutsuProviderStatusError(params: {
+  generationId: string;
+  userId: string;
+  providerStatus: string;
+  error: string;
+}) {
+  await db()
+    .update(aiTask)
+    .set({
+      taskResult: JSON.stringify({
+        providerStatus: params.providerStatus,
+        error: params.error,
+        statusPollError: true,
+      }),
+    })
+    .where(
+      and(
+        eq(aiTask.id, params.generationId),
+        eq(aiTask.userId, params.userId),
+        eq(aiTask.scene, GENJUTSU_SCENE),
+        eq(aiTask.status, 'submitted')
+      )
+    );
 }
 
 export async function markGenjutsuAttemptInsufficient(params: {
@@ -213,7 +477,7 @@ export async function markGenjutsuAttemptInsufficient(params: {
         eq(aiTask.id, params.generationId),
         eq(aiTask.userId, params.userId),
         eq(aiTask.scene, GENJUTSU_SCENE),
-        inArray(aiTask.status, ['initiated', 'reserving'])
+        inArray(aiTask.status, ['initiated', 'ready', 'reserving'])
       )
     );
 }
@@ -287,7 +551,7 @@ export async function reserveGenjutsuCredits(params: {
     generationId: params.generationId,
     userId: params.userId,
   });
-  if (existing && existing.status !== 'initiated') return existing;
+  if (existing && existing.status !== 'ready') return existing;
 
   const result = await db().transaction(async (tx: any) => {
     const [insideExisting] = await tx
@@ -302,7 +566,7 @@ export async function reserveGenjutsuCredits(params: {
       )
       .limit(1);
 
-    if (insideExisting && insideExisting.status !== 'initiated') {
+    if (insideExisting && insideExisting.status !== 'ready') {
       return { task: insideExisting, insufficient: false };
     }
 
@@ -320,7 +584,7 @@ export async function reserveGenjutsuCredits(params: {
             eq(aiTask.id, params.generationId),
             eq(aiTask.userId, params.userId),
             eq(aiTask.scene, GENJUTSU_SCENE),
-            eq(aiTask.status, 'initiated')
+            eq(aiTask.status, 'ready')
           )
         );
 

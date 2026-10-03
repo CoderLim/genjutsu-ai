@@ -4,12 +4,15 @@ import test from 'node:test';
 import {
   assertGenjutsuInputKeysOwned,
   assertGenjutsuObjectMetadata,
+  assertGenjutsuSealedInputKeysOwned,
   assertGenjutsuResultKeyOwned,
   assertGenjutsuUploadSize,
   GENJUTSU_MAX_IMAGE_BYTES,
   GENJUTSU_MAX_VIDEO_BYTES,
   getGenjutsuInputPrefix,
   getGenjutsuResultKey,
+  getGenjutsuSealedInputKey,
+  getGenjutsuSealedInputPrefix,
 } from './storage';
 
 test('Genjutsu input keys are scoped to user and generation', () => {
@@ -30,6 +33,48 @@ test('Genjutsu input keys are scoped to user and generation', () => {
         `${prefix}reference-02.webp`,
       ],
     })
+  );
+});
+
+test('Genjutsu sealed input keys are distinct and user scoped', () => {
+  const params = {
+    userId: 'user-123',
+    generationId: 'gen-456789',
+  };
+  const stagingPrefix = getGenjutsuInputPrefix(params);
+  const sealedPrefix = getGenjutsuSealedInputPrefix(params);
+  const videoKey = getGenjutsuSealedInputKey({
+    ...params,
+    stagingKey: `${stagingPrefix}source.mp4`,
+  });
+  const imageKey = getGenjutsuSealedInputKey({
+    ...params,
+    stagingKey: `${stagingPrefix}reference-01.png`,
+  });
+
+  assert.equal(
+    sealedPrefix,
+    'genjutsu/sealed-inputs/user-123/gen-456789/'
+  );
+  assert.equal(videoKey, `${sealedPrefix}source.mp4`);
+  assert.equal(imageKey, `${sealedPrefix}reference-01.png`);
+
+  assert.doesNotThrow(() =>
+    assertGenjutsuSealedInputKeysOwned({
+      ...params,
+      videoKey,
+      imageKeys: [imageKey],
+    })
+  );
+
+  assert.throws(
+    () =>
+      assertGenjutsuSealedInputKeysOwned({
+        ...params,
+        videoKey: `${stagingPrefix}source.mp4`,
+        imageKeys: [imageKey],
+      }),
+    /sealed Genjutsu source-video storage key/
   );
 });
 
