@@ -97,6 +97,59 @@ jobs:
             LIMIT 100;
           "
 
+          echo "=== INSUFFICIENT_REQUIRED_CREDITS ==="
+          $WRANGLER d1 execute genjutsu-ai-db --remote --json --command "
+            SELECT
+              COALESCE(json_extract(options, '$.resolution'), '(none)') AS resolution,
+              CAST(json_extract(task_result, '$.requiredCredits') AS INTEGER) AS required_credits,
+              CAST(json_extract(task_result, '$.balance') AS INTEGER) AS balance,
+              COUNT(*) AS count
+            FROM ai_task
+            WHERE scene='genjutsu' AND status='insufficient_credits'
+            GROUP BY resolution, required_credits, balance
+            ORDER BY count DESC, resolution, required_credits, balance;
+          "
+
+          echo "=== STATUS_BY_MODE_RESOLUTION ==="
+          $WRANGLER d1 execute genjutsu-ai-db --remote --json --command "
+            SELECT
+              status,
+              COALESCE(json_extract(options, '$.mode'), '(none)') AS mode,
+              COALESCE(json_extract(options, '$.resolution'), '(none)') AS resolution,
+              COUNT(*) AS count,
+              COUNT(DISTINCT user_id) AS users
+            FROM ai_task
+            WHERE scene='genjutsu'
+            GROUP BY status, mode, resolution
+            ORDER BY status, count DESC;
+          "
+
+          echo "=== ATTEMPTS_PER_USER_DISTRIBUTION ==="
+          $WRANGLER d1 execute genjutsu-ai-db --remote --json --command "
+            WITH per_user AS (
+              SELECT user_id, status, COUNT(*) AS attempts
+              FROM ai_task
+              WHERE scene='genjutsu'
+              GROUP BY user_id, status
+            )
+            SELECT status, attempts, COUNT(*) AS users
+            FROM per_user
+            GROUP BY status, attempts
+            ORDER BY status, attempts;
+          "
+
+          echo "=== DISTINCT_USERS_FUNNEL ==="
+          $WRANGLER d1 execute genjutsu-ai-db --remote --json --command "
+            SELECT
+              COUNT(DISTINCT user_id) AS total_users,
+              COUNT(DISTINCT CASE WHEN status='initiated' THEN user_id END) AS initiated_users,
+              COUNT(DISTINCT CASE WHEN status='insufficient_credits' THEN user_id END) AS insufficient_users,
+              COUNT(DISTINCT CASE WHEN status='completed' THEN user_id END) AS completed_users,
+              COUNT(DISTINCT CASE WHEN status='refunded' THEN user_id END) AS refunded_users
+            FROM ai_task
+            WHERE scene='genjutsu';
+          "
+
           echo "=== INITIATED_AGE_BUCKETS ==="
           $WRANGLER d1 execute genjutsu-ai-db --remote --json --command "
             SELECT
