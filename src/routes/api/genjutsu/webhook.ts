@@ -55,6 +55,7 @@ async function POST({ request }: { request: Request }) {
         userId: task.userId,
         providerStatus: provider.providerStatus,
         videoKey: durable.videoKey,
+        providerUsage: provider.providerUsage,
       });
     } else if (provider.status === 'failed') {
       await refundGenjutsuGeneration({
