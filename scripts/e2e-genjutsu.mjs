@@ -273,7 +273,7 @@ async function main() {
     );
     assert.equal(conflict?.data?.code, 'GENERATION_INPUT_CONFLICT');
 
-    const [videoUpload, imageUpload] = uploadBatch.uploads;
+    const [videoUpload, imageUpload] = repeatedUploadBatch.uploads;
     assert.match(
       videoUpload.storageKey,
       /\/source\.mp4$/
