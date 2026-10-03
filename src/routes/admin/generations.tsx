@@ -1,13 +1,22 @@
 import { useEffect, useState } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
+import { Film, Play } from 'lucide-react';
 
 import { apiGet, type PageResult } from '@/lib/api-client';
 import { formatDateTime } from '@/lib/time';
+import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
 import { DataTable, type Column } from '@/components/data-table';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   Select,
   SelectContent,
@@ -33,8 +42,18 @@ interface Generation {
   costCredits: number;
   providerCostUsd: number | null;
   sourceDurationSeconds: number | null;
+  sourceVideoUrl: string | null;
+  videoUrl: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+type PreviewView = 'before' | 'after';
+
+interface VideoPreview {
+  sourceUrl: string | null;
+  resultUrl: string | null;
+  view: PreviewView;
 }
 
 const PAGE_SIZE = 20;
@@ -66,12 +85,26 @@ function statusVariant(status: string) {
   return 'secondary';
 }
 
+function preferredThumbUrl(g: Generation) {
+  return g.videoUrl || g.sourceVideoUrl || null;
+}
+
+function openPreviewFor(g: Generation): VideoPreview | null {
+  if (!g.videoUrl && !g.sourceVideoUrl) return null;
+  return {
+    sourceUrl: g.sourceVideoUrl,
+    resultUrl: g.videoUrl,
+    view: g.videoUrl ? 'after' : 'before',
+  };
+}
+
 function GenerationsPage() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [status, setStatus] = useState('all');
   const [provider, setProvider] = useState('all');
+  const [preview, setPreview] = useState<VideoPreview | null>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 300);
@@ -99,7 +132,48 @@ function GenerationsPage() {
     placeholderData: keepPreviousData,
   });
 
+  const activePreviewUrl =
+    preview?.view === 'after'
+      ? preview.resultUrl || preview.sourceUrl
+      : preview?.sourceUrl || preview?.resultUrl;
+  const canToggle = Boolean(preview?.sourceUrl) && Boolean(preview?.resultUrl);
+
   const columns: Column<Generation>[] = [
+    {
+      header: m['admin.generations.video'](),
+      className: 'w-[120px]',
+      cell: (g) => {
+        const thumbUrl = preferredThumbUrl(g);
+        if (!thumbUrl) {
+          return (
+            <div className="bg-muted text-muted-foreground flex size-16 items-center justify-center rounded-md">
+              <Film className="size-5 opacity-60" />
+            </div>
+          );
+        }
+        return (
+          <button
+            type="button"
+            onClick={() => setPreview(openPreviewFor(g))}
+            aria-label={m['admin.generations.open_video']()}
+            className="group relative block size-16 overflow-hidden rounded-md bg-black"
+          >
+            <video
+              src={thumbUrl}
+              muted
+              playsInline
+              preload="metadata"
+              className="size-full object-cover transition duration-200 group-hover:scale-[1.03]"
+            />
+            <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/0 transition group-hover:bg-black/30">
+              <span className="bg-background/90 text-foreground flex size-7 items-center justify-center rounded-full opacity-0 shadow transition group-hover:opacity-100">
+                <Play className="size-3.5 fill-current" />
+              </span>
+            </span>
+          </button>
+        );
+      },
+    },
     {
       header: m['admin.generations.user'](),
       cell: (g) => (
@@ -229,6 +303,72 @@ function GenerationsPage() {
           />
         </CardContent>
       </Card>
+
+      <Dialog
+        open={Boolean(preview)}
+        onOpenChange={(open) => {
+          if (!open) setPreview(null);
+        }}
+      >
+        <DialogContent
+          className="overflow-hidden p-0 sm:max-w-4xl"
+          showCloseButton
+        >
+          <DialogHeader className="space-y-3 px-4 pt-4 pr-12">
+            <DialogTitle>
+              {preview?.view === 'before'
+                ? m['admin.generations.before']()
+                : m['admin.generations.after']()}
+            </DialogTitle>
+            {canToggle ? (
+              <div className="bg-muted flex w-fit gap-1 rounded-lg p-1">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={preview?.view === 'before' ? 'default' : 'ghost'}
+                  className={cn(
+                    'h-7 px-3',
+                    preview?.view !== 'before' && 'text-muted-foreground'
+                  )}
+                  onClick={() =>
+                    setPreview((current) =>
+                      current ? { ...current, view: 'before' } : current
+                    )
+                  }
+                >
+                  {m['admin.generations.before']()}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={preview?.view === 'after' ? 'default' : 'ghost'}
+                  className={cn(
+                    'h-7 px-3',
+                    preview?.view !== 'after' && 'text-muted-foreground'
+                  )}
+                  onClick={() =>
+                    setPreview((current) =>
+                      current ? { ...current, view: 'after' } : current
+                    )
+                  }
+                >
+                  {m['admin.generations.after']()}
+                </Button>
+              </div>
+            ) : null}
+          </DialogHeader>
+          {activePreviewUrl ? (
+            <video
+              key={`${preview?.view}-${activePreviewUrl}`}
+              src={activePreviewUrl}
+              controls
+              autoPlay
+              playsInline
+              className="max-h-[75vh] w-full bg-black object-contain"
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

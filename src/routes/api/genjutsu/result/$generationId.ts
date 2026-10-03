@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router';
 
 import { getAuth } from '@/core/auth';
 import {
+  getGenjutsuTaskByGenerationId,
   getGenjutsuTaskById,
   parseGenjutsuTaskInfo,
 } from '@/modules/genjutsu/billing';
@@ -13,6 +14,7 @@ import {
   assertGenjutsuResultKeyOwned,
   createGenjutsuR2ReadUrl,
 } from '@/modules/genjutsu/storage';
+import { hasPermission } from '@/modules/rbac/service';
 
 function errorResponse(message: string, status: number) {
   return new Response(message, {
@@ -42,23 +44,24 @@ async function GET({
   const session = await auth.api.getSession({ headers: request.headers });
   if (!session?.user) return errorResponse('Unauthorized', 401);
 
-  const task = await getGenjutsuTaskById({
-    generationId: params.generationId,
-    userId: session.user.id,
-  });
+  const isAdmin = await hasPermission(session.user.id, 'admin.*');
+  const task = isAdmin
+    ? await getGenjutsuTaskByGenerationId(params.generationId)
+    : await getGenjutsuTaskById({
+        generationId: params.generationId,
+        userId: session.user.id,
+      });
   if (!task || task.status !== 'completed') {
     return errorResponse('Generation result not found', 404);
   }
 
   const parsed = parseGenjutsuTaskInfo(task);
   const videoKey =
-    typeof parsed.result?.videoKey === 'string'
-      ? parsed.result.videoKey
-      : null;
+    typeof parsed.result?.videoKey === 'string' ? parsed.result.videoKey : null;
 
   if (videoKey) {
     assertGenjutsuResultKeyOwned({
-      userId: session.user.id,
+      userId: task.userId,
       generationId: task.id,
       videoKey,
     });
@@ -74,9 +77,7 @@ async function GET({
   }
 
   const legacyUrl =
-    typeof parsed.result?.videoUrl === 'string'
-      ? parsed.result.videoUrl
-      : null;
+    typeof parsed.result?.videoUrl === 'string' ? parsed.result.videoUrl : null;
   if (!legacyUrl) return errorResponse('Generation result not found', 404);
 
   let parsedUrl: URL;

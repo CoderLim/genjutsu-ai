@@ -94,6 +94,8 @@ async function GET({ request }: { request: Request }) {
       const options = parseJson(row.options);
       const info = parseJson(row.taskInfo);
       const result = parseJson(row.taskResult);
+      const hasSourceVideo =
+        typeof options?.videoKey === 'string' && options.videoKey.length > 0;
       return {
         id: row.id,
         userId: row.userId,
@@ -120,6 +122,13 @@ async function GET({ request }: { request: Request }) {
         sourceDurationSeconds:
           typeof info?.sourceDurationSeconds === 'number'
             ? info.sourceDurationSeconds
+            : null,
+        sourceVideoUrl: hasSourceVideo
+          ? `/api/genjutsu/source/${encodeURIComponent(row.id)}`
+          : null,
+        videoUrl:
+          row.status === 'completed'
+            ? `/api/genjutsu/result/${encodeURIComponent(row.id)}`
             : null,
         createdAt: row.createdAt,
         updatedAt: row.updatedAt,

@@ -1,7 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router';
 
 import { getAuth } from '@/core/auth';
-import { getGenjutsuTaskById } from '@/modules/genjutsu/billing';
+import {
+  getGenjutsuTaskByGenerationId,
+  getGenjutsuTaskById,
+} from '@/modules/genjutsu/billing';
 import {
   getGenjutsuE2EUrlForStorageKey,
   isGenjutsuE2EMockEnabled,
@@ -10,6 +13,7 @@ import {
   assertGenjutsuSourceVideoKeyOwned,
   createGenjutsuR2ReadUrl,
 } from '@/modules/genjutsu/storage';
+import { hasPermission } from '@/modules/rbac/service';
 
 function errorResponse(message: string, status: number) {
   return new Response(message, {
@@ -48,10 +52,13 @@ async function GET({
   const session = await auth.api.getSession({ headers: request.headers });
   if (!session?.user) return errorResponse('Unauthorized', 401);
 
-  const task = await getGenjutsuTaskById({
-    generationId: params.generationId,
-    userId: session.user.id,
-  });
+  const isAdmin = await hasPermission(session.user.id, 'admin.*');
+  const task = isAdmin
+    ? await getGenjutsuTaskByGenerationId(params.generationId)
+    : await getGenjutsuTaskById({
+        generationId: params.generationId,
+        userId: session.user.id,
+      });
   if (!task) return errorResponse('Generation source not found', 404);
 
   const options = parseOptions(task.options);
@@ -61,7 +68,7 @@ async function GET({
 
   try {
     assertGenjutsuSourceVideoKeyOwned({
-      userId: session.user.id,
+      userId: task.userId,
       generationId: task.id,
       videoKey,
     });

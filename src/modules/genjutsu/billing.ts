@@ -2,13 +2,14 @@ import { and, eq, inArray } from 'drizzle-orm';
 
 import { db } from '@/core/db';
 import { aiTask } from '@/config/db/schema';
-import { getUuid } from '@/lib/hash';
 import {
   consume,
+  CreditTransactionScene,
   getBalance,
   revoke,
-  CreditTransactionScene,
 } from '@/modules/credits/service';
+import { getUuid } from '@/lib/hash';
+
 import {
   type GenjutsuMode,
   type GenjutsuProvider,
@@ -114,7 +115,9 @@ function assertReusableUploadBinding(
   }
 
   const options = assertAttemptMetadata(task, params);
-  const imageKeys = Array.isArray(options?.imageKeys) ? options.imageKeys : null;
+  const imageKeys = Array.isArray(options?.imageKeys)
+    ? options.imageKeys
+    : null;
   const contentTypes = Array.isArray(options?.contentTypes)
     ? options.contentTypes
     : null;
@@ -153,10 +156,7 @@ function assertReusableUploadBinding(
 }
 
 export function assertGenerationId(value: unknown): string {
-  if (
-    typeof value !== 'string' ||
-    !/^[A-Za-z0-9_-]{8,128}$/.test(value)
-  ) {
+  if (typeof value !== 'string' || !/^[A-Za-z0-9_-]{8,128}$/.test(value)) {
     throw new Error('Invalid generation ID');
   }
   return value;
@@ -330,6 +330,15 @@ export async function getGenjutsuTaskById(params: {
   return task ?? null;
 }
 
+export async function getGenjutsuTaskByGenerationId(generationId: string) {
+  const [task] = await db()
+    .select()
+    .from(aiTask)
+    .where(and(eq(aiTask.id, generationId), eq(aiTask.scene, GENJUTSU_SCENE)))
+    .limit(1);
+  return task ?? null;
+}
+
 export async function claimGenjutsuSeal(params: {
   generationId: string;
   userId: string;
@@ -486,12 +495,7 @@ export async function getGenjutsuTaskByRequestIdAnyUser(requestId: string) {
   const [task] = await db()
     .select()
     .from(aiTask)
-    .where(
-      and(
-        eq(aiTask.taskId, requestId),
-        eq(aiTask.scene, GENJUTSU_SCENE)
-      )
-    )
+    .where(and(eq(aiTask.taskId, requestId), eq(aiTask.scene, GENJUTSU_SCENE)))
     .limit(1);
   return task ?? null;
 }
