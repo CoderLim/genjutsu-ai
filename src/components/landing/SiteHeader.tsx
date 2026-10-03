@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useSession } from '@/core/auth/client';
 import { Link } from '@/core/i18n/navigation';
 import { envConfigs } from '@/config';
+import { m } from '@/paraglide/messages.js';
 import { cn } from '@/lib/cn';
 import { GlobeIcon, MenuIcon, RaphaelLogo } from '@/components/icons';
 import { SiteUserMenu } from '@/components/site-user-menu';
@@ -98,6 +99,10 @@ function AuthSlot({ className }: { className?: string }) {
 
 export function SiteHeader() {
   const [sheetOpen, setSheetOpen] = useState(false);
+  const navLinks = [
+    ...NAV_LINKS,
+    { label: m['creations.nav'](), href: '/creations' },
+  ];
 
   return (
     <section className="text-foreground relative z-[260] py-3">
@@ -107,7 +112,7 @@ export function SiteHeader() {
           <div className="flex min-w-0 items-center gap-2 xl:gap-4">
             <BrandLink />
             <div className="flex items-center">
-              {NAV_LINKS.map((item) => (
+              {navLinks.map((item) => (
                 <Link key={item.href} href={item.href} className={navLinkClass}>
                   {item.label}
                 </Link>
@@ -152,7 +157,7 @@ export function SiteHeader() {
                   </SheetTitle>
                 </SheetHeader>
                 <div className="flex h-full flex-col overflow-y-auto px-4 pt-2 pb-8">
-                  {NAV_LINKS.map((item) => (
+                  {navLinks.map((item) => (
                     <Link
                       key={item.href}
                       href={item.href}
