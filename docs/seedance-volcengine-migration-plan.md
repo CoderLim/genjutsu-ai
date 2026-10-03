@@ -13,7 +13,7 @@ Move the current Seedance 2.5 path from fal.ai to Volcengine Ark as the primary 
 Target outcomes:
 
 - Keep **Motion Transfer** and **Objects Swap** on Seedance 2.5.
-- Use Volcengine model \`doubao-seedance-2-5-260628\`.
+- Use Volcengine model `doubao-seedance-2-5-260628`.
 - Reduce provider cost without coupling the migration to a customer-pricing change.
 - Preserve historical fal Seedance tasks so they can still be polled/reconciled.
 - Keep fal available as an operational fallback for **new** jobs.
@@ -41,27 +41,27 @@ The current two product workflows map to Ark as follows:
 
 | Product workflow | Current fal task | Ark task |
 | --- | --- | --- |
-| Motion Transfer | \`reference\` | \`omni_reference_task_type=reference\` |
-| Objects Swap | \`editing\` | \`omni_reference_task_type=edit\` |
+| Motion Transfer | `reference` | `omni_reference_task_type=reference` |
+| Objects Swap | `editing` | `omni_reference_task_type=edit` |
 
 For Ark **edit** tasks:
 
-- at least one \`reference_video\` is required;
+- at least one `reference_video` is required;
 - source video must be 4–30 seconds;
-- \`ratio=adaptive\`;
-- \`duration=-1\`;
+- `ratio=adaptive`;
+- `duration=-1`;
 - the prompt must clearly express an edit intent such as replace/modify/remove/add.
 
 This matches the existing 4-second upload/server gate for Objects Swap.
 
 Seedance 2.5 Ark inputs relevant to Genjutsu:
 
-- image: \`type=image_url\`, \`role=reference_image\`;
-- video: \`type=video_url\`, \`role=reference_video\`;
+- image: `type=image_url`, `role=reference_image`;
+- video: `type=video_url`, `role=reference_video`;
 - 480p / 720p / 1080p output supported;
 - callback URL is supported;
-- terminal-user identifier is supported through \`safety_identifier\`;
-- successful task responses expose \`usage.completion_tokens\`;
+- terminal-user identifier is supported through `safety_identifier`;
+- successful task responses expose `usage.completion_tokens`;
 - generated result URLs expire, so successful results must continue to be copied to R2.
 
 The current site restriction on real-person media remains in place. Ark's own Seedance documentation also states that direct reference image/video inputs containing real human faces are not supported in the normal path, so there is no reason to loosen the product gate during this migration.
@@ -74,20 +74,20 @@ Today the logical provider type is:
 type GenjutsuProvider = 'higgsfield' | 'seedance';
 ~~~
 
-The value \`seedance\` is currently coupled to fal.ai:
+The value `seedance` is currently coupled to fal.ai:
 
-- \`src/modules/genjutsu/seedance.ts\`
-  - calls \`https://queue.fal.run\`;
+- `src/modules/genjutsu/seedance.ts`
+  - calls `https://queue.fal.run`;
   - reads the Fal key;
-  - builds fal-specific \`image_urls/video_urls/task\` payloads;
+  - builds fal-specific `image_urls/video_urls/task` payloads;
   - uses fal list-rate constants;
   - polls fal queue endpoints.
-- \`src/modules/genjutsu/workflow.ts\`
-  - resolves Seedance to \`bytedance/seedance-2.5/us/reference-to-video\`.
-- \`aiTask.provider\` and \`aiTask.model\` are persisted and later used for polling.
+- `src/modules/genjutsu/workflow.ts`
+  - resolves Seedance to `bytedance/seedance-2.5/us/reference-to-video`.
+- `aiTask.provider` and `aiTask.model` are persisted and later used for polling.
 - successful output is copied to R2 before completion.
 - customer credits are reserved before provider submit.
-- \`settleGenjutsuGeneration\` currently marks completion but does **not** reconcile the reserved customer-credit amount against a final provider invoice.
+- `settleGenjutsuGeneration` currently marks completion but does **not** reconcile the reserved customer-credit amount against a final provider invoice.
 
 That last point matters: provider cost migration and customer price changes must be treated as separate work.
 
@@ -95,7 +95,7 @@ That last point matters: provider cost migration and customer price changes must
 
 ### Decision
 
-Do not reinterpret historical \`provider='seedance'\` rows.
+Do not reinterpret historical `provider='seedance'` rows.
 
 Use:
 
@@ -108,12 +108,12 @@ type GenjutsuProvider =
 
 Why:
 
-1. Existing jobs already persist \`provider='seedance'\` with a fal model path.
+1. Existing jobs already persist `provider='seedance'` with a fal model path.
 2. Changing the meaning of that value would make old submitted jobs poll the wrong API.
 3. A new explicit provider value makes task recovery deterministic.
 4. It avoids a database migration solely for naming.
 
-Later cleanup may rename \`seedance.ts\` to \`seedance-fal.ts\`, but that is not required for the first safe rollout.
+Later cleanup may rename `seedance.ts` to `seedance-fal.ts`, but that is not required for the first safe rollout.
 
 ## 5. Proposed architecture
 
@@ -153,7 +153,7 @@ The new adapter should own:
 - token/cost extraction;
 - callback-aware status handling.
 
-Shared product workflow intent should remain in \`workflow.ts\`.
+Shared product workflow intent should remain in `workflow.ts`.
 
 ## 6. Configuration
 
@@ -179,7 +179,7 @@ Recommended rollout behavior:
 - then enable both after quality/cost checks;
 - fallback is a routing/config decision for new jobs, not an automatic retry of an already-submitted job.
 
-Do not expose \`ARK_API_KEY\` to the browser.
+Do not expose `ARK_API_KEY` to the browser.
 
 P0 may use an environment secret only. Admin-panel credential support can be added after the provider path is proven.
 
@@ -187,7 +187,7 @@ P0 may use an environment secret only. Admin-panel credential support can be add
 
 ### 7.1 Shared reference labels
 
-The existing prompt builder emits fal-oriented references such as \`@Video1\` and \`@Image1\`.
+The existing prompt builder emits fal-oriented references such as `@Video1` and `@Image1`.
 
 Do not assume those literal labels have identical semantics on Ark.
 
@@ -240,7 +240,7 @@ Ark request shape:
 }
 ~~~
 
-For \`reference\`, duration may be explicit when we want source-length output. Keep the current source-duration probe and clamp to the supported range. Do not trust a browser-supplied duration.
+For `reference`, duration may be explicit when we want source-length output. Keep the current source-duration probe and clamp to the supported range. Do not trust a browser-supplied duration.
 
 ### 7.3 Objects Swap
 
@@ -275,7 +275,7 @@ Ark request shape:
 }
 ~~~
 
-Important: do not translate fal's \`duration='auto'\` / \`aspect_ratio='auto'\` literally. Ark edit requires \`duration=-1\` and \`ratio='adaptive'\`.
+Important: do not translate fal's `duration='auto'` / `aspect_ratio='auto'` literally. Ark edit requires `duration=-1` and `ratio='adaptive'`.
 
 ## 8. Billing and cost accounting
 
@@ -366,7 +366,7 @@ type GenjutsuQuote = {
 
 Then customer pricing may use a product rate card while provider cost is accounting-only.
 
-If we later want exact cost-plus charging, \`settleGenjutsuGeneration\` must first gain atomic delta settlement/refund support. It does not have that capability today.
+If we later want exact cost-plus charging, `settleGenjutsuGeneration` must first gain atomic delta settlement/refund support. It does not have that capability today.
 
 ## 9. Status, callback and R2 durability
 
@@ -386,11 +386,11 @@ Rules:
 1. A callback is only a wake-up signal.
 2. As today, verify final state by querying the provider before mutating billing state.
 3. On success, download/copy the Ark result into R2 **before** marking the Genjutsu task completed.
-4. Store \`usage.completion_tokens\` before/with completion.
+4. Store `usage.completion_tokens` before/with completion.
 5. Ark result URLs are temporary; never expose them as the durable canonical result.
 6. Preserve current submission claim/idempotency protection.
 
-The existing webhook route can dispatch by persisted \`task.provider\`.
+The existing webhook route can dispatch by persisted `task.provider`.
 
 ## 10. Fallback safety
 
@@ -409,13 +409,13 @@ Do **not** auto-fallback after:
 - Ark 5xx where task creation is uncertain;
 - any response where a task ID may have been created.
 
-For ambiguous submission, keep the current \`submission_unknown\` pattern and reconcile Ark by request/task information rather than creating a fal job.
+For ambiguous submission, keep the current `submission_unknown` pattern and reconcile Ark by request/task information rather than creating a fal job.
 
 Operationally, the safest fallback is a circuit breaker that routes **subsequent new requests** to fal.
 
 ## 11. Error mapping
 
-Create \`VolcengineSeedanceHttpError\` with:
+Create `VolcengineSeedanceHttpError` with:
 
 - HTTP status;
 - Ark error code;
@@ -428,7 +428,7 @@ Map known categories into existing product errors:
 - real-person / likeness rejection -> existing no-real-people UI message;
 - quota / balance / rate limit -> provider unavailable, no customer credit loss;
 - definitive task failure -> refund reserved customer credits;
-- ambiguous transport -> \`submission_unknown\`, no immediate resubmit.
+- ambiguous transport -> `submission_unknown`, no immediate resubmit.
 
 Do not surface raw Ark internal messages directly when they contain implementation detail.
 
@@ -438,21 +438,21 @@ Do not surface raw Ark internal messages directly when they contain implementati
 
 Files:
 
-- add \`src/modules/genjutsu/seedance-volcengine.ts\`;
-- add \`src/modules/genjutsu/seedance-volcengine.test.ts\`;
-- update \`src/modules/genjutsu/types.ts\`;
-- update \`src/config/index.ts\`;
-- update \`.env.example\`;
-- update \`src/modules/genjutsu/service.ts\`;
-- update \`src/modules/genjutsu/workflow.ts\` only as needed for provider-specific reference labels.
+- add `src/modules/genjutsu/seedance-volcengine.ts`;
+- add `src/modules/genjutsu/seedance-volcengine.test.ts`;
+- update `src/modules/genjutsu/types.ts`;
+- update `src/config/index.ts`;
+- update `.env.example`;
+- update `src/modules/genjutsu/service.ts`;
+- update `src/modules/genjutsu/workflow.ts` only as needed for provider-specific reference labels.
 
 Tests must cover:
 
-- Motion Transfer -> \`reference\`;
-- Objects Swap -> \`edit\`;
-- edit always sends \`ratio=adaptive\`, \`duration=-1\`;
+- Motion Transfer -> `reference`;
+- Objects Swap -> `edit`;
+- edit always sends `ratio=adaptive`, `duration=-1`;
 - 4s lower bound and 30s upper bound;
-- 1–8 current product image references map to \`reference_image\`;
+- 1–8 current product image references map to `reference_image`;
 - signed R2 URLs only;
 - no client-provided cost/duration authority;
 - status mapping;
@@ -466,7 +466,7 @@ Before routing production traffic:
 
 - calculate estimate using server-probed duration;
 - persist Ark quote metadata;
-- on successful smoke jobs record \`usage.completion_tokens\`;
+- on successful smoke jobs record `usage.completion_tokens`;
 - calculate actual CNY provider cost;
 - log estimate-vs-actual delta.
 
@@ -522,10 +522,10 @@ Persist the selected provider before submit so a config change never moves an in
 
 After Ark is stable:
 
-- make \`seedance-volcengine\` the Seedance default for new jobs;
+- make `seedance-volcengine` the Seedance default for new jobs;
 - retain fal for emergency routing;
-- keep legacy \`provider='seedance'\` polling forever or until all historical tasks are terminal;
-- optionally rename \`seedance.ts\` -> \`seedance-fal.ts\` in a cleanup-only commit;
+- keep legacy `provider='seedance'` polling forever or until all historical tasks are terminal;
+- optionally rename `seedance.ts` -> `seedance-fal.ts` in a cleanup-only commit;
 - consider decoupling customer pricing from provider cost;
 - add an admin cost dashboard if volume justifies it.
 
@@ -542,8 +542,8 @@ Do not mutate already-submitted Ark tasks.
 
 During rollback:
 
-- Ark tasks continue polling Ark because \`aiTask.provider='seedance-volcengine'\`;
-- fal tasks continue polling fal because \`aiTask.provider='seedance'\`;
+- Ark tasks continue polling Ark because `aiTask.provider='seedance-volcengine'`;
+- fal tasks continue polling fal because `aiTask.provider='seedance'`;
 - completed results remain provider-independent in R2.
 
 This is the primary reason to persist backend identity explicitly.
@@ -561,20 +561,20 @@ Migration is ready to become default when all are true:
 - final Ark token usage is persisted;
 - failed Ark jobs refund customer credits exactly once;
 - ambiguous submission does not auto-submit to fal;
-- historical \`provider='seedance'\` rows still poll fal;
+- historical `provider='seedance'` rows still poll fal;
 - canary quality is not materially worse than the current fal Seedance path;
-- measured Ark cost reduction is confirmed from actual \`completion_tokens\`, not only list-price math.
+- measured Ark cost reduction is confirmed from actual `completion_tokens`, not only list-price math.
 
 ## 15. Suggested commit sequence
 
 Keep implementation reviewable:
 
-1. \`test(genjutsu): define Volcengine Seedance 2.5 adapter contract\`
-2. \`feat(genjutsu): add Volcengine Seedance 2.5 adapter\`
-3. \`feat(genjutsu): route persisted Ark provider tasks\`
-4. \`feat(genjutsu): record Ark token usage and provider cost\`
-5. \`test(genjutsu): cover Ark fallback and ambiguous submission\`
-6. \`chore(genjutsu): enable Ark Seedance canary\`
+1. `test(genjutsu): define Volcengine Seedance 2.5 adapter contract`
+2. `feat(genjutsu): add Volcengine Seedance 2.5 adapter`
+3. `feat(genjutsu): route persisted Ark provider tasks`
+4. `feat(genjutsu): record Ark token usage and provider cost`
+5. `test(genjutsu): cover Ark fallback and ambiguous submission`
+6. `chore(genjutsu): enable Ark Seedance canary`
 
 Do not combine the first production routing change with the adapter implementation commit.
 
