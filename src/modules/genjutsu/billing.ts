@@ -177,7 +177,7 @@ export async function createGenjutsuAttempt(params: {
   });
   if (existing) {
     assertAttemptMetadata(existing, params);
-    if (existing.status !== 'ready') {
+    if (existing.status !== 'initiated') {
       throw new GenjutsuAttemptConflictError(
         'GENERATION_ALREADY_STARTED',
         'This generation has already started'
