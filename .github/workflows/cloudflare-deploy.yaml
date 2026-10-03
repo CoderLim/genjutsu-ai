@@ -1,4 +1,4 @@
-# Production deploy workflow. Admin navigation rollout 2026-10-02.
+# Production deploy workflow. My Creations rollout 2026-10-03.
 name: Deploy Cloudflare Worker
 
 on:
