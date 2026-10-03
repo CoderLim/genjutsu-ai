@@ -119,6 +119,20 @@ export const envConfigs: Record<string, string> = {
   seedance_genjutsu_generate_audio:
     procEnv.SEEDANCE_GENJUTSU_GENERATE_AUDIO ?? 'true',
 
+  // Volcengine Ark Seedance 2.5 (server-only). Keep fal Seedance as a
+  // distinct provider identity so historical tasks always poll the backend
+  // that originally created them.
+  ark_api_key: procEnv.ARK_API_KEY ?? '',
+  ark_api_base_url:
+    procEnv.ARK_API_BASE_URL ?? 'https://ark.cn-beijing.volces.com/api/v3',
+  seedance_volcengine_model:
+    procEnv.SEEDANCE_VOLCENGINE_MODEL ?? 'doubao-seedance-2-5-260628',
+  seedance_volcengine_video_input_rate_cny_per_million_tokens:
+    procEnv.SEEDANCE_VOLCENGINE_VIDEO_INPUT_RATE_CNY_PER_MILLION_TOKENS ??
+    '42',
+  seedance_volcengine_cny_per_usd:
+    procEnv.SEEDANCE_VOLCENGINE_CNY_PER_USD ?? '7',
+
   genjutsu_e2e_mock: procEnv.GENJUTSU_E2E_MOCK ?? 'false',
 
   // Locale (public)

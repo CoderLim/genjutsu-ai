@@ -28,6 +28,7 @@ import {
   resolveGenjutsuProviderTarget,
   SeedanceHttpError,
   submitGenjutsu,
+  VolcengineSeedanceHttpError,
   type GenjutsuMode,
   type GenjutsuProvider,
   type GenjutsuResolution,
@@ -228,7 +229,11 @@ async function POST({ request }: { request: Request }) {
         }
       : resolveGenjutsuProviderTarget(input.mode);
 
-    if (target.provider === 'seedance' && !hasStorageInput(input)) {
+    if (
+      (target.provider === 'seedance' ||
+        target.provider === 'seedance-volcengine') &&
+      !hasStorageInput(input)
+    ) {
       throw new Error(
         'Seedance generations must use server-owned R2 storage keys'
       );
@@ -263,7 +268,11 @@ async function POST({ request }: { request: Request }) {
       if (balance < minimumCredits) {
         throw new InsufficientCreditsError(minimumCredits, balance);
       }
-    } else if (!task && target.provider === 'seedance') {
+    } else if (
+      !task &&
+      (target.provider === 'seedance' ||
+        target.provider === 'seedance-volcengine')
+    ) {
       // Seedance has no free /estimate endpoint. Probe the server-owned R2
       // source once, build the list-rate quote, and reject an obviously
       // insufficient wallet before submit. Provider likeness policy is
@@ -272,7 +281,9 @@ async function POST({ request }: { request: Request }) {
         ...providerInput,
         ...target,
       });
-      const credits = calculateGenjutsuCredits(estimate.providerCostUsd);
+      const credits = calculateGenjutsuCredits(
+        estimate.customerPriceBasisUsd ?? estimate.providerCostUsd
+      );
       const balance = await getBalance(session.user.id);
       if (balance < credits) {
         throw new InsufficientCreditsError(credits, balance);
@@ -298,7 +309,9 @@ async function POST({ request }: { request: Request }) {
               ? body.durationSeconds
               : undefined,
         });
-        const credits = calculateGenjutsuCredits(estimate.providerCostUsd);
+        const credits = calculateGenjutsuCredits(
+          estimate.customerPriceBasisUsd ?? estimate.providerCostUsd
+        );
         sourceDurationSeconds = estimate.sourceDurationSeconds;
         pendingQuote = {
           providerCostUsd: estimate.providerCostUsd,
@@ -371,7 +384,8 @@ async function POST({ request }: { request: Request }) {
     } catch (error: any) {
       if (
         error instanceof HiggsfieldHttpError ||
-        error instanceof SeedanceHttpError
+        error instanceof SeedanceHttpError ||
+        error instanceof VolcengineSeedanceHttpError
       ) {
         await refundGenjutsuGeneration({
           generationId,
@@ -380,7 +394,8 @@ async function POST({ request }: { request: Request }) {
           error: error.message,
         });
         const likeness =
-          error instanceof SeedanceHttpError &&
+          (error instanceof SeedanceHttpError ||
+            error instanceof VolcengineSeedanceHttpError) &&
           isSeedanceLikenessRejection(error.message);
         return respJson(
           -1,
