@@ -75,10 +75,7 @@ export function createGenjutsuE2EUploadDescriptor(
   };
 }
 
-export async function saveGenjutsuE2EUpload(
-  token: string,
-  request: Request
-) {
+export async function saveGenjutsuE2EUpload(token: string, request: Request) {
   if (!isGenjutsuE2EMockEnabled()) {
     throw new Error('Genjutsu E2E mock is disabled');
   }
@@ -104,6 +101,21 @@ export function getGenjutsuE2EUpload(token: string) {
   if (!isGenjutsuE2EMockEnabled()) return null;
   cleanupExpiredUploads();
   return store().get(token) ?? null;
+}
+
+/** Resolve in-memory E2E upload bytes from a public e2e-upload URL. */
+export function getGenjutsuE2EUploadFromUrl(url: string) {
+  if (!isGenjutsuE2EMockEnabled()) return null;
+  try {
+    const parsed = new URL(url);
+    const match = /^\/api\/genjutsu\/e2e-upload\/([^/]+)$/.exec(
+      parsed.pathname
+    );
+    if (!match) return null;
+    return getGenjutsuE2EUpload(decodeURIComponent(match[1]));
+  } catch {
+    return null;
+  }
 }
 
 export function getGenjutsuE2EUrlForStorageKey(storageKey: string) {

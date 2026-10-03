@@ -1,6 +1,10 @@
 import { envConfigs } from '@/config';
 import { getConfig } from '@/modules/config/service';
 
+import {
+  createGenjutsuE2ERequestId,
+  isGenjutsuE2EMockEnabled,
+} from './e2e-mock';
 import type { GenjutsuMode, GenjutsuResolution } from './types';
 import { buildSeedanceWorkflowPrompt, getSeedanceTask } from './workflow';
 
@@ -261,7 +265,17 @@ export async function submitSeedance(input: {
   sourceDurationSeconds: number;
   endUserId: string;
 }) {
+  // Validate payload shape even in E2E mock so preflight bugs still surface.
   const model = modelPath(input.model);
+  buildSeedancePayload(input);
+
+  if (isGenjutsuE2EMockEnabled()) {
+    return {
+      requestId: createGenjutsuE2ERequestId(),
+      status: 'queued',
+    };
+  }
+
   const body = buildSeedancePayload(input);
   const webhookUrl = getWebhookUrl();
   const path = webhookUrl
