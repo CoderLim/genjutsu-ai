@@ -12,12 +12,19 @@ import { useSession } from '@/core/auth/client';
 import { Link } from '@/core/i18n/navigation';
 import { apiGet, type PageResult } from '@/lib/api-client';
 import { formatDateTime } from '@/lib/time';
+import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
 import { SiteFooter } from '@/components/landing/SiteFooter';
 import { SiteHeader } from '@/components/landing/SiteHeader';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 interface Generation {
   id: string;
@@ -26,6 +33,7 @@ interface Generation {
   mode: string | null;
   resolution: string | null;
   costCredits: number;
+  sourceVideoUrl: string | null;
   videoUrl: string | null;
   createdAt: string;
   updatedAt: string;
@@ -33,6 +41,11 @@ interface Generation {
 
 interface GenerationStatus {
   status: string;
+}
+
+interface VideoPreview {
+  url: string;
+  title: string;
 }
 
 const PAGE_SIZE = 12;
@@ -74,31 +87,112 @@ function statusVariant(status: string) {
   return 'secondary' as const;
 }
 
+function VideoThumb({
+  src,
+  label,
+  onOpen,
+  className,
+}: {
+  src: string;
+  label: string;
+  onOpen: () => void;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      aria-label={m['creations.open_video']()}
+      className={cn(
+        'group relative block size-full overflow-hidden bg-black text-left',
+        className
+      )}
+    >
+      <video
+        src={src}
+        muted
+        playsInline
+        preload="metadata"
+        className="size-full object-cover transition duration-200 group-hover:scale-[1.02]"
+      />
+      <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-linear-to-t from-black/70 to-transparent px-2 py-1.5 text-[11px] font-medium text-white">
+        {label}
+      </span>
+      <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/0 transition group-hover:bg-black/25">
+        <span className="bg-background/90 text-foreground flex size-9 items-center justify-center rounded-full opacity-0 shadow transition group-hover:opacity-100">
+          <Play className="size-4 fill-current" />
+        </span>
+      </span>
+    </button>
+  );
+}
+
 function GenerationCard({
   generation,
   onRefresh,
   refreshing,
+  onPreview,
 }: {
   generation: Generation;
   onRefresh: (id: string) => void;
   refreshing: boolean;
+  onPreview: (preview: VideoPreview) => void;
 }) {
   const completed = generation.status === 'completed' && generation.videoUrl;
   const failed =
     generation.status === 'refunded' ||
     generation.status === 'failed_preflight' ||
     generation.status === 'insufficient_credits';
+  const sourceUrl = generation.sourceVideoUrl;
+  const resultUrl = generation.videoUrl;
 
   return (
     <Card className="overflow-hidden py-0">
       <div className="bg-muted relative aspect-video overflow-hidden">
-        {completed ? (
-          <video
-            src={generation.videoUrl || undefined}
-            controls
-            playsInline
-            preload="metadata"
-            className="size-full object-cover"
+        {completed && sourceUrl && resultUrl ? (
+          <div className="grid size-full grid-cols-2">
+            <VideoThumb
+              src={sourceUrl}
+              label={m['creations.source_video']()}
+              onOpen={() =>
+                onPreview({
+                  url: sourceUrl,
+                  title: m['creations.source_video'](),
+                })
+              }
+            />
+            <VideoThumb
+              src={resultUrl}
+              label={m['creations.generated_video']()}
+              onOpen={() =>
+                onPreview({
+                  url: resultUrl,
+                  title: m['creations.generated_video'](),
+                })
+              }
+            />
+          </div>
+        ) : completed && resultUrl ? (
+          <VideoThumb
+            src={resultUrl}
+            label={m['creations.generated_video']()}
+            onOpen={() =>
+              onPreview({
+                url: resultUrl,
+                title: m['creations.generated_video'](),
+              })
+            }
+          />
+        ) : failed && sourceUrl ? (
+          <VideoThumb
+            src={sourceUrl}
+            label={m['creations.source_video']()}
+            onOpen={() =>
+              onPreview({
+                url: sourceUrl,
+                title: m['creations.source_video'](),
+              })
+            }
           />
         ) : (
           <div className="text-muted-foreground flex size-full flex-col items-center justify-center gap-3 p-6 text-center">
@@ -114,7 +208,7 @@ function GenerationCard({
         )}
         <Badge
           variant={statusVariant(generation.status)}
-          className="absolute top-3 right-3"
+          className="absolute top-3 right-3 z-10"
         >
           {statusLabel(generation.status)}
         </Badge>
@@ -130,7 +224,9 @@ function GenerationCard({
           </h2>
           <div className="text-muted-foreground mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs">
             {generation.mode ? <span>{generation.mode}</span> : null}
-            {generation.resolution ? <span>{generation.resolution}</span> : null}
+            {generation.resolution ? (
+              <span>{generation.resolution}</span>
+            ) : null}
             <span>
               {m['creations.credits']({ count: generation.costCredits })}
             </span>
@@ -143,16 +239,19 @@ function GenerationCard({
         </div>
 
         <div className="flex gap-2">
-          {completed ? (
-            <a
-              href={generation.videoUrl || undefined}
-              target="_blank"
-              rel="noreferrer"
-              className={buttonVariants({ variant: 'outline' })}
+          {completed && resultUrl ? (
+            <Button
+              variant="outline"
+              onClick={() =>
+                onPreview({
+                  url: resultUrl,
+                  title: m['creations.generated_video'](),
+                })
+              }
             >
               <Play className="size-4" />
               {m['creations.view_video']()}
-            </a>
+            </Button>
           ) : failed ? (
             <Link href="/" className={buttonVariants({ variant: 'outline' })}>
               <Sparkles className="size-4" />
@@ -180,6 +279,7 @@ function GenerationCard({
 
 function CreationsPage() {
   const [page, setPage] = useState(1);
+  const [preview, setPreview] = useState<VideoPreview | null>(null);
   const { data: session, isPending: sessionPending } = useSession();
   const queryClient = useQueryClient();
   const userId = session?.user?.id;
@@ -294,6 +394,7 @@ function CreationsPage() {
                 <GenerationCard
                   key={generation.id}
                   generation={generation}
+                  onPreview={setPreview}
                   onRefresh={(id) => refreshMutation.mutate(id)}
                   refreshing={
                     refreshMutation.isPending &&
@@ -308,9 +409,7 @@ function CreationsPage() {
                 <Button
                   variant="outline"
                   disabled={page <= 1 || query.isFetching}
-                  onClick={() =>
-                    setPage((current) => Math.max(1, current - 1))
-                  }
+                  onClick={() => setPage((current) => Math.max(1, current - 1))}
                 >
                   {m['creations.previous']()}
                 </Button>
@@ -332,6 +431,32 @@ function CreationsPage() {
         )}
       </main>
       <SiteFooter />
+
+      <Dialog
+        open={Boolean(preview)}
+        onOpenChange={(open) => {
+          if (!open) setPreview(null);
+        }}
+      >
+        <DialogContent
+          className="overflow-hidden p-0 sm:max-w-4xl"
+          showCloseButton
+        >
+          <DialogHeader className="px-4 pt-4 pr-12">
+            <DialogTitle>{preview?.title}</DialogTitle>
+          </DialogHeader>
+          {preview ? (
+            <video
+              key={preview.url}
+              src={preview.url}
+              controls
+              autoPlay
+              playsInline
+              className="max-h-[75vh] w-full bg-black object-contain"
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -193,8 +193,11 @@ async function headR2Object(key: string): Promise<GenjutsuObjectMetadata> {
   const rawLength = response.headers.get('content-length');
   const contentLength = rawLength ? Number(rawLength) : NaN;
   const contentType =
-    response.headers.get('content-type')?.split(';', 1)[0]?.trim().toLowerCase() ||
-    '';
+    response.headers
+      .get('content-type')
+      ?.split(';', 1)[0]
+      ?.trim()
+      .toLowerCase() || '';
 
   if (!Number.isSafeInteger(contentLength) || contentLength <= 0) {
     throw new Error(`R2 object has an invalid content length: ${key}`);
@@ -331,6 +334,28 @@ export function assertGenjutsuInputKeysOwned(params: {
   }
 }
 
+export function assertGenjutsuSourceVideoKeyOwned(params: {
+  userId: string;
+  generationId: string;
+  videoKey: string;
+}) {
+  assertSafeObjectKey(params.videoKey);
+  const stagingPrefix = getGenjutsuInputPrefix(params);
+  const sealedPrefix = getGenjutsuSealedInputPrefix(params);
+  const stagingPattern = new RegExp(
+    `^${escapeRegExp(stagingPrefix)}source\\.(?:mp4|mov|webm)$`
+  );
+  const sealedPattern = new RegExp(
+    `^${escapeRegExp(sealedPrefix)}source\\.(?:mp4|mov|webm)$`
+  );
+  if (
+    !stagingPattern.test(params.videoKey) &&
+    !sealedPattern.test(params.videoKey)
+  ) {
+    throw new Error('Invalid Genjutsu source-video storage key');
+  }
+}
+
 export function assertGenjutsuSealedInputKeysOwned(params: {
   userId: string;
   generationId: string;
@@ -446,7 +471,9 @@ export async function sealGenjutsuR2Inputs(params: {
   assertGenjutsuInputKeysOwned(params);
 
   const sourceKeys = [params.videoKey, ...params.imageKeys];
-  const metadata = await Promise.all(sourceKeys.map((key) => headR2Object(key)));
+  const metadata = await Promise.all(
+    sourceKeys.map((key) => headR2Object(key))
+  );
 
   metadata.forEach((item, index) => {
     assertGenjutsuObjectMetadata({
@@ -590,7 +617,9 @@ export async function persistGenjutsuResultToR2(params: {
     });
 
     if (!copied.success) {
-      throw new Error(copied.error || 'Failed to persist Genjutsu result to R2');
+      throw new Error(
+        copied.error || 'Failed to persist Genjutsu result to R2'
+      );
     }
   }
 
