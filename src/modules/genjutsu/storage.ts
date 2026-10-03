@@ -37,6 +37,7 @@ type R2SigningConfig = {
 export type GenjutsuObjectMetadata = {
   contentLength: number;
   contentType: string;
+  etag?: string;
 };
 
 function trimSlashes(value: string) {
@@ -199,7 +200,48 @@ async function headR2Object(key: string): Promise<GenjutsuObjectMetadata> {
     throw new Error(`R2 object has an invalid content length: ${key}`);
   }
 
-  return { contentLength, contentType };
+  return {
+    contentLength,
+    contentType,
+    etag: response.headers.get('etag') || undefined,
+  };
+}
+
+async function copyR2Object(params: {
+  sourceKey: string;
+  destinationKey: string;
+  sourceEtag?: string;
+}) {
+  const config = await getR2SigningConfig();
+  assertSafeObjectKey(params.sourceKey);
+  assertSafeObjectKey(params.destinationKey);
+
+  const sourcePath = encodePath(
+    [config.bucket, config.uploadPath, params.sourceKey]
+      .filter(Boolean)
+      .join('/')
+  );
+  const headers = new Headers({
+    'x-amz-copy-source': `/${sourcePath}`,
+    'x-amz-metadata-directive': 'COPY',
+  });
+  if (params.sourceEtag) {
+    headers.set('x-amz-copy-source-if-match', params.sourceEtag);
+  }
+
+  const response = await createR2Client(config).fetch(
+    new Request(buildR2ObjectUrl(config, params.destinationKey), {
+      method: 'PUT',
+      headers,
+    })
+  );
+
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '');
+    throw new Error(
+      `Failed to seal Genjutsu input: HTTP ${response.status}${detail ? ` - ${detail.slice(0, 300)}` : ''}`
+    );
+  }
 }
 
 export function getGenjutsuInputPrefix(params: {
@@ -209,6 +251,31 @@ export function getGenjutsuInputPrefix(params: {
   return `genjutsu/inputs/${safeSegment(params.userId)}/${safeSegment(
     params.generationId
   )}/`;
+}
+
+export function getGenjutsuSealedInputPrefix(params: {
+  userId: string;
+  generationId: string;
+}) {
+  return `genjutsu/sealed-inputs/${safeSegment(params.userId)}/${safeSegment(
+    params.generationId
+  )}/`;
+}
+
+export function getGenjutsuSealedInputKey(params: {
+  userId: string;
+  generationId: string;
+  stagingKey: string;
+}) {
+  const stagingPrefix = getGenjutsuInputPrefix(params);
+  if (!params.stagingKey.startsWith(stagingPrefix)) {
+    throw new Error('Invalid Genjutsu staging input key');
+  }
+  const filename = params.stagingKey.slice(stagingPrefix.length);
+  if (!filename || filename.includes('/')) {
+    throw new Error('Invalid Genjutsu staging input key');
+  }
+  return `${getGenjutsuSealedInputPrefix(params)}${filename}`;
 }
 
 export function getGenjutsuInputKey(params: {
@@ -260,6 +327,43 @@ export function assertGenjutsuInputKeysOwned(params: {
     assertSafeObjectKey(key);
     if (!referencePattern.test(key)) {
       throw new Error('Invalid Genjutsu reference-image storage keys');
+    }
+  }
+}
+
+export function assertGenjutsuSealedInputKeysOwned(params: {
+  userId: string;
+  generationId: string;
+  videoKey: string;
+  imageKeys: string[];
+}) {
+  const prefix = getGenjutsuSealedInputPrefix(params);
+  const escapedPrefix = escapeRegExp(prefix);
+  const sourcePattern = new RegExp(
+    `^${escapedPrefix}source\\.(?:mp4|mov|webm)$`
+  );
+  const referencePattern = new RegExp(
+    `^${escapedPrefix}reference-0[1-8]\\.(?:jpg|png|webp|gif|avif|heic|heif)$`
+  );
+
+  assertSafeObjectKey(params.videoKey);
+  if (!sourcePattern.test(params.videoKey)) {
+    throw new Error('Invalid sealed Genjutsu source-video storage key');
+  }
+
+  if (
+    !Array.isArray(params.imageKeys) ||
+    params.imageKeys.length < 1 ||
+    params.imageKeys.length > 8 ||
+    new Set(params.imageKeys).size !== params.imageKeys.length
+  ) {
+    throw new Error('Invalid sealed Genjutsu reference-image storage keys');
+  }
+
+  for (const key of params.imageKeys) {
+    assertSafeObjectKey(key);
+    if (!referencePattern.test(key)) {
+      throw new Error('Invalid sealed Genjutsu reference-image storage keys');
     }
   }
 }
@@ -331,13 +435,92 @@ export async function createGenjutsuR2ReadUrl(key: string) {
   return signed.url;
 }
 
+export async function sealGenjutsuR2Inputs(params: {
+  userId: string;
+  generationId: string;
+  videoKey: string;
+  imageKeys: string[];
+  expectedContentTypes?: string[];
+  expectedContentLengths?: number[];
+}) {
+  assertGenjutsuInputKeysOwned(params);
+
+  const sourceKeys = [params.videoKey, ...params.imageKeys];
+  const metadata = await Promise.all(sourceKeys.map((key) => headR2Object(key)));
+
+  metadata.forEach((item, index) => {
+    assertGenjutsuObjectMetadata({
+      key: sourceKeys[index],
+      index,
+      metadata: item,
+    });
+
+    const expectedType = params.expectedContentTypes?.[index]
+      ?.split(';', 1)[0]
+      ?.trim()
+      .toLowerCase();
+    if (expectedType && item.contentType !== expectedType) {
+      throw new Error('Uploaded media content type changed before sealing');
+    }
+
+    const expectedLength = params.expectedContentLengths?.[index];
+    if (
+      Number.isSafeInteger(expectedLength) &&
+      expectedLength! > 0 &&
+      item.contentLength !== expectedLength
+    ) {
+      throw new Error('Uploaded media size changed before sealing');
+    }
+  });
+
+  const sealedKeys = sourceKeys.map((sourceKey) =>
+    getGenjutsuSealedInputKey({
+      userId: params.userId,
+      generationId: params.generationId,
+      stagingKey: sourceKey,
+    })
+  );
+
+  await Promise.all(
+    sourceKeys.map((sourceKey, index) =>
+      copyR2Object({
+        sourceKey,
+        destinationKey: sealedKeys[index],
+        sourceEtag: metadata[index].etag,
+      })
+    )
+  );
+
+  const sealedMetadata = await Promise.all(
+    sealedKeys.map((key) => headR2Object(key))
+  );
+  sealedMetadata.forEach((item, index) => {
+    assertGenjutsuObjectMetadata({
+      key: sealedKeys[index],
+      index,
+      metadata: item,
+    });
+    if (
+      item.contentLength !== metadata[index].contentLength ||
+      item.contentType !== metadata[index].contentType
+    ) {
+      throw new Error('Sealed Genjutsu input does not match uploaded media');
+    }
+  });
+
+  return {
+    videoKey: sealedKeys[0],
+    imageKeys: sealedKeys.slice(1),
+  };
+}
+
 export async function resolveGenjutsuInputUrls(params: {
   userId: string;
   generationId: string;
   videoKey: string;
   imageKeys: string[];
 }) {
-  assertGenjutsuInputKeysOwned(params);
+  assertGenjutsuSealedInputKeysOwned(params);
 
   const storage = await getStorage();
   if (!storage) {
