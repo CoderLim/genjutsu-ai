@@ -37,6 +37,8 @@ interface Generation {
 
 const PAGE_SIZE = 20;
 const STATUSES = [
+  'initiated',
+  'insufficient_credits',
   'reserved',
   'submitting',
   'submitted',
