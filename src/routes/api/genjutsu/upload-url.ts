@@ -8,6 +8,7 @@ import {
 import {
   assertGenerationId,
   createGenjutsuAttempt,
+  GenjutsuAttemptConflictError,
 } from '@/modules/genjutsu/billing';
 import { resolveGenjutsuProviderTarget } from '@/modules/genjutsu/service';
 import {
@@ -16,7 +17,7 @@ import {
   assertGenjutsuUploadSize,
 } from '@/modules/genjutsu/storage';
 import { enforceMinIntervalRateLimit } from '@/lib/rate-limit';
-import { respData, respErr } from '@/lib/resp';
+import { respData, respErr, respJson } from '@/lib/resp';
 
 async function POST({ request }: { request: Request }) {
   const limited = enforceMinIntervalRateLimit(request, {
@@ -127,6 +128,15 @@ async function POST({ request }: { request: Request }) {
 
     return respData({ uploads });
   } catch (error: any) {
+    if (error instanceof GenjutsuAttemptConflictError) {
+      return respJson(
+        -1,
+        error.message,
+        { code: error.code },
+        { status: 409 }
+      );
+    }
+
     console.error('genjutsu upload-url failed:', error);
     return respErr(error?.message || 'Failed to create upload URL', {
       status: 400,
