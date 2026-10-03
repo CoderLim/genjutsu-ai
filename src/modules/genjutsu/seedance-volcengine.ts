@@ -274,12 +274,17 @@ export function buildVolcengineSeedancePayload(input: {
   }
 
   const taskType = input.mode === 'objects-swap' ? 'edit' : 'reference';
-  const prompt = buildSeedanceWorkflowPrompt({
+  const workflowPrompt = buildSeedanceWorkflowPrompt({
     mode: input.mode,
     userPrompt: input.prompt,
     imageCount: input.imageUrls.length,
     references: arkReferenceTokens(input.imageUrls.length),
   });
+  // Ark still checks prompt intent after validating omni_reference_task_type.
+  // Prefix edit jobs with an explicit provider-documented edit keyword so an
+  // Objects Swap request cannot be misclassified as plain reference generation.
+  const prompt =
+    taskType === 'edit' ? `编辑视频：${workflowPrompt}` : workflowPrompt;
 
   const content: Array<Record<string, unknown>> = [
     { type: 'text', text: prompt },
