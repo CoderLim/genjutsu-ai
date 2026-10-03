@@ -340,6 +340,7 @@ async function main() {
     assert.ok(started.requestId?.startsWith('e2e-'));
     assert.ok(started.reservedCredits > 0);
 
+    await sleep(1_100);
     const completed = await appGet(
       `/api/genjutsu/status?generationId=${encodeURIComponent(generationId)}`,
       cookie
