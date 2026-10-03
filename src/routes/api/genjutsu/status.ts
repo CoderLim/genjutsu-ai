@@ -8,9 +8,11 @@ import {
   readGenjutsuE2EVideoKey,
 } from '@/modules/genjutsu/e2e-mock';
 import {
+  createGenjutsuR2ReadUrl,
   getGenjutsuResultKey,
   persistGenjutsuResultToR2,
 } from '@/modules/genjutsu/storage';
+import { probeVideoDurationSeconds } from '@/modules/genjutsu/video-metadata';
 import {
   assertGenerationId,
   getGenjutsuTaskById,
@@ -187,11 +189,19 @@ async function GET({ request }: { request: Request }) {
         sourceUrl: provider.videoUrl,
       });
 
+      const outputDurationSeconds =
+        task.provider === 'seedance'
+          ? await probeVideoDurationSeconds(
+              await createGenjutsuR2ReadUrl(durable.videoKey)
+            )
+          : undefined;
+
       const settled = await settleGenjutsuGeneration({
         generationId: task.id,
         userId: session.user.id,
         providerStatus: provider.providerStatus,
         videoKey: durable.videoKey,
+        outputDurationSeconds,
       });
 
       if (settled?.status === 'completed') {
