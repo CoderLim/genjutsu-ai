@@ -85,6 +85,37 @@ async function GET({ request }: { request: Request }) {
       });
     }
 
+    if (task.status === 'insufficient_credits') {
+      const requiredCredits = Number(parsed.result?.requiredCredits);
+      const balance = Number(parsed.result?.balance);
+      const hasRequired = Number.isFinite(requiredCredits);
+      const hasBalance = Number.isFinite(balance);
+
+      return respData({
+        status: 'failed',
+        providerStatus: 'insufficient_credits',
+        videoUrl: null,
+        error:
+          hasRequired && hasBalance
+            ? `Insufficient credits: need ${requiredCredits}, balance ${balance}`
+            : hasRequired
+              ? `Insufficient credits: need ${requiredCredits}`
+              : 'Insufficient credits',
+        requiredCredits: hasRequired ? requiredCredits : undefined,
+        balance: hasBalance ? balance : undefined,
+        reservedCredits: 0,
+      });
+    }
+
+    if (task.status === 'initiated') {
+      return respData({
+        status: 'processing',
+        providerStatus: 'initiated',
+        videoUrl: null,
+        reservedCredits: 0,
+      });
+    }
+
     if (task.status === 'submission_unknown') {
       return respData({
         status: 'processing',
