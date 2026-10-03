@@ -13,6 +13,7 @@ import {
   submitSeedance,
 } from './seedance';
 import {
+  assertVolcengineSeedanceConfigured,
   estimateVolcengineSeedanceProviderCost,
   getVolcengineSeedanceStatus,
   submitVolcengineSeedance,
@@ -467,6 +468,9 @@ export async function resolveGenjutsuProviderCost(
     );
 
     if (input.provider === 'seedance-volcengine') {
+      // Fail configuration errors before reserving user credits or claiming a
+      // submission slot. This is a pure preflight and does not call Ark.
+      assertVolcengineSeedanceConfigured(input.model);
       return {
         ...estimateVolcengineSeedanceProviderCost({
           mode: input.mode,
