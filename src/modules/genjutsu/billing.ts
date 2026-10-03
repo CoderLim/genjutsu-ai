@@ -18,6 +18,8 @@ import {
 export const GENJUTSU_SCENE = 'genjutsu';
 
 export type GenjutsuTaskStatus =
+  | 'initiated'
+  | 'insufficient_credits'
   | 'reserved'
   | 'submitting'
   | 'submitted'
@@ -44,6 +46,66 @@ export function assertGenerationId(value: unknown): string {
     throw new Error('Invalid generation ID');
   }
   return value;
+}
+
+export async function createGenjutsuAttempt(params: {
+  generationId: string;
+  userId: string;
+  mode: GenjutsuMode;
+  provider: GenjutsuProvider;
+  model: string;
+  resolution: GenjutsuResolution;
+  prompt: string;
+  videoKey: string;
+  imageKeys: string[];
+}) {
+  const existing = await getGenjutsuTaskById({
+    generationId: params.generationId,
+    userId: params.userId,
+  });
+  if (existing) return existing;
+
+  const task = {
+    id: params.generationId,
+    userId: params.userId,
+    mediaType: 'video',
+    provider: params.provider,
+    model: params.model,
+    prompt: params.prompt,
+    options: JSON.stringify({
+      mode: params.mode,
+      resolution: params.resolution,
+      prompt: params.prompt,
+      videoKey: params.videoKey,
+      imageKeys: params.imageKeys,
+    }),
+    status: 'initiated',
+    taskId: null,
+    taskInfo: JSON.stringify({
+      attemptStage: 'upload_requested',
+      providerCostUsd: null,
+      providerEstimate: null,
+      sourceDurationSeconds: null,
+    }),
+    taskResult: null,
+    costCredits: 0,
+    scene: GENJUTSU_SCENE,
+    creditId: null,
+  };
+
+  try {
+    await db().insert(aiTask).values(task);
+    return task;
+  } catch (error) {
+    // A duplicate request for the same generationId may race the initial
+    // insert. Preserve idempotency by returning the row that won the race.
+    const raced = await getGenjutsuTaskById({
+      generationId: params.generationId,
+      userId: params.userId,
+    });
+    if (raced) return raced;
+    throw error;
+  }
 }
 
 export async function getGenjutsuTaskById(params: {
@@ -133,7 +195,7 @@ export async function reserveGenjutsuCredits(params: {
     generationId: params.generationId,
     userId: params.userId,
   });
-  if (existing) return existing;
+  if (existing && existing.status !== 'initiated') return existing;
 
   const result = await db().transaction(async (tx: any) => {
     const [insideExisting] = await tx
@@ -148,7 +210,9 @@ export async function reserveGenjutsuCredits(params: {
       )
       .limit(1);
 
-    if (insideExisting) return { task: insideExisting, insufficient: false };
+    if (insideExisting && insideExisting.status !== 'initiated') {
+      return { task: insideExisting, insufficient: false };
+    }
 
     const consumed = await consume({
       userId: params.userId,
@@ -168,6 +232,25 @@ export async function reserveGenjutsuCredits(params: {
     });
 
     if (!consumed.success || !consumed.consumedCredit) {
+      if (insideExisting) {
+        await tx
+          .update(aiTask)
+          .set({
+            status: 'insufficient_credits',
+            taskResult: JSON.stringify({
+              requiredCredits: params.credits,
+              reason: 'insufficient_credits',
+            }),
+          })
+          .where(
+            and(
+              eq(aiTask.id, params.generationId),
+              eq(aiTask.userId, params.userId),
+              eq(aiTask.scene, GENJUTSU_SCENE),
+              eq(aiTask.status, 'initiated')
+            )
+          );
+      }
       return { task: null, insufficient: true };
     }
 
@@ -208,7 +291,32 @@ export async function reserveGenjutsuCredits(params: {
       creditId: consumed.consumedCredit.id,
     };
 
-    await tx.insert(aiTask).values(task);
+    if (insideExisting) {
+      await tx
+        .update(aiTask)
+        .set({
+          provider: task.provider,
+          model: task.model,
+          prompt: task.prompt,
+          options: task.options,
+          status: task.status,
+          taskId: task.taskId,
+          taskInfo: task.taskInfo,
+          taskResult: task.taskResult,
+          costCredits: task.costCredits,
+          creditId: task.creditId,
+        })
+        .where(
+          and(
+            eq(aiTask.id, params.generationId),
+            eq(aiTask.userId, params.userId),
+            eq(aiTask.scene, GENJUTSU_SCENE),
+            eq(aiTask.status, 'initiated')
+          )
+        );
+    } else {
+      await tx.insert(aiTask).values(task);
+    }
     return { task, insufficient: false };
   });
 
