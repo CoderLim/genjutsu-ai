@@ -987,6 +987,81 @@ export function GeneratorPanel({
 
         notFoundCount = 0;
 
+        if (polled.providerStatus === 'initiated') {
+          try {
+            // The upload finished and this attempt is persisted, but the paid
+            // /generate request never advanced it. Retrying the same
+            // generationId is safe because reservation/submission are claimed
+            // server-side and the stored upload inputs are immutable.
+            const resumed = await apiPost<GenerationStart>(
+              '/api/genjutsu/generate',
+              { generationId: active.generationId }
+            );
+
+            if (resumed.status === 'insufficient_credits') {
+              localStorage.removeItem(activeGenerationKey(active.userId));
+              setStatus('idle');
+              setResult(null);
+              setNeedsCredits(true);
+              setError('Insufficient credits');
+              return;
+            }
+
+            if (
+              typeof resumed.reservedCredits === 'number' &&
+              resumed.reservedCredits > 0 &&
+              resumed.reservedCredits !== active.reservedCredits
+            ) {
+              active.reservedCredits = resumed.reservedCredits;
+              localStorage.setItem(
+                activeGenerationKey(active.userId),
+                JSON.stringify(active)
+              );
+              setResult({
+                ...active.draft,
+                reservedCredits: resumed.reservedCredits,
+              });
+            }
+
+            setNeedsCredits(false);
+            setError('');
+          } catch (cause) {
+            const data =
+              cause instanceof ApiError &&
+              cause.data &&
+              typeof cause.data === 'object'
+                ? (cause.data as Record<string, unknown>)
+                : null;
+            const insufficient = data?.code === 'INSUFFICIENT_CREDITS';
+            const submissionUnknown = data?.code === 'SUBMISSION_UNKNOWN';
+
+            if (cause instanceof ApiError && !submissionUnknown) {
+              // The server definitively rejected this not-yet-paid attempt, so
+              // it is safe to unlock Generate instead of polling forever.
+              localStorage.removeItem(activeGenerationKey(active.userId));
+              setStatus('idle');
+              setResult(null);
+              setNeedsCredits(insufficient);
+              setError(cause.message);
+              return;
+            }
+
+            // A network failure may have happened after the retry reached the
+            // server. Keep the same attempt locked and re-check its state
+            // rather than creating a second generation.
+            setError(
+              submissionUnknown
+                ? cause instanceof Error
+                  ? cause.message
+                  : 'Generation submission result is uncertain.'
+                : 'Connection lost before generation started. Retrying the existing attempt.'
+            );
+          }
+
+          delayMs = Math.min(5_000, Math.ceil(delayMs * 1.2));
+          continue;
+        }
+
         if (
           typeof polled.reservedCredits === 'number' &&
           polled.reservedCredits > 0 &&
@@ -1028,6 +1103,7 @@ export function GeneratorPanel({
           localStorage.removeItem(activeGenerationKey(active.userId));
           setStatus('idle');
           setResult(null);
+          setNeedsCredits(polled.providerStatus === 'insufficient_credits');
           const uiError =
             generationFailureUiMessage(polled.error) ||
             `Generation failed (${polled.providerStatus})`;
