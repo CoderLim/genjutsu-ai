@@ -294,6 +294,7 @@ async function resolveHiggsfieldProviderCost(input: {
       'genjutsu estimate returned no usable USD; using list-rate fallback'
     );
   } catch (error) {
+    if (error instanceof HiggsfieldPreflightError) throw error;
     console.warn(
       'genjutsu estimate unavailable, using list-rate fallback:',
       error instanceof Error ? error.message : error
