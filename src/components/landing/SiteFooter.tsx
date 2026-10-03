@@ -156,7 +156,7 @@ export function SiteFooter() {
                 height={55}
                 loading="lazy"
                 decoding="async"
-                className="h-[55px] w-[175px]"
+                className="h-[27px] w-auto"
               />
             </a>
           </div>
