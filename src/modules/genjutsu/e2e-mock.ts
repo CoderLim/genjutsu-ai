@@ -136,6 +136,30 @@ export function resolveGenjutsuE2EInputUrls(params: {
   };
 }
 
+export function sealGenjutsuE2EStorageObject(
+  sourceKey: string,
+  destinationKey: string
+) {
+  if (!isGenjutsuE2EMockEnabled()) {
+    throw new Error('Genjutsu E2E mock is disabled');
+  }
+
+  cleanupExpiredUploads();
+  const sourceToken = storageKeys().get(sourceKey);
+  const source = sourceToken ? store().get(sourceToken) : null;
+  if (!sourceToken || !source) {
+    throw new Error('E2E source storage object is missing');
+  }
+
+  const sealedToken = getUuid();
+  store().set(sealedToken, {
+    bytes: new Uint8Array(source.bytes),
+    contentType: source.contentType,
+    createdAt: Date.now(),
+  });
+  storageKeys().set(destinationKey, sealedToken);
+}
+
 export function copyGenjutsuE2EStorageObject(
   sourceKey: string,
   destinationKey: string
