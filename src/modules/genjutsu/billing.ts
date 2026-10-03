@@ -306,6 +306,7 @@ export async function settleGenjutsuGeneration(params: {
   providerStatus: string;
   videoKey?: string;
   videoUrl?: string;
+  providerUsage?: unknown;
 }) {
   if (!params.videoKey && !params.videoUrl) {
     throw new Error('Completed Genjutsu generation is missing a result');
@@ -319,6 +320,9 @@ export async function settleGenjutsuGeneration(params: {
         providerStatus: params.providerStatus,
         ...(params.videoKey ? { videoKey: params.videoKey } : {}),
         ...(params.videoUrl ? { videoUrl: params.videoUrl } : {}),
+        ...(params.providerUsage != null
+          ? { providerUsage: params.providerUsage }
+          : {}),
       }),
     })
     .where(
