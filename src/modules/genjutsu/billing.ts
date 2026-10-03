@@ -440,6 +440,46 @@ export async function markGenjutsuAttemptFailedPreflight(params: {
     );
 }
 
+export async function markGenjutsuUploadFailed(params: {
+  generationId: string;
+  userId: string;
+  errorCode:
+    | 'UPLOAD_HTTP_ERROR'
+    | 'UPLOAD_NETWORK_ERROR'
+    | 'UPLOAD_ABORTED';
+  error: string;
+  fileIndex: number;
+  fileType: 'video' | 'image';
+  httpStatus?: number | null;
+}) {
+  await db()
+    .update(aiTask)
+    .set({
+      status: 'failed_preflight',
+      taskResult: JSON.stringify({
+        stage: 'upload',
+        errorCode: params.errorCode,
+        error: params.error,
+        fileIndex: params.fileIndex,
+        fileType: params.fileType,
+        httpStatus: params.httpStatus ?? null,
+      }),
+    })
+    .where(
+      and(
+        eq(aiTask.id, params.generationId),
+        eq(aiTask.userId, params.userId),
+        eq(aiTask.scene, GENJUTSU_SCENE),
+        eq(aiTask.status, 'initiated')
+      )
+    );
+
+  return getGenjutsuTaskById({
+    generationId: params.generationId,
+    userId: params.userId,
+  });
+}
+
 export async function recordGenjutsuProviderStatusError(params: {
   generationId: string;
   userId: string;

@@ -244,6 +244,48 @@ async function main() {
     assert.equal(initiatedStatus.status, 'processing');
     assert.equal(initiatedStatus.providerStatus, 'initiated');
 
+    // A direct-to-R2 browser upload failure must be persisted instead of
+    // leaving the attempt stuck forever at upload_requested.
+    await sleep(1_100);
+    const failedUploadGenerationId = `e2e-upload-failure-${randomUUID()}`;
+    await appPost('/api/genjutsu/attempt', cookie, {
+      generationId: failedUploadGenerationId,
+      mode: 'motion-transfer',
+      resolution: '720p',
+      prompt: 'E2E upload failure',
+    });
+    await appPost('/api/genjutsu/upload-url', cookie, {
+      generationId: failedUploadGenerationId,
+      mode: 'motion-transfer',
+      resolution: '720p',
+      prompt: 'E2E upload failure',
+      contentTypes: ['video/mp4', 'image/png'],
+      contentLengths: [videoBytes.byteLength, imageBytes.byteLength],
+    });
+    const failureRecorded = await appPost(
+      '/api/genjutsu/attempt-failure',
+      cookie,
+      {
+        generationId: failedUploadGenerationId,
+        fileIndex: 0,
+        errorCode: 'UPLOAD_HTTP_ERROR',
+        httpStatus: 403,
+      }
+    );
+    assert.equal(failureRecorded.status, 'failed_preflight');
+    assert.equal(failureRecorded.recorded, true);
+
+    await sleep(1_100);
+    const failedUploadStatus = await appGet(
+      `/api/genjutsu/status?generationId=${encodeURIComponent(failedUploadGenerationId)}`,
+      cookie
+    );
+    assert.equal(failedUploadStatus.status, 'failed');
+    assert.equal(failedUploadStatus.providerStatus, 'failed_preflight');
+    assert.equal(failedUploadStatus.errorCode, 'UPLOAD_HTTP_ERROR');
+    assert.equal(failedUploadStatus.stage, 'upload');
+    assert.match(failedUploadStatus.error, /HTTP 403/);
+
     // An identical retry may re-sign the same immutable input keys.
     await sleep(1_100);
     const repeatedUploadBatch = await appPost(

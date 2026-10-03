@@ -115,6 +115,16 @@ async function GET({ request }: { request: Request }) {
           typeof result?.providerStatus === 'string'
             ? result.providerStatus
             : null,
+        failureStage:
+          typeof result?.stage === 'string' ? result.stage : null,
+        errorCode:
+          typeof result?.errorCode === 'string' ? result.errorCode : null,
+        errorFileIndex:
+          typeof result?.fileIndex === 'number' ? result.fileIndex : null,
+        errorFileType:
+          typeof result?.fileType === 'string' ? result.fileType : null,
+        errorHttpStatus:
+          typeof result?.httpStatus === 'number' ? result.httpStatus : null,
         error: typeof result?.error === 'string' ? result.error : null,
         costCredits: row.costCredits,
         providerCostUsd:

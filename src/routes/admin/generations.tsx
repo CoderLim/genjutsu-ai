@@ -39,6 +39,11 @@ interface Generation {
   attemptStage: string | null;
   taskId: string | null;
   providerStatus: string | null;
+  failureStage: string | null;
+  errorCode: string | null;
+  errorFileIndex: number | null;
+  errorFileType: string | null;
+  errorHttpStatus: number | null;
   error: string | null;
   costCredits: number;
   providerCostUsd: number | null;
@@ -203,6 +208,20 @@ function GenerationsPage() {
           {g.attemptStage ? (
             <div className="text-muted-foreground mt-1 text-xs">
               stage: {g.attemptStage}
+            </div>
+          ) : null}
+          {g.failureStage ? (
+            <div className="text-muted-foreground mt-1 text-xs">
+              failed at: {g.failureStage}
+            </div>
+          ) : null}
+          {g.errorCode ? (
+            <div className="text-muted-foreground mt-1 font-mono text-xs">
+              {g.errorCode}
+              {g.errorFileType
+                ? ` · ${g.errorFileType}${g.errorFileIndex != null ? ` #${g.errorFileIndex}` : ''}`
+                : ''}
+              {g.errorHttpStatus != null ? ` · HTTP ${g.errorHttpStatus}` : ''}
             </div>
           ) : null}
           {g.error ? (
