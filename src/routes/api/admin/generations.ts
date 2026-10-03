@@ -108,6 +108,8 @@ async function GET({ request }: { request: Request }) {
         resolution:
           typeof options?.resolution === 'string' ? options.resolution : null,
         status: row.status,
+        attemptStage:
+          typeof info?.attemptStage === 'string' ? info.attemptStage : null,
         taskId: row.taskId,
         providerStatus:
           typeof result?.providerStatus === 'string'
