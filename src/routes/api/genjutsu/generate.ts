@@ -316,10 +316,7 @@ async function POST({ request }: { request: Request }) {
         const estimate = await resolveGenjutsuProviderCost({
           ...providerInput,
           ...target,
-          durationSeconds:
-            typeof body.durationSeconds === 'number'
-              ? body.durationSeconds
-              : undefined,
+          durationSeconds: sourceDurationSeconds,
         });
         const credits = calculateGenjutsuCredits(estimate.providerCostUsd);
         sourceDurationSeconds = estimate.sourceDurationSeconds;
