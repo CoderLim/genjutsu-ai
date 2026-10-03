@@ -301,8 +301,26 @@ async function resolveHiggsfieldProviderCost(input: {
     );
   }
 
+  let fallbackDurationSeconds = input.durationSeconds;
+  if (
+    typeof fallbackDurationSeconds !== 'number' ||
+    !Number.isFinite(fallbackDurationSeconds) ||
+    fallbackDurationSeconds <= 0
+  ) {
+    try {
+      fallbackDurationSeconds = await probeSeedanceSourceDurationSeconds(
+        input.videoUrl
+      );
+    } catch (error) {
+      console.warn(
+        'genjutsu source duration probe unavailable, using conservative fallback:',
+        error instanceof Error ? error.message : error
+      );
+    }
+  }
+
   const durationSeconds = normalizeFallbackDurationSeconds(
-    input.durationSeconds
+    fallbackDurationSeconds
   );
   const providerCostUsd = estimateGenjutsuListCost({
     durationSeconds,
