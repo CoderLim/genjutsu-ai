@@ -213,13 +213,15 @@ async function POST({ request }: { request: Request }) {
     let input: GenerationInput;
 
     if (task) {
-      if (task.status !== 'reserved') {
+      if (task.status !== 'initiated' && task.status !== 'reserved') {
         return respData(taskResponse(task));
       }
       input = inputFromTask(task);
     } else {
       input = inputFromBody(body);
     }
+
+    const needsReservation = !task || task.status === 'initiated';
 
     const target = task
       ? {
@@ -252,7 +254,7 @@ async function POST({ request }: { request: Request }) {
       sourceDurationSeconds?: number;
     } | null = null;
 
-    if (!task && target.provider === 'higgsfield') {
+    if (needsReservation && target.provider === 'higgsfield') {
       // Cheap preflight: if the user cannot afford even the minimum 4-second
       // clip at this resolution, fail before live /estimate or submit.
       const minimumCredits = estimateGenjutsuCredits({
@@ -263,7 +265,7 @@ async function POST({ request }: { request: Request }) {
       if (balance < minimumCredits) {
         throw new InsufficientCreditsError(minimumCredits, balance);
       }
-    } else if (!task && target.provider === 'seedance') {
+    } else if (needsReservation && target.provider === 'seedance') {
       // Seedance has no free /estimate endpoint. Probe the server-owned R2
       // source once, build the list-rate quote, and reject an obviously
       // insufficient wallet before submit. Provider likeness policy is
@@ -287,7 +289,7 @@ async function POST({ request }: { request: Request }) {
       };
     }
 
-    if (!task) {
+    if (needsReservation) {
       if (!pendingQuote) {
         // Higgsfield's live /estimate; client-supplied credit amounts ignored.
         const estimate = await resolveGenjutsuProviderCost({
