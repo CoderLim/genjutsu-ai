@@ -57,23 +57,40 @@ function getCnyPerUsd() {
 function getArkApiKey() {
   const value = envConfigs.ark_api_key?.trim();
   if (!value) {
-    throw new Error(
-      'Volcengine Ark API key is not configured. Set ARK_API_KEY on the server.'
+    throw new VolcengineSeedanceHttpError(
+      503,
+      'Volcengine Ark API key is not configured. Set ARK_API_KEY on the server.',
+      'ARK_NOT_CONFIGURED'
     );
   }
   return value;
 }
 
 function getArkApiBaseUrl() {
-  return (
+  const value = (
     envConfigs.ark_api_base_url?.trim() || DEFAULT_ARK_API_BASE_URL
   ).replace(/\/$/, '');
+  try {
+    const parsed = new URL(value);
+    if (parsed.protocol !== 'https:') throw new Error('HTTPS required');
+    return value;
+  } catch {
+    throw new VolcengineSeedanceHttpError(
+      503,
+      'Volcengine Ark API base URL is invalid.',
+      'ARK_INVALID_BASE_URL'
+    );
+  }
 }
 
 function normalizeModel(model: string) {
   const value = model.trim();
   if (!value || !/^[A-Za-z0-9._-]+$/.test(value)) {
-    throw new Error('Invalid Volcengine Seedance model');
+    throw new VolcengineSeedanceHttpError(
+      503,
+      'Invalid Volcengine Seedance model configuration.',
+      'ARK_INVALID_MODEL'
+    );
   }
   return value;
 }
@@ -163,9 +180,19 @@ function arkReferenceTokens(imageCount: number) {
 }
 
 function assertSourceDurationSeconds(value: number) {
-  if (!Number.isFinite(value) || value < 4 || value > 30.2) {
+  if (!Number.isFinite(value) || value < 4 || value > 30) {
     throw new Error('Seedance source video must be between 4 and 30 seconds');
   }
+}
+
+export function assertVolcengineSeedanceConfigured(model?: string) {
+  getArkApiKey();
+  getArkApiBaseUrl();
+  normalizeModel(
+    model ||
+      envConfigs.seedance_volcengine_model?.trim() ||
+      DEFAULT_VOLCENGINE_SEEDANCE_MODEL
+  );
 }
 
 function estimatedOutputDurationSeconds(input: {
