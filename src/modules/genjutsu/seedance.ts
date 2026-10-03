@@ -17,6 +17,13 @@ const SEEDANCE_VIDEO_REFERENCE_RATE_USD_PER_BILLED_SECOND: Record<
   '1080p': 0.8377668,
 };
 
+export class SeedancePreflightError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'SeedancePreflightError';
+  }
+}
+
 export class SeedanceHttpError extends Error {
   constructor(
     public status: number,
@@ -31,7 +38,7 @@ export class SeedanceHttpError extends Error {
 async function getFalApiKey() {
   const apiKey = (await getConfig('fal_api_key'))?.trim();
   if (!apiKey) {
-    throw new Error(
+    throw new SeedancePreflightError(
       'Fal API key is not configured. Set it in Admin → Settings → AI → Fal or FAL_KEY.'
     );
   }
@@ -41,7 +48,7 @@ async function getFalApiKey() {
 function modelPath(model: string) {
   const value = model.trim().replace(/^\/+/, '');
   if (!value || !/^[A-Za-z0-9._/-]+$/.test(value)) {
-    throw new Error('Invalid Seedance model');
+    throw new SeedancePreflightError('Invalid Seedance model');
   }
   return value;
 }
@@ -209,7 +216,9 @@ export function buildSeedancePayload(input: {
     input.imageUrls.length < 1 ||
     input.imageUrls.length > 8
   ) {
-    throw new Error('Provide between 1 and 8 reference images');
+    throw new SeedancePreflightError(
+      'Provide between 1 and 8 reference images'
+    );
   }
 
   const task = getSeedanceTask(input.mode);
