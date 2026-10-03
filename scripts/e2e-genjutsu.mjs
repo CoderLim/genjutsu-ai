@@ -320,6 +320,24 @@ async function main() {
     );
     assert.equal(completed.reservedCredits, started.reservedCredits);
 
+    // Once reservation/submission has started, upload inputs are frozen even
+    // when the caller retries with the exact original payload.
+    await sleep(1_100);
+    const startedConflict = await appPostExpectError(
+      '/api/genjutsu/upload-url',
+      cookie,
+      {
+        generationId,
+        mode: 'motion-transfer',
+        resolution: '720p',
+        prompt: 'E2E smoke test',
+        contentTypes: ['video/mp4', 'image/png'],
+        contentLengths: [videoBytes.byteLength, imageBytes.byteLength],
+      },
+      409
+    );
+    assert.equal(startedConflict?.data?.code, 'GENERATION_ALREADY_STARTED');
+
     const resultResponse = await fetch(`${baseUrl}${completed.videoUrl}`, {
       headers: {
         Cookie: cookie,
