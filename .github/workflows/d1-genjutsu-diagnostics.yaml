@@ -1,0 +1,115 @@
+name: D1 Genjutsu Diagnostics
+
+on:
+  push:
+    branches: ['main']
+    paths:
+      - '.github/workflows/d1-genjutsu-diagnostics.yaml'
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN || secrets.CF_API_TOKEN }}
+      CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_API_KEY }}
+      CF_API_KEY_FALLBACK: ${{ secrets.CF_API_KEY }}
+      CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL || secrets.CF_EMAIL }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID || secrets.CF_ACCOUNT_ID || vars.CLOUDFLARE_ACCOUNT_ID || vars.CF_ACCOUNT_ID }}
+    steps:
+      - name: Normalize Cloudflare credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${CLOUDFLARE_API_TOKEN:-}" ] && [ -n "${CLOUDFLARE_API_KEY:-}" ] && [ -z "${CLOUDFLARE_EMAIL:-}" ]; then
+            export CLOUDFLARE_API_TOKEN="$CLOUDFLARE_API_KEY"
+            unset CLOUDFLARE_API_KEY
+          fi
+          if [ -z "${CLOUDFLARE_API_TOKEN:-}" ] && [ -n "${CF_API_KEY_FALLBACK:-}" ]; then
+            if [ -n "${CLOUDFLARE_EMAIL:-}" ]; then
+              export CLOUDFLARE_API_KEY="${CLOUDFLARE_API_KEY:-$CF_API_KEY_FALLBACK}"
+            else
+              export CLOUDFLARE_API_TOKEN="$CF_API_KEY_FALLBACK"
+            fi
+          fi
+          {
+            echo "CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN:-}"
+            echo "CLOUDFLARE_API_KEY=${CLOUDFLARE_API_KEY:-}"
+            echo "CLOUDFLARE_EMAIL=${CLOUDFLARE_EMAIL:-}"
+          } >> "$GITHUB_ENV"
+
+      - name: Query Genjutsu production D1
+        shell: bash
+        run: |
+          set -euo pipefail
+          WRANGLER="npx --yes wrangler@4.98.0"
+
+          echo "=== STATUS_COUNTS ==="
+          $WRANGLER d1 execute genjutsu-ai-db --remote --json --command "
+            SELECT status, COUNT(*) AS count
+            FROM ai_task
+            WHERE scene='genjutsu'
+            GROUP BY status
+            ORDER BY count DESC;
+          "
+
+          echo "=== STATUS_STAGE_COUNTS ==="
+          $WRANGLER d1 execute genjutsu-ai-db --remote --json --command "
+            SELECT
+              status,
+              COALESCE(json_extract(task_info, '$.attemptStage'), '(none)') AS attempt_stage,
+              provider,
+              COUNT(*) AS count
+            FROM ai_task
+            WHERE scene='genjutsu'
+            GROUP BY status, attempt_stage, provider
+            ORDER BY count DESC, status, attempt_stage;
+          "
+
+          echo "=== LAST_48H_STATUS_STAGE ==="
+          $WRANGLER d1 execute genjutsu-ai-db --remote --json --command "
+            SELECT
+              status,
+              COALESCE(json_extract(task_info, '$.attemptStage'), '(none)') AS attempt_stage,
+              provider,
+              COUNT(*) AS count
+            FROM ai_task
+            WHERE scene='genjutsu'
+              AND created_at >= (unixepoch('now','-48 hours') * 1000)
+            GROUP BY status, attempt_stage, provider
+            ORDER BY count DESC, status, attempt_stage;
+          "
+
+          echo "=== RECENT_100_NO_PII ==="
+          $WRANGLER d1 execute genjutsu-ai-db --remote --json --command "
+            SELECT
+              datetime(created_at / 1000, 'unixepoch') AS created_utc,
+              status,
+              COALESCE(json_extract(task_info, '$.attemptStage'), '(none)') AS attempt_stage,
+              provider,
+              cost_credits,
+              COALESCE(json_extract(task_result, '$.reason'), '') AS reason,
+              COALESCE(json_extract(task_result, '$.errorCode'), '') AS error_code
+            FROM ai_task
+            WHERE scene='genjutsu'
+            ORDER BY created_at DESC
+            LIMIT 100;
+          "
+
+          echo "=== INITIATED_AGE_BUCKETS ==="
+          $WRANGLER d1 execute genjutsu-ai-db --remote --json --command "
+            SELECT
+              COALESCE(json_extract(task_info, '$.attemptStage'), '(none)') AS attempt_stage,
+              CASE
+                WHEN created_at >= (unixepoch('now','-5 minutes') * 1000) THEN '<5m'
+                WHEN created_at >= (unixepoch('now','-1 hour') * 1000) THEN '5m-1h'
+                WHEN created_at >= (unixepoch('now','-24 hours') * 1000) THEN '1h-24h'
+                ELSE '>24h'
+              END AS age_bucket,
+              COUNT(*) AS count
+            FROM ai_task
+            WHERE scene='genjutsu' AND status='initiated'
+            GROUP BY attempt_stage, age_bucket
+            ORDER BY attempt_stage, age_bucket;
+          "
