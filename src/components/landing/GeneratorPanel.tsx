@@ -1150,7 +1150,14 @@ export function GeneratorPanel({
       const contentLengths = media.map((item) => item.file.size);
       const uploadBatch = await apiPost<{ uploads: SignedUpload[] }>(
         '/api/genjutsu/upload-url',
-        { generationId, contentTypes, contentLengths }
+        {
+          generationId,
+          mode,
+          resolution,
+          prompt: prompt.trim(),
+          contentTypes,
+          contentLengths,
+        }
       );
 
       if (uploadBatch.uploads.length !== media.length) {
