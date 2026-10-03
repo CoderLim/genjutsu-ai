@@ -39,11 +39,17 @@ const PAGE_SIZE = 12;
 
 function statusLabel(status: string) {
   if (status === 'completed') return m['creations.status.completed']();
-  if (status === 'refunded' || status === 'insufficient_credits') {
+  if (
+    status === 'refunded' ||
+    status === 'failed_preflight' ||
+    status === 'insufficient_credits'
+  ) {
     return m['creations.status.failed']();
   }
   if (
     status === 'initiated' ||
+    status === 'sealing' ||
+    status === 'ready' ||
     status === 'reserving' ||
     status === 'reserved' ||
     status === 'submitting' ||
@@ -58,7 +64,11 @@ function statusLabel(status: string) {
 
 function statusVariant(status: string) {
   if (status === 'completed') return 'default' as const;
-  if (status === 'refunded' || status === 'insufficient_credits') {
+  if (
+    status === 'refunded' ||
+    status === 'failed_preflight' ||
+    status === 'insufficient_credits'
+  ) {
     return 'destructive' as const;
   }
   return 'secondary' as const;
@@ -76,6 +86,7 @@ function GenerationCard({
   const completed = generation.status === 'completed' && generation.videoUrl;
   const failed =
     generation.status === 'refunded' ||
+    generation.status === 'failed_preflight' ||
     generation.status === 'insufficient_credits';
 
   return (
