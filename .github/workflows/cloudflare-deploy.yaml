@@ -1,4 +1,4 @@
-# Production deploy workflow. My Creations rollout 2026-10-03.
+# Production deploy workflow. Generation attempt-stage rollout 2026-10-04.
 name: Deploy Cloudflare Worker
 
 on:
