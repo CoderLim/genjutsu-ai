@@ -20,6 +20,7 @@ export const GENJUTSU_SCENE = 'genjutsu';
 export type GenjutsuTaskStatus =
   | 'initiated'
   | 'insufficient_credits'
+  | 'reserving'
   | 'reserved'
   | 'submitting'
   | 'submitted'
@@ -126,6 +127,32 @@ export async function getGenjutsuTaskById(params: {
   return task ?? null;
 }
 
+export async function markGenjutsuAttemptInsufficient(params: {
+  generationId: string;
+  userId: string;
+  requiredCredits: number;
+  balance: number;
+}) {
+  await db()
+    .update(aiTask)
+    .set({
+      status: 'insufficient_credits',
+      taskResult: JSON.stringify({
+        requiredCredits: params.requiredCredits,
+        balance: params.balance,
+        reason: 'insufficient_credits',
+      }),
+    })
+    .where(
+      and(
+        eq(aiTask.id, params.generationId),
+        eq(aiTask.userId, params.userId),
+        eq(aiTask.scene, GENJUTSU_SCENE),
+        inArray(aiTask.status, ['initiated', 'reserving'])
+      )
+    );
+}
+
 export async function getGenjutsuTaskByRequestIdAnyUser(requestId: string) {
   const [task] = await db()
     .select()
@@ -214,6 +241,55 @@ export async function reserveGenjutsuCredits(params: {
       return { task: insideExisting, insufficient: false };
     }
 
+    let reservationClaim: string | null = null;
+    if (insideExisting) {
+      reservationClaim = getUuid();
+      await tx
+        .update(aiTask)
+        .set({
+          status: 'reserving',
+          taskResult: JSON.stringify({ reservationClaim }),
+        })
+        .where(
+          and(
+            eq(aiTask.id, params.generationId),
+            eq(aiTask.userId, params.userId),
+            eq(aiTask.scene, GENJUTSU_SCENE),
+            eq(aiTask.status, 'initiated')
+          )
+        );
+
+      const [claimed] = await tx
+        .select()
+        .from(aiTask)
+        .where(
+          and(
+            eq(aiTask.id, params.generationId),
+            eq(aiTask.userId, params.userId),
+            eq(aiTask.scene, GENJUTSU_SCENE)
+          )
+        )
+        .limit(1);
+
+      let claimedToken: string | null = null;
+      if (claimed?.taskResult) {
+        try {
+          claimedToken =
+            JSON.parse(claimed.taskResult)?.reservationClaim ?? null;
+        } catch {
+          claimedToken = null;
+        }
+      }
+
+      if (
+        !claimed ||
+        claimed.status !== 'reserving' ||
+        claimedToken !== reservationClaim
+      ) {
+        return { task: claimed ?? insideExisting, insufficient: false };
+      }
+    }
+
     const consumed = await consume({
       userId: params.userId,
       userEmail: params.userEmail,
@@ -247,7 +323,7 @@ export async function reserveGenjutsuCredits(params: {
               eq(aiTask.id, params.generationId),
               eq(aiTask.userId, params.userId),
               eq(aiTask.scene, GENJUTSU_SCENE),
-              eq(aiTask.status, 'initiated')
+              eq(aiTask.status, 'reserving')
             )
           );
       }
@@ -311,7 +387,7 @@ export async function reserveGenjutsuCredits(params: {
             eq(aiTask.id, params.generationId),
             eq(aiTask.userId, params.userId),
             eq(aiTask.scene, GENJUTSU_SCENE),
-            eq(aiTask.status, 'initiated')
+            eq(aiTask.status, 'reserving')
           )
         );
     } else {
