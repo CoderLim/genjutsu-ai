@@ -44,6 +44,7 @@ function statusLabel(status: string) {
   }
   if (
     status === 'initiated' ||
+    status === 'reserving' ||
     status === 'reserved' ||
     status === 'submitting' ||
     status === 'submitted' ||
