@@ -478,6 +478,46 @@ function generationFailureUiMessage(error?: string | null) {
   return error || '';
 }
 
+function classifyUploadFailure(cause: unknown) {
+  if (
+    cause instanceof ApiError &&
+    Number.isInteger(cause.code) &&
+    cause.code >= 400 &&
+    cause.code <= 599
+  ) {
+    return {
+      errorCode: 'UPLOAD_HTTP_ERROR' as const,
+      httpStatus: cause.code,
+    };
+  }
+
+  if (cause instanceof Error && cause.name === 'AbortError') {
+    return {
+      errorCode: 'UPLOAD_ABORTED' as const,
+      httpStatus: null,
+    };
+  }
+
+  return {
+    errorCode: 'UPLOAD_NETWORK_ERROR' as const,
+    httpStatus: null,
+  };
+}
+
+async function reportUploadFailure(params: {
+  generationId: string;
+  fileIndex: number;
+  cause: unknown;
+}) {
+  const failure = classifyUploadFailure(params.cause);
+  await apiPost('/api/genjutsu/attempt-failure', {
+    generationId: params.generationId,
+    fileIndex: params.fileIndex,
+    errorCode: failure.errorCode,
+    httpStatus: failure.httpStatus,
+  });
+}
+
 function redirectToSignIn() {
   const callbackUrl = encodeURIComponent(
     `${window.location.pathname}${window.location.search}`
@@ -1194,11 +1234,20 @@ export function GeneratorPanel({
       for (let index = 0; index < media.length; index += 1) {
         const upload = uploadBatch.uploads[index];
         if (!upload) throw new Error('Missing storage upload URL');
-        await uploadToSignedUrl({
-          url: upload.uploadUrl,
-          file: media[index].file,
-          headers: upload.uploadHeaders,
-        });
+        try {
+          await uploadToSignedUrl({
+            url: upload.uploadUrl,
+            file: media[index].file,
+            headers: upload.uploadHeaders,
+          });
+        } catch (cause) {
+          await reportUploadFailure({
+            generationId,
+            fileIndex: index,
+            cause,
+          }).catch(() => undefined);
+          throw cause;
+        }
       }
 
       if (generationRunRef.current !== runId) return;
