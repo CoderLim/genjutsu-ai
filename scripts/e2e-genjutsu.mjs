@@ -194,10 +194,23 @@ async function main() {
     );
     const uploadBatch = await appPost('/api/genjutsu/upload-url', cookie, {
       generationId,
+      mode: 'motion-transfer',
+      resolution: '720p',
+      prompt: 'E2E smoke test',
       contentTypes: ['video/mp4', 'image/png'],
       contentLengths: [videoBytes.byteLength, imageBytes.byteLength],
     });
     assert.equal(uploadBatch.uploads.length, 2);
+
+    const attempts = await appGet(
+      '/api/user/generations?page=1&pageSize=12',
+      cookie
+    );
+    const recordedAttempt = attempts.items.find(
+      (item) => item.id === generationId
+    );
+    assert.ok(recordedAttempt, 'Generate click was not recorded');
+    assert.equal(recordedAttempt.status, 'initiated');
 
     const [videoUpload, imageUpload] = uploadBatch.uploads;
     assert.match(

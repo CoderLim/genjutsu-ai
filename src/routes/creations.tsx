@@ -39,8 +39,12 @@ const PAGE_SIZE = 12;
 
 function statusLabel(status: string) {
   if (status === 'completed') return m['creations.status.completed']();
-  if (status === 'refunded') return m['creations.status.failed']();
+  if (status === 'refunded' || status === 'insufficient_credits') {
+    return m['creations.status.failed']();
+  }
   if (
+    status === 'initiated' ||
+    status === 'reserving' ||
     status === 'reserved' ||
     status === 'submitting' ||
     status === 'submitted' ||
@@ -54,7 +58,9 @@ function statusLabel(status: string) {
 
 function statusVariant(status: string) {
   if (status === 'completed') return 'default' as const;
-  if (status === 'refunded') return 'destructive' as const;
+  if (status === 'refunded' || status === 'insufficient_credits') {
+    return 'destructive' as const;
+  }
   return 'secondary' as const;
 }
 
@@ -68,7 +74,9 @@ function GenerationCard({
   refreshing: boolean;
 }) {
   const completed = generation.status === 'completed' && generation.videoUrl;
-  const failed = generation.status === 'refunded';
+  const failed =
+    generation.status === 'refunded' ||
+    generation.status === 'insufficient_credits';
 
   return (
     <Card className="overflow-hidden py-0">
