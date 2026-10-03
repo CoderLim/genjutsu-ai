@@ -38,6 +38,9 @@ interface Generation {
 const PAGE_SIZE = 20;
 const STATUSES = [
   'initiated',
+  'sealing',
+  'ready',
+  'failed_preflight',
   'insufficient_credits',
   'reserving',
   'reserved',
@@ -51,7 +54,11 @@ const STATUSES = [
 
 function statusVariant(status: string) {
   if (status === 'completed') return 'default';
-  if (status === 'refunded' || status === 'submission_unknown') {
+  if (
+    status === 'refunded' ||
+    status === 'failed_preflight' ||
+    status === 'submission_unknown'
+  ) {
     return 'destructive';
   }
   return 'secondary';
