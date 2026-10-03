@@ -161,6 +161,7 @@ async function GET({ request }: { request: Request }) {
         userId: session.user.id,
         providerStatus: provider.providerStatus,
         videoKey: durable.videoKey,
+        providerUsage: provider.providerUsage,
       });
 
       if (settled?.status === 'completed') {
