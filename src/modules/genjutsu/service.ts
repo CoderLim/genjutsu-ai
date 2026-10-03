@@ -287,6 +287,26 @@ async function resolveHiggsfieldProviderCost(input: {
   imageUrls: string[];
   durationSeconds?: number;
 }): Promise<GenjutsuCostEstimate> {
+  if (isGenjutsuE2EMockEnabled()) {
+    const durationSeconds = normalizeFallbackDurationSeconds(
+      input.durationSeconds ?? 4
+    );
+    const providerCostUsd = estimateGenjutsuListCost({
+      durationSeconds,
+      resolution: input.resolution,
+    });
+    return {
+      providerCostUsd,
+      providerCredits: null,
+      payload: {
+        source: 'e2e_list_estimate',
+        durationSeconds,
+        resolution: input.resolution,
+      },
+      source: 'list_fallback',
+    };
+  }
+
   try {
     const estimate = await estimateGenjutsuProviderCost(input);
     if (estimate) return estimate;
