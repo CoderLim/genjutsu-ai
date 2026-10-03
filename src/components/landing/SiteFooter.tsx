@@ -129,7 +129,7 @@ export function SiteFooter() {
             </div>
           </div>
 
-          <div className="border-border mt-6 flex items-center justify-center border-t pt-6">
+          <div className="border-border mt-6 flex flex-wrap items-center justify-center gap-4 border-t pt-6">
             <a
               href="https://submito.net"
               target="_blank"
@@ -142,6 +142,21 @@ export function SiteFooter() {
                 loading="lazy"
                 decoding="async"
                 className="h-[27px] w-auto"
+              />
+            </a>
+            <a
+              href="https://findly.tools/genjutsu-ai?utm_source=genjutsu-ai"
+              target="_blank"
+              rel="nofollow sponsored noopener noreferrer"
+            >
+              <img
+                src="https://findly.tools/badges/findly-tools-badge-light.svg"
+                alt="Featured on Findly.tools"
+                width={175}
+                height={55}
+                loading="lazy"
+                decoding="async"
+                className="h-[55px] w-[175px]"
               />
             </a>
           </div>
