@@ -46,6 +46,7 @@ test('Volcengine objects swap maps to edit with locked adaptive/-1 fields', () =
   assert.equal(payload.omni_reference_task_type, 'edit');
   assert.equal(payload.duration, -1);
   assert.equal(payload.ratio, 'adaptive');
+  assert.match(String(payload.content[0].text), /编辑视频/);
   assert.match(String(payload.content[0].text), /Replace the bottle/);
 });
 
