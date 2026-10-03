@@ -36,6 +36,7 @@ interface Generation {
   mode: string | null;
   resolution: string | null;
   status: string;
+  attemptStage: string | null;
   taskId: string | null;
   providerStatus: string | null;
   error: string | null;
@@ -199,6 +200,11 @@ function GenerationsPage() {
       cell: (g) => (
         <div className="max-w-[260px]">
           <Badge variant={statusVariant(g.status)}>{g.status}</Badge>
+          {g.attemptStage ? (
+            <div className="text-muted-foreground mt-1 text-xs">
+              stage: {g.attemptStage}
+            </div>
+          ) : null}
           {g.error ? (
             <div
               className="text-muted-foreground mt-1 truncate text-xs"
