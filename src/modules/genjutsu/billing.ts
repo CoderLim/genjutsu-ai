@@ -39,6 +39,71 @@ export class InsufficientCreditsError extends Error {
   }
 }
 
+export class GenjutsuAttemptConflictError extends Error {
+  constructor(
+    public code:
+      | 'GENERATION_INPUT_CONFLICT'
+      | 'GENERATION_ALREADY_STARTED',
+    message: string
+  ) {
+    super(message);
+    this.name = 'GenjutsuAttemptConflictError';
+  }
+}
+
+function assertReusableGenjutsuAttempt(
+  task: any,
+  params: {
+    mode: GenjutsuMode;
+    provider: GenjutsuProvider;
+    model: string;
+    resolution: GenjutsuResolution;
+    prompt: string;
+    videoKey: string;
+    imageKeys: string[];
+  }
+) {
+  if (task.status !== 'initiated') {
+    throw new GenjutsuAttemptConflictError(
+      'GENERATION_ALREADY_STARTED',
+      'This generation has already started and its upload inputs can no longer be changed'
+    );
+  }
+
+  let options: any = null;
+  try {
+    options = task.options ? JSON.parse(task.options) : null;
+  } catch {
+    options = null;
+  }
+
+  const imageKeys = Array.isArray(options?.imageKeys)
+    ? options.imageKeys
+    : null;
+  const matches =
+    task.provider === params.provider &&
+    task.model === params.model &&
+    (task.prompt || '') === params.prompt &&
+    options?.mode === params.mode &&
+    options?.resolution === params.resolution &&
+    options?.prompt === params.prompt &&
+    options?.videoKey === params.videoKey &&
+    imageKeys !== null &&
+    imageKeys.length === params.imageKeys.length &&
+    imageKeys.every(
+      (key: unknown, index: number) => key === params.imageKeys[index]
+    );
+
+  if (!matches) {
+    throw new GenjutsuAttemptConflictError(
+      'GENERATION_INPUT_CONFLICT',
+      'This generation ID is already bound to different upload inputs'
+    );
+  }
+
+  return task;
+}
+
 export function assertGenerationId(value: unknown): string {
   if (
     typeof value !== 'string' ||
@@ -64,7 +129,7 @@ export async function createGenjutsuAttempt(params: {
     generationId: params.generationId,
     userId: params.userId,
   });
-  if (existing) return existing;
+  if (existing) return assertReusableGenjutsuAttempt(existing, params);
 
   const task = {
     id: params.generationId,
@@ -104,7 +169,7 @@ export async function createGenjutsuAttempt(params: {
       generationId: params.generationId,
       userId: params.userId,
     });
-    if (raced) return raced;
+    if (raced) return assertReusableGenjutsuAttempt(raced, params);
     throw error;
   }
 }
