@@ -7,6 +7,7 @@ import {
   claimGenjutsuSubmission,
   getGenjutsuTaskById,
   InsufficientCreditsError,
+  markGenjutsuAttemptInsufficient,
   markGenjutsuSubmissionUnknown,
   markGenjutsuSubmitted,
   parseGenjutsuTaskInfo,
@@ -263,6 +264,12 @@ async function POST({ request }: { request: Request }) {
       });
       const balance = await getBalance(session.user.id);
       if (balance < minimumCredits) {
+        await markGenjutsuAttemptInsufficient({
+          generationId,
+          userId: session.user.id,
+          requiredCredits: minimumCredits,
+          balance,
+        });
         throw new InsufficientCreditsError(minimumCredits, balance);
       }
     } else if (needsReservation && target.provider === 'seedance') {
@@ -277,6 +284,12 @@ async function POST({ request }: { request: Request }) {
       const credits = calculateGenjutsuCredits(estimate.providerCostUsd);
       const balance = await getBalance(session.user.id);
       if (balance < credits) {
+        await markGenjutsuAttemptInsufficient({
+          generationId,
+          userId: session.user.id,
+          requiredCredits: credits,
+          balance,
+        });
         throw new InsufficientCreditsError(credits, balance);
       }
 
