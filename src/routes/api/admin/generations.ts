@@ -78,6 +78,7 @@ async function GET({ request }: { request: Request }) {
         taskId: aiTask.taskId,
         options: aiTask.options,
         taskInfo: aiTask.taskInfo,
+        taskResult: aiTask.taskResult,
         costCredits: aiTask.costCredits,
         createdAt: aiTask.createdAt,
         updatedAt: aiTask.updatedAt,
@@ -92,6 +93,7 @@ async function GET({ request }: { request: Request }) {
     const items = rows.map((row) => {
       const options = parseJson(row.options);
       const info = parseJson(row.taskInfo);
+      const result = parseJson(row.taskResult);
       return {
         id: row.id,
         userId: row.userId,
@@ -105,6 +107,11 @@ async function GET({ request }: { request: Request }) {
           typeof options?.resolution === 'string' ? options.resolution : null,
         status: row.status,
         taskId: row.taskId,
+        providerStatus:
+          typeof result?.providerStatus === 'string'
+            ? result.providerStatus
+            : null,
+        error: typeof result?.error === 'string' ? result.error : null,
         costCredits: row.costCredits,
         providerCostUsd:
           typeof info?.providerCostUsd === 'number'
