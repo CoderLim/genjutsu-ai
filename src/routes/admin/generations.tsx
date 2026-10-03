@@ -110,39 +110,12 @@ function GenerationsPage() {
       ),
     },
     {
-      header: m['admin.generations.generation'](),
-      cell: (g) => (
-        <div className="max-w-[220px]">
-          <div className="font-mono text-xs">{g.id}</div>
-          {g.prompt ? (
-            <div
-              className="text-muted-foreground mt-1 truncate text-xs"
-              title={g.prompt}
-            >
-              {g.prompt}
-            </div>
-          ) : null}
-        </div>
-      ),
-    },
-    {
       header: m['admin.generations.mode'](),
       cell: (g) => (
         <div className="text-sm">
           <div>{g.mode || '—'}</div>
           <div className="text-muted-foreground text-xs">
             {g.resolution || '—'}
-          </div>
-        </div>
-      ),
-    },
-    {
-      header: m['admin.generations.provider'](),
-      cell: (g) => (
-        <div className="max-w-[220px] text-sm">
-          <div className="font-medium">{g.provider}</div>
-          <div className="text-muted-foreground truncate text-xs" title={g.model}>
-            {g.model}
           </div>
         </div>
       ),
@@ -180,14 +153,6 @@ function GenerationsPage() {
           </div>
         </div>
       ),
-    },
-    {
-      header: m['admin.generations.duration'](),
-      className: 'w-[90px]',
-      cell: (g) =>
-        g.sourceDurationSeconds == null
-          ? '—'
-          : `${g.sourceDurationSeconds.toFixed(1)}s`,
     },
     {
       header: m['admin.generations.created_at'](),
