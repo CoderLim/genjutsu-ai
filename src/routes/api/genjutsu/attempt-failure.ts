@@ -3,10 +3,15 @@ import { createFileRoute } from '@tanstack/react-router';
 import { getAuth } from '@/core/auth';
 import {
   assertGenerationId,
+  getGenjutsuTaskById,
+  getGenjutsuUploadBinding,
   markGenjutsuUploadFailed,
+  recordGenjutsuUploadObservation,
 } from '@/modules/genjutsu/billing';
+import { inspectGenjutsuStagingObject } from '@/modules/genjutsu/storage';
 import { enforceMinIntervalRateLimit } from '@/lib/rate-limit';
 import { respData, respErr } from '@/lib/resp';
+import { sanitizeUploadDiagnostics } from '@/lib/upload-diagnostics';
 
 const UPLOAD_ERROR_CODES = new Set([
   'UPLOAD_HTTP_ERROR',
@@ -28,8 +33,41 @@ async function POST({ request }: { request: Request }) {
 
     const body = await request.json().catch(() => ({}));
     const generationId = assertGenerationId(body.generationId);
-    const errorCode =
-      typeof body.errorCode === 'string' ? body.errorCode : '';
+
+    // Lightweight observation for successful uploads that needed retries.
+    if (body.event === 'retry_succeeded') {
+      const fileIndex = Number(body.fileIndex);
+      if (!Number.isInteger(fileIndex) || fileIndex < 0 || fileIndex > 8) {
+        return respErr('Invalid upload file index', { status: 400 });
+      }
+      const diagnostics = sanitizeUploadDiagnostics(body.diagnostics);
+      const task = await recordGenjutsuUploadObservation({
+        generationId,
+        userId: session.user.id,
+        observation: {
+          kind: 'retry_succeeded',
+          fileIndex,
+          fileType: fileIndex === 0 ? 'video' : 'image',
+          attemptCount: diagnostics.attemptCount ?? null,
+          uploadElapsedMs: diagnostics.uploadElapsedMs ?? null,
+          online: diagnostics.online ?? null,
+          visibilityState: diagnostics.visibilityState ?? null,
+          browser: diagnostics.browser ?? null,
+          os: diagnostics.os ?? null,
+        },
+      });
+      if (!task)
+        return respErr('Generation attempt not found', { status: 404 });
+      return respData({
+        generationId,
+        status: task.status,
+        recorded: true,
+        recovered: false,
+        event: 'retry_succeeded',
+      });
+    }
+
+    const errorCode = typeof body.errorCode === 'string' ? body.errorCode : '';
     if (!UPLOAD_ERROR_CODES.has(errorCode)) {
       return respErr('Invalid upload failure code', { status: 400 });
     }
@@ -45,6 +83,7 @@ async function POST({ request }: { request: Request }) {
       Number.isInteger(rawStatus) && rawStatus >= 400 && rawStatus <= 599
         ? rawStatus
         : null;
+    const diagnostics = sanitizeUploadDiagnostics(body.diagnostics);
 
     let error: string;
     if (errorCode === 'UPLOAD_HTTP_ERROR') {
@@ -57,7 +96,110 @@ async function POST({ request }: { request: Request }) {
       error = `Network error while uploading ${fileType} ${fileIndex}`;
     }
 
-    const task = await markGenjutsuUploadFailed({
+    const task = await getGenjutsuTaskById({
+      generationId,
+      userId: session.user.id,
+    });
+    if (!task) return respErr('Generation attempt not found', { status: 404 });
+    if (task.status !== 'initiated') {
+      return respData({
+        generationId,
+        status: task.status,
+        recorded: false,
+        recovered: false,
+        r2ObjectExists: null,
+        r2ObjectSizeMatches: null,
+        r2ObjectTypeMatches: null,
+        r2InspectionStatus: null,
+        r2InspectionError: null,
+      });
+    }
+
+    const binding = getGenjutsuUploadBinding(task);
+    const storageKey =
+      fileIndex === 0 ? binding?.videoKey : binding?.imageKeys?.[fileIndex - 1];
+
+    let inspection = {
+      exists: null as boolean | null,
+      sizeMatches: null as boolean | null,
+      typeMatches: null as boolean | null,
+      contentLength: null as number | null,
+      contentType: null as string | null,
+      inspectionStatus: 'skipped' as 'ok' | 'missing' | 'error' | 'skipped',
+      inspectionError: null as string | null,
+    };
+
+    if (storageKey && binding) {
+      try {
+        inspection = await inspectGenjutsuStagingObject({
+          userId: session.user.id,
+          generationId,
+          fileIndex,
+          storageKey,
+          expectedContentType: binding.contentTypes[fileIndex],
+          expectedContentLength: binding.contentLengths[fileIndex],
+        });
+      } catch (inspectError) {
+        console.error('genjutsu attempt-failure inspect failed:', inspectError);
+        inspection = {
+          exists: null,
+          sizeMatches: null,
+          typeMatches: null,
+          contentLength: null,
+          contentType: null,
+          inspectionStatus: 'error',
+          inspectionError:
+            inspectError instanceof Error
+              ? inspectError.message.slice(0, 200)
+              : 'Inspection failed',
+        };
+      }
+    }
+
+    const canRecover =
+      (errorCode === 'UPLOAD_NETWORK_ERROR' ||
+        errorCode === 'UPLOAD_ABORTED') &&
+      inspection.exists === true &&
+      inspection.sizeMatches === true &&
+      inspection.typeMatches === true;
+
+    if (canRecover) {
+      await recordGenjutsuUploadObservation({
+        generationId,
+        userId: session.user.id,
+        observation: {
+          kind: 'head_recovered',
+          fileIndex,
+          fileType,
+          attemptCount: diagnostics.attemptCount ?? null,
+          uploadElapsedMs: diagnostics.uploadElapsedMs ?? null,
+          online: diagnostics.online ?? null,
+          visibilityState: diagnostics.visibilityState ?? null,
+          browser: diagnostics.browser ?? null,
+          os: diagnostics.os ?? null,
+          errorName: diagnostics.errorName ?? null,
+          r2ObjectExists: true,
+          r2ObjectSizeMatches: true,
+          r2ObjectTypeMatches: true,
+          r2InspectionStatus: 'ok',
+          recovered: true,
+        },
+      });
+
+      return respData({
+        generationId,
+        status: task.status,
+        recorded: true,
+        recovered: true,
+        r2ObjectExists: true,
+        r2ObjectSizeMatches: true,
+        r2ObjectTypeMatches: true,
+        r2InspectionStatus: 'ok',
+        r2InspectionError: null,
+      });
+    }
+
+    const updated = await markGenjutsuUploadFailed({
       generationId,
       userId: session.user.id,
       errorCode: errorCode as
@@ -68,14 +210,34 @@ async function POST({ request }: { request: Request }) {
       fileIndex,
       fileType,
       httpStatus,
+      attemptCount: diagnostics.attemptCount ?? null,
+      uploadElapsedMs: diagnostics.uploadElapsedMs ?? null,
+      online: diagnostics.online ?? null,
+      visibilityState: diagnostics.visibilityState ?? null,
+      browser: diagnostics.browser ?? null,
+      os: diagnostics.os ?? null,
+      errorName: diagnostics.errorName ?? null,
+      r2ObjectExists: inspection.exists,
+      r2ObjectSizeMatches: inspection.sizeMatches,
+      r2ObjectTypeMatches: inspection.typeMatches,
+      r2InspectionStatus: inspection.inspectionStatus,
+      r2InspectionError: inspection.inspectionError,
+      recovered: false,
     });
 
-    if (!task) return respErr('Generation attempt not found', { status: 404 });
+    if (!updated)
+      return respErr('Generation attempt not found', { status: 404 });
 
     return respData({
       generationId,
-      status: task.status,
-      recorded: task.status === 'failed_preflight',
+      status: updated.status,
+      recorded: updated.status === 'failed_preflight',
+      recovered: false,
+      r2ObjectExists: inspection.exists,
+      r2ObjectSizeMatches: inspection.sizeMatches,
+      r2ObjectTypeMatches: inspection.typeMatches,
+      r2InspectionStatus: inspection.inspectionStatus,
+      r2InspectionError: inspection.inspectionError,
     });
   } catch (error: any) {
     console.error('genjutsu attempt-failure failed:', error);

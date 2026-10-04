@@ -94,6 +94,12 @@ async function GET({ request }: { request: Request }) {
       const options = parseJson(row.options);
       const info = parseJson(row.taskInfo);
       const result = parseJson(row.taskResult);
+      const recovery =
+        info?.uploadRecovery &&
+        typeof info.uploadRecovery === 'object' &&
+        !Array.isArray(info.uploadRecovery)
+          ? (info.uploadRecovery as Record<string, unknown>)
+          : null;
       const hasSourceVideo =
         typeof options?.videoKey === 'string' && options.videoKey.length > 0;
       return {
@@ -115,16 +121,92 @@ async function GET({ request }: { request: Request }) {
           typeof result?.providerStatus === 'string'
             ? result.providerStatus
             : null,
-        failureStage:
-          typeof result?.stage === 'string' ? result.stage : null,
+        failureStage: typeof result?.stage === 'string' ? result.stage : null,
         errorCode:
           typeof result?.errorCode === 'string' ? result.errorCode : null,
         errorFileIndex:
-          typeof result?.fileIndex === 'number' ? result.fileIndex : null,
+          typeof result?.fileIndex === 'number'
+            ? result.fileIndex
+            : typeof recovery?.fileIndex === 'number'
+              ? recovery.fileIndex
+              : null,
         errorFileType:
-          typeof result?.fileType === 'string' ? result.fileType : null,
+          typeof result?.fileType === 'string'
+            ? result.fileType
+            : typeof recovery?.fileType === 'string'
+              ? recovery.fileType
+              : null,
         errorHttpStatus:
           typeof result?.httpStatus === 'number' ? result.httpStatus : null,
+        uploadAttemptCount:
+          typeof result?.attemptCount === 'number'
+            ? result.attemptCount
+            : typeof recovery?.attemptCount === 'number'
+              ? recovery.attemptCount
+              : null,
+        uploadElapsedMs:
+          typeof result?.uploadElapsedMs === 'number'
+            ? result.uploadElapsedMs
+            : typeof recovery?.uploadElapsedMs === 'number'
+              ? recovery.uploadElapsedMs
+              : null,
+        uploadBrowser:
+          typeof result?.browser === 'string'
+            ? result.browser
+            : typeof recovery?.browser === 'string'
+              ? recovery.browser
+              : null,
+        uploadOs:
+          typeof result?.os === 'string'
+            ? result.os
+            : typeof recovery?.os === 'string'
+              ? recovery.os
+              : null,
+        uploadOnline:
+          typeof result?.online === 'boolean'
+            ? result.online
+            : typeof recovery?.online === 'boolean'
+              ? recovery.online
+              : null,
+        r2ObjectExists:
+          typeof result?.r2ObjectExists === 'boolean'
+            ? result.r2ObjectExists
+            : typeof recovery?.r2ObjectExists === 'boolean'
+              ? recovery.r2ObjectExists
+              : null,
+        r2ObjectSizeMatches:
+          typeof result?.r2ObjectSizeMatches === 'boolean'
+            ? result.r2ObjectSizeMatches
+            : typeof recovery?.r2ObjectSizeMatches === 'boolean'
+              ? recovery.r2ObjectSizeMatches
+              : null,
+        r2ObjectTypeMatches:
+          typeof result?.r2ObjectTypeMatches === 'boolean'
+            ? result.r2ObjectTypeMatches
+            : typeof recovery?.r2ObjectTypeMatches === 'boolean'
+              ? recovery.r2ObjectTypeMatches
+              : null,
+        r2InspectionStatus:
+          typeof result?.r2InspectionStatus === 'string'
+            ? result.r2InspectionStatus
+            : typeof recovery?.r2InspectionStatus === 'string'
+              ? recovery.r2InspectionStatus
+              : null,
+        r2InspectionError:
+          typeof result?.r2InspectionError === 'string'
+            ? result.r2InspectionError
+            : typeof recovery?.r2InspectionError === 'string'
+              ? recovery.r2InspectionError
+              : null,
+        uploadRecovered:
+          typeof result?.recovered === 'boolean'
+            ? result.recovered
+            : recovery?.recovered === true
+              ? true
+              : null,
+        uploadRetrySuccessCount: Array.isArray(info?.uploadRetrySuccesses)
+          ? info.uploadRetrySuccesses.length
+          : null,
         error: typeof result?.error === 'string' ? result.error : null,
         costCredits: row.costCredits,
         providerCostUsd:

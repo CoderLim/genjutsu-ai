@@ -14,8 +14,18 @@ import { toast } from 'sonner';
 
 import { useSession } from '@/core/auth/client';
 import { estimateGenjutsuCredits } from '@/modules/genjutsu/pricing';
-import { ApiError, apiGet, apiPost, uploadToSignedUrl } from '@/lib/api-client';
+import {
+  ApiError,
+  apiGet,
+  apiPost,
+  SignedUploadError,
+  uploadToSignedUrl,
+} from '@/lib/api-client';
 import { cn } from '@/lib/cn';
+import {
+  collectUploadDiagnostics,
+  type UploadClientDiagnostics,
+} from '@/lib/upload-diagnostics';
 import { m } from '@/paraglide/messages.js';
 import { useUserCredits } from '@/hooks/use-user-credits';
 import {
@@ -479,6 +489,28 @@ function generationFailureUiMessage(error?: string | null) {
 }
 
 function classifyUploadFailure(cause: unknown) {
+  if (cause instanceof SignedUploadError) {
+    if (cause.httpStatus != null) {
+      return {
+        errorCode: 'UPLOAD_HTTP_ERROR' as const,
+        httpStatus: cause.httpStatus,
+        diagnostics: cause.diagnostics,
+      };
+    }
+    if (cause.cause instanceof Error && cause.cause.name === 'AbortError') {
+      return {
+        errorCode: 'UPLOAD_ABORTED' as const,
+        httpStatus: null,
+        diagnostics: cause.diagnostics,
+      };
+    }
+    return {
+      errorCode: 'UPLOAD_NETWORK_ERROR' as const,
+      httpStatus: null,
+      diagnostics: cause.diagnostics,
+    };
+  }
+
   if (
     cause instanceof ApiError &&
     Number.isInteger(cause.code) &&
@@ -488,6 +520,7 @@ function classifyUploadFailure(cause: unknown) {
     return {
       errorCode: 'UPLOAD_HTTP_ERROR' as const,
       httpStatus: cause.code,
+      diagnostics: null as UploadClientDiagnostics | null,
     };
   }
 
@@ -495,12 +528,14 @@ function classifyUploadFailure(cause: unknown) {
     return {
       errorCode: 'UPLOAD_ABORTED' as const,
       httpStatus: null,
+      diagnostics: null as UploadClientDiagnostics | null,
     };
   }
 
   return {
     errorCode: 'UPLOAD_NETWORK_ERROR' as const,
     httpStatus: null,
+    diagnostics: null as UploadClientDiagnostics | null,
   };
 }
 
@@ -510,11 +545,37 @@ async function reportUploadFailure(params: {
   cause: unknown;
 }) {
   const failure = classifyUploadFailure(params.cause);
-  await apiPost('/api/genjutsu/attempt-failure', {
+  return apiPost<{
+    generationId: string;
+    status: string;
+    recorded: boolean;
+    recovered: boolean;
+    r2ObjectExists: boolean | null;
+    r2ObjectSizeMatches: boolean | null;
+    r2ObjectTypeMatches: boolean | null;
+  }>('/api/genjutsu/attempt-failure', {
     generationId: params.generationId,
     fileIndex: params.fileIndex,
     errorCode: failure.errorCode,
     httpStatus: failure.httpStatus,
+    diagnostics: failure.diagnostics,
+  });
+}
+
+async function reportUploadRetrySucceeded(params: {
+  generationId: string;
+  fileIndex: number;
+  attemptCount: number;
+  uploadElapsedMs: number;
+}) {
+  return apiPost('/api/genjutsu/attempt-failure', {
+    generationId: params.generationId,
+    fileIndex: params.fileIndex,
+    event: 'retry_succeeded',
+    diagnostics: collectUploadDiagnostics({
+      attemptCount: params.attemptCount,
+      uploadElapsedMs: params.uploadElapsedMs,
+    }),
   });
 }
 
@@ -1235,17 +1296,28 @@ export function GeneratorPanel({
         const upload = uploadBatch.uploads[index];
         if (!upload) throw new Error('Missing storage upload URL');
         try {
-          await uploadToSignedUrl({
+          const uploaded = await uploadToSignedUrl({
             url: upload.uploadUrl,
             file: media[index].file,
             headers: upload.uploadHeaders,
           });
+          if (uploaded.attemptCount > 1) {
+            await reportUploadRetrySucceeded({
+              generationId,
+              fileIndex: index,
+              attemptCount: uploaded.attemptCount,
+              uploadElapsedMs: uploaded.uploadElapsedMs,
+            }).catch(() => undefined);
+          }
         } catch (cause) {
-          await reportUploadFailure({
+          const report = await reportUploadFailure({
             generationId,
             fileIndex: index,
             cause,
-          }).catch(() => undefined);
+          }).catch(() => null);
+          if (report?.recovered) {
+            continue;
+          }
           throw cause;
         }
       }

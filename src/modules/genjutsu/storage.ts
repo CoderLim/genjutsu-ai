@@ -3,7 +3,7 @@ import { AwsClient } from 'aws4fetch';
 import { getAllConfigs } from '@/modules/config/service';
 import { getStorage } from '@/modules/storage/service';
 
-const UPLOAD_EXPIRES_SECONDS = 5 * 60;
+const UPLOAD_EXPIRES_SECONDS = 15 * 60;
 const READ_EXPIRES_SECONDS = 60 * 60;
 
 export const GENJUTSU_MAX_VIDEO_BYTES = 200 * 1024 * 1024;
@@ -181,32 +181,180 @@ async function signR2Object(params: {
 }
 
 async function headR2Object(key: string): Promise<GenjutsuObjectMetadata> {
-  const config = await getR2SigningConfig();
-  const response = await createR2Client(config).fetch(
-    new Request(buildR2ObjectUrl(config, key), { method: 'HEAD' })
-  );
-
-  if (!response.ok) {
+  const result = await headR2ObjectResult(key);
+  if (result.status === 'ok') return result.metadata;
+  if (result.status === 'missing') {
     throw new Error(`Uploaded media is missing from R2: ${key}`);
   }
+  throw new Error(
+    `Failed to inspect R2 object ${key}: ${result.error}${
+      result.httpStatus != null ? ` (HTTP ${result.httpStatus})` : ''
+    }`
+  );
+}
 
-  const rawLength = response.headers.get('content-length');
-  const contentLength = rawLength ? Number(rawLength) : NaN;
-  const contentType =
-    response.headers
-      .get('content-type')
-      ?.split(';', 1)[0]
-      ?.trim()
-      .toLowerCase() || '';
+type HeadR2ObjectResult =
+  | { status: 'ok'; metadata: GenjutsuObjectMetadata }
+  | { status: 'missing' }
+  | { status: 'error'; error: string; httpStatus?: number };
 
-  if (!Number.isSafeInteger(contentLength) || contentLength <= 0) {
-    throw new Error(`R2 object has an invalid content length: ${key}`);
+async function headR2ObjectResult(key: string): Promise<HeadR2ObjectResult> {
+  try {
+    const config = await getR2SigningConfig();
+    const response = await createR2Client(config).fetch(
+      new Request(buildR2ObjectUrl(config, key), { method: 'HEAD' })
+    );
+
+    if (response.status === 404) {
+      return { status: 'missing' };
+    }
+
+    if (!response.ok) {
+      return {
+        status: 'error',
+        error: `HEAD failed with HTTP ${response.status}`,
+        httpStatus: response.status,
+      };
+    }
+
+    const rawLength = response.headers.get('content-length');
+    const contentLength = rawLength ? Number(rawLength) : NaN;
+    const contentType =
+      response.headers
+        .get('content-type')
+        ?.split(';', 1)[0]
+        ?.trim()
+        .toLowerCase() || '';
+
+    if (!Number.isSafeInteger(contentLength) || contentLength <= 0) {
+      return {
+        status: 'error',
+        error: 'R2 object has an invalid content length',
+        httpStatus: response.status,
+      };
+    }
+
+    return {
+      status: 'ok',
+      metadata: {
+        contentLength,
+        contentType,
+        etag: response.headers.get('etag') || undefined,
+      },
+    };
+  } catch (error) {
+    return {
+      status: 'error',
+      error:
+        error instanceof Error
+          ? error.message.slice(0, 200)
+          : 'HEAD request failed',
+    };
+  }
+}
+
+export function assertGenjutsuStagingKeyOwned(params: {
+  userId: string;
+  generationId: string;
+  fileIndex: number;
+  key: string;
+}) {
+  assertSafeObjectKey(params.key);
+  const prefix = getGenjutsuInputPrefix(params);
+  const escapedPrefix = escapeRegExp(prefix);
+
+  if (params.fileIndex === 0) {
+    const sourcePattern = new RegExp(
+      `^${escapedPrefix}source\\.(?:mp4|mov|webm)$`
+    );
+    if (!sourcePattern.test(params.key)) {
+      throw new Error('Invalid Genjutsu source-video storage key');
+    }
+    return;
   }
 
+  const expectedName = `reference-${String(params.fileIndex).padStart(2, '0')}`;
+  const referencePattern = new RegExp(
+    `^${escapedPrefix}${escapeRegExp(expectedName)}\\.(?:jpg|png|webp|gif|avif|heic|heif)$`
+  );
+  if (!referencePattern.test(params.key)) {
+    throw new Error('Invalid Genjutsu reference-image storage key');
+  }
+}
+
+export type GenjutsuStagingObjectInspection = {
+  exists: boolean | null;
+  sizeMatches: boolean | null;
+  typeMatches: boolean | null;
+  contentLength: number | null;
+  contentType: string | null;
+  inspectionStatus: 'ok' | 'missing' | 'error';
+  inspectionError: string | null;
+};
+
+export async function inspectGenjutsuStagingObject(params: {
+  userId: string;
+  generationId: string;
+  fileIndex: number;
+  storageKey: string;
+  expectedContentType?: string;
+  expectedContentLength?: number;
+}): Promise<GenjutsuStagingObjectInspection> {
+  assertGenjutsuStagingKeyOwned({
+    userId: params.userId,
+    generationId: params.generationId,
+    fileIndex: params.fileIndex,
+    key: params.storageKey,
+  });
+
+  const head = await headR2ObjectResult(params.storageKey);
+
+  if (head.status === 'missing') {
+    return {
+      exists: false,
+      sizeMatches: false,
+      typeMatches: false,
+      contentLength: null,
+      contentType: null,
+      inspectionStatus: 'missing',
+      inspectionError: null,
+    };
+  }
+
+  if (head.status === 'error') {
+    return {
+      exists: null,
+      sizeMatches: null,
+      typeMatches: null,
+      contentLength: null,
+      contentType: null,
+      inspectionStatus: 'error',
+      inspectionError: head.error,
+    };
+  }
+
+  const metadata = head.metadata;
+  const expectedType = params.expectedContentType
+    ?.split(';', 1)[0]
+    ?.trim()
+    .toLowerCase();
+  const typeMatches = expectedType
+    ? metadata.contentType === expectedType
+    : true;
+  const sizeMatches =
+    Number.isSafeInteger(params.expectedContentLength) &&
+    params.expectedContentLength! > 0
+      ? metadata.contentLength === params.expectedContentLength
+      : true;
+
   return {
-    contentLength,
-    contentType,
-    etag: response.headers.get('etag') || undefined,
+    exists: true,
+    sizeMatches,
+    typeMatches,
+    contentLength: metadata.contentLength,
+    contentType: metadata.contentType,
+    inspectionStatus: 'ok',
+    inspectionError: null,
   };
 }
 
