@@ -51,7 +51,9 @@ interface Generation {
   uploadOnline: boolean | null;
   r2ObjectExists: boolean | null;
   r2ObjectSizeMatches: boolean | null;
+  r2InspectionStatus: string | null;
   uploadRecovered: boolean | null;
+  uploadRetrySuccessCount: number | null;
   error: string | null;
   costCredits: number;
   providerCostUsd: number | null;
@@ -235,6 +237,9 @@ function GenerationsPage() {
           {g.uploadAttemptCount != null ||
           g.uploadElapsedMs != null ||
           g.r2ObjectExists != null ||
+          g.r2InspectionStatus ||
+          g.uploadRecovered ||
+          g.uploadRetrySuccessCount ||
           g.uploadBrowser ||
           g.uploadOs ? (
             <div className="text-muted-foreground mt-1 font-mono text-xs">
@@ -243,14 +248,21 @@ function GenerationsPage() {
                   ? `${g.uploadAttemptCount}x`
                   : null,
                 g.uploadElapsedMs != null ? `${g.uploadElapsedMs}ms` : null,
-                g.r2ObjectExists == null
-                  ? null
-                  : g.r2ObjectExists
-                    ? g.r2ObjectSizeMatches === false
-                      ? 'r2 size mismatch'
-                      : 'r2 exists'
-                    : 'r2 missing',
+                g.r2InspectionStatus === 'error'
+                  ? 'r2 inspect error'
+                  : g.r2InspectionStatus === 'skipped'
+                    ? 'r2 inspect skipped'
+                    : g.r2ObjectExists == null
+                      ? null
+                      : g.r2ObjectExists
+                        ? g.r2ObjectSizeMatches === false
+                          ? 'r2 size mismatch'
+                          : 'r2 exists'
+                        : 'r2 missing',
                 g.uploadRecovered ? 'recovered' : null,
+                g.uploadRetrySuccessCount
+                  ? `retry-ok ${g.uploadRetrySuccessCount}`
+                  : null,
                 [g.uploadBrowser, g.uploadOs].filter(Boolean).join('/'),
                 g.uploadOnline == null
                   ? null

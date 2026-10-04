@@ -181,43 +181,76 @@ async function signR2Object(params: {
 }
 
 async function headR2Object(key: string): Promise<GenjutsuObjectMetadata> {
-  const metadata = await headR2ObjectIfExists(key);
-  if (!metadata) {
+  const result = await headR2ObjectResult(key);
+  if (result.status === 'ok') return result.metadata;
+  if (result.status === 'missing') {
     throw new Error(`Uploaded media is missing from R2: ${key}`);
   }
-  return metadata;
+  throw new Error(
+    `Failed to inspect R2 object ${key}: ${result.error}${
+      result.httpStatus != null ? ` (HTTP ${result.httpStatus})` : ''
+    }`
+  );
 }
 
-async function headR2ObjectIfExists(
-  key: string
-): Promise<GenjutsuObjectMetadata | null> {
-  const config = await getR2SigningConfig();
-  const response = await createR2Client(config).fetch(
-    new Request(buildR2ObjectUrl(config, key), { method: 'HEAD' })
-  );
+type HeadR2ObjectResult =
+  | { status: 'ok'; metadata: GenjutsuObjectMetadata }
+  | { status: 'missing' }
+  | { status: 'error'; error: string; httpStatus?: number };
 
-  if (response.status === 404 || !response.ok) {
-    return null;
+async function headR2ObjectResult(key: string): Promise<HeadR2ObjectResult> {
+  try {
+    const config = await getR2SigningConfig();
+    const response = await createR2Client(config).fetch(
+      new Request(buildR2ObjectUrl(config, key), { method: 'HEAD' })
+    );
+
+    if (response.status === 404) {
+      return { status: 'missing' };
+    }
+
+    if (!response.ok) {
+      return {
+        status: 'error',
+        error: `HEAD failed with HTTP ${response.status}`,
+        httpStatus: response.status,
+      };
+    }
+
+    const rawLength = response.headers.get('content-length');
+    const contentLength = rawLength ? Number(rawLength) : NaN;
+    const contentType =
+      response.headers
+        .get('content-type')
+        ?.split(';', 1)[0]
+        ?.trim()
+        .toLowerCase() || '';
+
+    if (!Number.isSafeInteger(contentLength) || contentLength <= 0) {
+      return {
+        status: 'error',
+        error: 'R2 object has an invalid content length',
+        httpStatus: response.status,
+      };
+    }
+
+    return {
+      status: 'ok',
+      metadata: {
+        contentLength,
+        contentType,
+        etag: response.headers.get('etag') || undefined,
+      },
+    };
+  } catch (error) {
+    return {
+      status: 'error',
+      error:
+        error instanceof Error
+          ? error.message.slice(0, 200)
+          : 'HEAD request failed',
+    };
   }
-
-  const rawLength = response.headers.get('content-length');
-  const contentLength = rawLength ? Number(rawLength) : NaN;
-  const contentType =
-    response.headers
-      .get('content-type')
-      ?.split(';', 1)[0]
-      ?.trim()
-      .toLowerCase() || '';
-
-  if (!Number.isSafeInteger(contentLength) || contentLength <= 0) {
-    return null;
-  }
-
-  return {
-    contentLength,
-    contentType,
-    etag: response.headers.get('etag') || undefined,
-  };
 }
 
 export function assertGenjutsuStagingKeyOwned(params: {
@@ -250,11 +283,13 @@ export function assertGenjutsuStagingKeyOwned(params: {
 }
 
 export type GenjutsuStagingObjectInspection = {
-  exists: boolean;
-  sizeMatches: boolean;
-  typeMatches: boolean;
+  exists: boolean | null;
+  sizeMatches: boolean | null;
+  typeMatches: boolean | null;
   contentLength: number | null;
   contentType: string | null;
+  inspectionStatus: 'ok' | 'missing' | 'error';
+  inspectionError: string | null;
 };
 
 export async function inspectGenjutsuStagingObject(params: {
@@ -272,23 +307,33 @@ export async function inspectGenjutsuStagingObject(params: {
     key: params.storageKey,
   });
 
-  let metadata: GenjutsuObjectMetadata | null = null;
-  try {
-    metadata = await headR2ObjectIfExists(params.storageKey);
-  } catch {
-    metadata = null;
-  }
+  const head = await headR2ObjectResult(params.storageKey);
 
-  if (!metadata) {
+  if (head.status === 'missing') {
     return {
       exists: false,
       sizeMatches: false,
       typeMatches: false,
       contentLength: null,
       contentType: null,
+      inspectionStatus: 'missing',
+      inspectionError: null,
     };
   }
 
+  if (head.status === 'error') {
+    return {
+      exists: null,
+      sizeMatches: null,
+      typeMatches: null,
+      contentLength: null,
+      contentType: null,
+      inspectionStatus: 'error',
+      inspectionError: head.error,
+    };
+  }
+
+  const metadata = head.metadata;
   const expectedType = params.expectedContentType
     ?.split(';', 1)[0]
     ?.trim()
@@ -308,6 +353,8 @@ export async function inspectGenjutsuStagingObject(params: {
     typeMatches,
     contentLength: metadata.contentLength,
     contentType: metadata.contentType,
+    inspectionStatus: 'ok',
+    inspectionError: null,
   };
 }
 

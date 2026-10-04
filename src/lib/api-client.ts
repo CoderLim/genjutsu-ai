@@ -1,6 +1,7 @@
 import {
   collectUploadDiagnostics,
   isRetryableUploadFailure,
+  UPLOAD_PUT_TIMEOUT_MS,
   UPLOAD_RETRY_DELAYS_MS,
   type UploadClientDiagnostics,
 } from '@/lib/upload-diagnostics';
@@ -95,17 +96,33 @@ async function putSignedUploadOnce(params: {
   file: File;
   headers?: Record<string, string>;
 }) {
-  const response = await fetch(params.url, {
-    method: 'PUT',
-    headers: params.headers,
-    body: params.file,
-    credentials: 'omit',
-  });
-  if (!response.ok) {
-    throw new ApiError(
-      response.status,
-      `Upload failed with HTTP ${response.status}`
-    );
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), UPLOAD_PUT_TIMEOUT_MS);
+  try {
+    const response = await fetch(params.url, {
+      method: 'PUT',
+      headers: params.headers,
+      body: params.file,
+      credentials: 'omit',
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      throw new ApiError(
+        response.status,
+        `Upload failed with HTTP ${response.status}`
+      );
+    }
+  } catch (cause) {
+    if (cause instanceof Error && cause.name === 'AbortError') {
+      const timeout = new Error(
+        `Upload timed out after ${UPLOAD_PUT_TIMEOUT_MS}ms`
+      );
+      timeout.name = 'UploadTimeoutError';
+      throw timeout;
+    }
+    throw cause;
+  } finally {
+    clearTimeout(timer);
   }
 }
 

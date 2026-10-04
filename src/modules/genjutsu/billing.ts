@@ -65,6 +65,31 @@ function parseTaskOptions(task: { options?: string | null }) {
   }
 }
 
+function parseTaskInfo(task: {
+  taskInfo?: string | null;
+}): Record<string, unknown> {
+  if (!task.taskInfo) return {};
+  try {
+    const parsed = JSON.parse(task.taskInfo);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return {};
+    }
+    return parsed as Record<string, unknown>;
+  } catch {
+    return {};
+  }
+}
+
+function mergeTaskInfo(
+  task: { taskInfo?: string | null },
+  patch: Record<string, unknown>
+): string {
+  return JSON.stringify({
+    ...parseTaskInfo(task),
+    ...patch,
+  });
+}
+
 function assertAttemptMetadata(
   task: any,
   params: {
@@ -278,7 +303,7 @@ export async function bindGenjutsuUploadInputs(params: {
       .update(aiTask)
       .set({
         options: nextOptions,
-        taskInfo: JSON.stringify({
+        taskInfo: mergeTaskInfo(task, {
           attemptStage: 'upload_requested',
           providerCostUsd: null,
           providerEstimate: null,
@@ -393,7 +418,7 @@ export async function markGenjutsuAttemptReady(params: {
         videoKey: params.videoKey,
         imageKeys: params.imageKeys,
       }),
-      taskInfo: JSON.stringify({
+      taskInfo: mergeTaskInfo(task, {
         attemptStage: 'sealed',
         providerCostUsd: null,
         providerEstimate: null,
@@ -458,6 +483,8 @@ export async function markGenjutsuUploadFailed(params: {
   r2ObjectExists?: boolean | null;
   r2ObjectSizeMatches?: boolean | null;
   r2ObjectTypeMatches?: boolean | null;
+  r2InspectionStatus?: 'ok' | 'missing' | 'error' | 'skipped' | null;
+  r2InspectionError?: string | null;
   recovered?: boolean;
 }) {
   await db()
@@ -481,8 +508,102 @@ export async function markGenjutsuUploadFailed(params: {
         r2ObjectExists: params.r2ObjectExists ?? null,
         r2ObjectSizeMatches: params.r2ObjectSizeMatches ?? null,
         r2ObjectTypeMatches: params.r2ObjectTypeMatches ?? null,
+        r2InspectionStatus: params.r2InspectionStatus ?? null,
+        r2InspectionError: params.r2InspectionError ?? null,
         recovered: params.recovered ?? false,
       }),
+    })
+    .where(
+      and(
+        eq(aiTask.id, params.generationId),
+        eq(aiTask.userId, params.userId),
+        eq(aiTask.scene, GENJUTSU_SCENE),
+        eq(aiTask.status, 'initiated')
+      )
+    );
+
+  return getGenjutsuTaskById({
+    generationId: params.generationId,
+    userId: params.userId,
+  });
+}
+
+export type GenjutsuUploadObservation = {
+  kind: 'head_recovered' | 'retry_succeeded';
+  fileIndex: number;
+  fileType: 'video' | 'image';
+  attemptCount?: number | null;
+  uploadElapsedMs?: number | null;
+  online?: boolean | null;
+  visibilityState?: string | null;
+  browser?: string | null;
+  os?: string | null;
+  errorName?: string | null;
+  r2ObjectExists?: boolean | null;
+  r2ObjectSizeMatches?: boolean | null;
+  r2ObjectTypeMatches?: boolean | null;
+  r2InspectionStatus?: 'ok' | 'missing' | 'error' | 'skipped' | null;
+  r2InspectionError?: string | null;
+  recovered?: boolean;
+};
+
+export async function recordGenjutsuUploadObservation(params: {
+  generationId: string;
+  userId: string;
+  observation: GenjutsuUploadObservation;
+}) {
+  const task = await getGenjutsuTaskById({
+    generationId: params.generationId,
+    userId: params.userId,
+  });
+  if (!task || task.status !== 'initiated') return task;
+
+  const info = parseTaskInfo(task);
+  const patch: Record<string, unknown> = {};
+
+  if (params.observation.kind === 'head_recovered') {
+    patch.uploadRecovery = {
+      fileIndex: params.observation.fileIndex,
+      fileType: params.observation.fileType,
+      attemptCount: params.observation.attemptCount ?? null,
+      uploadElapsedMs: params.observation.uploadElapsedMs ?? null,
+      online: params.observation.online ?? null,
+      visibilityState: params.observation.visibilityState ?? null,
+      browser: params.observation.browser ?? null,
+      os: params.observation.os ?? null,
+      errorName: params.observation.errorName ?? null,
+      r2ObjectExists: true,
+      r2ObjectSizeMatches: true,
+      r2ObjectTypeMatches: true,
+      r2InspectionStatus: 'ok',
+      recovered: true,
+      at: Date.now(),
+    };
+  } else {
+    const existing = Array.isArray(info.uploadRetrySuccesses)
+      ? info.uploadRetrySuccesses.filter(
+          (item): item is Record<string, unknown> =>
+            !!item && typeof item === 'object' && !Array.isArray(item)
+        )
+      : [];
+    existing.push({
+      fileIndex: params.observation.fileIndex,
+      fileType: params.observation.fileType,
+      attemptCount: params.observation.attemptCount ?? null,
+      uploadElapsedMs: params.observation.uploadElapsedMs ?? null,
+      online: params.observation.online ?? null,
+      visibilityState: params.observation.visibilityState ?? null,
+      browser: params.observation.browser ?? null,
+      os: params.observation.os ?? null,
+      at: Date.now(),
+    });
+    patch.uploadRetrySuccesses = existing.slice(-9);
+  }
+
+  await db()
+    .update(aiTask)
+    .set({
+      taskInfo: mergeTaskInfo(task, patch),
     })
     .where(
       and(
@@ -771,7 +892,7 @@ export async function reserveGenjutsuCredits(params: {
       }),
       status: 'reserved',
       taskId: null,
-      taskInfo: JSON.stringify({
+      taskInfo: mergeTaskInfo(insideExisting || {}, {
         providerCostUsd: params.providerCostUsd,
         providerEstimate: params.providerEstimate ?? null,
         sourceDurationSeconds:

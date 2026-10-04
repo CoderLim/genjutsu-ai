@@ -22,7 +22,10 @@ import {
   uploadToSignedUrl,
 } from '@/lib/api-client';
 import { cn } from '@/lib/cn';
-import type { UploadClientDiagnostics } from '@/lib/upload-diagnostics';
+import {
+  collectUploadDiagnostics,
+  type UploadClientDiagnostics,
+} from '@/lib/upload-diagnostics';
 import { m } from '@/paraglide/messages.js';
 import { useUserCredits } from '@/hooks/use-user-credits';
 import {
@@ -556,6 +559,23 @@ async function reportUploadFailure(params: {
     errorCode: failure.errorCode,
     httpStatus: failure.httpStatus,
     diagnostics: failure.diagnostics,
+  });
+}
+
+async function reportUploadRetrySucceeded(params: {
+  generationId: string;
+  fileIndex: number;
+  attemptCount: number;
+  uploadElapsedMs: number;
+}) {
+  return apiPost('/api/genjutsu/attempt-failure', {
+    generationId: params.generationId,
+    fileIndex: params.fileIndex,
+    event: 'retry_succeeded',
+    diagnostics: collectUploadDiagnostics({
+      attemptCount: params.attemptCount,
+      uploadElapsedMs: params.uploadElapsedMs,
+    }),
   });
 }
 
@@ -1276,11 +1296,19 @@ export function GeneratorPanel({
         const upload = uploadBatch.uploads[index];
         if (!upload) throw new Error('Missing storage upload URL');
         try {
-          await uploadToSignedUrl({
+          const uploaded = await uploadToSignedUrl({
             url: upload.uploadUrl,
             file: media[index].file,
             headers: upload.uploadHeaders,
           });
+          if (uploaded.attemptCount > 1) {
+            await reportUploadRetrySucceeded({
+              generationId,
+              fileIndex: index,
+              attemptCount: uploaded.attemptCount,
+              uploadElapsedMs: uploaded.uploadElapsedMs,
+            }).catch(() => undefined);
+          }
         } catch (cause) {
           const report = await reportUploadFailure({
             generationId,

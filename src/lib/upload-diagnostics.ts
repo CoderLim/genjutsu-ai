@@ -1,4 +1,5 @@
 export const UPLOAD_RETRY_DELAYS_MS = [0, 1_000, 2_000] as const;
+export const UPLOAD_PUT_TIMEOUT_MS = 45_000;
 
 export type UploadClientDiagnostics = {
   attemptCount: number;
@@ -47,11 +48,15 @@ export function classifyClientEnvironment(userAgent: string): {
   else if (/Linux/i.test(ua)) os = 'Linux';
 
   let browser: (typeof BROWSERS)[number] = 'Other';
-  if (/Edg\//i.test(ua)) browser = 'Edge';
-  else if (/OPR\/|Opera/i.test(ua)) browser = 'Opera';
+  if (/Edg\//i.test(ua) || /EdgiOS\//i.test(ua)) browser = 'Edge';
+  else if (/OPR\/|Opera|OPiOS\//i.test(ua)) browser = 'Opera';
   else if (/SamsungBrowser/i.test(ua)) browser = 'Samsung';
-  else if (/Firefox\//i.test(ua)) browser = 'Firefox';
-  else if (/Chrome\//i.test(ua) && !/Chromium/i.test(ua)) browser = 'Chrome';
+  else if (/Firefox\/|FxiOS\//i.test(ua)) browser = 'Firefox';
+  else if (
+    /CriOS\//i.test(ua) ||
+    (/Chrome\//i.test(ua) && !/Chromium/i.test(ua))
+  )
+    browser = 'Chrome';
   else if (/Safari\//i.test(ua)) browser = 'Safari';
 
   return { browser, os };
@@ -75,6 +80,10 @@ export function isRetryableUploadFailure(cause: unknown): boolean {
     return status === 408 || status === 429 || (status >= 500 && status <= 599);
   }
 
+  if (cause instanceof Error && cause.name === 'UploadTimeoutError') {
+    return true;
+  }
+
   if (cause instanceof Error && cause.name === 'AbortError') {
     return false;
   }
@@ -86,7 +95,7 @@ export function isRetryableUploadFailure(cause: unknown): boolean {
 export function collectUploadDiagnostics(params: {
   attemptCount: number;
   uploadElapsedMs: number;
-  cause: unknown;
+  cause?: unknown;
 }): UploadClientDiagnostics {
   const env =
     typeof navigator !== 'undefined'
@@ -109,7 +118,9 @@ export function collectUploadDiagnostics(params: {
       ? params.cause.name.slice(0, 64)
       : typeof params.cause === 'string'
         ? 'StringError'
-        : 'UnknownError';
+        : params.cause === undefined
+          ? null
+          : 'UnknownError';
 
   return {
     attemptCount: params.attemptCount,
