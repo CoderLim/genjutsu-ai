@@ -1,4 +1,4 @@
-# Production deploy workflow. Admin generation details rollout 2026-10-04.
+# Production deploy workflow. Android upload diagnostics rollout 2026-10-04.
 name: Deploy Cloudflare Worker
 
 on:
