@@ -1,5 +1,23 @@
 export const UPLOAD_RETRY_DELAYS_MS = [0, 1_000, 2_000] as const;
-export const UPLOAD_PUT_TIMEOUT_MS = 45_000;
+
+const UPLOAD_TIMEOUT_MIN_MS = 60_000;
+const UPLOAD_TIMEOUT_MAX_MS = 8 * 60_000;
+const UPLOAD_TIMEOUT_BASE_MS = 30_000;
+const UPLOAD_TIMEOUT_ASSUMED_BYTES_PER_SECOND = 256 * 1024;
+
+export function getUploadPutTimeoutMs(fileSizeBytes: number) {
+  if (!Number.isFinite(fileSizeBytes) || fileSizeBytes <= 0) {
+    return UPLOAD_TIMEOUT_MIN_MS;
+  }
+
+  const transferMs = Math.ceil(
+    (fileSizeBytes / UPLOAD_TIMEOUT_ASSUMED_BYTES_PER_SECOND) * 1_000
+  );
+  return Math.min(
+    UPLOAD_TIMEOUT_MAX_MS,
+    Math.max(UPLOAD_TIMEOUT_MIN_MS, UPLOAD_TIMEOUT_BASE_MS + transferMs)
+  );
+}
 
 export type UploadClientDiagnostics = {
   attemptCount: number;
