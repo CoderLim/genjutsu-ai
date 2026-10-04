@@ -478,8 +478,27 @@ export async function markGenjutsuUploadFailed(params: {
   online?: boolean | null;
   visibilityState?: string | null;
   browser?: string | null;
+  browserMajor?: number | null;
   os?: string | null;
+  isWebView?: boolean | null;
+  inAppBrowser?: string | null;
+  effectiveType?: string | null;
+  rttMs?: number | null;
+  downlinkMbps?: number | null;
+  origin?: string | null;
+  uploadHost?: string | null;
   errorName?: string | null;
+  errorMessage?: string | null;
+  attempts?: Array<{
+    attempt: number;
+    elapsedMs: number;
+    errorName: string | null;
+    errorMessage: string | null;
+    httpStatus: number | null;
+  }> | null;
+  cfCountry?: string | null;
+  cfColo?: string | null;
+  cfAsn?: number | null;
   r2ObjectExists?: boolean | null;
   r2ObjectSizeMatches?: boolean | null;
   r2ObjectTypeMatches?: boolean | null;
@@ -503,8 +522,21 @@ export async function markGenjutsuUploadFailed(params: {
         online: params.online ?? null,
         visibilityState: params.visibilityState ?? null,
         browser: params.browser ?? null,
+        browserMajor: params.browserMajor ?? null,
         os: params.os ?? null,
+        isWebView: params.isWebView ?? null,
+        inAppBrowser: params.inAppBrowser ?? null,
+        effectiveType: params.effectiveType ?? null,
+        rttMs: params.rttMs ?? null,
+        downlinkMbps: params.downlinkMbps ?? null,
+        origin: params.origin ?? null,
+        uploadHost: params.uploadHost ?? null,
         errorName: params.errorName ?? null,
+        errorMessage: params.errorMessage ?? null,
+        attempts: params.attempts ?? [],
+        cfCountry: params.cfCountry ?? null,
+        cfColo: params.cfColo ?? null,
+        cfAsn: params.cfAsn ?? null,
         r2ObjectExists: params.r2ObjectExists ?? null,
         r2ObjectSizeMatches: params.r2ObjectSizeMatches ?? null,
         r2ObjectTypeMatches: params.r2ObjectTypeMatches ?? null,
