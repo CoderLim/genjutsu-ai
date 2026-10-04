@@ -23,10 +23,10 @@ import {
   calculateGenjutsuCredits,
   estimateGenjutsuCredits,
 } from '@/modules/genjutsu/pricing';
+import { splitProviderFailureError } from '@/modules/genjutsu/provider-errors';
 import {
   HiggsfieldHttpError,
   HiggsfieldPreflightError,
-  isSeedanceLikenessRejection,
   resolveGenjutsuProviderCost,
   resolveGenjutsuProviderTarget,
   SeedanceHttpError,
@@ -429,21 +429,20 @@ async function POST({ request }: { request: Request }) {
         error instanceof SeedanceHttpError ||
         error instanceof VolcengineSeedanceHttpError
       ) {
+        const failure = splitProviderFailureError(error.message);
         await refundGenjutsuGeneration({
           generationId,
           userId: session.user.id,
           providerStatus: `http_${error.status}`,
-          error: error.message,
+          error: failure.error,
+          providerError: failure.providerError,
+          errorCode: failure.errorCode,
         });
-        const likeness =
-          (error instanceof SeedanceHttpError ||
-            error instanceof VolcengineSeedanceHttpError) &&
-          isSeedanceLikenessRejection(error.message);
         return respJson(
           -1,
-          error.message || 'The video provider rejected the generation',
+          failure.error,
           {
-            code: likeness ? 'PROVIDER_LIKENESS_REJECTED' : 'PROVIDER_REJECTED',
+            code: failure.errorCode,
             generationId,
             refundedCredits: task.costCredits || 0,
           },

@@ -848,6 +848,7 @@
   "genjutsu.safety.check_failed": "参考图校验失败，请换一张再试",
   "genjutsu.safety.upload_hint": "图片/视频不可含真人 · 最多 8 张图",
   "genjutsu.safety.checking_aria": "检测参考图中",
+  "genjutsu.error.provider_failed": "生成失败，请稍后再试。",
   "genjutsu.estimate.credits": "~{count} cr",
   "genjutsu.estimate.tooltip": "根据视频时长和分辨率估算的本次消耗，仅供参考；实际预留积分以点击生成时服务端计算为准。",
   "genjutsu.estimate.help_aria": "关于预估积分",

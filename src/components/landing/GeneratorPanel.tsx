@@ -455,7 +455,30 @@ function isLikenessRejectionMessage(message: string) {
   );
 }
 
-function likenessRejectionUiMessage(cause: unknown): string {
+function isProviderFailedMessage(message: string) {
+  return /generation failed\. please try again later/i.test(message);
+}
+
+function generationFailureUiMessage(
+  error?: string | null,
+  errorCode?: string | null
+) {
+  if (
+    errorCode === 'PROVIDER_LIKENESS_REJECTED' ||
+    (error && isLikenessRejectionMessage(error))
+  ) {
+    return m['genjutsu.safety.face_rejected']();
+  }
+  if (
+    errorCode === 'PROVIDER_FAILED' ||
+    (error && isProviderFailedMessage(error))
+  ) {
+    return m['genjutsu.error.provider_failed']();
+  }
+  return error || '';
+}
+
+function providerSubmitUiMessage(cause: unknown): string {
   const code =
     cause instanceof ApiError &&
     cause.data &&
@@ -478,14 +501,10 @@ function likenessRejectionUiMessage(cause: unknown): string {
   ) {
     return m['genjutsu.safety.face_rejected']();
   }
-  return message;
-}
-
-function generationFailureUiMessage(error?: string | null) {
-  if (error && isLikenessRejectionMessage(error)) {
-    return m['genjutsu.safety.face_rejected']();
+  if (code === 'PROVIDER_FAILED' || isProviderFailedMessage(message)) {
+    return m['genjutsu.error.provider_failed']();
   }
-  return error || '';
+  return message;
 }
 
 function classifyUploadFailure(cause: unknown) {
@@ -866,6 +885,7 @@ type GenerationPoll = {
   providerStatus: string;
   videoUrl: string | null;
   error?: string;
+  errorCode?: string;
   reservedCredits?: number;
   refundedCredits?: number;
 };
@@ -1150,7 +1170,7 @@ export function GeneratorPanel({
           setResult(null);
           setNeedsCredits(polled.providerStatus === 'insufficient_credits');
           const uiError =
-            generationFailureUiMessage(polled.error) ||
+            generationFailureUiMessage(polled.error, polled.errorCode) ||
             `Generation failed (${polled.providerStatus})`;
           setError(uiError);
           return;
@@ -1380,9 +1400,7 @@ export function GeneratorPanel({
           apiData?.code === 'PROVIDER_LIKENESS_REJECTED' ||
           (typeof cause.message === 'string' &&
             isLikenessRejectionMessage(cause.message));
-        const uiMessage = likenessRejected
-          ? likenessRejectionUiMessage(cause)
-          : cause.message;
+        const uiMessage = providerSubmitUiMessage(cause);
         if (likenessRejected) toast.error(uiMessage);
         setError(uiMessage);
         return;

@@ -15,10 +15,12 @@ import {
   isGenjutsuE2EMockEnabled,
   readGenjutsuE2EVideoKey,
 } from '@/modules/genjutsu/e2e-mock';
+import { splitProviderFailureError } from '@/modules/genjutsu/provider-errors';
 import {
   getGenjutsuStatus,
   HiggsfieldHttpError,
   SeedanceHttpError,
+  VolcengineSeedanceHttpError,
 } from '@/modules/genjutsu/service';
 import {
   getGenjutsuResultKey,
@@ -29,6 +31,31 @@ import { respData, respErr, respJson } from '@/lib/resp';
 
 function stableResultUrl(generationId: string) {
   return `/api/genjutsu/result/${encodeURIComponent(generationId)}`;
+}
+
+function userFacingRefundError(
+  result: {
+    error?: unknown;
+    providerError?: unknown;
+    errorCode?: unknown;
+  } | null
+) {
+  const storedError =
+    typeof result?.error === 'string' ? result.error : 'Generation failed';
+  // New records store user copy in `error` and raw dump in `providerError`.
+  // Legacy refunds only have the raw provider string in `error`.
+  if (typeof result?.providerError === 'string' && result.providerError) {
+    return {
+      error: storedError,
+      errorCode:
+        typeof result.errorCode === 'string' ? result.errorCode : undefined,
+    };
+  }
+  const failure = splitProviderFailureError(storedError);
+  return {
+    error: failure.error,
+    errorCode: failure.errorCode,
+  };
 }
 
 async function GET({ request }: { request: Request }) {
@@ -80,11 +107,13 @@ async function GET({ request }: { request: Request }) {
     }
 
     if (task.status === 'refunded') {
+      const failure = userFacingRefundError(parsed.result);
       return respData({
         status: 'failed',
         providerStatus: parsed.result?.providerStatus || 'failed',
         videoUrl: null,
-        error: parsed.result?.error || 'Generation failed',
+        error: failure.error,
+        errorCode: failure.errorCode,
         refundedCredits:
           parsed.result?.refundedCredits ?? task.costCredits ?? 0,
       });
@@ -205,14 +234,19 @@ async function GET({ request }: { request: Request }) {
     } catch (error: any) {
       const providerStatus =
         error instanceof HiggsfieldHttpError ||
-        error instanceof SeedanceHttpError
+        error instanceof SeedanceHttpError ||
+        error instanceof VolcengineSeedanceHttpError
           ? `http_${error.status}`
           : 'status_error';
+      const failure = splitProviderFailureError(
+        error?.message || 'Provider status request failed'
+      );
       await recordGenjutsuProviderStatusError({
         generationId: task.id,
         userId: session.user.id,
         providerStatus,
-        error: error?.message || 'Provider status request failed',
+        error: failure.error,
+        providerError: failure.providerError,
       }).catch(() => undefined);
       throw error;
     }
@@ -242,6 +276,10 @@ async function GET({ request }: { request: Request }) {
       }
 
       const settledParsed = settled ? parseGenjutsuTaskInfo(settled) : null;
+      const refundFailure =
+        settled?.status === 'refunded'
+          ? userFacingRefundError(settledParsed?.result)
+          : null;
       return respData({
         status: settled?.status === 'refunded' ? 'failed' : 'processing',
         providerStatus:
@@ -249,7 +287,8 @@ async function GET({ request }: { request: Request }) {
           settled?.status ||
           'processing',
         videoUrl: null,
-        error: settledParsed?.result?.error,
+        error: refundFailure?.error ?? settledParsed?.result?.error,
+        errorCode: refundFailure?.errorCode,
         reservedCredits: task.costCredits || 0,
         refundedCredits:
           settled?.status === 'refunded'
@@ -261,11 +300,16 @@ async function GET({ request }: { request: Request }) {
     }
 
     if (provider.status === 'failed') {
+      const failure = splitProviderFailureError(
+        provider.error || 'Generation failed'
+      );
       const refunded = await refundGenjutsuGeneration({
         generationId: task.id,
         userId: session.user.id,
         providerStatus: provider.providerStatus,
-        error: provider.error || 'Generation failed',
+        error: failure.error,
+        providerError: failure.providerError,
+        errorCode: failure.errorCode,
       });
 
       if (refunded?.status === 'completed') {
@@ -279,7 +323,11 @@ async function GET({ request }: { request: Request }) {
       }
 
       return respData({
-        ...provider,
+        status: 'failed',
+        providerStatus: provider.providerStatus,
+        videoUrl: null,
+        error: failure.error,
+        errorCode: failure.errorCode,
         refundedCredits: refunded?.costCredits ?? task.costCredits ?? 0,
       });
     }

@@ -1,12 +1,13 @@
 import { createFileRoute } from '@tanstack/react-router';
 
-import { getGenjutsuStatus } from '@/modules/genjutsu/service';
-import { persistGenjutsuResultToR2 } from '@/modules/genjutsu/storage';
 import {
   getGenjutsuTaskByRequestIdAnyUser,
   refundGenjutsuGeneration,
   settleGenjutsuGeneration,
 } from '@/modules/genjutsu/billing';
+import { splitProviderFailureError } from '@/modules/genjutsu/provider-errors';
+import { getGenjutsuStatus } from '@/modules/genjutsu/service';
+import { persistGenjutsuResultToR2 } from '@/modules/genjutsu/storage';
 import { respOk } from '@/lib/resp';
 
 function readRequestId(payload: any, request: Request) {
@@ -59,11 +60,16 @@ async function POST({ request }: { request: Request }) {
           'providerUsage' in provider ? provider.providerUsage : undefined,
       });
     } else if (provider.status === 'failed') {
+      const failure = splitProviderFailureError(
+        provider.error || 'Generation failed'
+      );
       await refundGenjutsuGeneration({
         generationId: task.id,
         userId: task.userId,
         providerStatus: provider.providerStatus,
-        error: provider.error || 'Generation failed',
+        error: failure.error,
+        providerError: failure.providerError,
+        errorCode: failure.errorCode,
       });
     }
   } catch (error) {

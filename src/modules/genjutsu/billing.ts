@@ -683,6 +683,7 @@ export async function recordGenjutsuProviderStatusError(params: {
   userId: string;
   providerStatus: string;
   error: string;
+  providerError?: string;
 }) {
   await db()
     .update(aiTask)
@@ -690,6 +691,9 @@ export async function recordGenjutsuProviderStatusError(params: {
       taskResult: JSON.stringify({
         providerStatus: params.providerStatus,
         error: params.error,
+        ...(params.providerError
+          ? { providerError: params.providerError }
+          : {}),
         statusPollError: true,
       }),
     })
@@ -1099,7 +1103,11 @@ export async function refundGenjutsuGeneration(params: {
   generationId: string;
   userId: string;
   providerStatus?: string;
+  /** User-facing failure copy (status / client). */
   error: string;
+  /** Raw provider dump for admin generations. */
+  providerError?: string;
+  errorCode?: string;
 }) {
   return db().transaction(async (tx: any) => {
     const [task] = await tx
@@ -1177,6 +1185,8 @@ export async function refundGenjutsuGeneration(params: {
     const taskResult = JSON.stringify({
       providerStatus: params.providerStatus ?? null,
       error: params.error,
+      ...(params.providerError ? { providerError: params.providerError } : {}),
+      ...(params.errorCode ? { errorCode: params.errorCode } : {}),
       refundedCredits: claimed.costCredits,
     });
 
