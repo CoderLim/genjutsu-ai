@@ -39,64 +39,47 @@ jobs:
             echo "CLOUDFLARE_EMAIL=${CLOUDFLARE_EMAIL:-}"
           } >> "$GITHUB_ENV"
 
-      - name: Query Android upload failures
+      - name: Check origin routing and successful retry
         shell: bash
         run: |
           set -euo pipefail
           WRANGLER="npx --yes wrangler@4.98.0"
 
-          echo "=== ANDROID_FAILURE_DETAILS ==="
+          echo "=== ORIGIN_ROUTING ==="
+          for url in https://genjutsuai.net/ https://www.genjutsuai.net/; do
+            echo "-- $url"
+            curl -sS -I --max-time 20 "$url" | sed -n '1p;/^location:/Ip;/^server:/Ip;/^cf-ray:/Ip'
+          done
+
+          echo "=== RETRY_SUCCEEDED_RECORDS ==="
           $WRANGLER d1 execute genjutsu-ai-db --remote --json --command "
             SELECT
               datetime(created_at/1000,'unixepoch') AS created_utc,
               substr(id,1,8) AS id8,
-              json_extract(options, '$.contentTypes[0]') AS content_type,
-              json_extract(options, '$.contentLengths[0]') AS content_length,
-              json_extract(task_result, '$.attemptCount') AS attempts,
-              json_extract(task_result, '$.uploadElapsedMs') AS elapsed_ms,
-              json_extract(task_result, '$.errorName') AS error_name,
-              json_extract(task_result, '$.online') AS online,
-              json_extract(task_result, '$.visibilityState') AS visibility_state,
-              json_extract(task_result, '$.r2ObjectExists') AS r2_exists,
-              json_extract(task_result, '$.r2ObjectSizeMatches') AS r2_size_matches,
-              json_extract(task_result, '$.r2ObjectTypeMatches') AS r2_type_matches,
-              json_extract(task_result, '$.r2InspectionStatus') AS r2_inspection_status,
-              json_extract(task_result, '$.r2InspectionError') AS r2_inspection_error
+              json_extract(task_info, '$.uploadRetrySuccesses[0].browser') AS browser,
+              json_extract(task_info, '$.uploadRetrySuccesses[0].os') AS os,
+              json_extract(task_info, '$.uploadRetrySuccesses[0].attemptCount') AS attempts,
+              json_extract(task_info, '$.uploadRetrySuccesses[0].uploadElapsedMs') AS elapsed_ms,
+              status
             FROM ai_task
             WHERE scene='genjutsu'
-              AND json_extract(task_result, '$.errorCode')='UPLOAD_NETWORK_ERROR'
-              AND json_extract(task_result, '$.os')='Android'
+              AND json_array_length(json_extract(task_info, '$.uploadRetrySuccesses')) > 0
               AND created_at >= 1791043200000
             ORDER BY created_at DESC;
           "
 
-          echo "=== FAILED_VS_SUCCESS_VIDEO_SIZES_TODAY ==="
+          echo "=== ANDROID_FAILURES_PER_USER ==="
           $WRANGLER d1 execute genjutsu-ai-db --remote --json --command "
-            SELECT
-              CASE
-                WHEN json_extract(task_result, '$.errorCode')='UPLOAD_NETWORK_ERROR'
-                  AND json_extract(task_result, '$.os')='Android'
-                  THEN 'android_failed'
-                WHEN status IN ('ready','completed','refunded','insufficient_credits')
-                  THEN 'passed_upload'
-                ELSE 'other'
-              END AS cohort,
-              COUNT(*) AS count,
-              CAST(AVG(json_extract(options, '$.contentLengths[0]')) AS INTEGER) AS avg_video_bytes,
-              MIN(json_extract(options, '$.contentLengths[0]')) AS min_video_bytes,
-              MAX(json_extract(options, '$.contentLengths[0]')) AS max_video_bytes
-            FROM ai_task
-            WHERE scene='genjutsu' AND created_at >= 1791043200000
-              AND json_extract(options, '$.contentLengths[0]') IS NOT NULL
-            GROUP BY cohort;
+            SELECT failures, COUNT(*) AS users
+            FROM (
+              SELECT user_id, COUNT(*) AS failures
+              FROM ai_task
+              WHERE scene='genjutsu'
+                AND json_extract(task_result, '$.errorCode')='UPLOAD_NETWORK_ERROR'
+                AND json_extract(task_result, '$.os')='Android'
+                AND created_at >= 1791043200000
+              GROUP BY user_id
+            )
+            GROUP BY failures
+            ORDER BY failures DESC;
           "
-
-          echo "=== R2_BUCKET_NAME ==="
-          BUCKET="$($WRANGLER d1 execute genjutsu-ai-db --remote --json --command "SELECT value FROM config WHERE name='r2_bucket_name' LIMIT 1;" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const j=JSON.parse(s);process.stdout.write(j?.[0]?.results?.[0]?.value||'')})")"
-          echo "bucket=$BUCKET"
-          if [ -n "$BUCKET" ]; then
-            echo "=== R2_CORS ==="
-            $WRANGLER r2 bucket cors list "$BUCKET" || true
-            echo "=== R2_CUSTOM_DOMAINS ==="
-            $WRANGLER r2 bucket domain list "$BUCKET" || true
-          fi
