@@ -180,11 +180,23 @@ async function GET({ request }: { request: Request }) {
             : typeof recovery?.r2ObjectSizeMatches === 'boolean'
               ? recovery.r2ObjectSizeMatches
               : null,
+        r2ObjectTypeMatches:
+          typeof result?.r2ObjectTypeMatches === 'boolean'
+            ? result.r2ObjectTypeMatches
+            : typeof recovery?.r2ObjectTypeMatches === 'boolean'
+              ? recovery.r2ObjectTypeMatches
+              : null,
         r2InspectionStatus:
           typeof result?.r2InspectionStatus === 'string'
             ? result.r2InspectionStatus
             : typeof recovery?.r2InspectionStatus === 'string'
               ? recovery.r2InspectionStatus
+              : null,
+        r2InspectionError:
+          typeof result?.r2InspectionError === 'string'
+            ? result.r2InspectionError
+            : typeof recovery?.r2InspectionError === 'string'
+              ? recovery.r2InspectionError
               : null,
         uploadRecovered:
           typeof result?.recovered === 'boolean'
