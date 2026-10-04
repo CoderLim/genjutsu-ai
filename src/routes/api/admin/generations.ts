@@ -5,6 +5,12 @@ import { getAuth } from '@/core/auth';
 import { db } from '@/core/db';
 import { aiTask, user } from '@/config/db/schema';
 import { GENJUTSU_SCENE } from '@/modules/genjutsu/billing';
+import {
+  calculateGenjutsuCredits,
+  estimateGenjutsuCredits,
+  type GenjutsuBillableResolution,
+} from '@/modules/genjutsu/pricing';
+import { estimateSeedanceProviderCost } from '@/modules/genjutsu/seedance';
 import { hasPermission } from '@/modules/rbac/service';
 import { respErr, respPage } from '@/lib/resp';
 
@@ -12,6 +18,62 @@ function parseJson(value: string | null) {
   if (!value) return null;
   try {
     return JSON.parse(value);
+  } catch {
+    return null;
+  }
+}
+
+function isBillableResolution(
+  value: unknown
+): value is GenjutsuBillableResolution {
+  return value === '480p' || value === '720p' || value === '1080p';
+}
+
+/**
+ * Best-effort credit estimate for admin display — mirrors GeneratorPanel /
+ * generate.ts list-rate fallback when the task never reached reservation.
+ */
+function resolveEstimatedCredits(input: {
+  provider: string;
+  providerCostUsd: number | null;
+  sourceDurationSeconds: number | null;
+  resolution: unknown;
+  requiredCredits: number | null;
+}): number | null {
+  if (input.requiredCredits != null && input.requiredCredits > 0) {
+    return input.requiredCredits;
+  }
+
+  if (input.providerCostUsd != null && input.providerCostUsd > 0) {
+    try {
+      return calculateGenjutsuCredits(input.providerCostUsd);
+    } catch {
+      // fall through to list-rate estimate
+    }
+  }
+
+  if (
+    !isBillableResolution(input.resolution) ||
+    input.sourceDurationSeconds == null ||
+    !Number.isFinite(input.sourceDurationSeconds) ||
+    input.sourceDurationSeconds <= 0
+  ) {
+    return null;
+  }
+
+  try {
+    if (input.provider === 'seedance') {
+      const quote = estimateSeedanceProviderCost({
+        resolution: input.resolution,
+        sourceDurationSeconds: input.sourceDurationSeconds,
+      });
+      return calculateGenjutsuCredits(quote.providerCostUsd);
+    }
+
+    return estimateGenjutsuCredits({
+      durationSeconds: input.sourceDurationSeconds,
+      resolution: input.resolution,
+    });
   } catch {
     return null;
   }
@@ -198,9 +260,7 @@ async function GET({ request }: { request: Request }) {
               ? recovery.browser
               : null,
         uploadBrowserMajor:
-          typeof result?.browserMajor === 'number'
-            ? result.browserMajor
-            : null,
+          typeof result?.browserMajor === 'number' ? result.browserMajor : null,
         uploadOs:
           typeof result?.os === 'string'
             ? result.os
@@ -216,38 +276,26 @@ async function GET({ request }: { request: Request }) {
         uploadIsWebView:
           typeof result?.isWebView === 'boolean' ? result.isWebView : null,
         uploadInAppBrowser:
-          typeof result?.inAppBrowser === 'string'
-            ? result.inAppBrowser
-            : null,
+          typeof result?.inAppBrowser === 'string' ? result.inAppBrowser : null,
         uploadEffectiveType:
           typeof result?.effectiveType === 'string'
             ? result.effectiveType
             : null,
-        uploadRttMs:
-          typeof result?.rttMs === 'number' ? result.rttMs : null,
+        uploadRttMs: typeof result?.rttMs === 'number' ? result.rttMs : null,
         uploadDownlinkMbps:
-          typeof result?.downlinkMbps === 'number'
-            ? result.downlinkMbps
-            : null,
-        uploadOrigin:
-          typeof result?.origin === 'string' ? result.origin : null,
+          typeof result?.downlinkMbps === 'number' ? result.downlinkMbps : null,
+        uploadOrigin: typeof result?.origin === 'string' ? result.origin : null,
         uploadHost:
           typeof result?.uploadHost === 'string' ? result.uploadHost : null,
         uploadErrorName:
           typeof result?.errorName === 'string' ? result.errorName : null,
         uploadErrorMessage:
-          typeof result?.errorMessage === 'string'
-            ? result.errorMessage
-            : null,
-        uploadAttempts: Array.isArray(result?.attempts)
-          ? result.attempts
-          : [],
+          typeof result?.errorMessage === 'string' ? result.errorMessage : null,
+        uploadAttempts: Array.isArray(result?.attempts) ? result.attempts : [],
         uploadCfCountry:
           typeof result?.cfCountry === 'string' ? result.cfCountry : null,
-        uploadCfColo:
-          typeof result?.cfColo === 'string' ? result.cfColo : null,
-        uploadCfAsn:
-          typeof result?.cfAsn === 'number' ? result.cfAsn : null,
+        uploadCfColo: typeof result?.cfColo === 'string' ? result.cfColo : null,
+        uploadCfAsn: typeof result?.cfAsn === 'number' ? result.cfAsn : null,
         r2ObjectExists:
           typeof result?.r2ObjectExists === 'boolean'
             ? result.r2ObjectExists
@@ -297,6 +345,26 @@ async function GET({ request }: { request: Request }) {
           typeof info?.sourceDurationSeconds === 'number'
             ? info.sourceDurationSeconds
             : null,
+        requiredCredits:
+          typeof result?.requiredCredits === 'number'
+            ? result.requiredCredits
+            : null,
+        estimatedCredits: resolveEstimatedCredits({
+          provider: row.provider,
+          providerCostUsd:
+            typeof info?.providerCostUsd === 'number'
+              ? info.providerCostUsd
+              : null,
+          sourceDurationSeconds:
+            typeof info?.sourceDurationSeconds === 'number'
+              ? info.sourceDurationSeconds
+              : null,
+          resolution: options?.resolution,
+          requiredCredits:
+            typeof result?.requiredCredits === 'number'
+              ? result.requiredCredits
+              : null,
+        }),
         inputMedia,
         sourceVideoUrl: hasSourceVideo
           ? `/api/genjutsu/source/${encodeURIComponent(row.id)}`
