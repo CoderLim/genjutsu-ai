@@ -33,6 +33,14 @@ interface GenerationInputMedia {
   url: string;
 }
 
+interface GenerationUploadAttempt {
+  attempt: number;
+  elapsedMs: number;
+  errorName: string | null;
+  errorMessage: string | null;
+  httpStatus: number | null;
+}
+
 interface Generation {
   id: string;
   userId: string;
@@ -55,8 +63,22 @@ interface Generation {
   uploadAttemptCount: number | null;
   uploadElapsedMs: number | null;
   uploadBrowser: string | null;
+  uploadBrowserMajor: number | null;
   uploadOs: string | null;
   uploadOnline: boolean | null;
+  uploadIsWebView: boolean | null;
+  uploadInAppBrowser: string | null;
+  uploadEffectiveType: string | null;
+  uploadRttMs: number | null;
+  uploadDownlinkMbps: number | null;
+  uploadOrigin: string | null;
+  uploadHost: string | null;
+  uploadErrorName: string | null;
+  uploadErrorMessage: string | null;
+  uploadAttempts: GenerationUploadAttempt[];
+  uploadCfCountry: string | null;
+  uploadCfColo: string | null;
+  uploadCfAsn: number | null;
   r2ObjectExists: boolean | null;
   r2ObjectSizeMatches: boolean | null;
   r2ObjectTypeMatches: boolean | null;
@@ -632,6 +654,145 @@ function GenerationsPage() {
                   {detail.prompt || '—'}
                 </div>
               </div>
+
+              {detail.uploadAttemptCount != null ||
+              detail.uploadErrorMessage ||
+              detail.uploadBrowser ||
+              detail.uploadOs ||
+              detail.uploadHost ||
+              detail.uploadCfCountry ? (
+                <div className="space-y-3 rounded-lg border p-4 text-sm">
+                  <div className="font-medium">Upload diagnostics</div>
+
+                  <div className="grid gap-x-6 gap-y-3 md:grid-cols-2 xl:grid-cols-4">
+                    <div>
+                      <div className="text-muted-foreground text-xs">Client</div>
+                      <div className="mt-1 font-mono text-xs">
+                        {[
+                          detail.uploadBrowser
+                            ? `${detail.uploadBrowser}${detail.uploadBrowserMajor != null ? ` ${detail.uploadBrowserMajor}` : ''}`
+                            : null,
+                          detail.uploadOs,
+                          detail.uploadIsWebView ? 'WebView' : null,
+                          detail.uploadInAppBrowser
+                            ? `in-app: ${detail.uploadInAppBrowser}`
+                            : null,
+                        ]
+                          .filter(Boolean)
+                          .join(' · ') || '—'}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-muted-foreground text-xs">Network</div>
+                      <div className="mt-1 font-mono text-xs">
+                        {[
+                          detail.uploadOnline == null
+                            ? null
+                            : detail.uploadOnline
+                              ? 'online'
+                              : 'offline',
+                          detail.uploadEffectiveType,
+                          detail.uploadRttMs != null
+                            ? `RTT ${detail.uploadRttMs}ms`
+                            : null,
+                          detail.uploadDownlinkMbps != null
+                            ? `${detail.uploadDownlinkMbps} Mbps`
+                            : null,
+                        ]
+                          .filter(Boolean)
+                          .join(' · ') || '—'}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-muted-foreground text-xs">Route</div>
+                      <div className="mt-1 break-all font-mono text-xs">
+                        origin: {detail.uploadOrigin || '—'}
+                      </div>
+                      <div className="text-muted-foreground mt-1 break-all font-mono text-xs">
+                        host: {detail.uploadHost || '—'}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-muted-foreground text-xs">Cloudflare edge</div>
+                      <div className="mt-1 font-mono text-xs">
+                        {[
+                          detail.uploadCfCountry,
+                          detail.uploadCfColo,
+                          detail.uploadCfAsn != null
+                            ? `AS${detail.uploadCfAsn}`
+                            : null,
+                        ]
+                          .filter(Boolean)
+                          .join(' · ') || '—'}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-md bg-muted/40 p-3 font-mono text-xs">
+                    <div>
+                      error:{' '}
+                      {[
+                        detail.uploadErrorName,
+                        detail.uploadErrorMessage,
+                      ]
+                        .filter(Boolean)
+                        .join(' · ') || '—'}
+                    </div>
+                    <div className="text-muted-foreground mt-1">
+                      total:{' '}
+                      {[
+                        detail.uploadAttemptCount != null
+                          ? `${detail.uploadAttemptCount} attempts`
+                          : null,
+                        detail.uploadElapsedMs != null
+                          ? `${detail.uploadElapsedMs}ms`
+                          : null,
+                        detail.r2InspectionStatus
+                          ? `R2 ${detail.r2InspectionStatus}`
+                          : null,
+                      ]
+                        .filter(Boolean)
+                        .join(' · ') || '—'}
+                    </div>
+                  </div>
+
+                  {detail.uploadAttempts.length ? (
+                    <div className="overflow-x-auto rounded-md border">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-muted/50">
+                          <tr>
+                            <th className="px-3 py-2 font-medium">Attempt</th>
+                            <th className="px-3 py-2 font-medium">Elapsed</th>
+                            <th className="px-3 py-2 font-medium">Status</th>
+                            <th className="px-3 py-2 font-medium">Error</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {detail.uploadAttempts.map((attempt) => (
+                            <tr key={attempt.attempt} className="border-t">
+                              <td className="px-3 py-2">#{attempt.attempt}</td>
+                              <td className="px-3 py-2">{attempt.elapsedMs}ms</td>
+                              <td className="px-3 py-2">
+                                {attempt.httpStatus != null
+                                  ? `HTTP ${attempt.httpStatus}`
+                                  : 'network'}
+                              </td>
+                              <td className="px-3 py-2">
+                                {[attempt.errorName, attempt.errorMessage]
+                                  .filter(Boolean)
+                                  .join(' · ') || '—'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
 
               <div className="space-y-3">
                 <div className="flex items-center justify-between gap-3">
