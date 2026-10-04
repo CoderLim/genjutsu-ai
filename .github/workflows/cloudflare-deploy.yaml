@@ -1,15 +1,23 @@
-# Read-only paid-user pricing diagnostics. Never deploys production.
-name: Diagnose Paid Credit Sufficiency
+# Production deploy workflow. Android upload diagnostics rollout 2026-10-04.
+name: Deploy Cloudflare Worker
 
 on:
   push:
-    branches: ['diagnose/post-p0-upload-20261004']
+    branches: ['main']
     paths:
       - '.github/workflows/cloudflare-deploy.yaml'
+  workflow_dispatch:
+
+concurrency:
+  group: cloudflare-production
+  cancel-in-progress: false
 
 jobs:
-  query:
+  deploy:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN || secrets.CF_API_TOKEN }}
       CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_API_KEY }}
@@ -19,45 +27,96 @@ jobs:
       ENV_PRODUCTION: ${{ secrets.ENV_PRODUCTION }}
 
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      - name: Query production D1 read-only
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Prepare Cloudflare deployment
         shell: bash
         run: |
           set -euo pipefail
-          if [ -z "${CLOUDFLARE_API_TOKEN:-}" ] && [ -n "${CLOUDFLARE_API_KEY:-}" ] && [ -z "${CLOUDFLARE_EMAIL:-}" ]; then export CLOUDFLARE_API_TOKEN="$CLOUDFLARE_API_KEY"; unset CLOUDFLARE_API_KEY; fi
-          if [ -z "${CLOUDFLARE_API_TOKEN:-}" ] && [ -n "${CF_API_KEY_FALLBACK:-}" ]; then
-            if [ -n "${CLOUDFLARE_EMAIL:-}" ]; then export CLOUDFLARE_API_KEY="${CLOUDFLARE_API_KEY:-$CF_API_KEY_FALLBACK}"; else export CLOUDFLARE_API_TOKEN="$CF_API_KEY_FALLBACK"; fi
+
+          # Support the common secret names already used across the repos.
+          if [ -z "${CLOUDFLARE_API_TOKEN:-}" ] && [ -n "${CLOUDFLARE_API_KEY:-}" ] && [ -z "${CLOUDFLARE_EMAIL:-}" ]; then
+            export CLOUDFLARE_API_TOKEN="$CLOUDFLARE_API_KEY"
+            unset CLOUDFLARE_API_KEY
           fi
-          W="npx --yes wrangler@4.98.0"
+          if [ -z "${CLOUDFLARE_API_TOKEN:-}" ] && [ -n "${CF_API_KEY_FALLBACK:-}" ]; then
+            if [ -n "${CLOUDFLARE_EMAIL:-}" ]; then
+              export CLOUDFLARE_API_KEY="${CLOUDFLARE_API_KEY:-$CF_API_KEY_FALLBACK}"
+            else
+              export CLOUDFLARE_API_TOKEN="$CF_API_KEY_FALLBACK"
+            fi
+          fi
 
-          echo "=== PAID_USER_INSUFFICIENT_DETAILS ==="
-          $W d1 execute genjutsu-ai-db --remote --json --command "
-            WITH p AS (
-              SELECT user_id,MIN(paid_at) first_paid_at
-              FROM 'order' WHERE status='paid' AND paid_at IS NOT NULL GROUP BY user_id
-            )
-            SELECT substr(t.id,1,8) id8,substr(t.user_id,1,8) user8,t.created_at,
-                   json_extract(t.options,'$.mode') mode,json_extract(t.options,'$.resolution') resolution,
-                   json_extract(t.task_result,'$.requiredCredits') required_credits,
-                   json_extract(t.task_result,'$.balance') balance_in_result,
-                   t.cost_credits,t.status
-            FROM ai_task t JOIN p ON p.user_id=t.user_id AND t.created_at>=p.first_paid_at
-            WHERE t.scene='genjutsu' AND t.status='insufficient_credits'
-            ORDER BY t.created_at ASC;
-          "
+          if [ -z "${CLOUDFLARE_API_TOKEN:-}" ] && { [ -z "${CLOUDFLARE_API_KEY:-}" ] || [ -z "${CLOUDFLARE_EMAIL:-}" ]; }; then
+            echo "Cloudflare credentials are missing. Configure CLOUDFLARE_API_TOKEN/CF_API_TOKEN, or a Global API Key plus email."
+            exit 1
+          fi
 
-          echo "=== PAID_USER_CURRENT_BALANCES ==="
-          $W d1 execute genjutsu-ai-db --remote --json --command "
-            WITH p AS (
-              SELECT user_id,COUNT(*) paid_orders,SUM(credits_amount) purchased_credits
-              FROM 'order' WHERE status='paid' GROUP BY user_id
-            )
-            SELECT substr(p.user_id,1,8) user8,p.paid_orders,p.purchased_credits,
-                   COALESCE(SUM(CASE WHEN c.transaction_type='grant' AND c.status='active' THEN c.remaining_credits ELSE 0 END),0) current_balance
-            FROM p LEFT JOIN credit c ON c.user_id=p.user_id
-            GROUP BY p.user_id,p.paid_orders,p.purchased_credits
-            ORDER BY p.user_id;
-          "
+          npx wrangler whoami
+
+          cp wrangler.example.jsonc wrangler.jsonc
+
+          D1_JSON="$(npx wrangler d1 list --json)"
+          D1_ID="$(D1_JSON="$D1_JSON" node - <<'NODE'
+          const raw = JSON.parse(process.env.D1_JSON || '[]');
+          const list = Array.isArray(raw) ? raw : (raw.result || raw.databases || []);
+          const db = list.find((item) => item && (item.name === 'genjutsu-ai-db' || item.database_name === 'genjutsu-ai-db'));
+          if (!db) process.exit(2);
+          process.stdout.write(String(db.uuid || db.id || db.database_id || ''));
+          NODE
+          )"
+
+          if [ -z "$D1_ID" ]; then
+            echo "Cloudflare D1 database genjutsu-ai-db was not found."
+            exit 1
+          fi
+
+          D1_ID="$D1_ID" node - <<'NODE'
+          const fs = require('node:fs');
+          const path = 'wrangler.jsonc';
+          let text = fs.readFileSync(path, 'utf8');
+          text = text.replace('REPLACE_WITH_OUTPUT_OF_WRANGLER_D1_CREATE', process.env.D1_ID);
+          fs.writeFileSync(path, text);
+          NODE
+
+          if [ -n "${ENV_PRODUCTION:-}" ]; then
+            printf '%s\n' "$ENV_PRODUCTION" > .env.production
+          else
+            : > .env.production
+          fi
+
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const path = '.env.production';
+          const desired = {
+            VITE_APP_URL: 'https://genjutsuai.net',
+            VITE_APP_NAME: 'Genjutsu AI',
+            DATABASE_PROVIDER: 'd1',
+          };
+          const source = fs.existsSync(path) ? fs.readFileSync(path, 'utf8') : '';
+          const lines = source.split(/\r?\n/).filter(Boolean);
+          const keys = new Set(Object.keys(desired));
+          const kept = lines.filter((line) => {
+            const match = line.match(/^([A-Za-z_][A-Za-z0-9_]*)=/);
+            return !match || !keys.has(match[1]);
+          });
+          for (const [key, value] of Object.entries(desired)) kept.push(`${key}=${value}`);
+          fs.writeFileSync(path, kept.join('\n') + '\n');
+          NODE
+
+          DATABASE_PROVIDER=d1 VITE_APP_URL=https://genjutsuai.net VITE_APP_NAME="Genjutsu AI" pnpm run cf:deploy
+
+      - name: Verify production
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location --max-time 30 https://genjutsuai.net/ -o /dev/null
+          curl --fail --silent --show-error --location --max-time 30 https://genjutsuai.net/api/config/public -o /dev/null
+          echo "Production smoke checks passed."
