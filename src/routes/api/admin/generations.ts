@@ -115,8 +115,7 @@ async function GET({ request }: { request: Request }) {
           typeof result?.providerStatus === 'string'
             ? result.providerStatus
             : null,
-        failureStage:
-          typeof result?.stage === 'string' ? result.stage : null,
+        failureStage: typeof result?.stage === 'string' ? result.stage : null,
         errorCode:
           typeof result?.errorCode === 'string' ? result.errorCode : null,
         errorFileIndex:
@@ -125,6 +124,27 @@ async function GET({ request }: { request: Request }) {
           typeof result?.fileType === 'string' ? result.fileType : null,
         errorHttpStatus:
           typeof result?.httpStatus === 'number' ? result.httpStatus : null,
+        uploadAttemptCount:
+          typeof result?.attemptCount === 'number' ? result.attemptCount : null,
+        uploadElapsedMs:
+          typeof result?.uploadElapsedMs === 'number'
+            ? result.uploadElapsedMs
+            : null,
+        uploadBrowser:
+          typeof result?.browser === 'string' ? result.browser : null,
+        uploadOs: typeof result?.os === 'string' ? result.os : null,
+        uploadOnline:
+          typeof result?.online === 'boolean' ? result.online : null,
+        r2ObjectExists:
+          typeof result?.r2ObjectExists === 'boolean'
+            ? result.r2ObjectExists
+            : null,
+        r2ObjectSizeMatches:
+          typeof result?.r2ObjectSizeMatches === 'boolean'
+            ? result.r2ObjectSizeMatches
+            : null,
+        uploadRecovered:
+          typeof result?.recovered === 'boolean' ? result.recovered : null,
         error: typeof result?.error === 'string' ? result.error : null,
         costCredits: row.costCredits,
         providerCostUsd:

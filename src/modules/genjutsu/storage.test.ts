@@ -7,6 +7,7 @@ import {
   assertGenjutsuResultKeyOwned,
   assertGenjutsuSealedInputKeysOwned,
   assertGenjutsuSourceVideoKeyOwned,
+  assertGenjutsuStagingKeyOwned,
   assertGenjutsuUploadSize,
   GENJUTSU_MAX_IMAGE_BYTES,
   GENJUTSU_MAX_VIDEO_BYTES,
@@ -162,6 +163,48 @@ test('Genjutsu rejects traversal, nested paths, invalid suffixes, and duplicate 
         imageKeys: [`${prefix}reference-01.png`, `${prefix}reference-01.png`],
       }),
     /reference-image storage keys/
+  );
+});
+
+test('Genjutsu staging key ownership is scoped by file index', () => {
+  const params = {
+    userId: 'user-123',
+    generationId: 'gen-456789',
+  };
+  const prefix = getGenjutsuInputPrefix(params);
+
+  assert.doesNotThrow(() =>
+    assertGenjutsuStagingKeyOwned({
+      ...params,
+      fileIndex: 0,
+      key: `${prefix}source.mp4`,
+    })
+  );
+  assert.doesNotThrow(() =>
+    assertGenjutsuStagingKeyOwned({
+      ...params,
+      fileIndex: 1,
+      key: `${prefix}reference-01.png`,
+    })
+  );
+
+  assert.throws(
+    () =>
+      assertGenjutsuStagingKeyOwned({
+        ...params,
+        fileIndex: 0,
+        key: `${prefix}reference-01.png`,
+      }),
+    /source-video storage key/
+  );
+  assert.throws(
+    () =>
+      assertGenjutsuStagingKeyOwned({
+        ...params,
+        fileIndex: 1,
+        key: `${prefix}reference-02.png`,
+      }),
+    /reference-image storage key/
   );
 });
 

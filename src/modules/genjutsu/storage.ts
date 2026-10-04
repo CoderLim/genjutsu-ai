@@ -181,13 +181,23 @@ async function signR2Object(params: {
 }
 
 async function headR2Object(key: string): Promise<GenjutsuObjectMetadata> {
+  const metadata = await headR2ObjectIfExists(key);
+  if (!metadata) {
+    throw new Error(`Uploaded media is missing from R2: ${key}`);
+  }
+  return metadata;
+}
+
+async function headR2ObjectIfExists(
+  key: string
+): Promise<GenjutsuObjectMetadata | null> {
   const config = await getR2SigningConfig();
   const response = await createR2Client(config).fetch(
     new Request(buildR2ObjectUrl(config, key), { method: 'HEAD' })
   );
 
-  if (!response.ok) {
-    throw new Error(`Uploaded media is missing from R2: ${key}`);
+  if (response.status === 404 || !response.ok) {
+    return null;
   }
 
   const rawLength = response.headers.get('content-length');
@@ -200,13 +210,104 @@ async function headR2Object(key: string): Promise<GenjutsuObjectMetadata> {
       .toLowerCase() || '';
 
   if (!Number.isSafeInteger(contentLength) || contentLength <= 0) {
-    throw new Error(`R2 object has an invalid content length: ${key}`);
+    return null;
   }
 
   return {
     contentLength,
     contentType,
     etag: response.headers.get('etag') || undefined,
+  };
+}
+
+export function assertGenjutsuStagingKeyOwned(params: {
+  userId: string;
+  generationId: string;
+  fileIndex: number;
+  key: string;
+}) {
+  assertSafeObjectKey(params.key);
+  const prefix = getGenjutsuInputPrefix(params);
+  const escapedPrefix = escapeRegExp(prefix);
+
+  if (params.fileIndex === 0) {
+    const sourcePattern = new RegExp(
+      `^${escapedPrefix}source\\.(?:mp4|mov|webm)$`
+    );
+    if (!sourcePattern.test(params.key)) {
+      throw new Error('Invalid Genjutsu source-video storage key');
+    }
+    return;
+  }
+
+  const expectedName = `reference-${String(params.fileIndex).padStart(2, '0')}`;
+  const referencePattern = new RegExp(
+    `^${escapedPrefix}${escapeRegExp(expectedName)}\\.(?:jpg|png|webp|gif|avif|heic|heif)$`
+  );
+  if (!referencePattern.test(params.key)) {
+    throw new Error('Invalid Genjutsu reference-image storage key');
+  }
+}
+
+export type GenjutsuStagingObjectInspection = {
+  exists: boolean;
+  sizeMatches: boolean;
+  typeMatches: boolean;
+  contentLength: number | null;
+  contentType: string | null;
+};
+
+export async function inspectGenjutsuStagingObject(params: {
+  userId: string;
+  generationId: string;
+  fileIndex: number;
+  storageKey: string;
+  expectedContentType?: string;
+  expectedContentLength?: number;
+}): Promise<GenjutsuStagingObjectInspection> {
+  assertGenjutsuStagingKeyOwned({
+    userId: params.userId,
+    generationId: params.generationId,
+    fileIndex: params.fileIndex,
+    key: params.storageKey,
+  });
+
+  let metadata: GenjutsuObjectMetadata | null = null;
+  try {
+    metadata = await headR2ObjectIfExists(params.storageKey);
+  } catch {
+    metadata = null;
+  }
+
+  if (!metadata) {
+    return {
+      exists: false,
+      sizeMatches: false,
+      typeMatches: false,
+      contentLength: null,
+      contentType: null,
+    };
+  }
+
+  const expectedType = params.expectedContentType
+    ?.split(';', 1)[0]
+    ?.trim()
+    .toLowerCase();
+  const typeMatches = expectedType
+    ? metadata.contentType === expectedType
+    : true;
+  const sizeMatches =
+    Number.isSafeInteger(params.expectedContentLength) &&
+    params.expectedContentLength! > 0
+      ? metadata.contentLength === params.expectedContentLength
+      : true;
+
+  return {
+    exists: true,
+    sizeMatches,
+    typeMatches,
+    contentLength: metadata.contentLength,
+    contentType: metadata.contentType,
   };
 }
 

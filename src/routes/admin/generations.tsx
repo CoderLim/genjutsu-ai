@@ -44,6 +44,14 @@ interface Generation {
   errorFileIndex: number | null;
   errorFileType: string | null;
   errorHttpStatus: number | null;
+  uploadAttemptCount: number | null;
+  uploadElapsedMs: number | null;
+  uploadBrowser: string | null;
+  uploadOs: string | null;
+  uploadOnline: boolean | null;
+  r2ObjectExists: boolean | null;
+  r2ObjectSizeMatches: boolean | null;
+  uploadRecovered: boolean | null;
   error: string | null;
   costCredits: number;
   providerCostUsd: number | null;
@@ -222,6 +230,36 @@ function GenerationsPage() {
                 ? ` · ${g.errorFileType}${g.errorFileIndex != null ? ` #${g.errorFileIndex}` : ''}`
                 : ''}
               {g.errorHttpStatus != null ? ` · HTTP ${g.errorHttpStatus}` : ''}
+            </div>
+          ) : null}
+          {g.uploadAttemptCount != null ||
+          g.uploadElapsedMs != null ||
+          g.r2ObjectExists != null ||
+          g.uploadBrowser ||
+          g.uploadOs ? (
+            <div className="text-muted-foreground mt-1 font-mono text-xs">
+              {[
+                g.uploadAttemptCount != null
+                  ? `${g.uploadAttemptCount}x`
+                  : null,
+                g.uploadElapsedMs != null ? `${g.uploadElapsedMs}ms` : null,
+                g.r2ObjectExists == null
+                  ? null
+                  : g.r2ObjectExists
+                    ? g.r2ObjectSizeMatches === false
+                      ? 'r2 size mismatch'
+                      : 'r2 exists'
+                    : 'r2 missing',
+                g.uploadRecovered ? 'recovered' : null,
+                [g.uploadBrowser, g.uploadOs].filter(Boolean).join('/'),
+                g.uploadOnline == null
+                  ? null
+                  : g.uploadOnline
+                    ? 'online'
+                    : 'offline',
+              ]
+                .filter(Boolean)
+                .join(' · ')}
             </div>
           ) : null}
           {g.error ? (

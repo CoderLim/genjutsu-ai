@@ -443,14 +443,22 @@ export async function markGenjutsuAttemptFailedPreflight(params: {
 export async function markGenjutsuUploadFailed(params: {
   generationId: string;
   userId: string;
-  errorCode:
-    | 'UPLOAD_HTTP_ERROR'
-    | 'UPLOAD_NETWORK_ERROR'
-    | 'UPLOAD_ABORTED';
+  errorCode: 'UPLOAD_HTTP_ERROR' | 'UPLOAD_NETWORK_ERROR' | 'UPLOAD_ABORTED';
   error: string;
   fileIndex: number;
   fileType: 'video' | 'image';
   httpStatus?: number | null;
+  attemptCount?: number | null;
+  uploadElapsedMs?: number | null;
+  online?: boolean | null;
+  visibilityState?: string | null;
+  browser?: string | null;
+  os?: string | null;
+  errorName?: string | null;
+  r2ObjectExists?: boolean | null;
+  r2ObjectSizeMatches?: boolean | null;
+  r2ObjectTypeMatches?: boolean | null;
+  recovered?: boolean;
 }) {
   await db()
     .update(aiTask)
@@ -463,6 +471,17 @@ export async function markGenjutsuUploadFailed(params: {
         fileIndex: params.fileIndex,
         fileType: params.fileType,
         httpStatus: params.httpStatus ?? null,
+        attemptCount: params.attemptCount ?? null,
+        uploadElapsedMs: params.uploadElapsedMs ?? null,
+        online: params.online ?? null,
+        visibilityState: params.visibilityState ?? null,
+        browser: params.browser ?? null,
+        os: params.os ?? null,
+        errorName: params.errorName ?? null,
+        r2ObjectExists: params.r2ObjectExists ?? null,
+        r2ObjectSizeMatches: params.r2ObjectSizeMatches ?? null,
+        r2ObjectTypeMatches: params.r2ObjectTypeMatches ?? null,
+        recovered: params.recovered ?? false,
       }),
     })
     .where(
@@ -478,6 +497,32 @@ export async function markGenjutsuUploadFailed(params: {
     generationId: params.generationId,
     userId: params.userId,
   });
+}
+
+export function getGenjutsuUploadBinding(task: { options?: string | null }) {
+  const options = parseTaskOptions(task);
+  if (!options || typeof options.videoKey !== 'string') return null;
+
+  const imageKeys = Array.isArray(options.imageKeys)
+    ? options.imageKeys.filter(
+        (value: unknown): value is string => typeof value === 'string'
+      )
+    : [];
+  const contentTypes = Array.isArray(options.contentTypes)
+    ? options.contentTypes.filter(
+        (value: unknown): value is string => typeof value === 'string'
+      )
+    : [];
+  const contentLengths = Array.isArray(options.contentLengths)
+    ? options.contentLengths.map((value: unknown) => Number(value))
+    : [];
+
+  return {
+    videoKey: options.videoKey as string,
+    imageKeys,
+    contentTypes,
+    contentLengths,
+  };
 }
 
 export async function recordGenjutsuProviderStatusError(params: {
