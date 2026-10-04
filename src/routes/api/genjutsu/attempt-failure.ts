@@ -19,6 +19,30 @@ const UPLOAD_ERROR_CODES = new Set([
   'UPLOAD_ABORTED',
 ]);
 
+function getCloudflareRequestDiagnostics(request: Request) {
+  const cf = (
+    request as Request & {
+      cf?: {
+        country?: unknown;
+        colo?: unknown;
+        asn?: unknown;
+      };
+    }
+  ).cf;
+
+  return {
+    cfCountry:
+      typeof cf?.country === 'string' ? cf.country.slice(0, 8) : null,
+    cfColo: typeof cf?.colo === 'string' ? cf.colo.slice(0, 8) : null,
+    cfAsn:
+      typeof cf?.asn === 'number' &&
+      Number.isInteger(cf.asn) &&
+      cf.asn >= 0
+        ? cf.asn
+        : null,
+  };
+}
+
 async function POST({ request }: { request: Request }) {
   const limited = enforceMinIntervalRateLimit(request, {
     intervalMs: 500,
@@ -84,6 +108,7 @@ async function POST({ request }: { request: Request }) {
         ? rawStatus
         : null;
     const diagnostics = sanitizeUploadDiagnostics(body.diagnostics);
+    const edgeDiagnostics = getCloudflareRequestDiagnostics(request);
 
     let error: string;
     if (errorCode === 'UPLOAD_HTTP_ERROR') {
@@ -215,8 +240,21 @@ async function POST({ request }: { request: Request }) {
       online: diagnostics.online ?? null,
       visibilityState: diagnostics.visibilityState ?? null,
       browser: diagnostics.browser ?? null,
+      browserMajor: diagnostics.browserMajor ?? null,
       os: diagnostics.os ?? null,
+      isWebView: diagnostics.isWebView ?? null,
+      inAppBrowser: diagnostics.inAppBrowser ?? null,
+      effectiveType: diagnostics.effectiveType ?? null,
+      rttMs: diagnostics.rttMs ?? null,
+      downlinkMbps: diagnostics.downlinkMbps ?? null,
+      origin: diagnostics.origin ?? null,
+      uploadHost: diagnostics.uploadHost ?? null,
       errorName: diagnostics.errorName ?? null,
+      errorMessage: diagnostics.errorMessage ?? null,
+      attempts: diagnostics.attempts ?? [],
+      cfCountry: edgeDiagnostics.cfCountry,
+      cfColo: edgeDiagnostics.cfColo,
+      cfAsn: edgeDiagnostics.cfAsn,
       r2ObjectExists: inspection.exists,
       r2ObjectSizeMatches: inspection.sizeMatches,
       r2ObjectTypeMatches: inspection.typeMatches,

@@ -197,6 +197,10 @@ async function GET({ request }: { request: Request }) {
             : typeof recovery?.browser === 'string'
               ? recovery.browser
               : null,
+        uploadBrowserMajor:
+          typeof result?.browserMajor === 'number'
+            ? result.browserMajor
+            : null,
         uploadOs:
           typeof result?.os === 'string'
             ? result.os
@@ -209,6 +213,41 @@ async function GET({ request }: { request: Request }) {
             : typeof recovery?.online === 'boolean'
               ? recovery.online
               : null,
+        uploadIsWebView:
+          typeof result?.isWebView === 'boolean' ? result.isWebView : null,
+        uploadInAppBrowser:
+          typeof result?.inAppBrowser === 'string'
+            ? result.inAppBrowser
+            : null,
+        uploadEffectiveType:
+          typeof result?.effectiveType === 'string'
+            ? result.effectiveType
+            : null,
+        uploadRttMs:
+          typeof result?.rttMs === 'number' ? result.rttMs : null,
+        uploadDownlinkMbps:
+          typeof result?.downlinkMbps === 'number'
+            ? result.downlinkMbps
+            : null,
+        uploadOrigin:
+          typeof result?.origin === 'string' ? result.origin : null,
+        uploadHost:
+          typeof result?.uploadHost === 'string' ? result.uploadHost : null,
+        uploadErrorName:
+          typeof result?.errorName === 'string' ? result.errorName : null,
+        uploadErrorMessage:
+          typeof result?.errorMessage === 'string'
+            ? result.errorMessage
+            : null,
+        uploadAttempts: Array.isArray(result?.attempts)
+          ? result.attempts
+          : [],
+        uploadCfCountry:
+          typeof result?.cfCountry === 'string' ? result.cfCountry : null,
+        uploadCfColo:
+          typeof result?.cfColo === 'string' ? result.cfColo : null,
+        uploadCfAsn:
+          typeof result?.cfAsn === 'number' ? result.cfAsn : null,
         r2ObjectExists:
           typeof result?.r2ObjectExists === 'boolean'
             ? result.r2ObjectExists
