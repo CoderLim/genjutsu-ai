@@ -1,24 +1,29 @@
 import { createFileRoute } from '@tanstack/react-router';
 
 import { getAuth } from '@/core/auth';
-import { getGenjutsuStatus } from '@/modules/genjutsu/service';
+import {
+  assertGenerationId,
+  getGenjutsuTaskById,
+  getGenjutsuTaskByRequestId,
+  parseGenjutsuTaskInfo,
+  recordGenjutsuProviderStatusError,
+  refundGenjutsuGeneration,
+  settleGenjutsuGeneration,
+} from '@/modules/genjutsu/billing';
 import {
   copyGenjutsuE2EStorageObject,
   isGenjutsuE2EMockEnabled,
   readGenjutsuE2EVideoKey,
 } from '@/modules/genjutsu/e2e-mock';
 import {
+  getGenjutsuStatus,
+  HiggsfieldHttpError,
+  SeedanceHttpError,
+} from '@/modules/genjutsu/service';
+import {
   getGenjutsuResultKey,
   persistGenjutsuResultToR2,
 } from '@/modules/genjutsu/storage';
-import {
-  assertGenerationId,
-  getGenjutsuTaskById,
-  getGenjutsuTaskByRequestId,
-  parseGenjutsuTaskInfo,
-  refundGenjutsuGeneration,
-  settleGenjutsuGeneration,
-} from '@/modules/genjutsu/billing';
 import { enforceMinIntervalRateLimit } from '@/lib/rate-limit';
 import { respData, respErr, respJson } from '@/lib/resp';
 
@@ -85,6 +90,53 @@ async function GET({ request }: { request: Request }) {
       });
     }
 
+    if (task.status === 'failed_preflight') {
+      return respData({
+        status: 'failed',
+        providerStatus: 'failed_preflight',
+        videoUrl: null,
+        error: parsed.result?.error || 'Generation failed before submission',
+        errorCode: parsed.result?.errorCode || undefined,
+        stage: parsed.result?.stage || undefined,
+        reservedCredits: 0,
+      });
+    }
+
+    if (task.status === 'insufficient_credits') {
+      const requiredCredits = Number(parsed.result?.requiredCredits);
+      const balance = Number(parsed.result?.balance);
+      const hasRequired = Number.isFinite(requiredCredits);
+      const hasBalance = Number.isFinite(balance);
+
+      return respData({
+        status: 'failed',
+        providerStatus: 'insufficient_credits',
+        videoUrl: null,
+        error:
+          hasRequired && hasBalance
+            ? `Insufficient credits: need ${requiredCredits}, balance ${balance}`
+            : hasRequired
+              ? `Insufficient credits: need ${requiredCredits}`
+              : 'Insufficient credits',
+        requiredCredits: hasRequired ? requiredCredits : undefined,
+        balance: hasBalance ? balance : undefined,
+        reservedCredits: 0,
+      });
+    }
+
+    if (
+      task.status === 'initiated' ||
+      task.status === 'sealing' ||
+      task.status === 'ready'
+    ) {
+      return respData({
+        status: 'processing',
+        providerStatus: task.status,
+        videoUrl: null,
+        reservedCredits: 0,
+      });
+    }
+
     if (task.status === 'submission_unknown') {
       return respData({
         status: 'processing',
@@ -143,11 +195,27 @@ async function GET({ request }: { request: Request }) {
       });
     }
 
-    const provider = await getGenjutsuStatus({
-      provider: task.provider || 'higgsfield',
-      model: task.model,
-      requestId: task.taskId,
-    });
+    let provider;
+    try {
+      provider = await getGenjutsuStatus({
+        provider: task.provider || 'higgsfield',
+        model: task.model,
+        requestId: task.taskId,
+      });
+    } catch (error: any) {
+      const providerStatus =
+        error instanceof HiggsfieldHttpError ||
+        error instanceof SeedanceHttpError
+          ? `http_${error.status}`
+          : 'status_error';
+      await recordGenjutsuProviderStatusError({
+        generationId: task.id,
+        userId: session.user.id,
+        providerStatus,
+        error: error?.message || 'Provider status request failed',
+      }).catch(() => undefined);
+      throw error;
+    }
 
     if (provider.status === 'completed' && provider.videoUrl) {
       const durable = await persistGenjutsuResultToR2({
@@ -177,13 +245,17 @@ async function GET({ request }: { request: Request }) {
       return respData({
         status: settled?.status === 'refunded' ? 'failed' : 'processing',
         providerStatus:
-          settledParsed?.result?.providerStatus || settled?.status || 'processing',
+          settledParsed?.result?.providerStatus ||
+          settled?.status ||
+          'processing',
         videoUrl: null,
         error: settledParsed?.result?.error,
         reservedCredits: task.costCredits || 0,
         refundedCredits:
           settled?.status === 'refunded'
-            ? settledParsed?.result?.refundedCredits ?? settled.costCredits ?? 0
+            ? (settledParsed?.result?.refundedCredits ??
+              settled.costCredits ??
+              0)
             : undefined,
       });
     }

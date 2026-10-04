@@ -7,6 +7,8 @@ import {
   claimGenjutsuSubmission,
   getGenjutsuTaskById,
   InsufficientCreditsError,
+  markGenjutsuAttemptFailedPreflight,
+  markGenjutsuAttemptInsufficient,
   markGenjutsuSubmissionUnknown,
   markGenjutsuSubmitted,
   parseGenjutsuTaskInfo,
@@ -23,10 +25,12 @@ import {
 } from '@/modules/genjutsu/pricing';
 import {
   HiggsfieldHttpError,
+  HiggsfieldPreflightError,
   isSeedanceLikenessRejection,
   resolveGenjutsuProviderCost,
   resolveGenjutsuProviderTarget,
   SeedanceHttpError,
+  SeedancePreflightError,
   submitGenjutsu,
   VolcengineSeedanceHttpError,
   type GenjutsuMode,
@@ -197,15 +201,20 @@ async function POST({ request }: { request: Request }) {
   });
   if (limited) return limited;
 
+  let generationIdForFailure: string | null = null;
+  let userIdForFailure: string | null = null;
+
   try {
     const auth = getAuth();
     const session = await auth.api.getSession({ headers: request.headers });
     if (!session?.user) {
       return respErr('Unauthorized', { status: 401 });
     }
+    userIdForFailure = session.user.id;
 
     const body = await request.json().catch(() => ({}));
     const generationId = assertGenerationId(body.generationId);
+    generationIdForFailure = generationId;
 
     let task = await getGenjutsuTaskById({
       generationId,
@@ -214,13 +223,15 @@ async function POST({ request }: { request: Request }) {
     let input: GenerationInput;
 
     if (task) {
-      if (task.status !== 'reserved') {
+      if (task.status !== 'ready' && task.status !== 'reserved') {
         return respData(taskResponse(task));
       }
       input = inputFromTask(task);
     } else {
       input = inputFromBody(body);
     }
+
+    const needsReservation = !task || task.status === 'ready';
 
     const target = task
       ? {
@@ -257,7 +268,7 @@ async function POST({ request }: { request: Request }) {
       sourceDurationSeconds?: number;
     } | null = null;
 
-    if (!task && target.provider === 'higgsfield') {
+    if (needsReservation && target.provider === 'higgsfield') {
       // Cheap preflight: if the user cannot afford even the minimum 4-second
       // clip at this resolution, fail before live /estimate or submit.
       const minimumCredits = estimateGenjutsuCredits({
@@ -266,10 +277,16 @@ async function POST({ request }: { request: Request }) {
       });
       const balance = await getBalance(session.user.id);
       if (balance < minimumCredits) {
+        await markGenjutsuAttemptInsufficient({
+          generationId,
+          userId: session.user.id,
+          requiredCredits: minimumCredits,
+          balance,
+        });
         throw new InsufficientCreditsError(minimumCredits, balance);
       }
     } else if (
-      !task &&
+      needsReservation &&
       (target.provider === 'seedance' ||
         target.provider === 'seedance-volcengine')
     ) {
@@ -286,6 +303,12 @@ async function POST({ request }: { request: Request }) {
       );
       const balance = await getBalance(session.user.id);
       if (balance < credits) {
+        await markGenjutsuAttemptInsufficient({
+          generationId,
+          userId: session.user.id,
+          requiredCredits: credits,
+          balance,
+        });
         throw new InsufficientCreditsError(credits, balance);
       }
 
@@ -298,16 +321,13 @@ async function POST({ request }: { request: Request }) {
       };
     }
 
-    if (!task) {
+    if (needsReservation) {
       if (!pendingQuote) {
         // Higgsfield's live /estimate; client-supplied credit amounts ignored.
         const estimate = await resolveGenjutsuProviderCost({
           ...providerInput,
           ...target,
-          durationSeconds:
-            typeof body.durationSeconds === 'number'
-              ? body.durationSeconds
-              : undefined,
+          durationSeconds: sourceDurationSeconds,
         });
         const credits = calculateGenjutsuCredits(
           estimate.customerPriceBasisUsd ?? estimate.providerCostUsd
@@ -383,6 +403,28 @@ async function POST({ request }: { request: Request }) {
       );
     } catch (error: any) {
       if (
+        error instanceof HiggsfieldPreflightError ||
+        error instanceof SeedancePreflightError
+      ) {
+        await refundGenjutsuGeneration({
+          generationId,
+          userId: session.user.id,
+          providerStatus: 'preflight_failed',
+          error: error.message,
+        });
+        return respJson(
+          -1,
+          error.message || 'The video provider could not start the generation',
+          {
+            code: 'PROVIDER_PREFLIGHT_FAILED',
+            generationId,
+            refundedCredits: task.costCredits || 0,
+          },
+          { status: 400 }
+        );
+      }
+
+      if (
         error instanceof HiggsfieldHttpError ||
         error instanceof SeedanceHttpError ||
         error instanceof VolcengineSeedanceHttpError
@@ -439,6 +481,16 @@ async function POST({ request }: { request: Request }) {
         },
         { status: 402 }
       );
+    }
+
+    if (generationIdForFailure && userIdForFailure) {
+      await markGenjutsuAttemptFailedPreflight({
+        generationId: generationIdForFailure,
+        userId: userIdForFailure,
+        stage: 'generate_preflight',
+        errorCode: 'GENERATION_PREFLIGHT_FAILED',
+        error: error?.message || 'Failed to start generation',
+      }).catch(() => undefined);
     }
 
     console.error('genjutsu submit failed:', error);

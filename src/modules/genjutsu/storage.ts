@@ -3,7 +3,7 @@ import { AwsClient } from 'aws4fetch';
 import { getAllConfigs } from '@/modules/config/service';
 import { getStorage } from '@/modules/storage/service';
 
-const UPLOAD_EXPIRES_SECONDS = 5 * 60;
+const UPLOAD_EXPIRES_SECONDS = 15 * 60;
 const READ_EXPIRES_SECONDS = 60 * 60;
 
 export const GENJUTSU_MAX_VIDEO_BYTES = 200 * 1024 * 1024;
@@ -37,6 +37,7 @@ type R2SigningConfig = {
 export type GenjutsuObjectMetadata = {
   contentLength: number;
   contentType: string;
+  etag?: string;
 };
 
 function trimSlashes(value: string) {
@@ -180,26 +181,218 @@ async function signR2Object(params: {
 }
 
 async function headR2Object(key: string): Promise<GenjutsuObjectMetadata> {
+  const result = await headR2ObjectResult(key);
+  if (result.status === 'ok') return result.metadata;
+  if (result.status === 'missing') {
+    throw new Error(`Uploaded media is missing from R2: ${key}`);
+  }
+  throw new Error(
+    `Failed to inspect R2 object ${key}: ${result.error}${
+      result.httpStatus != null ? ` (HTTP ${result.httpStatus})` : ''
+    }`
+  );
+}
+
+type HeadR2ObjectResult =
+  | { status: 'ok'; metadata: GenjutsuObjectMetadata }
+  | { status: 'missing' }
+  | { status: 'error'; error: string; httpStatus?: number };
+
+async function headR2ObjectResult(key: string): Promise<HeadR2ObjectResult> {
+  try {
+    const config = await getR2SigningConfig();
+    const response = await createR2Client(config).fetch(
+      new Request(buildR2ObjectUrl(config, key), { method: 'HEAD' })
+    );
+
+    if (response.status === 404) {
+      return { status: 'missing' };
+    }
+
+    if (!response.ok) {
+      return {
+        status: 'error',
+        error: `HEAD failed with HTTP ${response.status}`,
+        httpStatus: response.status,
+      };
+    }
+
+    const rawLength = response.headers.get('content-length');
+    const contentLength = rawLength ? Number(rawLength) : NaN;
+    const contentType =
+      response.headers
+        .get('content-type')
+        ?.split(';', 1)[0]
+        ?.trim()
+        .toLowerCase() || '';
+
+    if (!Number.isSafeInteger(contentLength) || contentLength <= 0) {
+      return {
+        status: 'error',
+        error: 'R2 object has an invalid content length',
+        httpStatus: response.status,
+      };
+    }
+
+    return {
+      status: 'ok',
+      metadata: {
+        contentLength,
+        contentType,
+        etag: response.headers.get('etag') || undefined,
+      },
+    };
+  } catch (error) {
+    return {
+      status: 'error',
+      error:
+        error instanceof Error
+          ? error.message.slice(0, 200)
+          : 'HEAD request failed',
+    };
+  }
+}
+
+export function assertGenjutsuStagingKeyOwned(params: {
+  userId: string;
+  generationId: string;
+  fileIndex: number;
+  key: string;
+}) {
+  assertSafeObjectKey(params.key);
+  const prefix = getGenjutsuInputPrefix(params);
+  const escapedPrefix = escapeRegExp(prefix);
+
+  if (params.fileIndex === 0) {
+    const sourcePattern = new RegExp(
+      `^${escapedPrefix}source\\.(?:mp4|mov|webm)$`
+    );
+    if (!sourcePattern.test(params.key)) {
+      throw new Error('Invalid Genjutsu source-video storage key');
+    }
+    return;
+  }
+
+  const expectedName = `reference-${String(params.fileIndex).padStart(2, '0')}`;
+  const referencePattern = new RegExp(
+    `^${escapedPrefix}${escapeRegExp(expectedName)}\\.(?:jpg|png|webp|gif|avif|heic|heif)$`
+  );
+  if (!referencePattern.test(params.key)) {
+    throw new Error('Invalid Genjutsu reference-image storage key');
+  }
+}
+
+export type GenjutsuStagingObjectInspection = {
+  exists: boolean | null;
+  sizeMatches: boolean | null;
+  typeMatches: boolean | null;
+  contentLength: number | null;
+  contentType: string | null;
+  inspectionStatus: 'ok' | 'missing' | 'error';
+  inspectionError: string | null;
+};
+
+export async function inspectGenjutsuStagingObject(params: {
+  userId: string;
+  generationId: string;
+  fileIndex: number;
+  storageKey: string;
+  expectedContentType?: string;
+  expectedContentLength?: number;
+}): Promise<GenjutsuStagingObjectInspection> {
+  assertGenjutsuStagingKeyOwned({
+    userId: params.userId,
+    generationId: params.generationId,
+    fileIndex: params.fileIndex,
+    key: params.storageKey,
+  });
+
+  const head = await headR2ObjectResult(params.storageKey);
+
+  if (head.status === 'missing') {
+    return {
+      exists: false,
+      sizeMatches: false,
+      typeMatches: false,
+      contentLength: null,
+      contentType: null,
+      inspectionStatus: 'missing',
+      inspectionError: null,
+    };
+  }
+
+  if (head.status === 'error') {
+    return {
+      exists: null,
+      sizeMatches: null,
+      typeMatches: null,
+      contentLength: null,
+      contentType: null,
+      inspectionStatus: 'error',
+      inspectionError: head.error,
+    };
+  }
+
+  const metadata = head.metadata;
+  const expectedType = params.expectedContentType
+    ?.split(';', 1)[0]
+    ?.trim()
+    .toLowerCase();
+  const typeMatches = expectedType
+    ? metadata.contentType === expectedType
+    : true;
+  const sizeMatches =
+    Number.isSafeInteger(params.expectedContentLength) &&
+    params.expectedContentLength! > 0
+      ? metadata.contentLength === params.expectedContentLength
+      : true;
+
+  return {
+    exists: true,
+    sizeMatches,
+    typeMatches,
+    contentLength: metadata.contentLength,
+    contentType: metadata.contentType,
+    inspectionStatus: 'ok',
+    inspectionError: null,
+  };
+}
+
+async function copyR2Object(params: {
+  sourceKey: string;
+  destinationKey: string;
+  sourceEtag?: string;
+}) {
   const config = await getR2SigningConfig();
+  assertSafeObjectKey(params.sourceKey);
+  assertSafeObjectKey(params.destinationKey);
+
+  const sourcePath = encodePath(
+    [config.bucket, config.uploadPath, params.sourceKey]
+      .filter(Boolean)
+      .join('/')
+  );
+  const headers = new Headers({
+    'x-amz-copy-source': `/${sourcePath}`,
+    'x-amz-metadata-directive': 'COPY',
+  });
+  if (params.sourceEtag) {
+    headers.set('x-amz-copy-source-if-match', params.sourceEtag);
+  }
+
   const response = await createR2Client(config).fetch(
-    new Request(buildR2ObjectUrl(config, key), { method: 'HEAD' })
+    new Request(buildR2ObjectUrl(config, params.destinationKey), {
+      method: 'PUT',
+      headers,
+    })
   );
 
   if (!response.ok) {
-    throw new Error(`Uploaded media is missing from R2: ${key}`);
+    const detail = await response.text().catch(() => '');
+    throw new Error(
+      `Failed to seal Genjutsu input: HTTP ${response.status}${detail ? ` - ${detail.slice(0, 300)}` : ''}`
+    );
   }
-
-  const rawLength = response.headers.get('content-length');
-  const contentLength = rawLength ? Number(rawLength) : NaN;
-  const contentType =
-    response.headers.get('content-type')?.split(';', 1)[0]?.trim().toLowerCase() ||
-    '';
-
-  if (!Number.isSafeInteger(contentLength) || contentLength <= 0) {
-    throw new Error(`R2 object has an invalid content length: ${key}`);
-  }
-
-  return { contentLength, contentType };
 }
 
 export function getGenjutsuInputPrefix(params: {
@@ -209,6 +402,31 @@ export function getGenjutsuInputPrefix(params: {
   return `genjutsu/inputs/${safeSegment(params.userId)}/${safeSegment(
     params.generationId
   )}/`;
+}
+
+export function getGenjutsuSealedInputPrefix(params: {
+  userId: string;
+  generationId: string;
+}) {
+  return `genjutsu/sealed-inputs/${safeSegment(params.userId)}/${safeSegment(
+    params.generationId
+  )}/`;
+}
+
+export function getGenjutsuSealedInputKey(params: {
+  userId: string;
+  generationId: string;
+  stagingKey: string;
+}) {
+  const stagingPrefix = getGenjutsuInputPrefix(params);
+  if (!params.stagingKey.startsWith(stagingPrefix)) {
+    throw new Error('Invalid Genjutsu staging input key');
+  }
+  const filename = params.stagingKey.slice(stagingPrefix.length);
+  if (!filename || filename.includes('/')) {
+    throw new Error('Invalid Genjutsu staging input key');
+  }
+  return `${getGenjutsuSealedInputPrefix(params)}${filename}`;
 }
 
 export function getGenjutsuInputKey(params: {
@@ -260,6 +478,65 @@ export function assertGenjutsuInputKeysOwned(params: {
     assertSafeObjectKey(key);
     if (!referencePattern.test(key)) {
       throw new Error('Invalid Genjutsu reference-image storage keys');
+    }
+  }
+}
+
+export function assertGenjutsuSourceVideoKeyOwned(params: {
+  userId: string;
+  generationId: string;
+  videoKey: string;
+}) {
+  assertSafeObjectKey(params.videoKey);
+  const stagingPrefix = getGenjutsuInputPrefix(params);
+  const sealedPrefix = getGenjutsuSealedInputPrefix(params);
+  const stagingPattern = new RegExp(
+    `^${escapeRegExp(stagingPrefix)}source\\.(?:mp4|mov|webm)$`
+  );
+  const sealedPattern = new RegExp(
+    `^${escapeRegExp(sealedPrefix)}source\\.(?:mp4|mov|webm)$`
+  );
+  if (
+    !stagingPattern.test(params.videoKey) &&
+    !sealedPattern.test(params.videoKey)
+  ) {
+    throw new Error('Invalid Genjutsu source-video storage key');
+  }
+}
+
+export function assertGenjutsuSealedInputKeysOwned(params: {
+  userId: string;
+  generationId: string;
+  videoKey: string;
+  imageKeys: string[];
+}) {
+  const prefix = getGenjutsuSealedInputPrefix(params);
+  const escapedPrefix = escapeRegExp(prefix);
+  const sourcePattern = new RegExp(
+    `^${escapedPrefix}source\\.(?:mp4|mov|webm)$`
+  );
+  const referencePattern = new RegExp(
+    `^${escapedPrefix}reference-0[1-8]\\.(?:jpg|png|webp|gif|avif|heic|heif)$`
+  );
+
+  assertSafeObjectKey(params.videoKey);
+  if (!sourcePattern.test(params.videoKey)) {
+    throw new Error('Invalid sealed Genjutsu source-video storage key');
+  }
+
+  if (
+    !Array.isArray(params.imageKeys) ||
+    params.imageKeys.length < 1 ||
+    params.imageKeys.length > 8 ||
+    new Set(params.imageKeys).size !== params.imageKeys.length
+  ) {
+    throw new Error('Invalid sealed Genjutsu reference-image storage keys');
+  }
+
+  for (const key of params.imageKeys) {
+    assertSafeObjectKey(key);
+    if (!referencePattern.test(key)) {
+      throw new Error('Invalid sealed Genjutsu reference-image storage keys');
     }
   }
 }
@@ -331,13 +608,94 @@ export async function createGenjutsuR2ReadUrl(key: string) {
   return signed.url;
 }
 
+export async function sealGenjutsuR2Inputs(params: {
+  userId: string;
+  generationId: string;
+  videoKey: string;
+  imageKeys: string[];
+  expectedContentTypes?: string[];
+  expectedContentLengths?: number[];
+}) {
+  assertGenjutsuInputKeysOwned(params);
+
+  const sourceKeys = [params.videoKey, ...params.imageKeys];
+  const metadata = await Promise.all(
+    sourceKeys.map((key) => headR2Object(key))
+  );
+
+  metadata.forEach((item, index) => {
+    assertGenjutsuObjectMetadata({
+      key: sourceKeys[index],
+      index,
+      metadata: item,
+    });
+
+    const expectedType = params.expectedContentTypes?.[index]
+      ?.split(';', 1)[0]
+      ?.trim()
+      .toLowerCase();
+    if (expectedType && item.contentType !== expectedType) {
+      throw new Error('Uploaded media content type changed before sealing');
+    }
+
+    const expectedLength = params.expectedContentLengths?.[index];
+    if (
+      Number.isSafeInteger(expectedLength) &&
+      expectedLength! > 0 &&
+      item.contentLength !== expectedLength
+    ) {
+      throw new Error('Uploaded media size changed before sealing');
+    }
+  });
+
+  const sealedKeys = sourceKeys.map((sourceKey) =>
+    getGenjutsuSealedInputKey({
+      userId: params.userId,
+      generationId: params.generationId,
+      stagingKey: sourceKey,
+    })
+  );
+
+  await Promise.all(
+    sourceKeys.map((sourceKey, index) =>
+      copyR2Object({
+        sourceKey,
+        destinationKey: sealedKeys[index],
+        sourceEtag: metadata[index].etag,
+      })
+    )
+  );
+
+  const sealedMetadata = await Promise.all(
+    sealedKeys.map((key) => headR2Object(key))
+  );
+  sealedMetadata.forEach((item, index) => {
+    assertGenjutsuObjectMetadata({
+      key: sealedKeys[index],
+      index,
+      metadata: item,
+    });
+    if (
+      item.contentLength !== metadata[index].contentLength ||
+      item.contentType !== metadata[index].contentType
+    ) {
+      throw new Error('Sealed Genjutsu input does not match uploaded media');
+    }
+  });
+
+  return {
+    videoKey: sealedKeys[0],
+    imageKeys: sealedKeys.slice(1),
+  };
+}
+
 export async function resolveGenjutsuInputUrls(params: {
   userId: string;
   generationId: string;
   videoKey: string;
   imageKeys: string[];
 }) {
-  assertGenjutsuInputKeysOwned(params);
+  assertGenjutsuSealedInputKeysOwned(params);
 
   const storage = await getStorage();
   if (!storage) {
@@ -407,7 +765,9 @@ export async function persistGenjutsuResultToR2(params: {
     });
 
     if (!copied.success) {
-      throw new Error(copied.error || 'Failed to persist Genjutsu result to R2');
+      throw new Error(
+        copied.error || 'Failed to persist Genjutsu result to R2'
+      );
     }
   }
 

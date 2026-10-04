@@ -1,9 +1,9 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { and, count, desc, eq, isNull } from 'drizzle-orm';
 
-import { aiTask } from '@/config/db/schema';
 import { getAuth } from '@/core/auth';
 import { db } from '@/core/db';
+import { aiTask } from '@/config/db/schema';
 import { GENJUTSU_SCENE } from '@/modules/genjutsu/billing';
 import { respErr, respPage } from '@/lib/resp';
 
@@ -62,6 +62,8 @@ async function GET({ request }: { request: Request }) {
 
     const items = rows.map((row) => {
       const options = parseJson(row.options);
+      const hasSourceVideo =
+        typeof options?.videoKey === 'string' && options.videoKey.length > 0;
       return {
         id: row.id,
         prompt: row.prompt,
@@ -70,6 +72,9 @@ async function GET({ request }: { request: Request }) {
         resolution:
           typeof options?.resolution === 'string' ? options.resolution : null,
         costCredits: row.costCredits,
+        sourceVideoUrl: hasSourceVideo
+          ? `/api/genjutsu/source/${encodeURIComponent(row.id)}`
+          : null,
         videoUrl:
           row.status === 'completed'
             ? `/api/genjutsu/result/${encodeURIComponent(row.id)}`

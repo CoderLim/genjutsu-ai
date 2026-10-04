@@ -14,8 +14,18 @@ import { toast } from 'sonner';
 
 import { useSession } from '@/core/auth/client';
 import { estimateGenjutsuCredits } from '@/modules/genjutsu/pricing';
-import { ApiError, apiGet, apiPost, uploadToSignedUrl } from '@/lib/api-client';
+import {
+  ApiError,
+  apiGet,
+  apiPost,
+  SignedUploadError,
+  uploadToSignedUrl,
+} from '@/lib/api-client';
 import { cn } from '@/lib/cn';
+import {
+  collectUploadDiagnostics,
+  type UploadClientDiagnostics,
+} from '@/lib/upload-diagnostics';
 import { m } from '@/paraglide/messages.js';
 import { useUserCredits } from '@/hooks/use-user-credits';
 import {
@@ -476,6 +486,97 @@ function generationFailureUiMessage(error?: string | null) {
     return m['genjutsu.safety.face_rejected']();
   }
   return error || '';
+}
+
+function classifyUploadFailure(cause: unknown) {
+  if (cause instanceof SignedUploadError) {
+    if (cause.httpStatus != null) {
+      return {
+        errorCode: 'UPLOAD_HTTP_ERROR' as const,
+        httpStatus: cause.httpStatus,
+        diagnostics: cause.diagnostics,
+      };
+    }
+    if (cause.cause instanceof Error && cause.cause.name === 'AbortError') {
+      return {
+        errorCode: 'UPLOAD_ABORTED' as const,
+        httpStatus: null,
+        diagnostics: cause.diagnostics,
+      };
+    }
+    return {
+      errorCode: 'UPLOAD_NETWORK_ERROR' as const,
+      httpStatus: null,
+      diagnostics: cause.diagnostics,
+    };
+  }
+
+  if (
+    cause instanceof ApiError &&
+    Number.isInteger(cause.code) &&
+    cause.code >= 400 &&
+    cause.code <= 599
+  ) {
+    return {
+      errorCode: 'UPLOAD_HTTP_ERROR' as const,
+      httpStatus: cause.code,
+      diagnostics: null as UploadClientDiagnostics | null,
+    };
+  }
+
+  if (cause instanceof Error && cause.name === 'AbortError') {
+    return {
+      errorCode: 'UPLOAD_ABORTED' as const,
+      httpStatus: null,
+      diagnostics: null as UploadClientDiagnostics | null,
+    };
+  }
+
+  return {
+    errorCode: 'UPLOAD_NETWORK_ERROR' as const,
+    httpStatus: null,
+    diagnostics: null as UploadClientDiagnostics | null,
+  };
+}
+
+async function reportUploadFailure(params: {
+  generationId: string;
+  fileIndex: number;
+  cause: unknown;
+}) {
+  const failure = classifyUploadFailure(params.cause);
+  return apiPost<{
+    generationId: string;
+    status: string;
+    recorded: boolean;
+    recovered: boolean;
+    r2ObjectExists: boolean | null;
+    r2ObjectSizeMatches: boolean | null;
+    r2ObjectTypeMatches: boolean | null;
+  }>('/api/genjutsu/attempt-failure', {
+    generationId: params.generationId,
+    fileIndex: params.fileIndex,
+    errorCode: failure.errorCode,
+    httpStatus: failure.httpStatus,
+    diagnostics: failure.diagnostics,
+  });
+}
+
+async function reportUploadRetrySucceeded(params: {
+  generationId: string;
+  fileIndex: number;
+  attemptCount: number;
+  uploadElapsedMs: number;
+}) {
+  return apiPost('/api/genjutsu/attempt-failure', {
+    generationId: params.generationId,
+    fileIndex: params.fileIndex,
+    event: 'retry_succeeded',
+    diagnostics: collectUploadDiagnostics({
+      attemptCount: params.attemptCount,
+      uploadElapsedMs: params.uploadElapsedMs,
+    }),
+  });
 }
 
 function redirectToSignIn() {
@@ -988,6 +1089,25 @@ export function GeneratorPanel({
         notFoundCount = 0;
 
         if (
+          polled.providerStatus === 'initiated' ||
+          polled.providerStatus === 'sealing' ||
+          polled.providerStatus === 'ready'
+        ) {
+          // These states are definitively before credit reservation/provider
+          // submission. Never turn a page refresh into a paid generation.
+          localStorage.removeItem(activeGenerationKey(active.userId));
+          setStatus('idle');
+          setResult(null);
+          setNeedsCredits(false);
+          setError(
+            polled.providerStatus === 'ready'
+              ? 'Upload completed, but generation was not started. Click Generate to try again.'
+              : 'The previous upload did not finish starting a generation. Click Generate to try again.'
+          );
+          return;
+        }
+
+        if (
           typeof polled.reservedCredits === 'number' &&
           polled.reservedCredits > 0 &&
           polled.reservedCredits !== active.reservedCredits
@@ -1028,6 +1148,7 @@ export function GeneratorPanel({
           localStorage.removeItem(activeGenerationKey(active.userId));
           setStatus('idle');
           setResult(null);
+          setNeedsCredits(polled.providerStatus === 'insufficient_credits');
           const uiError =
             generationFailureUiMessage(polled.error) ||
             `Generation failed (${polled.providerStatus})`;
@@ -1142,6 +1263,13 @@ export function GeneratorPanel({
     });
 
     try {
+      await apiPost('/api/genjutsu/attempt', {
+        generationId,
+        mode,
+        resolution,
+        prompt: prompt.trim(),
+      });
+
       const media = [video, ...images];
       const contentTypes = media.map(
         (item, index) =>
@@ -1150,7 +1278,14 @@ export function GeneratorPanel({
       const contentLengths = media.map((item) => item.file.size);
       const uploadBatch = await apiPost<{ uploads: SignedUpload[] }>(
         '/api/genjutsu/upload-url',
-        { generationId, contentTypes, contentLengths }
+        {
+          generationId,
+          mode,
+          resolution,
+          prompt: prompt.trim(),
+          contentTypes,
+          contentLengths,
+        }
       );
 
       if (uploadBatch.uploads.length !== media.length) {
@@ -1160,43 +1295,41 @@ export function GeneratorPanel({
       for (let index = 0; index < media.length; index += 1) {
         const upload = uploadBatch.uploads[index];
         if (!upload) throw new Error('Missing storage upload URL');
-        await uploadToSignedUrl({
-          url: upload.uploadUrl,
-          file: media[index].file,
-          headers: upload.uploadHeaders,
-        });
+        try {
+          const uploaded = await uploadToSignedUrl({
+            url: upload.uploadUrl,
+            file: media[index].file,
+            headers: upload.uploadHeaders,
+          });
+          if (uploaded.attemptCount > 1) {
+            await reportUploadRetrySucceeded({
+              generationId,
+              fileIndex: index,
+              attemptCount: uploaded.attemptCount,
+              uploadElapsedMs: uploaded.uploadElapsedMs,
+            }).catch(() => undefined);
+          }
+        } catch (cause) {
+          const report = await reportUploadFailure({
+            generationId,
+            fileIndex: index,
+            cause,
+          }).catch(() => null);
+          if (report?.recovered) {
+            continue;
+          }
+          throw cause;
+        }
       }
 
       if (generationRunRef.current !== runId) return;
 
-      const [videoUpload, ...imageUploads] = uploadBatch.uploads;
-      if (!videoUpload) throw new Error('Missing uploaded video');
+      await apiPost('/api/genjutsu/seal-inputs', {
+        generationId,
+      });
 
-      const usesR2Keys =
-        typeof videoUpload.storageKey === 'string' &&
-        imageUploads.every((item) => typeof item.storageKey === 'string');
-
-      const mediaPayload = usesR2Keys
-        ? {
-            videoKey: videoUpload.storageKey as string,
-            imageKeys: imageUploads.map((item) => item.storageKey as string),
-          }
-        : (() => {
-            if (
-              typeof videoUpload.publicUrl !== 'string' ||
-              imageUploads.some((item) => typeof item.publicUrl !== 'string')
-            ) {
-              throw new Error('Uploaded media is missing a readable URL');
-            }
-            return {
-              videoUrl: videoUpload.publicUrl,
-              imageUrls: imageUploads.map((item) => item.publicUrl as string),
-            };
-          })();
-
-      // Persist before the paid POST. If the browser loses the response after
-      // the server accepted it, refresh/resume will reconcile by generationId
-      // instead of creating a second paid request.
+      // Persist before the paid POST. A refresh may reconcile an already-paid
+      // job, but must never auto-start a still-unpaid ready attempt.
       const active: PersistedGeneration = {
         userId: session.user.id,
         generationId,
@@ -1210,10 +1343,6 @@ export function GeneratorPanel({
 
       const started = await apiPost<GenerationStart>('/api/genjutsu/generate', {
         generationId,
-        mode,
-        resolution,
-        prompt: prompt.trim(),
-        ...mediaPayload,
       });
 
       active.generationId = started.generationId;

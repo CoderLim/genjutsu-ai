@@ -141,6 +141,24 @@ async function appPost(path, cookie, body) {
   return payload.data;
 }
 
+async function appPostExpectError(path, cookie, body, expectedStatus) {
+  const response = await fetch(`${baseUrl}${path}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Cookie: cookie,
+      Origin: baseUrl,
+    },
+    body: JSON.stringify(body),
+  });
+  const payload = await response.json().catch(() => null);
+  assert.equal(response.status, expectedStatus, JSON.stringify(payload));
+  assert.notEqual(payload?.code, 0, 'expected an API error');
+  return payload;
+}
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 async function appGet(path, cookie) {
   const response = await fetch(`${baseUrl}${path}`, {
     headers: {
@@ -192,22 +210,121 @@ async function main() {
       'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
       'base64'
     );
+    await appPost('/api/genjutsu/attempt', cookie, {
+      generationId,
+      mode: 'motion-transfer',
+      resolution: '720p',
+      prompt: 'E2E smoke test',
+    });
+
+    const attempts = await appGet(
+      '/api/user/generations?page=1&pageSize=12',
+      cookie
+    );
+    const recordedAttempt = attempts.items.find(
+      (item) => item.id === generationId
+    );
+    assert.ok(recordedAttempt, 'Generate click was not recorded');
+    assert.equal(recordedAttempt.status, 'initiated');
+
     const uploadBatch = await appPost('/api/genjutsu/upload-url', cookie, {
       generationId,
+      mode: 'motion-transfer',
+      resolution: '720p',
+      prompt: 'E2E smoke test',
       contentTypes: ['video/mp4', 'image/png'],
       contentLengths: [videoBytes.byteLength, imageBytes.byteLength],
     });
     assert.equal(uploadBatch.uploads.length, 2);
 
-    const [videoUpload, imageUpload] = uploadBatch.uploads;
-    assert.match(
-      videoUpload.storageKey,
-      /\/source\.mp4$/
+    const initiatedStatus = await appGet(
+      `/api/genjutsu/status?generationId=${encodeURIComponent(generationId)}`,
+      cookie
     );
-    assert.match(
-      imageUpload.storageKey,
-      /\/reference-01\.png$/
+    assert.equal(initiatedStatus.status, 'processing');
+    assert.equal(initiatedStatus.providerStatus, 'initiated');
+
+    // A direct-to-R2 browser upload failure must be persisted instead of
+    // leaving the attempt stuck forever at upload_requested.
+    await sleep(1_100);
+    const failedUploadGenerationId = `e2e-upload-failure-${randomUUID()}`;
+    await appPost('/api/genjutsu/attempt', cookie, {
+      generationId: failedUploadGenerationId,
+      mode: 'motion-transfer',
+      resolution: '720p',
+      prompt: 'E2E upload failure',
+    });
+    await appPost('/api/genjutsu/upload-url', cookie, {
+      generationId: failedUploadGenerationId,
+      mode: 'motion-transfer',
+      resolution: '720p',
+      prompt: 'E2E upload failure',
+      contentTypes: ['video/mp4', 'image/png'],
+      contentLengths: [videoBytes.byteLength, imageBytes.byteLength],
+    });
+    const failureRecorded = await appPost(
+      '/api/genjutsu/attempt-failure',
+      cookie,
+      {
+        generationId: failedUploadGenerationId,
+        fileIndex: 0,
+        errorCode: 'UPLOAD_HTTP_ERROR',
+        httpStatus: 403,
+      }
     );
+    assert.equal(failureRecorded.status, 'failed_preflight');
+    assert.equal(failureRecorded.recorded, true);
+
+    await sleep(1_100);
+    const failedUploadStatus = await appGet(
+      `/api/genjutsu/status?generationId=${encodeURIComponent(failedUploadGenerationId)}`,
+      cookie
+    );
+    assert.equal(failedUploadStatus.status, 'failed');
+    assert.equal(failedUploadStatus.providerStatus, 'failed_preflight');
+    assert.equal(failedUploadStatus.errorCode, 'UPLOAD_HTTP_ERROR');
+    assert.equal(failedUploadStatus.stage, 'upload');
+    assert.match(failedUploadStatus.error, /HTTP 403/);
+
+    // An identical retry may re-sign the same immutable input keys.
+    await sleep(1_100);
+    const repeatedUploadBatch = await appPost(
+      '/api/genjutsu/upload-url',
+      cookie,
+      {
+        generationId,
+        mode: 'motion-transfer',
+        resolution: '720p',
+        prompt: 'E2E smoke test',
+        contentTypes: ['video/mp4', 'image/png'],
+        contentLengths: [videoBytes.byteLength, imageBytes.byteLength],
+      }
+    );
+    assert.deepEqual(
+      repeatedUploadBatch.uploads.map((item) => item.storageKey),
+      uploadBatch.uploads.map((item) => item.storageKey)
+    );
+
+    // The same generationId must never be rebound to different inputs.
+    await sleep(1_100);
+    const conflict = await appPostExpectError(
+      '/api/genjutsu/upload-url',
+      cookie,
+      {
+        generationId,
+        mode: 'motion-transfer',
+        resolution: '720p',
+        prompt: 'Different prompt must conflict',
+        contentTypes: ['video/mp4', 'image/png'],
+        contentLengths: [videoBytes.byteLength, imageBytes.byteLength],
+      },
+      409
+    );
+    assert.equal(conflict?.data?.code, 'GENERATION_INPUT_CONFLICT');
+
+    const [videoUpload, imageUpload] = repeatedUploadBatch.uploads;
+    assert.match(videoUpload.storageKey, /\/source\.mp4$/);
+    assert.match(imageUpload.storageKey, /\/reference-01\.png$/);
 
     for (const [upload, bytes, type] of [
       [videoUpload, videoBytes, 'video/mp4'],
@@ -224,23 +341,47 @@ async function main() {
       assert.ok(response.ok, `mock upload failed: HTTP ${response.status}`);
     }
 
-    console.log('\n[6/6] Running Generate → Status → source-video result...');
+    const sealed = await appPost('/api/genjutsu/seal-inputs', cookie, {
+      generationId,
+    });
+    assert.equal(sealed.status, 'ready');
+    assert.match(sealed.videoKey, /\/sealed-inputs\//);
+
+    const readyStatus = await appGet(
+      `/api/genjutsu/status?generationId=${encodeURIComponent(generationId)}`,
+      cookie
+    );
+    assert.equal(readyStatus.status, 'processing');
+    assert.equal(readyStatus.providerStatus, 'ready');
+
+    // Old signed PUT URLs may still be valid, but they only target staging.
+    // Overwriting staging after seal must not alter the provider input.
+    const tamperedVideoBytes = Buffer.from('x'.repeat(videoBytes.byteLength));
+    const overwrite = await fetch(videoUpload.uploadUrl, {
+      method: 'PUT',
+      headers: {
+        ...(videoUpload.uploadHeaders || {}),
+        'Content-Type': 'video/mp4',
+      },
+      body: tamperedVideoBytes,
+    });
+    assert.ok(
+      overwrite.ok,
+      `staging overwrite failed: HTTP ${overwrite.status}`
+    );
+
+    console.log(
+      '\n[6/6] Running Generate → Status → sealed source-video result...'
+    );
     const started = await appPost('/api/genjutsu/generate', cookie, {
       generationId,
-      mode: 'motion-transfer',
-      resolution: '720p',
-      prompt: 'E2E smoke test',
-      videoKey: videoUpload.storageKey,
-      imageKeys: [imageUpload.storageKey],
-      price: 1,
-      credits: 0,
-      providerCostUsd: 0,
     });
 
     assert.equal(started.generationId, generationId);
     assert.ok(started.requestId?.startsWith('e2e-'));
     assert.ok(started.reservedCredits > 0);
 
+    await sleep(1_100);
     const completed = await appGet(
       `/api/genjutsu/status?generationId=${encodeURIComponent(generationId)}`,
       cookie
@@ -251,6 +392,24 @@ async function main() {
       `/api/genjutsu/result/${encodeURIComponent(generationId)}`
     );
     assert.equal(completed.reservedCredits, started.reservedCredits);
+
+    // Once reservation/submission has started, upload inputs are frozen even
+    // when the caller retries with the exact original payload.
+    await sleep(1_100);
+    const startedConflict = await appPostExpectError(
+      '/api/genjutsu/upload-url',
+      cookie,
+      {
+        generationId,
+        mode: 'motion-transfer',
+        resolution: '720p',
+        prompt: 'E2E smoke test',
+        contentTypes: ['video/mp4', 'image/png'],
+        contentLengths: [videoBytes.byteLength, imageBytes.byteLength],
+      },
+      409
+    );
+    assert.equal(startedConflict?.data?.code, 'GENERATION_ALREADY_STARTED');
 
     const resultResponse = await fetch(`${baseUrl}${completed.videoUrl}`, {
       headers: {
@@ -265,8 +424,12 @@ async function main() {
     assert.deepEqual(returned, videoBytes.subarray(0, 10));
 
     console.log('\n✅ Genjutsu E2E passed');
-    console.log('   auth → storageKey upload → safety/quote → credit reserve →');
-    console.log('   mock provider submit → durable result key → stable result URL');
+    console.log(
+      '   auth → persisted attempt → staging upload → immutable seal →'
+    );
+    console.log(
+      '   credit reserve → mock provider submit → durable result URL'
+    );
   } finally {
     stop();
     await new Promise((resolve) => setTimeout(resolve, 300));

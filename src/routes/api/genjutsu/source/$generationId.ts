@@ -4,14 +4,13 @@ import { getAuth } from '@/core/auth';
 import {
   getGenjutsuTaskByGenerationId,
   getGenjutsuTaskById,
-  parseGenjutsuTaskInfo,
 } from '@/modules/genjutsu/billing';
 import {
   getGenjutsuE2EUrlForStorageKey,
   isGenjutsuE2EMockEnabled,
 } from '@/modules/genjutsu/e2e-mock';
 import {
-  assertGenjutsuResultKeyOwned,
+  assertGenjutsuSourceVideoKeyOwned,
   createGenjutsuR2ReadUrl,
 } from '@/modules/genjutsu/storage';
 import { hasPermission } from '@/modules/rbac/service';
@@ -33,6 +32,15 @@ function redirectResponse(url: string) {
   });
 }
 
+function parseOptions(value: string | null | undefined) {
+  if (!value) return null;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+}
+
 async function GET({
   request,
   params,
@@ -51,50 +59,34 @@ async function GET({
         generationId: params.generationId,
         userId: session.user.id,
       });
-  if (!task || task.status !== 'completed') {
-    return errorResponse('Generation result not found', 404);
-  }
+  if (!task) return errorResponse('Generation source not found', 404);
 
-  const parsed = parseGenjutsuTaskInfo(task);
+  const options = parseOptions(task.options);
   const videoKey =
-    typeof parsed.result?.videoKey === 'string' ? parsed.result.videoKey : null;
+    typeof options?.videoKey === 'string' ? options.videoKey : null;
+  if (!videoKey) return errorResponse('Generation source not found', 404);
 
-  if (videoKey) {
-    assertGenjutsuResultKeyOwned({
+  try {
+    assertGenjutsuSourceVideoKeyOwned({
       userId: task.userId,
       generationId: task.id,
       videoKey,
     });
-
-    if (isGenjutsuE2EMockEnabled()) {
-      const mockUrl = getGenjutsuE2EUrlForStorageKey(videoKey);
-      return mockUrl
-        ? redirectResponse(mockUrl)
-        : errorResponse('E2E result object not found', 404);
-    }
-
-    return redirectResponse(await createGenjutsuR2ReadUrl(videoKey));
-  }
-
-  const legacyUrl =
-    typeof parsed.result?.videoUrl === 'string' ? parsed.result.videoUrl : null;
-  if (!legacyUrl) return errorResponse('Generation result not found', 404);
-
-  let parsedUrl: URL;
-  try {
-    parsedUrl = new URL(legacyUrl, new URL(request.url).origin);
   } catch {
-    return errorResponse('Invalid legacy result URL', 500);
+    return errorResponse('Generation source not found', 404);
   }
 
-  if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
-    return errorResponse('Invalid legacy result URL', 500);
+  if (isGenjutsuE2EMockEnabled()) {
+    const mockUrl = getGenjutsuE2EUrlForStorageKey(videoKey);
+    return mockUrl
+      ? redirectResponse(mockUrl)
+      : errorResponse('E2E source object not found', 404);
   }
 
-  return redirectResponse(parsedUrl.toString());
+  return redirectResponse(await createGenjutsuR2ReadUrl(videoKey));
 }
 
-export const Route = createFileRoute('/api/genjutsu/result/$generationId')({
+export const Route = createFileRoute('/api/genjutsu/source/$generationId')({
   server: {
     handlers: { GET },
   },
