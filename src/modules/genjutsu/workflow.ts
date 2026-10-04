@@ -78,6 +78,27 @@ function referenceMappings(references: string[]) {
     .join(', ');
 }
 
+function buildReferenceRules(input: {
+  video: string;
+  references: string[];
+  imageCount: number;
+}) {
+  const mappings =
+    referenceMappings(input.references) ||
+    `Reference 1 = ${input.references[0] || '@Image1'}`;
+
+  if (input.imageCount <= 1) {
+    return [`Reference 1 maps to ${input.references[0] || '@Image1'}.`];
+  }
+
+  return [
+    `Reference labels map to provider images as follows: ${mappings}.`,
+    'The reference images may represent different elements, different roles, or multiple views of the same element.',
+    `Use the user instruction to determine how each reference should be used in relation to ${input.video}.`,
+    'Do not blend, merge, or transfer visual traits between unrelated references unless the user explicitly asks for that.',
+  ];
+}
+
 export function buildSeedanceWorkflowPrompt(input: {
   mode: GenjutsuMode;
   userPrompt?: string;
@@ -93,34 +114,28 @@ export function buildSeedanceWorkflowPrompt(input: {
   const video = tokens.video;
   const references = tokens.images.slice(0, input.imageCount);
   const primary = references[0] || '@Image1';
-  const mappings =
-    referenceMappings(references) || `Reference 1 = ${primary}`;
-  const multiReferenceRules =
-    input.imageCount > 1
-      ? [
-          `Reference labels map to provider images as follows: ${mappings}.`,
-          'The reference images may represent different characters, products, wardrobe items, props, objects, or visual elements. Do not assume they are alternate views of the same subject.',
-          `Use the user instruction to determine which reference belongs to which target in ${video}. Apply each reference only to its matching target.`,
-          'Do not blend, merge, or transfer visual traits between unrelated references unless the user explicitly asks for that.',
-        ]
-      : [`Reference 1 maps to ${primary}.`];
+  const referenceRules = buildReferenceRules({
+    video,
+    references,
+    imageCount: input.imageCount,
+  });
 
   if (input.mode === 'motion-transfer') {
     return [
-      `Use ${video} strictly as the motion, timing, pose, choreography, camera movement, and shot-composition reference.`,
-      ...multiReferenceRules,
+      `Use ${video} as the source of motion, timing, poses, choreography, camera movement, framing, shot composition, and shot progression.`,
+      ...referenceRules,
       input.imageCount === 1
-        ? `Use ${primary} as the replacement character or subject appearance reference.`
-        : 'When several references are provided, preserve each referenced target independently according to the user instruction.',
-      `Preserve the action timing, body motion, gestures, camera movement, framing, and shot progression from ${video} as closely as possible.`,
-      `Keep each replaced subject visually consistent throughout the video, including face or character design, clothing, proportions, colors, products, props, and other defining details from its assigned reference.`,
-      `Do not copy the original replaced subject identity or appearance from ${video}.`,
-      `Preserve the original environment and unrelated subjects from ${video} unless the user instruction explicitly requests a scene, style, or target change.`,
+        ? `Use ${primary} as a visual reference according to the user instruction.`
+        : 'The references may define characters, products, wardrobe, props, locations, environments, visual appearance, or multiple views of the same element.',
+      `Preserve the motion, timing, camera movement, framing, and shot progression of ${video} as closely as possible.`,
+      'Rebuild only the characters, products, wardrobe, props, locations, environments, or visual appearance requested by the user and reference images.',
+      'Keep all referenced elements visually consistent throughout the video.',
+      'Do not change motion, camera behavior, timing, framing, or shot progression unless the user explicitly requests it.',
       userPrompt
         ? `User instruction: ${userPrompt}`
         : input.imageCount > 1
-          ? 'No explicit mapping was provided. Infer roles conservatively from visual correspondence and modify only clearly matching targets; never merge unrelated references.'
-          : '',
+          ? 'No explicit mapping was provided. Infer reference roles conservatively from visual correspondence. References may describe different elements or multiple views of the same element. Preserve the source motion, camera, timing, framing, and shot progression.'
+          : `Use ${primary} as the visual reference for the primary appearance transformation while preserving the motion, camera, timing, framing, and shot progression from ${video}.`,
     ]
       .filter(Boolean)
       .join('\n');
@@ -128,19 +143,19 @@ export function buildSeedanceWorkflowPrompt(input: {
 
   return [
     `Edit ${video} instead of redesigning the whole shot.`,
-    ...multiReferenceRules,
+    ...referenceRules,
     input.imageCount === 1
       ? `Use ${primary} as the replacement reference.`
-      : 'When several references are provided, each may control a different requested target.',
-    'Replace only the requested target objects, products, outfits, characters, subjects, or other visual elements.',
-    `Preserve everything unrelated to the requested replacements from ${video} as closely as possible: motion, camera movement, timing, background, composition, lighting, other people, and other objects.`,
+      : 'The references may control different requested targets or provide multiple views of the same target.',
+    'Replace only the requested characters, products, wardrobe, props, objects, locations, environments, or other visual elements.',
+    `Preserve everything unrelated to the requested replacements from ${video} as closely as possible: motion, camera movement, timing, framing, composition, background, lighting, unrelated people, and unrelated objects.`,
     'Integrate every replacement naturally with the original perspective, scale, occlusion, lighting, shadows, reflections, and motion.',
-    'Do not regenerate or alter unrelated parts of the video.',
+    `Do not regenerate or alter unrelated parts of ${video}.`,
     userPrompt
       ? `Target replacement instruction: ${userPrompt}`
       : input.imageCount > 1
-        ? 'No explicit mapping was provided. Infer roles conservatively from visual correspondence and replace only clearly matching targets; never merge unrelated references.'
-        : 'Target replacement instruction: replace the most prominent matching target in the source video with Reference 1.',
+        ? 'No explicit mapping was provided. Use visual correspondence conservatively. Only modify targets with a clear match to the references, and do not merge unrelated references.'
+        : `Target replacement instruction: replace the most prominent matching target in ${video} with Reference 1.`,
   ]
     .filter(Boolean)
     .join('\n');
