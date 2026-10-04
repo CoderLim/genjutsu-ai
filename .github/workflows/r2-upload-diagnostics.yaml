@@ -99,10 +99,30 @@ jobs:
             exit 2
           fi
 
-          echo "=== R2_CORS ==="
+          echo "=== R2_CORS_API ==="
+          set +e
           if [ -n "${CLOUDFLARE_API_TOKEN:-}" ]; then
-            curl --fail --silent --show-error               -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"               "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/r2/buckets/$BUCKET/cors"
+            curl --silent --show-error -i \
+              -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+              "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/r2/buckets/$BUCKET/cors"
           else
-            curl --fail --silent --show-error               -H "X-Auth-Email: $CLOUDFLARE_EMAIL"               -H "X-Auth-Key: $CLOUDFLARE_API_KEY"               "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/r2/buckets/$BUCKET/cors"
+            curl --silent --show-error -i \
+              -H "X-Auth-Email: $CLOUDFLARE_EMAIL" \
+              -H "X-Auth-Key: $CLOUDFLARE_API_KEY" \
+              "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/r2/buckets/$BUCKET/cors"
           fi
+          set -e
+          echo
+
+          echo "=== R2_BROWSER_PREFLIGHT ==="
+          ENDPOINT="$($WRANGLER d1 execute genjutsu-ai-db --remote --json --command "SELECT value FROM config WHERE name='r2_endpoint' LIMIT 1;" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const j=JSON.parse(s);const r=(j[0]?.results||[])[0];process.stdout.write(r?.value||'')})")"
+          UPLOAD_PATH="$($WRANGLER d1 execute genjutsu-ai-db --remote --json --command "SELECT value FROM config WHERE name='r2_upload_path' LIMIT 1;" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const j=JSON.parse(s);const r=(j[0]?.results||[])[0];process.stdout.write(r?.value||'uploads')})")"
+          TEST_URL="${ENDPOINT%/}/$BUCKET/${UPLOAD_PATH#/}/genjutsu/diagnostics/cors-test.mp4"
+          ENDPOINT="$ENDPOINT" node -e "try{console.log('endpoint_host='+new URL(process.env.ENDPOINT).host)}catch{console.log('endpoint_host=(invalid)')}"
+          set +e
+          curl --silent --show-error -i -X OPTIONS "$TEST_URL" \
+            -H "Origin: https://genjutsuai.net" \
+            -H "Access-Control-Request-Method: PUT" \
+            -H "Access-Control-Request-Headers: content-type"
+          set -e
           echo
