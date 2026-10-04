@@ -1,9 +1,9 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { and, count, desc, eq, like, or, type SQL } from 'drizzle-orm';
+import { and, count, desc, eq, inArray, like, or, type SQL } from 'drizzle-orm';
 
 import { getAuth } from '@/core/auth';
 import { db } from '@/core/db';
-import { aiTask, user } from '@/config/db/schema';
+import { aiTask, order, subscription, user } from '@/config/db/schema';
 import { GENJUTSU_SCENE } from '@/modules/genjutsu/billing';
 import {
   calculateGenjutsuCredits,
@@ -13,6 +13,39 @@ import {
 import { estimateSeedanceProviderCost } from '@/modules/genjutsu/seedance';
 import { hasPermission } from '@/modules/rbac/service';
 import { respErr, respPage } from '@/lib/resp';
+
+/** Mirrors getCurrentSubscription() — active-ish subscription counts as paid. */
+const PAID_SUBSCRIPTION_STATUSES = [
+  'active',
+  'pending_cancel',
+  'trialing',
+] as const;
+
+/** Paid = completed order, or an active-ish subscription. */
+async function resolvePaidUserIds(userIds: string[]): Promise<Set<string>> {
+  const paid = new Set<string>();
+  if (userIds.length === 0) return paid;
+
+  const [paidOrders, activeSubs] = await Promise.all([
+    db()
+      .selectDistinct({ userId: order.userId })
+      .from(order)
+      .where(and(inArray(order.userId, userIds), eq(order.status, 'paid'))),
+    db()
+      .selectDistinct({ userId: subscription.userId })
+      .from(subscription)
+      .where(
+        and(
+          inArray(subscription.userId, userIds),
+          inArray(subscription.status, [...PAID_SUBSCRIPTION_STATUSES])
+        )
+      ),
+  ]);
+
+  for (const row of paidOrders) paid.add(row.userId);
+  for (const row of activeSubs) paid.add(row.userId);
+  return paid;
+}
 
 function parseJson(value: string | null) {
   if (!value) return null;
@@ -378,7 +411,15 @@ async function GET({ request }: { request: Request }) {
       };
     });
 
-    return respPage(items, totalResult.count);
+    const paidUserIds = await resolvePaidUserIds(
+      Array.from(new Set(rows.map((row) => row.userId)))
+    );
+    const itemsWithPaid = items.map((item) => ({
+      ...item,
+      isPaid: paidUserIds.has(item.userId),
+    }));
+
+    return respPage(itemsWithPaid, totalResult.count);
   } catch (error: any) {
     return respErr(error.message || 'Internal error');
   }
