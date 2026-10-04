@@ -147,6 +147,7 @@ function UploadedMediaCard({
 }) {
   const [dimensions, setDimensions] = useState<string | null>(null);
   const [duration, setDuration] = useState<number | null>(null);
+  const [loadError, setLoadError] = useState(false);
 
   return (
     <div className="overflow-hidden rounded-lg border">
@@ -173,6 +174,7 @@ function UploadedMediaCard({
             preload="metadata"
             className="aspect-video max-h-[420px] w-full object-contain"
             onLoadedMetadata={(event) => {
+              setLoadError(false);
               const video = event.currentTarget;
               if (video.videoWidth > 0 && video.videoHeight > 0) {
                 setDimensions(`${video.videoWidth}×${video.videoHeight}`);
@@ -181,6 +183,7 @@ function UploadedMediaCard({
                 setDuration(video.duration);
               }
             }}
+            onError={() => setLoadError(true)}
           />
         ) : (
           <img
@@ -189,14 +192,22 @@ function UploadedMediaCard({
             loading="lazy"
             className="max-h-[420px] w-full object-contain"
             onLoad={(event) => {
+              setLoadError(false);
               const image = event.currentTarget;
               if (image.naturalWidth > 0 && image.naturalHeight > 0) {
                 setDimensions(`${image.naturalWidth}×${image.naturalHeight}`);
               }
             }}
+            onError={() => setLoadError(true)}
           />
         )}
       </div>
+
+      {loadError ? (
+        <div className="border-t px-3 py-2 text-xs text-destructive">
+          Media could not be loaded (the R2 object may be missing or unavailable).
+        </div>
+      ) : null}
 
       <div className="grid grid-cols-2 gap-x-4 gap-y-2 p-3 text-xs sm:grid-cols-3">
         <div>
