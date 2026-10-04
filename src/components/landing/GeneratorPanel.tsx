@@ -430,7 +430,7 @@ function VideoUploadSlot({
         ) : (
           <EmptyUploadButton
             title="Add a reference video to edit"
-            hint="4–30s · no real people in the source video"
+            hint="4–30s"
             icon={<FilmIcon className="text-primary/78 size-5 shrink-0" />}
             dragging={dragging}
             onClick={() => inputRef.current?.click()}

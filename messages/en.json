@@ -846,7 +846,7 @@
   "genjutsu.safety.face_rejected": "Images and videos cannot contain real people. Please use media without real human likenesses.",
   "genjutsu.safety.unavailable": "Safety check is temporarily unavailable. Please try again later.",
   "genjutsu.safety.check_failed": "Reference check failed. Please try another image.",
-  "genjutsu.safety.upload_hint": "No real people in images or video · up to 8 images",
+  "genjutsu.safety.upload_hint": "Up to 8 images",
   "genjutsu.safety.checking_aria": "Checking reference image",
   "genjutsu.estimate.credits": "~{count} cr",
   "genjutsu.estimate.tooltip": "Estimated credits for this job based on your video length and resolution. The exact amount is calculated on the server when you generate.",
