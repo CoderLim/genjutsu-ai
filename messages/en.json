@@ -857,6 +857,7 @@
   "admin.generations.empty": "No generation records yet",
   "admin.generations.search_placeholder": "Search user, generation ID, request ID, model, or prompt...",
   "admin.generations.user": "User",
+  "admin.generations.paid_user": "Paid user",
   "admin.generations.video": "Video",
   "admin.generations.open_video": "Open video",
   "admin.generations.before": "Before",

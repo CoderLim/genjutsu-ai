@@ -1,7 +1,7 @@
 import { memo, useEffect, useMemo, useState } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
-import { Eye, Film, ImageIcon, Play } from 'lucide-react';
+import { Crown, Eye, Film, ImageIcon, Play } from 'lucide-react';
 
 import {
   calculateGenjutsuCredits,
@@ -51,6 +51,7 @@ interface Generation {
   userId: string;
   userName: string | null;
   userEmail: string;
+  isPaid: boolean;
   provider: string;
   model: string;
   prompt: string;
@@ -456,7 +457,15 @@ const GenerationsTable = memo(function GenerationsTable({
         header: m['admin.generations.user'](),
         cell: (g) => (
           <div className="min-w-[180px]">
-            <div className="font-medium">{g.userName || '—'}</div>
+            <div className="flex items-center gap-1.5 font-medium">
+              <span className="truncate">{g.userName || '—'}</span>
+              {g.isPaid ? (
+                <Crown
+                  className="size-3.5 shrink-0 text-amber-500"
+                  aria-label={m['admin.generations.paid_user']()}
+                />
+              ) : null}
+            </div>
             <div className="text-muted-foreground text-xs">{g.userEmail}</div>
           </div>
         ),
@@ -712,8 +721,14 @@ function GenerationsPage() {
               <div className="grid gap-4 rounded-lg border p-4 text-sm md:grid-cols-2 xl:grid-cols-4">
                 <div>
                   <div className="text-muted-foreground text-xs">User</div>
-                  <div className="mt-1 font-medium">
-                    {detail.userName || '—'}
+                  <div className="mt-1 flex items-center gap-1.5 font-medium">
+                    <span>{detail.userName || '—'}</span>
+                    {detail.isPaid ? (
+                      <Crown
+                        className="size-3.5 shrink-0 text-amber-500"
+                        aria-label={m['admin.generations.paid_user']()}
+                      />
+                    ) : null}
                   </div>
                   <div className="text-muted-foreground text-xs break-all">
                     {detail.userEmail}

@@ -857,6 +857,7 @@
   "admin.generations.empty": "暂无生成记录",
   "admin.generations.search_placeholder": "搜索用户、生成 ID、请求 ID、模型或提示词...",
   "admin.generations.user": "用户",
+  "admin.generations.paid_user": "付费用户",
   "admin.generations.video": "视频",
   "admin.generations.open_video": "打开视频",
   "admin.generations.before": "Before",
