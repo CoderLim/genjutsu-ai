@@ -16,7 +16,6 @@ jobs:
       CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_API_KEY }}
       CF_API_KEY_FALLBACK: ${{ secrets.CF_API_KEY }}
       CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL || secrets.CF_EMAIL }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID || secrets.CF_ACCOUNT_ID || vars.CLOUDFLARE_ACCOUNT_ID || vars.CF_ACCOUNT_ID }}
     steps:
       - name: Normalize Cloudflare credentials
         shell: bash
@@ -39,47 +38,34 @@ jobs:
             echo "CLOUDFLARE_EMAIL=${CLOUDFLARE_EMAIL:-}"
           } >> "$GITHUB_ENV"
 
-      - name: Check origin routing and successful retry
+      - name: Correlate Android retry success
         shell: bash
         run: |
           set -euo pipefail
           WRANGLER="npx --yes wrangler@4.98.0"
-
-          echo "=== ORIGIN_ROUTING ==="
-          for url in https://genjutsuai.net/ https://www.genjutsuai.net/; do
-            echo "-- $url"
-            curl -sS -I --max-time 20 "$url" | sed -n '1p;/^location:/Ip;/^server:/Ip;/^cf-ray:/Ip'
-          done
-
-          echo "=== RETRY_SUCCEEDED_RECORDS ==="
+          echo "=== ANDROID_RETRY_SUCCESS_CORRELATION ==="
           $WRANGLER d1 execute genjutsu-ai-db --remote --json --command "
-            SELECT
-              datetime(created_at/1000,'unixepoch') AS created_utc,
-              substr(id,1,8) AS id8,
-              json_extract(task_info, '$.uploadRetrySuccesses[0].browser') AS browser,
-              json_extract(task_info, '$.uploadRetrySuccesses[0].os') AS os,
-              json_extract(task_info, '$.uploadRetrySuccesses[0].attemptCount') AS attempts,
-              json_extract(task_info, '$.uploadRetrySuccesses[0].uploadElapsedMs') AS elapsed_ms,
-              status
-            FROM ai_task
-            WHERE scene='genjutsu'
-              AND json_array_length(json_extract(task_info, '$.uploadRetrySuccesses')) > 0
-              AND created_at >= 1791043200000
-            ORDER BY created_at DESC;
-          "
-
-          echo "=== ANDROID_FAILURES_PER_USER ==="
-          $WRANGLER d1 execute genjutsu-ai-db --remote --json --command "
-            SELECT failures, COUNT(*) AS users
-            FROM (
-              SELECT user_id, COUNT(*) AS failures
+            WITH success_users AS (
+              SELECT user_id, id, created_at,
+                     json_extract(options, '$.contentLengths[0]') AS content_length,
+                     json_extract(task_info, '$.uploadRetrySuccesses[0].attemptCount') AS attempts,
+                     json_extract(task_info, '$.uploadRetrySuccesses[0].uploadElapsedMs') AS elapsed_ms
               FROM ai_task
               WHERE scene='genjutsu'
-                AND json_extract(task_result, '$.errorCode')='UPLOAD_NETWORK_ERROR'
-                AND json_extract(task_result, '$.os')='Android'
+                AND json_extract(task_info, '$.uploadRetrySuccesses[0].os')='Android'
                 AND created_at >= 1791043200000
-              GROUP BY user_id
             )
-            GROUP BY failures
-            ORDER BY failures DESC;
+            SELECT
+              datetime(s.created_at/1000,'unixepoch') AS success_utc,
+              s.content_length,
+              s.attempts,
+              s.elapsed_ms,
+              SUM(CASE WHEN json_extract(t.task_result, '$.errorCode')='UPLOAD_NETWORK_ERROR'
+                        AND json_extract(t.task_result, '$.os')='Android'
+                       THEN 1 ELSE 0 END) AS same_user_android_failures
+            FROM success_users s
+            LEFT JOIN ai_task t ON t.user_id=s.user_id
+              AND t.scene='genjutsu'
+              AND t.created_at >= 1791043200000
+            GROUP BY s.id, s.created_at, s.content_length, s.attempts, s.elapsed_ms;
           "
