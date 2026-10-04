@@ -3,6 +3,7 @@ import {
   isRetryableUploadFailure,
   getUploadPutTimeoutMs,
   UPLOAD_RETRY_DELAYS_MS,
+  type UploadAttemptDiagnostic,
   type UploadClientDiagnostics,
 } from '@/lib/upload-diagnostics';
 
@@ -133,6 +134,7 @@ export async function uploadToSignedUrl(params: {
   const startedAt = Date.now();
   let attemptCount = 0;
   let lastCause: unknown;
+  const attempts: UploadAttemptDiagnostic[] = [];
 
   for (let index = 0; index < UPLOAD_RETRY_DELAYS_MS.length; index += 1) {
     const delayMs = UPLOAD_RETRY_DELAYS_MS[index];
@@ -141,14 +143,41 @@ export async function uploadToSignedUrl(params: {
     }
 
     attemptCount += 1;
+    const attemptStartedAt = Date.now();
     try {
       await putSignedUploadOnce(params);
+      attempts.push({
+        attempt: attemptCount,
+        elapsedMs: Date.now() - attemptStartedAt,
+        errorName: null,
+        errorMessage: null,
+        httpStatus: null,
+      });
       return {
         attemptCount,
         uploadElapsedMs: Date.now() - startedAt,
+        attempts,
       };
     } catch (cause) {
       lastCause = cause;
+      attempts.push({
+        attempt: attemptCount,
+        elapsedMs: Date.now() - attemptStartedAt,
+        errorName: cause instanceof Error ? cause.name.slice(0, 64) : null,
+        errorMessage:
+          cause instanceof Error
+            ? cause.message.replace(/[\r\n\t]+/g, ' ').slice(0, 200)
+            : typeof cause === 'string'
+              ? cause.replace(/[\r\n\t]+/g, ' ').slice(0, 200)
+              : null,
+        httpStatus:
+          cause instanceof ApiError &&
+          Number.isInteger(cause.code) &&
+          cause.code >= 100 &&
+          cause.code <= 599
+            ? cause.code
+            : null,
+      });
       const canRetry =
         index < UPLOAD_RETRY_DELAYS_MS.length - 1 &&
         isRetryableUploadFailure(cause);
@@ -160,6 +189,8 @@ export async function uploadToSignedUrl(params: {
     attemptCount,
     uploadElapsedMs: Date.now() - startedAt,
     cause: lastCause,
+    attempts,
+    uploadUrl: params.url,
   });
 
   if (
