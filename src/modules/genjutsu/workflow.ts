@@ -128,14 +128,14 @@ export function buildSeedanceWorkflowPrompt(input: {
         ? `Use ${primary} as a visual reference according to the user instruction.`
         : 'The references may define characters, products, wardrobe, props, locations, environments, visual appearance, or multiple views of the same element.',
       `Preserve the motion, timing, camera movement, framing, and shot progression of ${video} as closely as possible.`,
-      'Rebuild only the characters, products, wardrobe, props, locations, environments, or visual appearance requested by the user and reference images.',
+      'Apply only the character, product, wardrobe, prop, location, environment, or visual-appearance changes clearly indicated by the user instruction and references.',
       'Keep all referenced elements visually consistent throughout the video.',
       'Do not change motion, camera behavior, timing, framing, or shot progression unless the user explicitly requests it.',
       userPrompt
         ? `User instruction: ${userPrompt}`
         : input.imageCount > 1
           ? 'No explicit mapping was provided. Infer reference roles conservatively from visual correspondence. References may describe different elements or multiple views of the same element. Preserve the source motion, camera, timing, framing, and shot progression.'
-          : `Use ${primary} as the visual reference for the primary appearance transformation while preserving the motion, camera, timing, framing, and shot progression from ${video}.`,
+          : `If a clear visual correspondence exists, use ${primary} to guide that element's appearance while preserving the motion, camera, timing, framing, and shot progression from ${video}. Otherwise preserve the source appearance.`,
     ]
       .filter(Boolean)
       .join('\n');
