@@ -1,0 +1,141 @@
+name: D1 Paid Failed Users Check
+
+on:
+  push:
+    branches: ['main']
+    paths:
+      - '.github/workflows/d1-paid-failed-users.yaml'
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN || secrets.CF_API_TOKEN }}
+      CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_API_KEY }}
+      CF_API_KEY_FALLBACK: ${{ secrets.CF_API_KEY }}
+      CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL || secrets.CF_EMAIL }}
+    steps:
+      - name: Normalize credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${CLOUDFLARE_API_TOKEN:-}" ] && [ -n "${CLOUDFLARE_API_KEY:-}" ] && [ -z "${CLOUDFLARE_EMAIL:-}" ]; then
+            export CLOUDFLARE_API_TOKEN="$CLOUDFLARE_API_KEY"
+            unset CLOUDFLARE_API_KEY
+          fi
+          if [ -z "${CLOUDFLARE_API_TOKEN:-}" ] && [ -n "${CF_API_KEY_FALLBACK:-}" ]; then
+            if [ -n "${CLOUDFLARE_EMAIL:-}" ]; then
+              export CLOUDFLARE_API_KEY="${CLOUDFLARE_API_KEY:-$CF_API_KEY_FALLBACK}"
+            else
+              export CLOUDFLARE_API_TOKEN="$CF_API_KEY_FALLBACK"
+            fi
+          fi
+          {
+            echo "CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN:-}"
+            echo "CLOUDFLARE_API_KEY=${CLOUDFLARE_API_KEY:-}"
+            echo "CLOUDFLARE_EMAIL=${CLOUDFLARE_EMAIL:-}"
+          } >> "$GITHUB_ENV"
+
+      - name: Query failed-user payment status
+        shell: bash
+        run: |
+          set -euo pipefail
+          WRANGLER="npx --yes wrangler@4.98.0"
+
+          echo "=== FAILED_USERS_PAYMENT_SUMMARY ==="
+          $WRANGLER d1 execute genjutsu-ai-db --remote --json --command "
+            WITH failed_users AS (
+              SELECT DISTINCT user_id
+              FROM ai_task
+              WHERE scene='genjutsu'
+                AND status='failed_preflight'
+                AND json_extract(task_result, '$.stage')='upload'
+            ),
+            per_user AS (
+              SELECT
+                fu.user_id,
+                EXISTS(
+                  SELECT 1 FROM "order" o
+                  WHERE o.user_id=fu.user_id
+                    AND o.paid_at IS NOT NULL
+                    AND COALESCE(o.payment_amount, o.amount, 0) > 0
+                ) AS has_paid_order,
+                EXISTS(
+                  SELECT 1 FROM credit c
+                  WHERE c.user_id=fu.user_id
+                    AND c.transaction_type='grant'
+                    AND COALESCE(c.order_no,'') <> ''
+                ) AS has_order_credit,
+                (SELECT COUNT(*) FROM ai_task t
+                  WHERE t.user_id=fu.user_id
+                    AND t.scene='genjutsu'
+                    AND t.status='failed_preflight'
+                    AND json_extract(t.task_result, '$.stage')='upload'
+                ) AS upload_failures
+              FROM failed_users fu
+            )
+            SELECT
+              COUNT(*) AS failed_users,
+              SUM(has_paid_order) AS users_with_paid_order,
+              SUM(has_order_credit) AS users_with_order_credit,
+              SUM(CASE WHEN has_paid_order=1 OR has_order_credit=1 THEN 1 ELSE 0 END) AS paid_users,
+              SUM(CASE WHEN has_paid_order=0 AND has_order_credit=0 THEN 1 ELSE 0 END) AS non_paid_users
+            FROM per_user;
+          "
+
+          echo "=== FAILED_USERS_BY_PAYMENT_CLASS ==="
+          $WRANGLER d1 execute genjutsu-ai-db --remote --json --command "
+            WITH failed_users AS (
+              SELECT DISTINCT user_id
+              FROM ai_task
+              WHERE scene='genjutsu'
+                AND status='failed_preflight'
+                AND json_extract(task_result, '$.stage')='upload'
+            ),
+            per_user AS (
+              SELECT
+                fu.user_id,
+                CASE WHEN
+                  EXISTS(
+                    SELECT 1 FROM "order" o
+                    WHERE o.user_id=fu.user_id
+                      AND o.paid_at IS NOT NULL
+                      AND COALESCE(o.payment_amount, o.amount, 0) > 0
+                  )
+                  OR EXISTS(
+                    SELECT 1 FROM credit c
+                    WHERE c.user_id=fu.user_id
+                      AND c.transaction_type='grant'
+                      AND COALESCE(c.order_no,'') <> ''
+                  )
+                THEN 'paid' ELSE 'not_paid' END AS payment_class,
+                (SELECT COUNT(*) FROM ai_task t
+                  WHERE t.user_id=fu.user_id
+                    AND t.scene='genjutsu'
+                    AND t.status='failed_preflight'
+                    AND json_extract(t.task_result, '$.stage')='upload'
+                ) AS upload_failures
+              FROM failed_users fu
+            )
+            SELECT payment_class, COUNT(*) AS users, SUM(upload_failures) AS failures
+            FROM per_user
+            GROUP BY payment_class;
+          "
+
+          echo "=== PAID_ORDER_STATUS_COUNTS_FOR_FAILED_USERS ==="
+          $WRANGLER d1 execute genjutsu-ai-db --remote --json --command "
+            WITH failed_users AS (
+              SELECT DISTINCT user_id
+              FROM ai_task
+              WHERE scene='genjutsu'
+                AND status='failed_preflight'
+                AND json_extract(task_result, '$.stage')='upload'
+            )
+            SELECT o.status, COUNT(*) AS orders, COUNT(DISTINCT o.user_id) AS users
+            FROM "order" o
+            WHERE o.user_id IN (SELECT user_id FROM failed_users)
+            GROUP BY o.status
+            ORDER BY orders DESC;
+          "
