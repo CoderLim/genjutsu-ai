@@ -28,6 +28,21 @@ test('object swap preserves unrelated content and supports locations', () => {
   assert.match(prompt, /Replace the red bottle/);
 });
 
+test('object swap object-only request explicitly preserves background', () => {
+  const prompt = buildSeedanceWorkflowPrompt({
+    mode: 'objects-swap',
+    userPrompt: 'Replace only the perfume bottle with Reference 1',
+    imageCount: 1,
+  });
+
+  assert.match(prompt, /Replace only the requested/);
+  assert.match(prompt, /background/);
+  assert.match(prompt, /unrelated people/);
+  assert.match(prompt, /unrelated objects/);
+  assert.match(prompt, /Do not regenerate or alter unrelated parts/);
+  assert.match(prompt, /Replace only the perfume bottle/);
+});
+
 test('multi-reference object swap allows different targets or multiple views of one target', () => {
   const prompt = buildSeedanceWorkflowPrompt({
     mode: 'objects-swap',
@@ -76,14 +91,16 @@ test('motion transfer keeps motion-camera contract without assuming a character 
     /source of motion, timing, poses, choreography, camera movement/
   );
   assert.match(prompt, /Use @Image1 as a visual reference/);
-  assert.match(prompt, /locations, environments/);
+  assert.match(prompt, /location, environment/);
   assert.match(prompt, /Move the whole fight into the forest/);
+  assert.match(prompt, /changes clearly indicated by the user instruction and references/);
   assert.doesNotMatch(prompt, /replacement character/);
   assert.doesNotMatch(
     prompt,
     /Do not copy the original replaced subject identity/
   );
   assert.doesNotMatch(prompt, /Preserve the original environment/);
+  assert.doesNotMatch(prompt, /Rebuild only/);
 });
 
 test('motion transfer supports character plus location references', () => {
@@ -123,15 +140,18 @@ test('motion transfer multi-reference prompt allows multiple views of one elemen
   );
 });
 
-test('motion transfer without a prompt stays role-neutral', () => {
+test('motion transfer without a prompt stays conservative and role-neutral', () => {
   const prompt = buildSeedanceWorkflowPrompt({
     mode: 'motion-transfer',
     imageCount: 1,
   });
 
-  assert.match(prompt, /primary appearance transformation/);
+  assert.match(prompt, /If a clear visual correspondence exists/);
+  assert.match(prompt, /Otherwise preserve the source appearance/);
   assert.match(prompt, /preserving the motion, camera, timing, framing/);
+  assert.doesNotMatch(prompt, /primary appearance transformation/);
   assert.doesNotMatch(prompt, /replacement character/);
+  assert.doesNotMatch(prompt, /Rebuild only/);
 });
 
 test('custom provider reference tokens are preserved', () => {
