@@ -69,12 +69,9 @@ async function GET({
   if (!videoKey) return errorResponse('Generation input not found', 404);
 
   const { searchParams } = new URL(request.url);
-  const index = Number(searchParams.get('index'));
-  if (
-    !Number.isInteger(index) ||
-    index < 0 ||
-    index > imageKeys.length
-  ) {
+  const rawIndex = searchParams.get('index');
+  const index = rawIndex == null ? Number.NaN : Number(rawIndex);
+  if (!Number.isInteger(index) || index < 0 || index > imageKeys.length) {
     return errorResponse('Invalid media index', 400);
   }
 
