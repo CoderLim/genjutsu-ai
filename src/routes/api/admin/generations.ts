@@ -102,6 +102,47 @@ async function GET({ request }: { request: Request }) {
           : null;
       const hasSourceVideo =
         typeof options?.videoKey === 'string' && options.videoKey.length > 0;
+      const imageKeys = Array.isArray(options?.imageKeys)
+        ? options.imageKeys.filter(
+            (value: unknown): value is string => typeof value === 'string'
+          )
+        : [];
+      const contentTypes = Array.isArray(options?.contentTypes)
+        ? options.contentTypes
+        : [];
+      const contentLengths = Array.isArray(options?.contentLengths)
+        ? options.contentLengths
+        : [];
+      const inputMedia = [
+        ...(hasSourceVideo
+          ? [
+              {
+                index: 0,
+                kind: 'video' as const,
+                contentType:
+                  typeof contentTypes[0] === 'string' ? contentTypes[0] : null,
+                contentLength:
+                  typeof contentLengths[0] === 'number'
+                    ? contentLengths[0]
+                    : null,
+                url: `/api/admin/generations/${encodeURIComponent(row.id)}/media?index=0`,
+              },
+            ]
+          : []),
+        ...imageKeys.map((_, imageIndex) => ({
+          index: imageIndex + 1,
+          kind: 'image' as const,
+          contentType:
+            typeof contentTypes[imageIndex + 1] === 'string'
+              ? contentTypes[imageIndex + 1]
+              : null,
+          contentLength:
+            typeof contentLengths[imageIndex + 1] === 'number'
+              ? contentLengths[imageIndex + 1]
+              : null,
+          url: `/api/admin/generations/${encodeURIComponent(row.id)}/media?index=${imageIndex + 1}`,
+        })),
+      ];
       return {
         id: row.id,
         userId: row.userId,
@@ -217,6 +258,7 @@ async function GET({ request }: { request: Request }) {
           typeof info?.sourceDurationSeconds === 'number'
             ? info.sourceDurationSeconds
             : null,
+        inputMedia,
         sourceVideoUrl: hasSourceVideo
           ? `/api/genjutsu/source/${encodeURIComponent(row.id)}`
           : null,
