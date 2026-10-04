@@ -1,5 +1,5 @@
-# Read-only paid-user / generation health diagnostics. Never deploys production.
-name: Diagnose Paid Gen Health
+# Read-only targeted paid-user diagnostics. Never deploys production.
+name: Diagnose Paid User Failures
 
 on:
   push:
@@ -19,151 +19,67 @@ jobs:
       ENV_PRODUCTION: ${{ secrets.ENV_PRODUCTION }}
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 22
-
       - name: Query production D1 read-only
         shell: bash
         run: |
           set -euo pipefail
-          if [ -z "${CLOUDFLARE_API_TOKEN:-}" ] && [ -n "${CLOUDFLARE_API_KEY:-}" ] && [ -z "${CLOUDFLARE_EMAIL:-}" ]; then
-            export CLOUDFLARE_API_TOKEN="$CLOUDFLARE_API_KEY"
-            unset CLOUDFLARE_API_KEY
-          fi
+          if [ -z "${CLOUDFLARE_API_TOKEN:-}" ] && [ -n "${CLOUDFLARE_API_KEY:-}" ] && [ -z "${CLOUDFLARE_EMAIL:-}" ]; then export CLOUDFLARE_API_TOKEN="$CLOUDFLARE_API_KEY"; unset CLOUDFLARE_API_KEY; fi
           if [ -z "${CLOUDFLARE_API_TOKEN:-}" ] && [ -n "${CF_API_KEY_FALLBACK:-}" ]; then
-            if [ -n "${CLOUDFLARE_EMAIL:-}" ]; then
-              export CLOUDFLARE_API_KEY="${CLOUDFLARE_API_KEY:-$CF_API_KEY_FALLBACK}"
-            else
-              export CLOUDFLARE_API_TOKEN="$CF_API_KEY_FALLBACK"
-            fi
+            if [ -n "${CLOUDFLARE_EMAIL:-}" ]; then export CLOUDFLARE_API_KEY="${CLOUDFLARE_API_KEY:-$CF_API_KEY_FALLBACK}"; else export CLOUDFLARE_API_TOKEN="$CF_API_KEY_FALLBACK"; fi
           fi
-          WRANGLER="npx --yes wrangler@4.98.0"
-          TODAY=1791043200000
-          STALE=1791120360000
+          W="npx --yes wrangler@4.98.0"
 
-          echo "=== PAID_ORDERS ==="
-          $WRANGLER d1 execute genjutsu-ai-db --remote --json --command "
-            SELECT substr(order_no,-8) order8, substr(user_id,1,8) user8,
-                   payment_provider, status, amount, currency, product_name,
-                   credits_amount, paid_at, created_at,
-                   CASE WHEN lower(COALESCE(payment_result,'')) LIKE '%test_mode%true%'
-                          OR lower(COALESCE(payment_result,'')) LIKE '%\"mode\":\"test\"%'
-                        THEN 1 ELSE 0 END AS looks_test
-            FROM 'order'
-            WHERE status='paid'
-            ORDER BY paid_at ASC;
-          "
-
-          echo "=== PAID_ORDER_GRANT_INTEGRITY ==="
-          $WRANGLER d1 execute genjutsu-ai-db --remote --json --command "
-            SELECT substr(o.order_no,-8) order8, substr(o.user_id,1,8) user8,
-                   o.credits_amount expected_credits,
-                   COUNT(c.id) grant_rows,
-                   COALESCE(SUM(c.credits),0) granted_credits,
-                   COALESCE(SUM(c.remaining_credits),0) remaining_from_order
-            FROM 'order' o
-            LEFT JOIN credit c
-              ON c.order_no=o.order_no
-             AND c.transaction_type='grant'
-            WHERE o.status='paid'
-            GROUP BY o.order_no,o.user_id,o.credits_amount
-            ORDER BY o.paid_at ASC;
-          "
-
-          echo "=== PAID_USERS_GEN_SUMMARY_AFTER_PAYMENT ==="
-          $WRANGLER d1 execute genjutsu-ai-db --remote --json --command "
-            WITH p AS (
-              SELECT user_id, MIN(paid_at) first_paid_at, COUNT(*) paid_orders,
-                     SUM(COALESCE(payment_amount,amount)) paid_amount_minor
-              FROM 'order'
-              WHERE status='paid' AND paid_at IS NOT NULL
-              GROUP BY user_id
-            )
-            SELECT substr(p.user_id,1,8) user8, p.first_paid_at, p.paid_orders,
-                   p.paid_amount_minor,
-                   COUNT(t.id) gen_attempts,
-                   SUM(CASE WHEN t.status='completed' THEN 1 ELSE 0 END) completed,
-                   SUM(CASE WHEN t.status='refunded' THEN 1 ELSE 0 END) refunded,
-                   SUM(CASE WHEN t.status='failed_preflight' THEN 1 ELSE 0 END) upload_or_preflight_failed,
-                   SUM(CASE WHEN t.status='insufficient_credits' THEN 1 ELSE 0 END) insufficient,
-                   SUM(CASE WHEN t.status IN ('initiated','sealing','ready','reserving','reserved','submitting','submitted','refunding','submission_unknown') THEN 1 ELSE 0 END) nonterminal,
-                   SUM(CASE WHEN t.cost_credits>0 THEN 1 ELSE 0 END) charged_attempts
-            FROM p
-            LEFT JOIN ai_task t
-              ON t.user_id=p.user_id
-             AND t.scene='genjutsu'
-             AND t.created_at>=p.first_paid_at
-            GROUP BY p.user_id,p.first_paid_at,p.paid_orders,p.paid_amount_minor
-            ORDER BY p.first_paid_at ASC;
-          "
-
-          echo "=== PAID_USERS_GEN_DETAIL_AFTER_PAYMENT ==="
-          $WRANGLER d1 execute genjutsu-ai-db --remote --json --command "
-            WITH p AS (
-              SELECT user_id, MIN(paid_at) first_paid_at
-              FROM 'order'
-              WHERE status='paid' AND paid_at IS NOT NULL
-              GROUP BY user_id
-            )
-            SELECT substr(t.id,1,8) id8, substr(t.user_id,1,8) user8,
-                   t.status,t.provider,t.model,t.created_at,t.updated_at,
-                   t.cost_credits, substr(COALESCE(t.credit_id,''),1,8) credit8,
-                   c.transaction_type credit_type,c.status credit_status,
-                   c.credits credit_delta,
-                   json_extract(t.task_result,'$.error') error,
-                   json_extract(t.task_result,'$.providerStatus') provider_status,
-                   json_extract(t.task_result,'$.refundedCredits') refunded_credits,
-                   json_extract(t.task_result,'$.errorCode') preflight_error_code
-            FROM ai_task t
-            JOIN p ON p.user_id=t.user_id AND t.created_at>=p.first_paid_at
-            LEFT JOIN credit c ON c.id=t.credit_id
-            WHERE t.scene='genjutsu'
-            ORDER BY t.created_at ASC;
-          "
-
-          echo "=== CREDIT_TASK_INTEGRITY_ANOMALIES ==="
-          $WRANGLER d1 execute genjutsu-ai-db --remote --json --command "
-            SELECT substr(t.id,1,8) id8, substr(t.user_id,1,8) user8,
-                   t.status,t.cost_credits,substr(COALESCE(t.credit_id,''),1,8) credit8,
-                   c.transaction_type,c.status credit_status,c.credits credit_delta,
-                   t.created_at,t.updated_at
-            FROM ai_task t
-            LEFT JOIN credit c ON c.id=t.credit_id
-            WHERE t.scene='genjutsu'
-              AND (
-                (t.status='completed' AND (t.credit_id IS NULL OR c.id IS NULL OR c.status!='active' OR c.transaction_type!='consume'))
-                OR
-                (t.status='refunded' AND (t.credit_id IS NULL OR c.id IS NULL OR c.status!='deleted' OR c.transaction_type!='consume'))
-                OR
-                (t.cost_credits>0 AND t.credit_id IS NULL)
-              )
-            ORDER BY t.updated_at DESC;
-          "
-
-          echo "=== STALE_NONTERMINAL_TODAY ==="
-          $WRANGLER d1 execute genjutsu-ai-db --remote --json --command "
-            SELECT substr(id,1,8) id8, substr(user_id,1,8) user8,
-                   status,provider,model,cost_credits,substr(COALESCE(credit_id,''),1,8) credit8,
-                   created_at,updated_at,
+          echo "=== HIGH_VALUE_PAID_USER_TASKS ==="
+          $W d1 execute genjutsu-ai-db --remote --json --command "
+            SELECT substr(id,1,8) id8,status,created_at,updated_at,provider,model,cost_credits,
+                   json_extract(options,'$.mode') mode,json_extract(options,'$.resolution') resolution,
+                   json_extract(task_result,'$.errorCode') preflight_code,
+                   json_extract(task_result,'$.error') error,
+                   json_extract(task_result,'$.providerStatus') provider_status,
+                   json_extract(task_result,'$.refundedCredits') refunded_credits,
+                   json_extract(task_result,'$.stage') failure_stage,
                    json_extract(task_info,'$.attemptStage') attempt_stage,
-                   json_extract(task_result,'$.error') error
+                   json_extract(task_info,'$.providerCostUsd') provider_cost_usd,
+                   substr(COALESCE(credit_id,''),1,8) credit8
             FROM ai_task
-            WHERE scene='genjutsu'
-              AND created_at >= $TODAY
-              AND updated_at < $STALE
-              AND status IN ('initiated','sealing','ready','reserving','reserved','submitting','submitted','refunding','submission_unknown')
-            ORDER BY updated_at ASC;
+            WHERE scene='genjutsu' AND substr(user_id,1,8)='7ea08762'
+            ORDER BY created_at ASC;
           "
 
-          echo "=== TODAY_CHARGED_TASKS ==="
-          $WRANGLER d1 execute genjutsu-ai-db --remote --json --command "
-            SELECT status,COUNT(*) count,SUM(cost_credits) credits
+          echo "=== STARTER_FAILED_USER_TASKS ==="
+          $W d1 execute genjutsu-ai-db --remote --json --command "
+            SELECT substr(id,1,8) id8,status,created_at,updated_at,provider,model,cost_credits,
+                   json_extract(task_result,'$.errorCode') preflight_code,
+                   json_extract(task_result,'$.errorMessage') error_message,
+                   json_extract(task_result,'$.error') error,
+                   json_extract(task_result,'$.r2InspectionStatus') r2_status,
+                   json_extract(task_result,'$.browser') browser,
+                   json_extract(task_result,'$.os') os,
+                   json_extract(task_info,'$.attemptStage') attempt_stage
             FROM ai_task
-            WHERE scene='genjutsu' AND created_at >= $TODAY AND cost_credits>0
-            GROUP BY status ORDER BY count DESC;
+            WHERE scene='genjutsu' AND substr(user_id,1,8)='ccb9f7d7'
+            ORDER BY created_at ASC;
+          "
+
+          echo "=== DUPLICATE_GRANT_ORDER_ROWS ==="
+          $W d1 execute genjutsu-ai-db --remote --json --command "
+            SELECT substr(id,1,8) credit8,transaction_type,transaction_scene,credits,remaining_credits,
+                   description,status,created_at,metadata
+            FROM credit
+            WHERE order_no=(SELECT order_no FROM 'order' WHERE substr(user_id,1,8)='cc53fa54' AND status='paid' LIMIT 1)
+            ORDER BY created_at ASC;
+          "
+
+          echo "=== SMOKE_COMPLETED_TASK ==="
+          $W d1 execute genjutsu-ai-db --remote --json --command "
+            SELECT substr(t.id,1,8) id8,t.status,t.cost_credits,t.created_at,t.updated_at,
+                   json_extract(t.task_result,'$.providerStatus') provider_status,
+                   CASE WHEN json_extract(t.task_result,'$.videoKey') IS NOT NULL OR json_extract(t.task_result,'$.videoUrl') IS NOT NULL THEN 1 ELSE 0 END has_result,
+                   c.status credit_status,c.credits credit_delta
+            FROM ai_task t LEFT JOIN credit c ON c.id=t.credit_id
+            WHERE t.scene='genjutsu' AND substr(t.user_id,1,8)='06e2ba7b' AND t.status='completed';
           "
