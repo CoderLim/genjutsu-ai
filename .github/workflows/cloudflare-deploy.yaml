@@ -115,6 +115,48 @@ jobs:
             LIMIT 100;
           "
 
+
+          echo "=== FAILURE_USER_HISTORY_TODAY ==="
+          $WRANGLER d1 execute genjutsu-ai-db --remote --json --command "
+            SELECT
+              substr(id,1,8) AS id8,
+              status,
+              created_at,
+              updated_at,
+              json_extract(task_result,'$.stage') AS failure_stage,
+              json_extract(task_result,'$.errorCode') AS error_code,
+              json_extract(task_result,'$.browser') AS browser,
+              json_extract(task_result,'$.os') AS os,
+              json_extract(task_result,'$.r2InspectionStatus') AS r2_status,
+              json_extract(options,'$.contentLengths[0]') AS video_bytes,
+              json_extract(task_info,'$.uploadRetrySuccesses') AS retry_successes
+            FROM ai_task
+            WHERE scene='genjutsu'
+              AND substr(user_id,1,8)='8c88f8b6'
+              AND created_at >= 1791043200000
+            ORDER BY created_at ASC;
+          "
+
+          echo "=== ALL_TODAY_UPLOAD_FAILURES_SAME_USER ==="
+          $WRANGLER d1 execute genjutsu-ai-db --remote --json --command "
+            SELECT
+              substr(id,1,8) AS id8,
+              created_at,
+              json_extract(task_result,'$.errorCode') AS error_code,
+              json_extract(task_result,'$.attemptCount') AS attempt_count,
+              json_extract(task_result,'$.uploadElapsedMs') AS elapsed_ms,
+              json_extract(task_result,'$.browser') AS browser,
+              json_extract(task_result,'$.os') AS os,
+              json_extract(task_result,'$.r2InspectionStatus') AS r2_status,
+              json_extract(options,'$.contentLengths[0]') AS video_bytes
+            FROM ai_task
+            WHERE scene='genjutsu'
+              AND substr(user_id,1,8)='8c88f8b6'
+              AND created_at >= 1791043200000
+              AND json_extract(task_result,'$.stage')='upload'
+            ORDER BY created_at ASC;
+          "
+
           echo "=== NEW_DIAGNOSTIC_FIELD_COVERAGE ==="
           $WRANGLER d1 execute genjutsu-ai-db --remote --json --command "
             SELECT
