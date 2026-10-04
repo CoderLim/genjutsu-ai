@@ -3,7 +3,7 @@ import { AwsClient } from 'aws4fetch';
 import { getAllConfigs } from '@/modules/config/service';
 import { getStorage } from '@/modules/storage/service';
 
-const UPLOAD_EXPIRES_SECONDS = 5 * 60;
+const UPLOAD_EXPIRES_SECONDS = 15 * 60;
 const READ_EXPIRES_SECONDS = 60 * 60;
 
 export const GENJUTSU_MAX_VIDEO_BYTES = 200 * 1024 * 1024;
