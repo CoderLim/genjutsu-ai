@@ -172,7 +172,7 @@ export function sanitizeUploadDiagnostics(
   if (
     Number.isInteger(uploadElapsedMs) &&
     uploadElapsedMs >= 0 &&
-    uploadElapsedMs <= 600_000
+    uploadElapsedMs <= 30 * 60_000
   ) {
     out.uploadElapsedMs = uploadElapsedMs;
   }
