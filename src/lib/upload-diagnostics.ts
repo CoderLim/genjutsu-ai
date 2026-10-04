@@ -4,6 +4,8 @@ const UPLOAD_TIMEOUT_MIN_MS = 60_000;
 const UPLOAD_TIMEOUT_MAX_MS = 8 * 60_000;
 const UPLOAD_TIMEOUT_BASE_MS = 30_000;
 const UPLOAD_TIMEOUT_ASSUMED_BYTES_PER_SECOND = 256 * 1024;
+const MAX_ERROR_MESSAGE_LENGTH = 200;
+const MAX_UPLOAD_ATTEMPTS_RECORDED = 10;
 
 export function getUploadPutTimeoutMs(fileSizeBytes: number) {
   if (!Number.isFinite(fileSizeBytes) || fileSizeBytes <= 0) {
@@ -19,14 +21,32 @@ export function getUploadPutTimeoutMs(fileSizeBytes: number) {
   );
 }
 
+export type UploadAttemptDiagnostic = {
+  attempt: number;
+  elapsedMs: number;
+  errorName: string | null;
+  errorMessage: string | null;
+  httpStatus: number | null;
+};
+
 export type UploadClientDiagnostics = {
   attemptCount: number;
   uploadElapsedMs: number;
   online: boolean | null;
   visibilityState: string | null;
   browser: string | null;
+  browserMajor: number | null;
   os: string | null;
+  isWebView: boolean | null;
+  inAppBrowser: string | null;
+  effectiveType: string | null;
+  rttMs: number | null;
+  downlinkMbps: number | null;
+  origin: string | null;
+  uploadHost: string | null;
   errorName: string | null;
+  errorMessage: string | null;
+  attempts: UploadAttemptDiagnostic[];
 };
 
 const BROWSERS = [
@@ -49,11 +69,51 @@ const OPERATING_SYSTEMS = [
   'Other',
 ] as const;
 
+const IN_APP_BROWSERS = [
+  'instagram',
+  'facebook',
+  'tiktok',
+  'line',
+] as const;
+
 const VISIBILITY_STATES = new Set(['visible', 'hidden', 'prerender']);
+const EFFECTIVE_TYPES = new Set(['slow-2g', '2g', '3g', '4g']);
+
+function truncateErrorMessage(value: string) {
+  return value.replace(/[\r\n\t]+/g, ' ').slice(0, MAX_ERROR_MESSAGE_LENGTH);
+}
+
+function getBrowserMajor(userAgent: string): number | null {
+  const match = userAgent.match(
+    /(?:Edg|OPR|SamsungBrowser|Firefox|FxiOS|CriOS|Chrome|Version)\/(\d+)/i
+  );
+  if (!match) return null;
+  const major = Number(match[1]);
+  return Number.isInteger(major) && major > 0 && major < 1_000 ? major : null;
+}
+
+function classifyInAppBrowser(userAgent: string): string | null {
+  if (/Instagram/i.test(userAgent)) return 'instagram';
+  if (/FBAN|FBAV/i.test(userAgent)) return 'facebook';
+  if (/TikTok/i.test(userAgent)) return 'tiktok';
+  if (/\bLine\//i.test(userAgent)) return 'line';
+  return null;
+}
+
+function isAndroidWebView(userAgent: string): boolean {
+  if (!/Android/i.test(userAgent)) return false;
+  return (
+    /(?:^|[;\s])wv(?:[;\s)]|$)/i.test(userAgent) ||
+    /Version\/4\.0.*Chrome\//i.test(userAgent)
+  );
+}
 
 export function classifyClientEnvironment(userAgent: string): {
   browser: (typeof BROWSERS)[number];
+  browserMajor: number | null;
   os: (typeof OPERATING_SYSTEMS)[number];
+  isWebView: boolean;
+  inAppBrowser: string | null;
 } {
   const ua = userAgent || '';
 
@@ -77,7 +137,13 @@ export function classifyClientEnvironment(userAgent: string): {
     browser = 'Chrome';
   else if (/Safari\//i.test(ua)) browser = 'Safari';
 
-  return { browser, os };
+  return {
+    browser,
+    browserMajor: getBrowserMajor(ua),
+    os,
+    isWebView: isAndroidWebView(ua),
+    inAppBrowser: classifyInAppBrowser(ua),
+  };
 }
 
 function getHttpStatus(cause: unknown): number | null {
@@ -110,15 +176,63 @@ export function isRetryableUploadFailure(cause: unknown): boolean {
   return true;
 }
 
+function collectConnectionDiagnostics() {
+  if (typeof navigator === 'undefined') {
+    return {
+      effectiveType: null,
+      rttMs: null,
+      downlinkMbps: null,
+    };
+  }
+
+  const connection = (
+    navigator as Navigator & {
+      connection?: {
+        effectiveType?: unknown;
+        rtt?: unknown;
+        downlink?: unknown;
+      };
+    }
+  ).connection;
+
+  return {
+    effectiveType:
+      typeof connection?.effectiveType === 'string' &&
+      EFFECTIVE_TYPES.has(connection.effectiveType)
+        ? connection.effectiveType
+        : null,
+    rttMs:
+      typeof connection?.rtt === 'number' &&
+      Number.isFinite(connection.rtt) &&
+      connection.rtt >= 0
+        ? Math.round(connection.rtt)
+        : null,
+    downlinkMbps:
+      typeof connection?.downlink === 'number' &&
+      Number.isFinite(connection.downlink) &&
+      connection.downlink >= 0
+        ? Number(connection.downlink.toFixed(2))
+        : null,
+  };
+}
+
 export function collectUploadDiagnostics(params: {
   attemptCount: number;
   uploadElapsedMs: number;
   cause?: unknown;
+  attempts?: UploadAttemptDiagnostic[];
+  uploadUrl?: string;
 }): UploadClientDiagnostics {
   const env =
     typeof navigator !== 'undefined'
       ? classifyClientEnvironment(navigator.userAgent || '')
-      : { browser: null, os: null };
+      : {
+          browser: null,
+          browserMajor: null,
+          os: null,
+          isWebView: null,
+          inAppBrowser: null,
+        };
 
   const visibilityState =
     typeof document !== 'undefined' &&
@@ -131,6 +245,8 @@ export function collectUploadDiagnostics(params: {
       ? navigator.onLine
       : null;
 
+  const connection = collectConnectionDiagnostics();
+
   const errorName =
     params.cause instanceof Error
       ? params.cause.name.slice(0, 64)
@@ -140,15 +256,88 @@ export function collectUploadDiagnostics(params: {
           ? null
           : 'UnknownError';
 
+  const errorMessage =
+    params.cause instanceof Error
+      ? truncateErrorMessage(params.cause.message)
+      : typeof params.cause === 'string'
+        ? truncateErrorMessage(params.cause)
+        : null;
+
+  let uploadHost: string | null = null;
+  if (params.uploadUrl) {
+    try {
+      uploadHost = new URL(params.uploadUrl).host.slice(0, 253);
+    } catch {
+      uploadHost = null;
+    }
+  }
+
   return {
     attemptCount: params.attemptCount,
     uploadElapsedMs: params.uploadElapsedMs,
     online,
     visibilityState,
     browser: env.browser,
+    browserMajor: env.browserMajor,
     os: env.os,
+    isWebView: env.isWebView,
+    inAppBrowser: env.inAppBrowser,
+    ...connection,
+    origin:
+      typeof window !== 'undefined'
+        ? window.location.origin.slice(0, 256)
+        : null,
+    uploadHost,
     errorName,
+    errorMessage,
+    attempts: (params.attempts || []).slice(-MAX_UPLOAD_ATTEMPTS_RECORDED),
   };
+}
+
+function sanitizeAttemptDiagnostics(raw: unknown): UploadAttemptDiagnostic[] {
+  if (!Array.isArray(raw)) return [];
+
+  const out: UploadAttemptDiagnostic[] = [];
+  for (const item of raw.slice(0, MAX_UPLOAD_ATTEMPTS_RECORDED)) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+    const input = item as Record<string, unknown>;
+    const attempt = Number(input.attempt);
+    const elapsedMs = Number(input.elapsedMs);
+    if (
+      !Number.isInteger(attempt) ||
+      attempt < 1 ||
+      attempt > MAX_UPLOAD_ATTEMPTS_RECORDED ||
+      !Number.isInteger(elapsedMs) ||
+      elapsedMs < 0 ||
+      elapsedMs > 10 * 60_000
+    ) {
+      continue;
+    }
+
+    const errorName =
+      typeof input.errorName === 'string' &&
+      /^[A-Za-z][A-Za-z0-9._-]{0,63}$/.test(input.errorName)
+        ? input.errorName
+        : null;
+    const errorMessage =
+      typeof input.errorMessage === 'string'
+        ? truncateErrorMessage(input.errorMessage)
+        : null;
+    const rawStatus = Number(input.httpStatus);
+    const httpStatus =
+      Number.isInteger(rawStatus) && rawStatus >= 100 && rawStatus <= 599
+        ? rawStatus
+        : null;
+
+    out.push({
+      attempt,
+      elapsedMs,
+      errorName,
+      errorMessage,
+      httpStatus,
+    });
+  }
+  return out;
 }
 
 export function sanitizeUploadDiagnostics(
@@ -177,9 +366,7 @@ export function sanitizeUploadDiagnostics(
     out.uploadElapsedMs = uploadElapsedMs;
   }
 
-  if (typeof input.online === 'boolean') {
-    out.online = input.online;
-  }
+  if (typeof input.online === 'boolean') out.online = input.online;
 
   if (
     typeof input.visibilityState === 'string' &&
@@ -195,11 +382,73 @@ export function sanitizeUploadDiagnostics(
     out.browser = input.browser;
   }
 
+  const browserMajor = Number(input.browserMajor);
+  if (
+    Number.isInteger(browserMajor) &&
+    browserMajor > 0 &&
+    browserMajor < 1_000
+  ) {
+    out.browserMajor = browserMajor;
+  }
+
   if (
     typeof input.os === 'string' &&
     (OPERATING_SYSTEMS as readonly string[]).includes(input.os)
   ) {
     out.os = input.os;
+  }
+
+  if (typeof input.isWebView === 'boolean') {
+    out.isWebView = input.isWebView;
+  }
+
+  if (
+    typeof input.inAppBrowser === 'string' &&
+    (IN_APP_BROWSERS as readonly string[]).includes(input.inAppBrowser)
+  ) {
+    out.inAppBrowser = input.inAppBrowser;
+  }
+
+  if (
+    typeof input.effectiveType === 'string' &&
+    EFFECTIVE_TYPES.has(input.effectiveType)
+  ) {
+    out.effectiveType = input.effectiveType;
+  }
+
+  const rttMs = Number(input.rttMs);
+  if (Number.isInteger(rttMs) && rttMs >= 0 && rttMs <= 120_000) {
+    out.rttMs = rttMs;
+  }
+
+  const downlinkMbps = Number(input.downlinkMbps);
+  if (
+    Number.isFinite(downlinkMbps) &&
+    downlinkMbps >= 0 &&
+    downlinkMbps <= 100_000
+  ) {
+    out.downlinkMbps = Math.round(downlinkMbps * 100) / 100;
+  }
+
+  if (typeof input.origin === 'string') {
+    try {
+      const url = new URL(input.origin);
+      if (
+        (url.protocol === 'https:' || url.protocol === 'http:') &&
+        url.origin === input.origin
+      ) {
+        out.origin = url.origin.slice(0, 256);
+      }
+    } catch {
+      // Ignore malformed origins.
+    }
+  }
+
+  if (
+    typeof input.uploadHost === 'string' &&
+    /^[A-Za-z0-9.-]{1,253}$/.test(input.uploadHost)
+  ) {
+    out.uploadHost = input.uploadHost;
   }
 
   if (
@@ -208,6 +457,13 @@ export function sanitizeUploadDiagnostics(
   ) {
     out.errorName = input.errorName;
   }
+
+  if (typeof input.errorMessage === 'string') {
+    out.errorMessage = truncateErrorMessage(input.errorMessage);
+  }
+
+  const attempts = sanitizeAttemptDiagnostics(input.attempts);
+  if (attempts.length > 0) out.attempts = attempts;
 
   return out;
 }
