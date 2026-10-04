@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
-import { Film, Play } from 'lucide-react';
+import { Eye, Film, ImageIcon, Play } from 'lucide-react';
 
 import { apiGet, type PageResult } from '@/lib/api-client';
 import { formatDateTime } from '@/lib/time';
@@ -24,6 +24,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+
+interface GenerationInputMedia {
+  index: number;
+  kind: 'video' | 'image';
+  contentType: string | null;
+  contentLength: number | null;
+  url: string;
+}
 
 interface Generation {
   id: string;
@@ -60,6 +68,7 @@ interface Generation {
   costCredits: number;
   providerCostUsd: number | null;
   sourceDurationSeconds: number | null;
+  inputMedia: GenerationInputMedia[];
   sourceVideoUrl: string | null;
   videoUrl: string | null;
   createdAt: string;
@@ -116,6 +125,107 @@ function openPreviewFor(g: Generation): VideoPreview | null {
   };
 }
 
+function formatBytes(value: number | null) {
+  if (value == null || !Number.isFinite(value) || value < 0) return '—';
+  if (value < 1024) return `${value} B`;
+  const units = ['KB', 'MB', 'GB'];
+  let size = value / 1024;
+  let unitIndex = 0;
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024;
+    unitIndex += 1;
+  }
+  return `${size >= 100 ? size.toFixed(0) : size.toFixed(1)} ${units[unitIndex]}`;
+}
+
+function UploadedMediaCard({
+  media,
+  label,
+}: {
+  media: GenerationInputMedia;
+  label: string;
+}) {
+  const [dimensions, setDimensions] = useState<string | null>(null);
+  const [duration, setDuration] = useState<number | null>(null);
+
+  return (
+    <div className="overflow-hidden rounded-lg border">
+      <div className="bg-muted/30 flex items-center justify-between gap-3 border-b px-3 py-2">
+        <div className="flex min-w-0 items-center gap-2 text-sm font-medium">
+          {media.kind === 'video' ? (
+            <Film className="size-4 shrink-0" />
+          ) : (
+            <ImageIcon className="size-4 shrink-0" />
+          )}
+          <span className="truncate">{label}</span>
+        </div>
+        <span className="text-muted-foreground text-xs">
+          {formatBytes(media.contentLength)}
+        </span>
+      </div>
+
+      <div className="bg-black">
+        {media.kind === 'video' ? (
+          <video
+            src={media.url}
+            controls
+            playsInline
+            preload="metadata"
+            className="aspect-video max-h-[420px] w-full object-contain"
+            onLoadedMetadata={(event) => {
+              const video = event.currentTarget;
+              if (video.videoWidth > 0 && video.videoHeight > 0) {
+                setDimensions(`${video.videoWidth}×${video.videoHeight}`);
+              }
+              if (Number.isFinite(video.duration) && video.duration > 0) {
+                setDuration(video.duration);
+              }
+            }}
+          />
+        ) : (
+          <img
+            src={media.url}
+            alt={label}
+            loading="lazy"
+            className="max-h-[420px] w-full object-contain"
+            onLoad={(event) => {
+              const image = event.currentTarget;
+              if (image.naturalWidth > 0 && image.naturalHeight > 0) {
+                setDimensions(`${image.naturalWidth}×${image.naturalHeight}`);
+              }
+            }}
+          />
+        )}
+      </div>
+
+      <div className="grid grid-cols-2 gap-x-4 gap-y-2 p-3 text-xs sm:grid-cols-3">
+        <div>
+          <div className="text-muted-foreground">
+            {m['admin.generations.file_type']()}
+          </div>
+          <div className="mt-0.5 font-mono">{media.contentType || '—'}</div>
+        </div>
+        <div>
+          <div className="text-muted-foreground">
+            {m['admin.generations.actual_resolution']()}
+          </div>
+          <div className="mt-0.5 font-mono">{dimensions || '—'}</div>
+        </div>
+        {media.kind === 'video' ? (
+          <div>
+            <div className="text-muted-foreground">
+              {m['admin.generations.duration']()}
+            </div>
+            <div className="mt-0.5 font-mono">
+              {duration == null ? '—' : `${duration.toFixed(2)}s`}
+            </div>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 function GenerationsPage() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
@@ -123,6 +233,7 @@ function GenerationsPage() {
   const [status, setStatus] = useState('all');
   const [provider, setProvider] = useState('all');
   const [preview, setPreview] = useState<VideoPreview | null>(null);
+  const [detail, setDetail] = useState<Generation | null>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 300);
@@ -318,6 +429,21 @@ function GenerationsPage() {
         </span>
       ),
     },
+    {
+      header: '',
+      className: 'w-[92px]',
+      cell: (g) => (
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={() => setDetail(g)}
+        >
+          <Eye className="mr-1 size-3.5" />
+          {m['admin.generations.view']()}
+        </Button>
+      ),
+    },
   ];
 
   return (
@@ -385,6 +511,169 @@ function GenerationsPage() {
           />
         </CardContent>
       </Card>
+
+
+      <Dialog
+        open={Boolean(detail)}
+        onOpenChange={(open) => {
+          if (!open) setDetail(null);
+        }}
+      >
+        <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-6xl">
+          <DialogHeader>
+            <DialogTitle>{m['admin.generations.details']()}</DialogTitle>
+          </DialogHeader>
+
+          {detail ? (
+            <div className="space-y-6">
+              <div className="grid gap-4 rounded-lg border p-4 text-sm md:grid-cols-2 xl:grid-cols-4">
+                <div>
+                  <div className="text-muted-foreground text-xs">User</div>
+                  <div className="mt-1 font-medium">{detail.userName || '—'}</div>
+                  <div className="text-muted-foreground break-all text-xs">
+                    {detail.userEmail}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-muted-foreground text-xs">
+                    {m['admin.generations.identifiers']()}
+                  </div>
+                  <div className="mt-1 break-all font-mono text-xs">
+                    generation: {detail.id}
+                  </div>
+                  <div className="text-muted-foreground mt-1 break-all font-mono text-xs">
+                    request: {detail.taskId || '—'}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-muted-foreground text-xs">
+                    {m['admin.generations.provider']()}
+                  </div>
+                  <div className="mt-1">{detail.provider || '—'}</div>
+                  <div className="text-muted-foreground text-xs">
+                    {detail.model || '—'}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-muted-foreground text-xs">
+                    {m['admin.generations.mode']()}
+                  </div>
+                  <div className="mt-1">{detail.mode || '—'}</div>
+                  <div className="text-muted-foreground text-xs">
+                    {m['admin.generations.requested_resolution']()}:{' '}
+                    {detail.resolution || '—'}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-muted-foreground text-xs">
+                    {m['admin.generations.status']()}
+                  </div>
+                  <div className="mt-1">
+                    <Badge variant={statusVariant(detail.status)}>
+                      {detail.status}
+                    </Badge>
+                  </div>
+                  <div className="text-muted-foreground mt-1 text-xs">
+                    stage: {detail.attemptStage || '—'}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-muted-foreground text-xs">
+                    {m['admin.generations.cost']()}
+                  </div>
+                  <div className="mt-1 tabular-nums">
+                    {detail.costCredits.toLocaleString()} cr
+                  </div>
+                  <div className="text-muted-foreground text-xs tabular-nums">
+                    {detail.providerCostUsd == null
+                      ? '—'
+                      : `${detail.providerCostUsd.toFixed(4)}`}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-muted-foreground text-xs">
+                    {m['admin.generations.duration']()}
+                  </div>
+                  <div className="mt-1 font-mono">
+                    {detail.sourceDurationSeconds == null
+                      ? '—'
+                      : `${detail.sourceDurationSeconds.toFixed(2)}s`}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-muted-foreground text-xs">
+                    {m['admin.generations.timeline']()}
+                  </div>
+                  <div className="mt-1 text-xs">
+                    {formatDateTime(detail.createdAt)}
+                  </div>
+                  <div className="text-muted-foreground mt-1 text-xs">
+                    updated {formatDateTime(detail.updatedAt)}
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <div className="text-sm font-medium">
+                  {m['admin.generations.prompt']()}
+                </div>
+                <div className="bg-muted/40 mt-2 whitespace-pre-wrap break-words rounded-lg border p-3 text-sm">
+                  {detail.prompt || '—'}
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-sm font-medium">
+                    {m['admin.generations.input_media']()}
+                  </div>
+                  <div className="text-muted-foreground text-xs">
+                    {detail.inputMedia.length} file
+                    {detail.inputMedia.length === 1 ? '' : 's'}
+                  </div>
+                </div>
+
+                {detail.inputMedia.length ? (
+                  <div className="grid gap-4 lg:grid-cols-2">
+                    {detail.inputMedia.map((media) => (
+                      <UploadedMediaCard
+                        key={media.index}
+                        media={media}
+                        label={
+                          media.kind === 'video'
+                            ? m['admin.generations.source_video']()
+                            : m['admin.generations.reference_image']({
+                                index: media.index,
+                              })
+                        }
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-muted-foreground rounded-lg border p-4 text-sm">
+                    No uploaded media metadata is available for this record.
+                  </div>
+                )}
+              </div>
+
+              {detail.videoUrl ? (
+                <div className="space-y-2">
+                  <div className="text-sm font-medium">
+                    {m['admin.generations.generated_video']()}
+                  </div>
+                  <video
+                    src={detail.videoUrl}
+                    controls
+                    playsInline
+                    preload="metadata"
+                    className="max-h-[560px] w-full rounded-lg bg-black object-contain"
+                  />
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={Boolean(preview)}
