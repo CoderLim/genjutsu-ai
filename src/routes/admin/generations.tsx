@@ -51,7 +51,9 @@ interface Generation {
   uploadOnline: boolean | null;
   r2ObjectExists: boolean | null;
   r2ObjectSizeMatches: boolean | null;
+  r2ObjectTypeMatches: boolean | null;
   r2InspectionStatus: string | null;
+  r2InspectionError: string | null;
   uploadRecovered: boolean | null;
   uploadRetrySuccessCount: number | null;
   error: string | null;
@@ -242,7 +244,10 @@ function GenerationsPage() {
           g.uploadRetrySuccessCount ||
           g.uploadBrowser ||
           g.uploadOs ? (
-            <div className="text-muted-foreground mt-1 font-mono text-xs">
+            <div
+              className="text-muted-foreground mt-1 font-mono text-xs"
+              title={g.r2InspectionError || undefined}
+            >
               {[
                 g.uploadAttemptCount != null
                   ? `${g.uploadAttemptCount}x`
@@ -257,7 +262,9 @@ function GenerationsPage() {
                       : g.r2ObjectExists
                         ? g.r2ObjectSizeMatches === false
                           ? 'r2 size mismatch'
-                          : 'r2 exists'
+                          : g.r2ObjectTypeMatches === false
+                            ? 'r2 type mismatch'
+                            : 'r2 exists'
                         : 'r2 missing',
                 g.uploadRecovered ? 'recovered' : null,
                 g.uploadRetrySuccessCount
