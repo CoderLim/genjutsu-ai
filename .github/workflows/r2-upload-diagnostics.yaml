@@ -126,6 +126,27 @@ jobs:
             ORDER BY attempts;
           "
 
+          echo "=== FAILED_USER_COHORT ==="
+          $WRANGLER d1 execute genjutsu-ai-db --remote --json --command "
+            WITH failed_users AS (
+              SELECT DISTINCT user_id
+              FROM ai_task
+              WHERE scene='genjutsu'
+                AND status='failed_preflight'
+                AND json_extract(task_result, '$.stage')='upload'
+            )
+            SELECT
+              status,
+              COALESCE(json_extract(task_info, '$.attemptStage'), '(none)') AS attempt_stage,
+              COUNT(*) AS attempts,
+              COUNT(DISTINCT user_id) AS users
+            FROM ai_task
+            WHERE scene='genjutsu'
+              AND user_id IN (SELECT user_id FROM failed_users)
+            GROUP BY status, attempt_stage
+            ORDER BY attempts DESC;
+          "
+
           echo "=== R2_BUCKET ==="
           BUCKET="$($WRANGLER d1 execute genjutsu-ai-db --remote --json --command "SELECT value FROM config WHERE name='r2_bucket_name' LIMIT 1;" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const j=JSON.parse(s);const r=(j[0]?.results||[])[0];process.stdout.write(r?.value||'')})")"
           echo "bucket=$BUCKET"
