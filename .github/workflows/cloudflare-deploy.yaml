@@ -1,5 +1,5 @@
-# Read-only targeted paid-user diagnostics. Never deploys production.
-name: Diagnose Paid User Failures
+# Read-only paid-user pricing diagnostics. Never deploys production.
+name: Diagnose Paid Credit Sufficiency
 
 on:
   push:
@@ -33,53 +33,31 @@ jobs:
           fi
           W="npx --yes wrangler@4.98.0"
 
-          echo "=== HIGH_VALUE_PAID_USER_TASKS ==="
+          echo "=== PAID_USER_INSUFFICIENT_DETAILS ==="
           $W d1 execute genjutsu-ai-db --remote --json --command "
-            SELECT substr(id,1,8) id8,status,created_at,updated_at,provider,model,cost_credits,
-                   json_extract(options,'$.mode') mode,json_extract(options,'$.resolution') resolution,
-                   json_extract(task_result,'$.errorCode') preflight_code,
-                   json_extract(task_result,'$.error') error,
-                   json_extract(task_result,'$.providerStatus') provider_status,
-                   json_extract(task_result,'$.refundedCredits') refunded_credits,
-                   json_extract(task_result,'$.stage') failure_stage,
-                   json_extract(task_info,'$.attemptStage') attempt_stage,
-                   json_extract(task_info,'$.providerCostUsd') provider_cost_usd,
-                   substr(COALESCE(credit_id,''),1,8) credit8
-            FROM ai_task
-            WHERE scene='genjutsu' AND substr(user_id,1,8)='7ea08762'
-            ORDER BY created_at ASC;
+            WITH p AS (
+              SELECT user_id,MIN(paid_at) first_paid_at
+              FROM 'order' WHERE status='paid' AND paid_at IS NOT NULL GROUP BY user_id
+            )
+            SELECT substr(t.id,1,8) id8,substr(t.user_id,1,8) user8,t.created_at,
+                   json_extract(t.options,'$.mode') mode,json_extract(t.options,'$.resolution') resolution,
+                   json_extract(t.task_result,'$.requiredCredits') required_credits,
+                   json_extract(t.task_result,'$.balance') balance_in_result,
+                   t.cost_credits,t.status
+            FROM ai_task t JOIN p ON p.user_id=t.user_id AND t.created_at>=p.first_paid_at
+            WHERE t.scene='genjutsu' AND t.status='insufficient_credits'
+            ORDER BY t.created_at ASC;
           "
 
-          echo "=== STARTER_FAILED_USER_TASKS ==="
+          echo "=== PAID_USER_CURRENT_BALANCES ==="
           $W d1 execute genjutsu-ai-db --remote --json --command "
-            SELECT substr(id,1,8) id8,status,created_at,updated_at,provider,model,cost_credits,
-                   json_extract(task_result,'$.errorCode') preflight_code,
-                   json_extract(task_result,'$.errorMessage') error_message,
-                   json_extract(task_result,'$.error') error,
-                   json_extract(task_result,'$.r2InspectionStatus') r2_status,
-                   json_extract(task_result,'$.browser') browser,
-                   json_extract(task_result,'$.os') os,
-                   json_extract(task_info,'$.attemptStage') attempt_stage
-            FROM ai_task
-            WHERE scene='genjutsu' AND substr(user_id,1,8)='ccb9f7d7'
-            ORDER BY created_at ASC;
-          "
-
-          echo "=== DUPLICATE_GRANT_ORDER_ROWS ==="
-          $W d1 execute genjutsu-ai-db --remote --json --command "
-            SELECT substr(id,1,8) credit8,transaction_type,transaction_scene,credits,remaining_credits,
-                   description,status,created_at,metadata
-            FROM credit
-            WHERE order_no=(SELECT order_no FROM 'order' WHERE substr(user_id,1,8)='cc53fa54' AND status='paid' LIMIT 1)
-            ORDER BY created_at ASC;
-          "
-
-          echo "=== SMOKE_COMPLETED_TASK ==="
-          $W d1 execute genjutsu-ai-db --remote --json --command "
-            SELECT substr(t.id,1,8) id8,t.status,t.cost_credits,t.created_at,t.updated_at,
-                   json_extract(t.task_result,'$.providerStatus') provider_status,
-                   CASE WHEN json_extract(t.task_result,'$.videoKey') IS NOT NULL OR json_extract(t.task_result,'$.videoUrl') IS NOT NULL THEN 1 ELSE 0 END has_result,
-                   c.status credit_status,c.credits credit_delta
-            FROM ai_task t LEFT JOIN credit c ON c.id=t.credit_id
-            WHERE t.scene='genjutsu' AND substr(t.user_id,1,8)='06e2ba7b' AND t.status='completed';
+            WITH p AS (
+              SELECT user_id,COUNT(*) paid_orders,SUM(credits_amount) purchased_credits
+              FROM 'order' WHERE status='paid' GROUP BY user_id
+            )
+            SELECT substr(p.user_id,1,8) user8,p.paid_orders,p.purchased_credits,
+                   COALESCE(SUM(CASE WHEN c.transaction_type='grant' AND c.status='active' THEN c.remaining_credits ELSE 0 END),0) current_balance
+            FROM p LEFT JOIN credit c ON c.user_id=p.user_id
+            GROUP BY p.user_id,p.paid_orders,p.purchased_credits
+            ORDER BY p.user_id;
           "
