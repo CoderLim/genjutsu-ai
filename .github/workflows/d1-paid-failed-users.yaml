@@ -57,7 +57,7 @@ jobs:
               SELECT
                 fu.user_id,
                 EXISTS(
-                  SELECT 1 FROM "order" o
+                  SELECT 1 FROM [order] o
                   WHERE o.user_id=fu.user_id
                     AND o.paid_at IS NOT NULL
                     AND COALESCE(o.payment_amount, o.amount, 0) > 0
@@ -99,7 +99,7 @@ jobs:
                 fu.user_id,
                 CASE WHEN
                   EXISTS(
-                    SELECT 1 FROM "order" o
+                    SELECT 1 FROM [order] o
                     WHERE o.user_id=fu.user_id
                       AND o.paid_at IS NOT NULL
                       AND COALESCE(o.payment_amount, o.amount, 0) > 0
@@ -134,7 +134,7 @@ jobs:
                 AND json_extract(task_result, '$.stage')='upload'
             )
             SELECT o.status, COUNT(*) AS orders, COUNT(DISTINCT o.user_id) AS users
-            FROM "order" o
+            FROM [order] o
             WHERE o.user_id IN (SELECT user_id FROM failed_users)
             GROUP BY o.status
             ORDER BY orders DESC;
