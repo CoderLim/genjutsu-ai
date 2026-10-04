@@ -1,23 +1,15 @@
-# Production deploy workflow. Android upload diagnostics rollout 2026-10-04.
-name: Deploy Cloudflare Worker
+# Read-only diagnostic branch workflow. Never deploys production.
+name: Diagnose Post-P0 Uploads
 
 on:
   push:
-    branches: ['main']
+    branches: ['diagnose/post-p0-upload-20261004']
     paths:
       - '.github/workflows/cloudflare-deploy.yaml'
-  workflow_dispatch:
-
-concurrency:
-  group: cloudflare-production
-  cancel-in-progress: false
 
 jobs:
-  deploy:
+  query:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN || secrets.CF_API_TOKEN }}
       CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_API_KEY }}
@@ -30,18 +22,16 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Enable Corepack
-        run: corepack enable
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Prepare Cloudflare deployment
+      - name: Query production D1 read-only
         shell: bash
         run: |
           set -euo pipefail
 
-          # Support the common secret names already used across the repos.
           if [ -z "${CLOUDFLARE_API_TOKEN:-}" ] && [ -n "${CLOUDFLARE_API_KEY:-}" ] && [ -z "${CLOUDFLARE_EMAIL:-}" ]; then
             export CLOUDFLARE_API_TOKEN="$CLOUDFLARE_API_KEY"
             unset CLOUDFLARE_API_KEY
@@ -54,69 +44,88 @@ jobs:
             fi
           fi
 
-          if [ -z "${CLOUDFLARE_API_TOKEN:-}" ] && { [ -z "${CLOUDFLARE_API_KEY:-}" ] || [ -z "${CLOUDFLARE_EMAIL:-}" ]; }; then
-            echo "Cloudflare credentials are missing. Configure CLOUDFLARE_API_TOKEN/CF_API_TOKEN, or a Global API Key plus email."
-            exit 1
-          fi
+          WRANGLER="npx --yes wrangler@4.98.0"
+          CUTOFF=1791110862000
 
-          npx wrangler whoami
+          echo "=== POST_DEPLOY_STATUS_COUNTS ==="
+          $WRANGLER d1 execute genjutsu-ai-db --remote --json --command "
+            SELECT status, COUNT(*) AS count
+            FROM ai_task
+            WHERE scene='genjutsu' AND updated_at >= $CUTOFF
+            GROUP BY status
+            ORDER BY count DESC;
+          "
 
-          cp wrangler.example.jsonc wrangler.jsonc
+          echo "=== POST_DEPLOY_UPLOAD_FAILURES ==="
+          $WRANGLER d1 execute genjutsu-ai-db --remote --json --command "
+            SELECT
+              substr(id,1,8) AS id8,
+              substr(user_id,1,8) AS user8,
+              status,
+              created_at,
+              updated_at,
+              json_extract(task_result,'$.errorCode') AS error_code,
+              json_extract(task_result,'$.errorMessage') AS error_message,
+              json_extract(task_result,'$.errorName') AS error_name,
+              json_extract(task_result,'$.fileType') AS file_type,
+              json_extract(task_result,'$.fileIndex') AS file_index,
+              json_extract(task_result,'$.attemptCount') AS attempt_count,
+              json_extract(task_result,'$.uploadElapsedMs') AS elapsed_ms,
+              json_extract(task_result,'$.browser') AS browser,
+              json_extract(task_result,'$.browserMajor') AS browser_major,
+              json_extract(task_result,'$.os') AS os,
+              json_extract(task_result,'$.isWebView') AS is_webview,
+              json_extract(task_result,'$.inAppBrowser') AS in_app_browser,
+              json_extract(task_result,'$.effectiveType') AS effective_type,
+              json_extract(task_result,'$.rttMs') AS rtt_ms,
+              json_extract(task_result,'$.downlinkMbps') AS downlink_mbps,
+              json_extract(task_result,'$.origin') AS origin,
+              json_extract(task_result,'$.uploadHost') AS upload_host,
+              json_extract(task_result,'$.cfCountry') AS cf_country,
+              json_extract(task_result,'$.cfColo') AS cf_colo,
+              json_extract(task_result,'$.cfAsn') AS cf_asn,
+              json_extract(task_result,'$.r2InspectionStatus') AS r2_status,
+              json_extract(task_result,'$.r2ObjectExists') AS r2_exists,
+              json_extract(task_result,'$.attempts') AS attempts,
+              json_extract(options,'$.contentLengths[0]') AS video_bytes
+            FROM ai_task
+            WHERE scene='genjutsu'
+              AND updated_at >= $CUTOFF
+              AND json_extract(task_result,'$.stage')='upload'
+            ORDER BY updated_at DESC
+            LIMIT 100;
+          "
 
-          D1_JSON="$(npx wrangler d1 list --json)"
-          D1_ID="$(D1_JSON="$D1_JSON" node - <<'NODE'
-          const raw = JSON.parse(process.env.D1_JSON || '[]');
-          const list = Array.isArray(raw) ? raw : (raw.result || raw.databases || []);
-          const db = list.find((item) => item && (item.name === 'genjutsu-ai-db' || item.database_name === 'genjutsu-ai-db'));
-          if (!db) process.exit(2);
-          process.stdout.write(String(db.uuid || db.id || db.database_id || ''));
-          NODE
-          )"
+          echo "=== POST_DEPLOY_RETRY_SUCCESSES ==="
+          $WRANGLER d1 execute genjutsu-ai-db --remote --json --command "
+            SELECT
+              substr(id,1,8) AS id8,
+              substr(user_id,1,8) AS user8,
+              status,
+              created_at,
+              updated_at,
+              json_extract(task_info,'$.uploadRetrySuccesses') AS retry_successes,
+              json_extract(options,'$.contentLengths[0]') AS video_bytes
+            FROM ai_task
+            WHERE scene='genjutsu'
+              AND updated_at >= $CUTOFF
+              AND json_type(task_info,'$.uploadRetrySuccesses')='array'
+              AND json_array_length(json_extract(task_info,'$.uploadRetrySuccesses')) > 0
+            ORDER BY updated_at DESC
+            LIMIT 100;
+          "
 
-          if [ -z "$D1_ID" ]; then
-            echo "Cloudflare D1 database genjutsu-ai-db was not found."
-            exit 1
-          fi
-
-          D1_ID="$D1_ID" node - <<'NODE'
-          const fs = require('node:fs');
-          const path = 'wrangler.jsonc';
-          let text = fs.readFileSync(path, 'utf8');
-          text = text.replace('REPLACE_WITH_OUTPUT_OF_WRANGLER_D1_CREATE', process.env.D1_ID);
-          fs.writeFileSync(path, text);
-          NODE
-
-          if [ -n "${ENV_PRODUCTION:-}" ]; then
-            printf '%s\n' "$ENV_PRODUCTION" > .env.production
-          else
-            : > .env.production
-          fi
-
-          node - <<'NODE'
-          const fs = require('node:fs');
-          const path = '.env.production';
-          const desired = {
-            VITE_APP_URL: 'https://genjutsuai.net',
-            VITE_APP_NAME: 'Genjutsu AI',
-            DATABASE_PROVIDER: 'd1',
-          };
-          const source = fs.existsSync(path) ? fs.readFileSync(path, 'utf8') : '';
-          const lines = source.split(/\r?\n/).filter(Boolean);
-          const keys = new Set(Object.keys(desired));
-          const kept = lines.filter((line) => {
-            const match = line.match(/^([A-Za-z_][A-Za-z0-9_]*)=/);
-            return !match || !keys.has(match[1]);
-          });
-          for (const [key, value] of Object.entries(desired)) kept.push(`${key}=${value}`);
-          fs.writeFileSync(path, kept.join('\n') + '\n');
-          NODE
-
-          DATABASE_PROVIDER=d1 VITE_APP_URL=https://genjutsuai.net VITE_APP_NAME="Genjutsu AI" pnpm run cf:deploy
-
-      - name: Verify production
-        shell: bash
-        run: |
-          set -euo pipefail
-          curl --fail --silent --show-error --location --max-time 30 https://genjutsuai.net/ -o /dev/null
-          curl --fail --silent --show-error --location --max-time 30 https://genjutsuai.net/api/config/public -o /dev/null
-          echo "Production smoke checks passed."
+          echo "=== NEW_DIAGNOSTIC_FIELD_COVERAGE ==="
+          $WRANGLER d1 execute genjutsu-ai-db --remote --json --command "
+            SELECT
+              COUNT(*) AS upload_failures,
+              SUM(CASE WHEN json_extract(task_result,'$.errorMessage') IS NOT NULL THEN 1 ELSE 0 END) AS with_error_message,
+              SUM(CASE WHEN json_extract(task_result,'$.browserMajor') IS NOT NULL THEN 1 ELSE 0 END) AS with_browser_major,
+              SUM(CASE WHEN json_extract(task_result,'$.isWebView') IS NOT NULL THEN 1 ELSE 0 END) AS with_webview_flag,
+              SUM(CASE WHEN json_type(task_result,'$.attempts')='array' THEN 1 ELSE 0 END) AS with_attempts,
+              SUM(CASE WHEN json_extract(task_result,'$.cfColo') IS NOT NULL THEN 1 ELSE 0 END) AS with_cf_colo
+            FROM ai_task
+            WHERE scene='genjutsu'
+              AND updated_at >= $CUTOFF
+              AND json_extract(task_result,'$.stage')='upload';
+          "
