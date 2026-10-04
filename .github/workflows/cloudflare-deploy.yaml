@@ -1,23 +1,15 @@
-# Production deploy workflow. Android upload diagnostics rollout 2026-10-04.
-name: Deploy Cloudflare Worker
+# Read-only paid-user / generation health diagnostics. Never deploys production.
+name: Diagnose Paid Gen Health
 
 on:
   push:
-    branches: ['main']
+    branches: ['diagnose/post-p0-upload-20261004']
     paths:
       - '.github/workflows/cloudflare-deploy.yaml'
-  workflow_dispatch:
-
-concurrency:
-  group: cloudflare-production
-  cancel-in-progress: false
 
 jobs:
-  deploy:
+  query:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN || secrets.CF_API_TOKEN }}
       CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_API_KEY }}
@@ -30,18 +22,15 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Enable Corepack
-        run: corepack enable
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Prepare Cloudflare deployment
+      - name: Query production D1 read-only
         shell: bash
         run: |
           set -euo pipefail
-
-          # Support the common secret names already used across the repos.
           if [ -z "${CLOUDFLARE_API_TOKEN:-}" ] && [ -n "${CLOUDFLARE_API_KEY:-}" ] && [ -z "${CLOUDFLARE_EMAIL:-}" ]; then
             export CLOUDFLARE_API_TOKEN="$CLOUDFLARE_API_KEY"
             unset CLOUDFLARE_API_KEY
@@ -53,70 +42,128 @@ jobs:
               export CLOUDFLARE_API_TOKEN="$CF_API_KEY_FALLBACK"
             fi
           fi
+          WRANGLER="npx --yes wrangler@4.98.0"
+          TODAY=1791043200000
+          STALE=1791120360000
 
-          if [ -z "${CLOUDFLARE_API_TOKEN:-}" ] && { [ -z "${CLOUDFLARE_API_KEY:-}" ] || [ -z "${CLOUDFLARE_EMAIL:-}" ]; }; then
-            echo "Cloudflare credentials are missing. Configure CLOUDFLARE_API_TOKEN/CF_API_TOKEN, or a Global API Key plus email."
-            exit 1
-          fi
+          echo "=== PAID_ORDERS ==="
+          $WRANGLER d1 execute genjutsu-ai-db --remote --json --command "
+            SELECT substr(order_no,-8) order8, substr(user_id,1,8) user8,
+                   payment_provider, status, amount, currency, product_name,
+                   credits_amount, paid_at, created_at,
+                   CASE WHEN lower(COALESCE(payment_result,'')) LIKE '%test_mode%true%'
+                          OR lower(COALESCE(payment_result,'')) LIKE '%\"mode\":\"test\"%'
+                        THEN 1 ELSE 0 END AS looks_test
+            FROM 'order'
+            WHERE status='paid'
+            ORDER BY paid_at ASC;
+          "
 
-          npx wrangler whoami
+          echo "=== PAID_ORDER_GRANT_INTEGRITY ==="
+          $WRANGLER d1 execute genjutsu-ai-db --remote --json --command "
+            SELECT substr(o.order_no,-8) order8, substr(o.user_id,1,8) user8,
+                   o.credits_amount expected_credits,
+                   COUNT(c.id) grant_rows,
+                   COALESCE(SUM(c.credits),0) granted_credits,
+                   COALESCE(SUM(c.remaining_credits),0) remaining_from_order
+            FROM 'order' o
+            LEFT JOIN credit c
+              ON c.order_no=o.order_no
+             AND c.transaction_type='grant'
+            WHERE o.status='paid'
+            GROUP BY o.order_no,o.user_id,o.credits_amount
+            ORDER BY o.paid_at ASC;
+          "
 
-          cp wrangler.example.jsonc wrangler.jsonc
+          echo "=== PAID_USERS_GEN_SUMMARY_AFTER_PAYMENT ==="
+          $WRANGLER d1 execute genjutsu-ai-db --remote --json --command "
+            WITH p AS (
+              SELECT user_id, MIN(paid_at) first_paid_at, COUNT(*) paid_orders,
+                     SUM(COALESCE(payment_amount,amount)) paid_amount_minor
+              FROM 'order'
+              WHERE status='paid' AND paid_at IS NOT NULL
+              GROUP BY user_id
+            )
+            SELECT substr(p.user_id,1,8) user8, p.first_paid_at, p.paid_orders,
+                   p.paid_amount_minor,
+                   COUNT(t.id) gen_attempts,
+                   SUM(CASE WHEN t.status='completed' THEN 1 ELSE 0 END) completed,
+                   SUM(CASE WHEN t.status='refunded' THEN 1 ELSE 0 END) refunded,
+                   SUM(CASE WHEN t.status='failed_preflight' THEN 1 ELSE 0 END) upload_or_preflight_failed,
+                   SUM(CASE WHEN t.status='insufficient_credits' THEN 1 ELSE 0 END) insufficient,
+                   SUM(CASE WHEN t.status IN ('initiated','sealing','ready','reserving','reserved','submitting','submitted','refunding','submission_unknown') THEN 1 ELSE 0 END) nonterminal,
+                   SUM(CASE WHEN t.cost_credits>0 THEN 1 ELSE 0 END) charged_attempts
+            FROM p
+            LEFT JOIN ai_task t
+              ON t.user_id=p.user_id
+             AND t.scene='genjutsu'
+             AND t.created_at>=p.first_paid_at
+            GROUP BY p.user_id,p.first_paid_at,p.paid_orders,p.paid_amount_minor
+            ORDER BY p.first_paid_at ASC;
+          "
 
-          D1_JSON="$(npx wrangler d1 list --json)"
-          D1_ID="$(D1_JSON="$D1_JSON" node - <<'NODE'
-          const raw = JSON.parse(process.env.D1_JSON || '[]');
-          const list = Array.isArray(raw) ? raw : (raw.result || raw.databases || []);
-          const db = list.find((item) => item && (item.name === 'genjutsu-ai-db' || item.database_name === 'genjutsu-ai-db'));
-          if (!db) process.exit(2);
-          process.stdout.write(String(db.uuid || db.id || db.database_id || ''));
-          NODE
-          )"
+          echo "=== PAID_USERS_GEN_DETAIL_AFTER_PAYMENT ==="
+          $WRANGLER d1 execute genjutsu-ai-db --remote --json --command "
+            WITH p AS (
+              SELECT user_id, MIN(paid_at) first_paid_at
+              FROM 'order'
+              WHERE status='paid' AND paid_at IS NOT NULL
+              GROUP BY user_id
+            )
+            SELECT substr(t.id,1,8) id8, substr(t.user_id,1,8) user8,
+                   t.status,t.provider,t.model,t.created_at,t.updated_at,
+                   t.cost_credits, substr(COALESCE(t.credit_id,''),1,8) credit8,
+                   c.transaction_type credit_type,c.status credit_status,
+                   c.credits credit_delta,
+                   json_extract(t.task_result,'$.error') error,
+                   json_extract(t.task_result,'$.providerStatus') provider_status,
+                   json_extract(t.task_result,'$.refundedCredits') refunded_credits,
+                   json_extract(t.task_result,'$.errorCode') preflight_error_code
+            FROM ai_task t
+            JOIN p ON p.user_id=t.user_id AND t.created_at>=p.first_paid_at
+            LEFT JOIN credit c ON c.id=t.credit_id
+            WHERE t.scene='genjutsu'
+            ORDER BY t.created_at ASC;
+          "
 
-          if [ -z "$D1_ID" ]; then
-            echo "Cloudflare D1 database genjutsu-ai-db was not found."
-            exit 1
-          fi
+          echo "=== CREDIT_TASK_INTEGRITY_ANOMALIES ==="
+          $WRANGLER d1 execute genjutsu-ai-db --remote --json --command "
+            SELECT substr(t.id,1,8) id8, substr(t.user_id,1,8) user8,
+                   t.status,t.cost_credits,substr(COALESCE(t.credit_id,''),1,8) credit8,
+                   c.transaction_type,c.status credit_status,c.credits credit_delta,
+                   t.created_at,t.updated_at
+            FROM ai_task t
+            LEFT JOIN credit c ON c.id=t.credit_id
+            WHERE t.scene='genjutsu'
+              AND (
+                (t.status='completed' AND (t.credit_id IS NULL OR c.id IS NULL OR c.status!='active' OR c.transaction_type!='consume'))
+                OR
+                (t.status='refunded' AND (t.credit_id IS NULL OR c.id IS NULL OR c.status!='deleted' OR c.transaction_type!='consume'))
+                OR
+                (t.cost_credits>0 AND t.credit_id IS NULL)
+              )
+            ORDER BY t.updated_at DESC;
+          "
 
-          D1_ID="$D1_ID" node - <<'NODE'
-          const fs = require('node:fs');
-          const path = 'wrangler.jsonc';
-          let text = fs.readFileSync(path, 'utf8');
-          text = text.replace('REPLACE_WITH_OUTPUT_OF_WRANGLER_D1_CREATE', process.env.D1_ID);
-          fs.writeFileSync(path, text);
-          NODE
+          echo "=== STALE_NONTERMINAL_TODAY ==="
+          $WRANGLER d1 execute genjutsu-ai-db --remote --json --command "
+            SELECT substr(id,1,8) id8, substr(user_id,1,8) user8,
+                   status,provider,model,cost_credits,substr(COALESCE(credit_id,''),1,8) credit8,
+                   created_at,updated_at,
+                   json_extract(task_info,'$.attemptStage') attempt_stage,
+                   json_extract(task_result,'$.error') error
+            FROM ai_task
+            WHERE scene='genjutsu'
+              AND created_at >= $TODAY
+              AND updated_at < $STALE
+              AND status IN ('initiated','sealing','ready','reserving','reserved','submitting','submitted','refunding','submission_unknown')
+            ORDER BY updated_at ASC;
+          "
 
-          if [ -n "${ENV_PRODUCTION:-}" ]; then
-            printf '%s\n' "$ENV_PRODUCTION" > .env.production
-          else
-            : > .env.production
-          fi
-
-          node - <<'NODE'
-          const fs = require('node:fs');
-          const path = '.env.production';
-          const desired = {
-            VITE_APP_URL: 'https://genjutsuai.net',
-            VITE_APP_NAME: 'Genjutsu AI',
-            DATABASE_PROVIDER: 'd1',
-          };
-          const source = fs.existsSync(path) ? fs.readFileSync(path, 'utf8') : '';
-          const lines = source.split(/\r?\n/).filter(Boolean);
-          const keys = new Set(Object.keys(desired));
-          const kept = lines.filter((line) => {
-            const match = line.match(/^([A-Za-z_][A-Za-z0-9_]*)=/);
-            return !match || !keys.has(match[1]);
-          });
-          for (const [key, value] of Object.entries(desired)) kept.push(`${key}=${value}`);
-          fs.writeFileSync(path, kept.join('\n') + '\n');
-          NODE
-
-          DATABASE_PROVIDER=d1 VITE_APP_URL=https://genjutsuai.net VITE_APP_NAME="Genjutsu AI" pnpm run cf:deploy
-
-      - name: Verify production
-        shell: bash
-        run: |
-          set -euo pipefail
-          curl --fail --silent --show-error --location --max-time 30 https://genjutsuai.net/ -o /dev/null
-          curl --fail --silent --show-error --location --max-time 30 https://genjutsuai.net/api/config/public -o /dev/null
-          echo "Production smoke checks passed."
+          echo "=== TODAY_CHARGED_TASKS ==="
+          $WRANGLER d1 execute genjutsu-ai-db --remote --json --command "
+            SELECT status,COUNT(*) count,SUM(cost_credits) credits
+            FROM ai_task
+            WHERE scene='genjutsu' AND created_at >= $TODAY AND cost_credits>0
+            GROUP BY status ORDER BY count DESC;
+          "
