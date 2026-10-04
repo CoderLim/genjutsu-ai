@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import {
   classifyClientEnvironment,
+  getUploadPutTimeoutMs,
   isRetryableUploadFailure,
   sanitizeUploadDiagnostics,
 } from '@/lib/upload-diagnostics';
@@ -49,6 +50,14 @@ test('classifyClientEnvironment maps common UA strings', () => {
     ),
     { browser: 'Edge', os: 'Windows' }
   );
+});
+
+test('getUploadPutTimeoutMs scales with file size without timing out normal slow uploads', () => {
+  assert.equal(getUploadPutTimeoutMs(1 * 1024 * 1024), 60_000);
+  assert.ok(getUploadPutTimeoutMs(20 * 1024 * 1024) > 60_000);
+  assert.ok(getUploadPutTimeoutMs(50 * 1024 * 1024) > 180_000);
+  assert.equal(getUploadPutTimeoutMs(200 * 1024 * 1024), 8 * 60_000);
+  assert.equal(getUploadPutTimeoutMs(0), 60_000);
 });
 
 test('isRetryableUploadFailure only retries transient failures', () => {
