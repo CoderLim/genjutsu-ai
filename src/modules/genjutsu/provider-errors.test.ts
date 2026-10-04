@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   GENJUTSU_PROVIDER_FAILED_CODE,
   GENJUTSU_PROVIDER_FAILURE_USER_MESSAGE,
+  isArkRealPersonPrivacyCode,
   looksLikeRawProviderError,
   splitProviderFailureError,
   toUserFacingProviderError,
@@ -20,7 +21,34 @@ test('detects Volcengine Safe Experience Mode dumps', () => {
   );
 });
 
-test('keeps likeness rejections actionable for users', () => {
+test('maps Ark PrivacyInformation codes to likeness rejection', () => {
+  assert.equal(
+    isArkRealPersonPrivacyCode(
+      'InputVideoSensitiveContentDetected.PrivacyInformation'
+    ),
+    true
+  );
+  assert.equal(
+    isArkRealPersonPrivacyCode(
+      'InputImageSensitiveContentDetected.PrivacyInformation'
+    ),
+    true
+  );
+
+  const split = splitProviderFailureError(
+    "The request failed because the input video 'content[1]' may contain real person. Request id: abc",
+    'InputVideoSensitiveContentDetected.PrivacyInformation'
+  );
+  assert.equal(split.likeness, true);
+  assert.equal(split.error, SEEDANCE_LIKENESS_REJECTION_MESSAGE);
+  assert.equal(split.errorCode, 'PROVIDER_LIKENESS_REJECTED');
+  assert.equal(
+    split.providerCode,
+    'InputVideoSensitiveContentDetected.PrivacyInformation'
+  );
+});
+
+test('keeps likeness rejections actionable for users via message fallback', () => {
   const raw =
     'The prompt or media appears to contain likenesses of real people and cannot be processed.';
   const split = splitProviderFailureError(raw);
@@ -28,6 +56,16 @@ test('keeps likeness rejections actionable for users', () => {
   assert.equal(split.error, SEEDANCE_LIKENESS_REJECTION_MESSAGE);
   assert.equal(split.providerError, raw);
   assert.equal(split.errorCode, 'PROVIDER_LIKENESS_REJECTED');
+});
+
+test('maps Volcengine real-person video rejection via message fallback', () => {
+  const raw =
+    "The request failed because the input video 'content[1]' may contain real person. Request id: 0217911282684540abef843717a049b367df527ee7bcb35a98326";
+  const split = splitProviderFailureError(raw);
+  assert.equal(split.likeness, true);
+  assert.equal(split.error, SEEDANCE_LIKENESS_REJECTION_MESSAGE);
+  assert.equal(split.errorCode, 'PROVIDER_LIKENESS_REJECTED');
+  assert.equal(split.providerError, raw);
 });
 
 test('always preserves raw text for admin on provider failures', () => {

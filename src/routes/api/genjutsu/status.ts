@@ -15,7 +15,11 @@ import {
   isGenjutsuE2EMockEnabled,
   readGenjutsuE2EVideoKey,
 } from '@/modules/genjutsu/e2e-mock';
-import { splitProviderFailureError } from '@/modules/genjutsu/provider-errors';
+import {
+  logGenjutsuProviderFailure,
+  providerFailureDebugFields,
+  splitProviderFailureError,
+} from '@/modules/genjutsu/provider-errors';
 import {
   getGenjutsuStatus,
   HiggsfieldHttpError,
@@ -37,23 +41,32 @@ function userFacingRefundError(
   result: {
     error?: unknown;
     providerError?: unknown;
+    providerCode?: unknown;
     errorCode?: unknown;
   } | null
 ) {
   const storedError =
     typeof result?.error === 'string' ? result.error : 'Generation failed';
+  const storedProviderError =
+    typeof result?.providerError === 'string' ? result.providerError : null;
+  const storedProviderCode =
+    typeof result?.providerCode === 'string' ? result.providerCode : null;
   // New records store user copy in `error` and raw dump in `providerError`.
   // Legacy refunds only have the raw provider string in `error`.
-  if (typeof result?.providerError === 'string' && result.providerError) {
+  if (storedProviderError) {
     return {
       error: storedError,
+      providerError: storedProviderError,
+      providerCode: storedProviderCode,
       errorCode:
-        typeof result.errorCode === 'string' ? result.errorCode : undefined,
+        typeof result?.errorCode === 'string' ? result.errorCode : undefined,
     };
   }
-  const failure = splitProviderFailureError(storedError);
+  const failure = splitProviderFailureError(storedError, storedProviderCode);
   return {
     error: failure.error,
+    providerError: failure.providerError,
+    providerCode: failure.providerCode,
     errorCode: failure.errorCode,
   };
 }
@@ -116,6 +129,10 @@ async function GET({ request }: { request: Request }) {
         errorCode: failure.errorCode,
         refundedCredits:
           parsed.result?.refundedCredits ?? task.costCredits ?? 0,
+        ...providerFailureDebugFields({
+          providerError: failure.providerError,
+          providerCode: failure.providerCode,
+        }),
       });
     }
 
@@ -239,8 +256,17 @@ async function GET({ request }: { request: Request }) {
           ? `http_${error.status}`
           : 'status_error';
       const failure = splitProviderFailureError(
-        error?.message || 'Provider status request failed'
+        error?.message || 'Provider status request failed',
+        error instanceof VolcengineSeedanceHttpError ? error.code : undefined
       );
+      logGenjutsuProviderFailure({
+        stage: 'status_poll',
+        generationId: task.id,
+        providerStatus,
+        errorCode: failure.errorCode,
+        providerCode: failure.providerCode,
+        providerError: failure.providerError,
+      });
       await recordGenjutsuProviderStatusError({
         generationId: task.id,
         userId: session.user.id,
@@ -296,19 +322,35 @@ async function GET({ request }: { request: Request }) {
               settled.costCredits ??
               0)
             : undefined,
+        ...(refundFailure
+          ? providerFailureDebugFields({
+              providerError: refundFailure.providerError,
+              providerCode: refundFailure.providerCode,
+            })
+          : {}),
       });
     }
 
     if (provider.status === 'failed') {
       const failure = splitProviderFailureError(
-        provider.error || 'Generation failed'
+        provider.error || 'Generation failed',
+        'errorCode' in provider ? provider.errorCode : undefined
       );
+      logGenjutsuProviderFailure({
+        stage: 'status_provider_failed',
+        generationId: task.id,
+        providerStatus: provider.providerStatus,
+        errorCode: failure.errorCode,
+        providerCode: failure.providerCode,
+        providerError: failure.providerError,
+      });
       const refunded = await refundGenjutsuGeneration({
         generationId: task.id,
         userId: session.user.id,
         providerStatus: provider.providerStatus,
         error: failure.error,
         providerError: failure.providerError,
+        providerCode: failure.providerCode,
         errorCode: failure.errorCode,
       });
 
@@ -329,6 +371,10 @@ async function GET({ request }: { request: Request }) {
         error: failure.error,
         errorCode: failure.errorCode,
         refundedCredits: refunded?.costCredits ?? task.costCredits ?? 0,
+        ...providerFailureDebugFields({
+          providerError: failure.providerError,
+          providerCode: failure.providerCode,
+        }),
       });
     }
 

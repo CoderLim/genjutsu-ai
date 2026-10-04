@@ -450,13 +450,24 @@ function VideoUploadSlot({
 }
 
 function isLikenessRejectionMessage(message: string) {
-  return /images and videos cannot contain real people|likenesses of real people|real people|private information that cannot be processed|human face|真人|肖像/i.test(
+  return /images and videos cannot contain real people|likenesses of real people|real people|real person|private information that cannot be processed|human face|真人|肖像/i.test(
     message
   );
 }
 
 function isProviderFailedMessage(message: string) {
   return /generation failed\. please try again later/i.test(message);
+}
+
+function logProviderFailureDebug(
+  data: Record<string, unknown> | null | undefined,
+  context: string
+) {
+  if (!import.meta.env.DEV) return;
+  const providerError =
+    typeof data?.providerError === 'string' ? data.providerError : null;
+  if (!providerError) return;
+  console.error(`[genjutsu] ${context} providerError:`, providerError, data);
 }
 
 function generationFailureUiMessage(
@@ -886,6 +897,7 @@ type GenerationPoll = {
   videoUrl: string | null;
   error?: string;
   errorCode?: string;
+  providerError?: string;
   reservedCredits?: number;
   refundedCredits?: number;
 };
@@ -1169,6 +1181,10 @@ export function GeneratorPanel({
           setStatus('idle');
           setResult(null);
           setNeedsCredits(polled.providerStatus === 'insufficient_credits');
+          logProviderFailureDebug(
+            polled as unknown as Record<string, unknown>,
+            'status'
+          );
           const uiError =
             generationFailureUiMessage(polled.error, polled.errorCode) ||
             `Generation failed (${polled.providerStatus})`;
@@ -1401,6 +1417,7 @@ export function GeneratorPanel({
           (typeof cause.message === 'string' &&
             isLikenessRejectionMessage(cause.message));
         const uiMessage = providerSubmitUiMessage(cause);
+        logProviderFailureDebug(apiData, 'generate');
         if (likenessRejected) toast.error(uiMessage);
         setError(uiMessage);
         return;

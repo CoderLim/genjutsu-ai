@@ -63,6 +63,7 @@ interface Generation {
   providerStatus: string | null;
   failureStage: string | null;
   errorCode: string | null;
+  providerCode: string | null;
   errorFileIndex: number | null;
   errorFileType: string | null;
   errorHttpStatus: number | null;
@@ -496,9 +497,9 @@ const GenerationsTable = memo(function GenerationsTable({
                 failed at: {g.failureStage}
               </div>
             ) : null}
-            {g.errorCode ? (
+            {g.errorCode || g.providerCode ? (
               <div className="text-muted-foreground mt-1 font-mono text-xs">
-                {g.errorCode}
+                {[g.errorCode, g.providerCode].filter(Boolean).join(' · ')}
                 {g.errorFileType
                   ? ` · ${g.errorFileType}${g.errorFileIndex != null ? ` #${g.errorFileIndex}` : ''}`
                   : ''}

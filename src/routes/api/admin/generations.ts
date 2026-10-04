@@ -374,6 +374,8 @@ async function GET({ request }: { request: Request }) {
             : typeof result?.error === 'string'
               ? result.error
               : null,
+        providerCode:
+          typeof result?.providerCode === 'string' ? result.providerCode : null,
         costCredits: row.costCredits,
         providerCostUsd:
           typeof info?.providerCostUsd === 'number'

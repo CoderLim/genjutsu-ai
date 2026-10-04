@@ -23,7 +23,11 @@ import {
   calculateGenjutsuCredits,
   estimateGenjutsuCredits,
 } from '@/modules/genjutsu/pricing';
-import { splitProviderFailureError } from '@/modules/genjutsu/provider-errors';
+import {
+  logGenjutsuProviderFailure,
+  providerFailureDebugFields,
+  splitProviderFailureError,
+} from '@/modules/genjutsu/provider-errors';
 import {
   HiggsfieldHttpError,
   HiggsfieldPreflightError,
@@ -429,13 +433,25 @@ async function POST({ request }: { request: Request }) {
         error instanceof SeedanceHttpError ||
         error instanceof VolcengineSeedanceHttpError
       ) {
-        const failure = splitProviderFailureError(error.message);
+        const failure = splitProviderFailureError(
+          error.message,
+          error instanceof VolcengineSeedanceHttpError ? error.code : undefined
+        );
+        logGenjutsuProviderFailure({
+          stage: 'generate_submit',
+          generationId,
+          providerStatus: `http_${error.status}`,
+          errorCode: failure.errorCode,
+          providerCode: failure.providerCode,
+          providerError: failure.providerError,
+        });
         await refundGenjutsuGeneration({
           generationId,
           userId: session.user.id,
           providerStatus: `http_${error.status}`,
           error: failure.error,
           providerError: failure.providerError,
+          providerCode: failure.providerCode,
           errorCode: failure.errorCode,
         });
         return respJson(
@@ -445,6 +461,10 @@ async function POST({ request }: { request: Request }) {
             code: failure.errorCode,
             generationId,
             refundedCredits: task.costCredits || 0,
+            ...providerFailureDebugFields({
+              providerError: failure.providerError,
+              providerCode: failure.providerCode,
+            }),
           },
           { status: error.status >= 400 && error.status < 500 ? 400 : 502 }
         );

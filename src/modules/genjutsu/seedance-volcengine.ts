@@ -4,16 +4,12 @@ import { estimateSeedanceProviderCost } from './seedance';
 import type { GenjutsuMode, GenjutsuResolution } from './types';
 import { buildSeedanceWorkflowPrompt } from './workflow';
 
-const DEFAULT_ARK_API_BASE_URL =
-  'https://ark.cn-beijing.volces.com/api/v3';
+const DEFAULT_ARK_API_BASE_URL = 'https://ark.cn-beijing.volces.com/api/v3';
 const DEFAULT_VOLCENGINE_SEEDANCE_MODEL = 'doubao-seedance-2-5-260628';
 const DEFAULT_VIDEO_INPUT_RATE_CNY_PER_MILLION_TOKENS = 42;
 const DEFAULT_CNY_PER_USD = 7;
 
-const ESTIMATED_TOKENS_PER_BILLED_SECOND: Record<
-  GenjutsuResolution,
-  number
-> = {
+const ESTIMATED_TOKENS_PER_BILLED_SECOND: Record<GenjutsuResolution, number> = {
   // Ark's public estimate formula is:
   // seconds * width * height * fps / 1024.
   // Use representative 24fps dimensions for pre-submit telemetry only;
@@ -309,10 +305,7 @@ export function buildVolcengineSeedancePayload(input: {
     duration:
       taskType === 'edit'
         ? -1
-        : Math.min(
-            30,
-            Math.max(4, Math.round(input.sourceDurationSeconds))
-          ),
+        : Math.min(30, Math.max(4, Math.round(input.sourceDurationSeconds))),
     generate_audio: envConfigs.seedance_genjutsu_generate_audio !== 'false',
     output_format: 'mp4' as const,
     safety_identifier: input.safetyIdentifier,
@@ -382,6 +375,7 @@ export function normalizeVolcengineSeedanceTask(
         payload,
         `Generation ended with status: ${providerStatus}`
       ),
+      errorCode: arkErrorCode(payload),
       providerUsage,
     };
   }

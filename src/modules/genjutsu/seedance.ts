@@ -113,6 +113,7 @@ export function isSeedanceLikenessRejection(value: unknown): boolean {
   return (
     text.includes('likenesses of real people') ||
     text.includes('real people') ||
+    text.includes('real person') ||
     text.includes('private information that cannot be processed') ||
     text.includes('human face') ||
     text.includes('真人')

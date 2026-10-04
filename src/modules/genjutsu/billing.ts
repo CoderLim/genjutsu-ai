@@ -1107,6 +1107,8 @@ export async function refundGenjutsuGeneration(params: {
   error: string;
   /** Raw provider dump for admin generations. */
   providerError?: string;
+  /** Upstream provider error.code when available (e.g. Ark). */
+  providerCode?: string | null;
   errorCode?: string;
 }) {
   return db().transaction(async (tx: any) => {
@@ -1186,6 +1188,7 @@ export async function refundGenjutsuGeneration(params: {
       providerStatus: params.providerStatus ?? null,
       error: params.error,
       ...(params.providerError ? { providerError: params.providerError } : {}),
+      ...(params.providerCode ? { providerCode: params.providerCode } : {}),
       ...(params.errorCode ? { errorCode: params.errorCode } : {}),
       refundedCredits: claimed.costCredits,
     });

@@ -33,6 +33,12 @@ test('Seedance likeness rejection tells users images and videos cannot include r
     isSeedanceLikenessRejection(SEEDANCE_LIKENESS_REJECTION_MESSAGE),
     true
   );
+  assert.equal(
+    isSeedanceLikenessRejection(
+      "The request failed because the input video 'content[1]' may contain real person."
+    ),
+    true
+  );
 });
 
 test('Seedance estimate bills source plus a four-second minimum output', () => {
