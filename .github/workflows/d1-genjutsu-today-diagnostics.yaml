@@ -39,50 +39,37 @@ jobs:
             echo "CLOUDFLARE_EMAIL=${CLOUDFLARE_EMAIL:-}"
           } >> "$GITHUB_ENV"
 
-      - name: Query today's Genjutsu production D1
+      - name: Query post-fix Genjutsu production D1
         shell: bash
         run: |
           set -euo pipefail
           WRANGLER="npx --yes wrangler@4.98.0"
-          START_MS=1791043200000
-          END_MS=1791129600000
+          POST_FIX_MS=1791085500000
 
-          echo "=== TODAY_STATUS_COUNTS ==="
-          $WRANGLER d1 execute genjutsu-ai-db --remote --json --command "
-            SELECT status, COUNT(*) AS count
-            FROM ai_task
-            WHERE scene='genjutsu' AND created_at >= $START_MS AND created_at < $END_MS
-            GROUP BY status ORDER BY count DESC;
-          "
-
-          echo "=== TODAY_STAGE_PROVIDER_COUNTS ==="
+          echo "=== POST_FIX_STATUS ==="
           $WRANGLER d1 execute genjutsu-ai-db --remote --json --command "
             SELECT status,
                    COALESCE(json_extract(task_info, '$.attemptStage'), '(none)') AS attempt_stage,
-                   provider,
                    COUNT(*) AS count
             FROM ai_task
-            WHERE scene='genjutsu' AND created_at >= $START_MS AND created_at < $END_MS
-            GROUP BY status, attempt_stage, provider
-            ORDER BY count DESC, status, attempt_stage;
-          "
-
-          echo "=== TODAY_FAILURE_CODES ==="
-          $WRANGLER d1 execute genjutsu-ai-db --remote --json --command "
-            SELECT status,
-                   COALESCE(json_extract(task_result, '$.stage'), '') AS failure_stage,
-                   COALESCE(json_extract(task_result, '$.errorCode'), '') AS error_code,
-                   COALESCE(json_extract(task_result, '$.fileType'), '') AS file_type,
-                   COALESCE(json_extract(task_result, '$.fileIndex'), '') AS file_index,
-                   COUNT(*) AS count
-            FROM ai_task
-            WHERE scene='genjutsu' AND created_at >= $START_MS AND created_at < $END_MS
-              AND (status='failed_preflight' OR json_extract(task_result, '$.errorCode') IS NOT NULL)
-            GROUP BY status, failure_stage, error_code, file_type, file_index
+            WHERE scene='genjutsu' AND created_at >= $POST_FIX_MS
+            GROUP BY status, attempt_stage
             ORDER BY count DESC;
           "
 
-          echo "=== TODAY_UPLOAD_DIAGNOSTICS ==="
+          echo "=== POST_FIX_UPLOAD_ERRORS ==="
+          $WRANGLER d1 execute genjutsu-ai-db --remote --json --command "
+            SELECT
+              COUNT(*) AS upload_network_errors,
+              COUNT(DISTINCT user_id) AS affected_users,
+              MIN(datetime(created_at/1000,'unixepoch')) AS first_utc,
+              MAX(datetime(created_at/1000,'unixepoch')) AS last_utc
+            FROM ai_task
+            WHERE scene='genjutsu' AND created_at >= $POST_FIX_MS
+              AND json_extract(task_result, '$.errorCode')='UPLOAD_NETWORK_ERROR';
+          "
+
+          echo "=== POST_FIX_UPLOAD_RECOVERY ==="
           $WRANGLER d1 execute genjutsu-ai-db --remote --json --command "
             SELECT
               SUM(CASE WHEN json_extract(task_info, '$.uploadRecovery.recovered') = 1 THEN 1 ELSE 0 END) AS recovered_count,
@@ -90,35 +77,21 @@ jobs:
               SUM(CASE WHEN json_extract(task_info, '$.uploadRecovery.r2ObjectExists') = 1 THEN 1 ELSE 0 END) AS r2_exists_after_error,
               SUM(CASE WHEN json_extract(task_info, '$.uploadRecovery.r2ObjectExists') = 0 THEN 1 ELSE 0 END) AS r2_missing_after_error
             FROM ai_task
-            WHERE scene='genjutsu' AND created_at >= $START_MS AND created_at < $END_MS;
+            WHERE scene='genjutsu' AND created_at >= $POST_FIX_MS;
           "
 
-          echo "=== TODAY_CREDIT_AND_COST ==="
+          echo "=== POST_FIX_FAILURE_TIMES ==="
           $WRANGLER d1 execute genjutsu-ai-db --remote --json --command "
-            SELECT
-              COUNT(*) AS total,
-              COUNT(DISTINCT user_id) AS users,
-              SUM(CASE WHEN status='insufficient_credits' THEN 1 ELSE 0 END) AS insufficient,
-              SUM(CASE WHEN status='completed' THEN 1 ELSE 0 END) AS completed,
-              SUM(CASE WHEN status IN ('reserved','submitting','submitted','completed','submission_unknown','refunding','refunded') THEN 1 ELSE 0 END) AS reached_reserve_or_later,
-              COALESCE(SUM(CASE WHEN status='completed' THEN cost_credits ELSE 0 END),0) AS completed_credits
+            SELECT datetime(created_at/1000,'unixepoch') AS created_utc,
+                   substr(id,1,8) AS id8,
+                   status,
+                   COALESCE(json_extract(task_result, '$.errorCode'), '') AS error_code,
+                   COALESCE(json_extract(task_result, '$.attemptCount'), json_extract(task_info, '$.uploadRecovery.attemptCount'), '') AS attempts,
+                   COALESCE(json_extract(task_result, '$.uploadElapsedMs'), json_extract(task_info, '$.uploadRecovery.uploadElapsedMs'), '') AS elapsed_ms,
+                   COALESCE(json_extract(task_result, '$.browser'), json_extract(task_info, '$.uploadRecovery.browser'), '') AS browser,
+                   COALESCE(json_extract(task_result, '$.os'), json_extract(task_info, '$.uploadRecovery.os'), '') AS os
             FROM ai_task
-            WHERE scene='genjutsu' AND created_at >= $START_MS AND created_at < $END_MS;
-          "
-
-          echo "=== TODAY_RECENT_NO_PII ==="
-          $WRANGLER d1 execute genjutsu-ai-db --remote --json --command "
-            SELECT
-              substr(id,1,8) AS id8,
-              datetime(created_at/1000,'unixepoch') AS created_utc,
-              status,
-              COALESCE(json_extract(task_info, '$.attemptStage'), '(none)') AS attempt_stage,
-              provider,
-              cost_credits,
-              COALESCE(json_extract(task_result, '$.errorCode'), '') AS error_code,
-              COALESCE(json_extract(task_info, '$.uploadRecovery.recovered'), '') AS recovered,
-              COALESCE(json_array_length(json_extract(task_info, '$.uploadRetrySuccesses')), 0) AS retry_successes
-            FROM ai_task
-            WHERE scene='genjutsu' AND created_at >= $START_MS AND created_at < $END_MS
-            ORDER BY created_at DESC LIMIT 80;
+            WHERE scene='genjutsu' AND created_at >= $POST_FIX_MS
+              AND json_extract(task_result, '$.errorCode')='UPLOAD_NETWORK_ERROR'
+            ORDER BY created_at DESC;
           "
