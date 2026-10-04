@@ -1,4 +1,5 @@
 # Production deploy workflow. Android upload diagnostics rollout 2026-10-04.
+# Manual production deploy: 2026-10-05 upload-hint copy.
 name: Deploy Cloudflare Worker
 
 on:
