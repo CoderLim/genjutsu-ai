@@ -83,10 +83,26 @@ function truncateErrorMessage(value: string) {
   return value.replace(/[\r\n\t]+/g, ' ').slice(0, MAX_ERROR_MESSAGE_LENGTH);
 }
 
-function getBrowserMajor(userAgent: string): number | null {
-  const match = userAgent.match(
-    /(?:Edg|OPR|SamsungBrowser|Firefox|FxiOS|CriOS|Chrome|Version)\/(\d+)/i
-  );
+function getBrowserMajor(
+  userAgent: string,
+  browser: (typeof BROWSERS)[number]
+): number | null {
+  const pattern =
+    browser === 'Edge'
+      ? /Edg\/(\d+)/i
+      : browser === 'Opera'
+        ? /(?:OPR|Opera)\/(\d+)/i
+        : browser === 'Samsung'
+          ? /SamsungBrowser\/(\d+)/i
+          : browser === 'Firefox'
+            ? /(?:Firefox|FxiOS)\/(\d+)/i
+            : browser === 'Chrome'
+              ? /(?:Chrome|CriOS)\/(\d+)/i
+              : browser === 'Safari'
+                ? /Version\/(\d+)/i
+                : null;
+  if (!pattern) return null;
+  const match = userAgent.match(pattern);
   if (!match) return null;
   const major = Number(match[1]);
   return Number.isInteger(major) && major > 0 && major < 1_000 ? major : null;
@@ -139,7 +155,7 @@ export function classifyClientEnvironment(userAgent: string): {
 
   return {
     browser,
-    browserMajor: getBrowserMajor(ua),
+    browserMajor: getBrowserMajor(ua, browser),
     os,
     isWebView: isAndroidWebView(ua),
     inAppBrowser: classifyInAppBrowser(ua),
