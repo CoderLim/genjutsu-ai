@@ -44,6 +44,25 @@ export function listVisibleCreditPacks(
   return GENJUTSU_CREDIT_PACKS;
 }
 
+export function getSmallestSufficientCreditPack(params: {
+  balance: number;
+  requiredCredits: number;
+  email?: string | null;
+}): GenjutsuCreditPack | null {
+  const deficit = Math.max(0, params.requiredCredits - params.balance);
+  if (deficit <= 0) return null;
+
+  const packs = [...listVisibleCreditPacks(params.email)].sort(
+    (a, b) => a.credits - b.credits || a.priceCents - b.priceCents
+  );
+
+  return (
+    packs.find((pack) => pack.credits >= deficit) ??
+    packs[packs.length - 1] ??
+    null
+  );
+}
+
 /**
  * Customer-wallet conversion and markup.
  *
