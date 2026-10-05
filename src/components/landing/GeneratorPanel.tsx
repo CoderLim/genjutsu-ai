@@ -14,7 +14,7 @@ import { toast } from 'sonner';
 
 import { useSession } from '@/core/auth/client';
 import {
-  estimateGenjutsuCredits,
+  estimateSeedanceCredits,
   getSmallestSufficientCreditPack,
   type GenjutsuCreditPack,
 } from '@/modules/genjutsu/pricing';
@@ -41,6 +41,13 @@ import {
   ObjectsSwapIcon,
   PlusIcon,
 } from '@/components/icons';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   Tooltip,
   TooltipContent,
@@ -927,7 +934,7 @@ const activeGenerationKey = (userId: string) =>
   `genjutsu_active_generation:${userId}`;
 
 function formatCreditPackPrice(pack: GenjutsuCreditPack) {
-  return new Intl.NumberFormat('en-US', {
+  return new Intl.NumberFormat(undefined, {
     style: 'currency',
     currency: (pack.currency || 'usd').toUpperCase(),
   }).format(pack.priceCents / 100);
@@ -946,103 +953,93 @@ function InsufficientCreditsModal({
   onClose: () => void;
   onBuy: () => void;
 }) {
-  useEffect(() => {
-    if (!gate) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !checkoutLoading) onClose();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [checkoutLoading, gate, onClose]);
-
-  if (!gate || typeof document === 'undefined') return null;
+  if (!gate) return null;
 
   const deficit = Math.max(0, gate.requiredCredits - gate.balance);
 
-  return createPortal(
-    <div
-      className="fixed inset-0 z-[500] flex items-center justify-center p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="insufficient-credits-title"
+  return (
+    <Dialog
+      open={Boolean(gate)}
+      onOpenChange={(open) => {
+        if (!open && !checkoutLoading) onClose();
+      }}
     >
-      <button
-        type="button"
-        aria-label="Close insufficient credits dialog"
-        className="absolute inset-0 bg-black/75 backdrop-blur-sm"
-        onClick={() => {
-          if (!checkoutLoading) onClose();
-        }}
-      />
-      <div className="relative z-10 w-full max-w-[420px] rounded-2xl border border-white/10 bg-[rgb(31,24,20)] p-5 text-[rgb(237,234,222)] shadow-2xl sm:p-6">
-        <button
-          type="button"
-          aria-label="Close"
-          disabled={checkoutLoading}
-          onClick={onClose}
-          className="absolute top-4 right-4 flex size-8 items-center justify-center rounded-full text-white/45 transition-colors hover:bg-white/8 hover:text-white/80 disabled:pointer-events-none disabled:opacity-40"
-        >
-          <CloseIcon className="size-4" />
-        </button>
-
-        <div className="pr-10">
-          <h2
-            id="insufficient-credits-title"
-            className="text-lg font-semibold tracking-tight"
-          >
-            Not enough credits
-          </h2>
-          <p className="mt-1.5 text-sm leading-6 text-white/55">
-            This generation needs {gate.requiredCredits.toLocaleString()}{' '}
-            credits.
-          </p>
-        </div>
+      <DialogContent
+        showCloseButton={!checkoutLoading}
+        overlayClassName="z-[490] bg-black/75 backdrop-blur-sm"
+        className="z-[500] w-full max-w-[420px] gap-0 rounded-2xl border border-white/10 bg-[rgb(31,24,20)] p-5 text-[rgb(237,234,222)] shadow-2xl sm:max-w-[420px] sm:p-6"
+      >
+        <DialogHeader className="gap-1.5 pr-8 text-left">
+          <DialogTitle className="text-lg font-semibold tracking-tight">
+            {m['genjutsu.credits.insufficient_title']()}
+          </DialogTitle>
+          <DialogDescription className="text-sm leading-6 text-white/55">
+            {m['genjutsu.credits.insufficient_description']({
+              count: gate.requiredCredits.toLocaleString(),
+            })}
+          </DialogDescription>
+        </DialogHeader>
 
         <div className="mt-5 rounded-xl border border-white/8 bg-black/15 px-4 py-3 text-sm">
           <div className="flex items-center justify-between py-1 text-white/58">
-            <span>Your balance</span>
+            <span>{m['genjutsu.credits.balance']()}</span>
             <span className="tabular-nums">
               {gate.balance.toLocaleString()}
             </span>
           </div>
           <div className="flex items-center justify-between py-1 text-white/58">
-            <span>Required</span>
+            <span>{m['genjutsu.credits.required']()}</span>
             <span className="tabular-nums">
               {gate.requiredCredits.toLocaleString()}
             </span>
           </div>
           <div className="my-2 h-px bg-white/8" />
           <div className="flex items-center justify-between py-1 font-medium">
-            <span>You need</span>
+            <span>
+              {m['genjutsu.credits.need_more']({
+                count: deficit.toLocaleString(),
+              })}
+            </span>
             <span className="tabular-nums text-[rgb(220,155,99)]">
-              {deficit.toLocaleString()} more
+              {deficit.toLocaleString()}
             </span>
           </div>
         </div>
 
+        {!pack ? (
+          <p className="mt-3 text-xs leading-5 text-white/50">
+            {m['genjutsu.credits.no_single_pack']({
+              count: deficit.toLocaleString(),
+            })}
+          </p>
+        ) : null}
+
         <button
           type="button"
-          disabled={!pack || checkoutLoading}
+          disabled={checkoutLoading}
           onClick={onBuy}
           className="mt-5 inline-flex h-10 w-full items-center justify-center rounded-xl bg-[rgb(204,144,92)] px-4 text-sm font-semibold text-[rgb(247,246,243)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-55"
         >
           {checkoutLoading
-            ? 'Opening checkout…'
+            ? m['genjutsu.credits.opening_checkout']()
             : pack
-              ? `Buy ${pack.credits.toLocaleString()} credits · ${formatCreditPackPrice(pack)}`
-              : 'Buy credits'}
+              ? m['genjutsu.credits.buy_pack']({
+                  count: pack.credits.toLocaleString(),
+                  price: formatCreditPackPrice(pack),
+                })
+              : m['genjutsu.credits.view_packs']()}
         </button>
+
         <button
           type="button"
           disabled={checkoutLoading}
           onClick={onClose}
           className="mt-2 inline-flex h-9 w-full items-center justify-center rounded-lg text-sm text-white/45 transition-colors hover:bg-white/5 hover:text-white/70 disabled:pointer-events-none disabled:opacity-40"
         >
-          Maybe later
+          {m['genjutsu.credits.maybe_later']()}
         </button>
-      </div>
-    </div>,
-    document.body
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -1422,7 +1419,7 @@ export function GeneratorPanel({
       return null;
     }
     try {
-      return estimateGenjutsuCredits({
+      return estimateSeedanceCredits({
         durationSeconds,
         resolution,
       });
@@ -1673,7 +1670,17 @@ export function GeneratorPanel({
   );
 
   const handleBuyCredits = async () => {
-    if (!creditGate || !recommendedCreditPack || checkoutLoading) return;
+    if (!creditGate || checkoutLoading) return;
+
+    if (!recommendedCreditPack) {
+      const pricingWindow = window.open('/pricing', '_blank');
+      if (pricingWindow) {
+        pricingWindow.opener = null;
+      } else {
+        window.location.href = '/pricing';
+      }
+      return;
+    }
 
     const checkoutWindow = window.open('', '_blank');
     if (checkoutWindow) checkoutWindow.opener = null;
@@ -1701,7 +1708,9 @@ export function GeneratorPanel({
     } catch (cause) {
       if (checkoutWindow && !checkoutWindow.closed) checkoutWindow.close();
       toast.error(
-        cause instanceof Error ? cause.message : 'Could not open checkout'
+        cause instanceof Error
+          ? cause.message
+          : m['genjutsu.credits.checkout_failed']()
       );
     } finally {
       setCheckoutLoading(false);
