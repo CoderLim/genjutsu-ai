@@ -995,13 +995,11 @@ function InsufficientCreditsModal({
           </div>
           <div className="my-2 h-px bg-white/8" />
           <div className="flex items-center justify-between py-1 font-medium">
-            <span>
+            <span>{m['genjutsu.credits.need_label']()}</span>
+            <span className="tabular-nums text-[rgb(220,155,99)]">
               {m['genjutsu.credits.need_more']({
                 count: deficit.toLocaleString(),
               })}
-            </span>
-            <span className="tabular-nums text-[rgb(220,155,99)]">
-              {deficit.toLocaleString()}
             </span>
           </div>
         </div>
