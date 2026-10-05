@@ -2,21 +2,21 @@ import { createFileRoute } from '@tanstack/react-router';
 
 import { getAuth } from '@/core/auth';
 import {
-  createGenjutsuE2EUploadDescriptor,
-  isGenjutsuE2EMockEnabled,
-} from '@/modules/genjutsu/e2e-mock';
-import {
   assertGenerationId,
   bindGenjutsuUploadInputs,
   createGenjutsuAttempt,
   GenjutsuAttemptConflictError,
   markGenjutsuAttemptFailedPreflight,
 } from '@/modules/genjutsu/billing';
+import {
+  createGenjutsuE2EUploadDescriptor,
+  isGenjutsuE2EMockEnabled,
+} from '@/modules/genjutsu/e2e-mock';
 import { resolveGenjutsuProviderTarget } from '@/modules/genjutsu/service';
 import {
+  assertGenjutsuUploadSize,
   createGenjutsuR2UploadDescriptor,
   getGenjutsuInputKey,
-  assertGenjutsuUploadSize,
 } from '@/modules/genjutsu/storage';
 import { enforceMinIntervalRateLimit } from '@/lib/rate-limit';
 import { respData, respErr, respJson } from '@/lib/resp';
@@ -145,12 +145,7 @@ async function POST({ request }: { request: Request }) {
     return respData({ uploads });
   } catch (error: any) {
     if (error instanceof GenjutsuAttemptConflictError) {
-      return respJson(
-        -1,
-        error.message,
-        { code: error.code },
-        { status: 409 }
-      );
+      return respJson(-1, error.message, { code: error.code }, { status: 409 });
     }
 
     if (generationIdForFailure && userIdForFailure) {

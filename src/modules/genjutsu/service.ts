@@ -13,6 +13,13 @@ import {
   SeedancePreflightError,
   submitSeedance,
 } from './seedance';
+import {
+  assertVolcengineSeedanceConfigured,
+  estimateVolcengineSeedanceProviderCost,
+  getVolcengineSeedanceStatus,
+  submitVolcengineSeedance,
+  VolcengineSeedanceHttpError,
+} from './seedance-volcengine';
 import type {
   GenjutsuMode,
   GenjutsuProvider,
@@ -30,6 +37,7 @@ export {
   isSeedanceLikenessRejection,
   SeedanceHttpError,
   SeedancePreflightError,
+  VolcengineSeedanceHttpError,
   resolveGenjutsuProviderTarget,
 };
 
@@ -203,7 +211,9 @@ function buildGenjutsuPayload(input: {
     throw new HiggsfieldPreflightError('Prompt is too long');
   }
   if (!isHttpUrl(input.videoUrl)) {
-    throw new HiggsfieldPreflightError('A valid uploaded video URL is required');
+    throw new HiggsfieldPreflightError(
+      'A valid uploaded video URL is required'
+    );
   }
   if (
     !Array.isArray(input.imageUrls) ||
@@ -211,7 +221,9 @@ function buildGenjutsuPayload(input: {
     input.imageUrls.length > 8 ||
     input.imageUrls.some((url) => !isHttpUrl(url))
   ) {
-    throw new HiggsfieldPreflightError('Provide between 1 and 8 valid reference image URLs');
+    throw new HiggsfieldPreflightError(
+      'Provide between 1 and 8 valid reference image URLs'
+    );
   }
 
   return {
@@ -227,9 +239,14 @@ function buildGenjutsuPayload(input: {
 
 export type GenjutsuCostEstimate = {
   providerCostUsd: number;
+  customerPriceBasisUsd?: number;
   providerCredits: unknown;
   payload: unknown;
-  source: 'estimate' | 'list_fallback' | 'seedance_list_estimate';
+  source:
+    | 'estimate'
+    | 'list_fallback'
+    | 'seedance_list_estimate'
+    | 'volcengine_seedance_estimate';
   sourceDurationSeconds?: number;
 };
 
@@ -494,10 +511,28 @@ export type GenjutsuProviderCostInput = {
 export async function resolveGenjutsuProviderCost(
   input: GenjutsuProviderCostInput
 ): Promise<GenjutsuCostEstimate> {
-  if (input.provider === 'seedance') {
+  if (
+    input.provider === 'seedance' ||
+    input.provider === 'seedance-volcengine'
+  ) {
     const sourceDurationSeconds = await probeSeedanceSourceDurationSeconds(
       input.videoUrl
     );
+
+    if (input.provider === 'seedance-volcengine') {
+      // Fail configuration errors before reserving user credits or claiming a
+      // submission slot. This is a pure preflight and does not call Ark.
+      assertVolcengineSeedanceConfigured(input.model);
+      return {
+        ...estimateVolcengineSeedanceProviderCost({
+          mode: input.mode,
+          resolution: input.resolution,
+          sourceDurationSeconds,
+        }),
+        sourceDurationSeconds,
+      };
+    }
+
     return {
       ...estimateSeedanceProviderCost({
         resolution: input.resolution,
@@ -521,7 +556,10 @@ export async function submitGenjutsu(input: {
   endUserId: string;
   sourceDurationSeconds?: number;
 }) {
-  if (input.provider === 'seedance') {
+  if (
+    input.provider === 'seedance' ||
+    input.provider === 'seedance-volcengine'
+  ) {
     if (
       typeof input.sourceDurationSeconds !== 'number' ||
       !Number.isFinite(input.sourceDurationSeconds) ||
@@ -530,6 +568,13 @@ export async function submitGenjutsu(input: {
       throw new SeedancePreflightError(
         'Seedance submission is missing the server-validated source duration'
       );
+    }
+
+    if (input.provider === 'seedance-volcengine') {
+      return submitVolcengineSeedance({
+        ...input,
+        sourceDurationSeconds: input.sourceDurationSeconds,
+      });
     }
 
     return submitSeedance({
@@ -546,6 +591,12 @@ export async function getGenjutsuStatus(input: {
   model?: string | null;
   requestId: string;
 }) {
+  if (input.provider === 'seedance-volcengine') {
+    return getVolcengineSeedanceStatus({
+      requestId: input.requestId,
+    });
+  }
+
   if (input.provider === 'seedance') {
     const model =
       input.model?.trim() ||

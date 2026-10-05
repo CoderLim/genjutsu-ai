@@ -1,7 +1,7 @@
 import {
   collectUploadDiagnostics,
-  isRetryableUploadFailure,
   getUploadPutTimeoutMs,
+  isRetryableUploadFailure,
   UPLOAD_RETRY_DELAYS_MS,
   type UploadAttemptDiagnostic,
   type UploadClientDiagnostics,

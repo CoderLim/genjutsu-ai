@@ -683,6 +683,7 @@ export async function recordGenjutsuProviderStatusError(params: {
   userId: string;
   providerStatus: string;
   error: string;
+  providerError?: string;
 }) {
   await db()
     .update(aiTask)
@@ -690,6 +691,9 @@ export async function recordGenjutsuProviderStatusError(params: {
       taskResult: JSON.stringify({
         providerStatus: params.providerStatus,
         error: params.error,
+        ...(params.providerError
+          ? { providerError: params.providerError }
+          : {}),
         statusPollError: true,
       }),
     })
@@ -1061,6 +1065,7 @@ export async function settleGenjutsuGeneration(params: {
   providerStatus: string;
   videoKey?: string;
   videoUrl?: string;
+  providerUsage?: unknown;
 }) {
   if (!params.videoKey && !params.videoUrl) {
     throw new Error('Completed Genjutsu generation is missing a result');
@@ -1074,6 +1079,9 @@ export async function settleGenjutsuGeneration(params: {
         providerStatus: params.providerStatus,
         ...(params.videoKey ? { videoKey: params.videoKey } : {}),
         ...(params.videoUrl ? { videoUrl: params.videoUrl } : {}),
+        ...(params.providerUsage != null
+          ? { providerUsage: params.providerUsage }
+          : {}),
       }),
     })
     .where(
@@ -1095,7 +1103,13 @@ export async function refundGenjutsuGeneration(params: {
   generationId: string;
   userId: string;
   providerStatus?: string;
+  /** User-facing failure copy (status / client). */
   error: string;
+  /** Raw provider dump for admin generations. */
+  providerError?: string;
+  /** Upstream provider error.code when available (e.g. Ark). */
+  providerCode?: string | null;
+  errorCode?: string;
 }) {
   return db().transaction(async (tx: any) => {
     const [task] = await tx
@@ -1173,6 +1187,9 @@ export async function refundGenjutsuGeneration(params: {
     const taskResult = JSON.stringify({
       providerStatus: params.providerStatus ?? null,
       error: params.error,
+      ...(params.providerError ? { providerError: params.providerError } : {}),
+      ...(params.providerCode ? { providerCode: params.providerCode } : {}),
+      ...(params.errorCode ? { errorCode: params.errorCode } : {}),
       refundedCredits: claimed.costCredits,
     });
 

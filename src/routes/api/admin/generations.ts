@@ -368,7 +368,14 @@ async function GET({ request }: { request: Request }) {
         uploadRetrySuccessCount: Array.isArray(info?.uploadRetrySuccesses)
           ? info.uploadRetrySuccesses.length
           : null,
-        error: typeof result?.error === 'string' ? result.error : null,
+        error:
+          typeof result?.providerError === 'string'
+            ? result.providerError
+            : typeof result?.error === 'string'
+              ? result.error
+              : null,
+        providerCode:
+          typeof result?.providerCode === 'string' ? result.providerCode : null,
         costCredits: row.costCredits,
         providerCostUsd:
           typeof info?.providerCostUsd === 'number'

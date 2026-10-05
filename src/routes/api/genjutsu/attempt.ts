@@ -55,12 +55,7 @@ async function POST({ request }: { request: Request }) {
     });
   } catch (error: any) {
     if (error instanceof GenjutsuAttemptConflictError) {
-      return respJson(
-        -1,
-        error.message,
-        { code: error.code },
-        { status: 409 }
-      );
+      return respJson(-1, error.message, { code: error.code }, { status: 409 });
     }
     console.error('genjutsu attempt failed:', error);
     return respErr(error?.message || 'Failed to create generation attempt', {

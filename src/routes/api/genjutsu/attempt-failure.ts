@@ -31,13 +31,10 @@ function getCloudflareRequestDiagnostics(request: Request) {
   ).cf;
 
   return {
-    cfCountry:
-      typeof cf?.country === 'string' ? cf.country.slice(0, 8) : null,
+    cfCountry: typeof cf?.country === 'string' ? cf.country.slice(0, 8) : null,
     cfColo: typeof cf?.colo === 'string' ? cf.colo.slice(0, 8) : null,
     cfAsn:
-      typeof cf?.asn === 'number' &&
-      Number.isInteger(cf.asn) &&
-      cf.asn >= 0
+      typeof cf?.asn === 'number' && Number.isInteger(cf.asn) && cf.asn >= 0
         ? cf.asn
         : null,
   };

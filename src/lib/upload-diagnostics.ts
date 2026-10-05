@@ -69,12 +69,7 @@ const OPERATING_SYSTEMS = [
   'Other',
 ] as const;
 
-const IN_APP_BROWSERS = [
-  'instagram',
-  'facebook',
-  'tiktok',
-  'line',
-] as const;
+const IN_APP_BROWSERS = ['instagram', 'facebook', 'tiktok', 'line'] as const;
 
 const VISIBILITY_STATES = new Set(['visible', 'hidden', 'prerender']);
 const EFFECTIVE_TYPES = new Set(['slow-2g', '2g', '3g', '4g']);

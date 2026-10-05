@@ -44,6 +44,21 @@ export function listVisibleCreditPacks(
   return GENJUTSU_CREDIT_PACKS;
 }
 
+export function getSmallestSufficientCreditPack(params: {
+  balance: number;
+  requiredCredits: number;
+  email?: string | null;
+}): GenjutsuCreditPack | null {
+  const deficit = Math.max(0, params.requiredCredits - params.balance);
+  if (deficit <= 0) return null;
+
+  const packs = [...listVisibleCreditPacks(params.email)].sort(
+    (a, b) => a.credits - b.credits || a.priceCents - b.priceCents
+  );
+
+  return packs.find((pack) => pack.credits >= deficit) ?? null;
+}
+
 /**
  * Customer-wallet conversion and markup.
  *
@@ -68,6 +83,20 @@ export const GENJUTSU_LIST_RATE_USD_PER_SECOND: Record<
   '480p': 0.318,
   '720p': 0.681,
   '1080p': 1.632,
+};
+
+/**
+ * Seedance 2.5 video-reference list rates. Billing includes both the source
+ * video seconds and generated output seconds. Volcengine intentionally uses
+ * the same customer-facing quote while the provider-cost migration is active.
+ */
+export const SEEDANCE_VIDEO_REFERENCE_RATE_USD_PER_BILLED_SECOND: Record<
+  GenjutsuBillableResolution,
+  number
+> = {
+  '480p': 0.15876,
+  '720p': 0.34056,
+  '1080p': 0.8377668,
 };
 
 export const GENJUTSU_CREDIT_PACKS: readonly GenjutsuCreditPack[] = [
@@ -132,6 +161,29 @@ export function estimateGenjutsuCredits(input: {
   resolution: GenjutsuBillableResolution;
 }) {
   return calculateGenjutsuCredits(estimateGenjutsuListCost(input));
+}
+
+export function estimateSeedanceListCost(input: {
+  durationSeconds: number;
+  resolution: GenjutsuBillableResolution;
+}) {
+  if (!Number.isFinite(input.durationSeconds) || input.durationSeconds <= 0) {
+    throw new Error('durationSeconds must be a positive finite number');
+  }
+
+  const outputSeconds = Math.min(30, Math.max(4, input.durationSeconds));
+  const billedSeconds = input.durationSeconds + outputSeconds;
+  return (
+    billedSeconds *
+    SEEDANCE_VIDEO_REFERENCE_RATE_USD_PER_BILLED_SECOND[input.resolution]
+  );
+}
+
+export function estimateSeedanceCredits(input: {
+  durationSeconds: number;
+  resolution: GenjutsuBillableResolution;
+}) {
+  return calculateGenjutsuCredits(estimateSeedanceListCost(input));
 }
 
 export function getCreditPack(id: GenjutsuCreditPackId) {

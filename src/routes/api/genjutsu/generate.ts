@@ -24,14 +24,19 @@ import {
   estimateGenjutsuCredits,
 } from '@/modules/genjutsu/pricing';
 import {
+  logGenjutsuProviderFailure,
+  providerFailureDebugFields,
+  splitProviderFailureError,
+} from '@/modules/genjutsu/provider-errors';
+import {
   HiggsfieldHttpError,
   HiggsfieldPreflightError,
-  isSeedanceLikenessRejection,
   resolveGenjutsuProviderCost,
   resolveGenjutsuProviderTarget,
   SeedanceHttpError,
   SeedancePreflightError,
   submitGenjutsu,
+  VolcengineSeedanceHttpError,
   type GenjutsuMode,
   type GenjutsuProvider,
   type GenjutsuResolution,
@@ -239,7 +244,11 @@ async function POST({ request }: { request: Request }) {
         }
       : resolveGenjutsuProviderTarget(input.mode);
 
-    if (target.provider === 'seedance' && !hasStorageInput(input)) {
+    if (
+      (target.provider === 'seedance' ||
+        target.provider === 'seedance-volcengine') &&
+      !hasStorageInput(input)
+    ) {
       throw new Error(
         'Seedance generations must use server-owned R2 storage keys'
       );
@@ -280,7 +289,11 @@ async function POST({ request }: { request: Request }) {
         });
         throw new InsufficientCreditsError(minimumCredits, balance);
       }
-    } else if (needsReservation && target.provider === 'seedance') {
+    } else if (
+      needsReservation &&
+      (target.provider === 'seedance' ||
+        target.provider === 'seedance-volcengine')
+    ) {
       // Seedance has no free /estimate endpoint. Probe the server-owned R2
       // source once, build the list-rate quote, and reject an obviously
       // insufficient wallet before submit. Provider likeness policy is
@@ -289,7 +302,9 @@ async function POST({ request }: { request: Request }) {
         ...providerInput,
         ...target,
       });
-      const credits = calculateGenjutsuCredits(estimate.providerCostUsd);
+      const credits = calculateGenjutsuCredits(
+        estimate.customerPriceBasisUsd ?? estimate.providerCostUsd
+      );
       const balance = await getBalance(session.user.id);
       if (balance < credits) {
         await markGenjutsuAttemptInsufficient({
@@ -318,7 +333,9 @@ async function POST({ request }: { request: Request }) {
           ...target,
           durationSeconds: sourceDurationSeconds,
         });
-        const credits = calculateGenjutsuCredits(estimate.providerCostUsd);
+        const credits = calculateGenjutsuCredits(
+          estimate.customerPriceBasisUsd ?? estimate.providerCostUsd
+        );
         sourceDurationSeconds = estimate.sourceDurationSeconds;
         pendingQuote = {
           providerCostUsd: estimate.providerCostUsd,
@@ -413,24 +430,41 @@ async function POST({ request }: { request: Request }) {
 
       if (
         error instanceof HiggsfieldHttpError ||
-        error instanceof SeedanceHttpError
+        error instanceof SeedanceHttpError ||
+        error instanceof VolcengineSeedanceHttpError
       ) {
+        const failure = splitProviderFailureError(
+          error.message,
+          error instanceof VolcengineSeedanceHttpError ? error.code : undefined
+        );
+        logGenjutsuProviderFailure({
+          stage: 'generate_submit',
+          generationId,
+          providerStatus: `http_${error.status}`,
+          errorCode: failure.errorCode,
+          providerCode: failure.providerCode,
+          providerError: failure.providerError,
+        });
         await refundGenjutsuGeneration({
           generationId,
           userId: session.user.id,
           providerStatus: `http_${error.status}`,
-          error: error.message,
+          error: failure.error,
+          providerError: failure.providerError,
+          providerCode: failure.providerCode,
+          errorCode: failure.errorCode,
         });
-        const likeness =
-          error instanceof SeedanceHttpError &&
-          isSeedanceLikenessRejection(error.message);
         return respJson(
           -1,
-          error.message || 'The video provider rejected the generation',
+          failure.error,
           {
-            code: likeness ? 'PROVIDER_LIKENESS_REJECTED' : 'PROVIDER_REJECTED',
+            code: failure.errorCode,
             generationId,
             refundedCredits: task.costCredits || 0,
+            ...providerFailureDebugFields({
+              providerError: failure.providerError,
+              providerCode: failure.providerCode,
+            }),
           },
           { status: error.status >= 400 && error.status < 500 ? 400 : 502 }
         );

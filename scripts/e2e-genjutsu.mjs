@@ -323,14 +323,8 @@ async function main() {
     assert.equal(conflict?.data?.code, 'GENERATION_INPUT_CONFLICT');
 
     const [videoUpload, imageUpload] = repeatedUploadBatch.uploads;
-    assert.match(
-      videoUpload.storageKey,
-      /\/source\.mp4$/
-    );
-    assert.match(
-      imageUpload.storageKey,
-      /\/reference-01\.png$/
-    );
+    assert.match(videoUpload.storageKey, /\/source\.mp4$/);
+    assert.match(imageUpload.storageKey, /\/reference-01\.png$/);
 
     for (const [upload, bytes, type] of [
       [videoUpload, videoBytes, 'video/mp4'],
@@ -371,9 +365,14 @@ async function main() {
       },
       body: tamperedVideoBytes,
     });
-    assert.ok(overwrite.ok, `staging overwrite failed: HTTP ${overwrite.status}`);
+    assert.ok(
+      overwrite.ok,
+      `staging overwrite failed: HTTP ${overwrite.status}`
+    );
 
-    console.log('\n[6/6] Running Generate → Status → sealed source-video result...');
+    console.log(
+      '\n[6/6] Running Generate → Status → sealed source-video result...'
+    );
     const started = await appPost('/api/genjutsu/generate', cookie, {
       generationId,
     });
@@ -425,8 +424,12 @@ async function main() {
     assert.deepEqual(returned, videoBytes.subarray(0, 10));
 
     console.log('\n✅ Genjutsu E2E passed');
-    console.log('   auth → persisted attempt → staging upload → immutable seal →');
-    console.log('   credit reserve → mock provider submit → durable result URL');
+    console.log(
+      '   auth → persisted attempt → staging upload → immutable seal →'
+    );
+    console.log(
+      '   credit reserve → mock provider submit → durable result URL'
+    );
   } finally {
     stop();
     await new Promise((resolve) => setTimeout(resolve, 300));

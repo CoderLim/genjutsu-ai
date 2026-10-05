@@ -1,12 +1,16 @@
 import { createFileRoute } from '@tanstack/react-router';
 
-import { getGenjutsuStatus } from '@/modules/genjutsu/service';
-import { persistGenjutsuResultToR2 } from '@/modules/genjutsu/storage';
 import {
   getGenjutsuTaskByRequestIdAnyUser,
   refundGenjutsuGeneration,
   settleGenjutsuGeneration,
 } from '@/modules/genjutsu/billing';
+import {
+  logGenjutsuProviderFailure,
+  splitProviderFailureError,
+} from '@/modules/genjutsu/provider-errors';
+import { getGenjutsuStatus } from '@/modules/genjutsu/service';
+import { persistGenjutsuResultToR2 } from '@/modules/genjutsu/storage';
 import { respOk } from '@/lib/resp';
 
 function readRequestId(payload: any, request: Request) {
@@ -55,13 +59,30 @@ async function POST({ request }: { request: Request }) {
         userId: task.userId,
         providerStatus: provider.providerStatus,
         videoKey: durable.videoKey,
+        providerUsage:
+          'providerUsage' in provider ? provider.providerUsage : undefined,
       });
     } else if (provider.status === 'failed') {
+      const failure = splitProviderFailureError(
+        provider.error || 'Generation failed',
+        'errorCode' in provider ? provider.errorCode : undefined
+      );
+      logGenjutsuProviderFailure({
+        stage: 'webhook_provider_failed',
+        generationId: task.id,
+        providerStatus: provider.providerStatus,
+        errorCode: failure.errorCode,
+        providerCode: failure.providerCode,
+        providerError: failure.providerError,
+      });
       await refundGenjutsuGeneration({
         generationId: task.id,
         userId: task.userId,
         providerStatus: provider.providerStatus,
-        error: provider.error || 'Generation failed',
+        error: failure.error,
+        providerError: failure.providerError,
+        providerCode: failure.providerCode,
+        errorCode: failure.errorCode,
       });
     }
   } catch (error) {
