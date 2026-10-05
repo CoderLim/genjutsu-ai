@@ -5,21 +5,14 @@ import {
   createGenjutsuE2ERequestId,
   isGenjutsuE2EMockEnabled,
 } from './e2e-mock';
+import {
+  estimateSeedanceListCost,
+  SEEDANCE_VIDEO_REFERENCE_RATE_USD_PER_BILLED_SECOND,
+} from './pricing';
 import type { GenjutsuMode, GenjutsuResolution } from './types';
 import { buildSeedanceWorkflowPrompt, getSeedanceTask } from './workflow';
 
 const FAL_QUEUE_BASE_URL = 'https://queue.fal.run';
-
-const SEEDANCE_VIDEO_REFERENCE_RATE_USD_PER_BILLED_SECOND: Record<
-  GenjutsuResolution,
-  number
-> = {
-  // Fal US pricing displayed for Seedance 2.5 with video references.
-  // Billing includes both input-video and output-video seconds.
-  '480p': 0.15876,
-  '720p': 0.34056,
-  '1080p': 0.8377668,
-};
 
 export class SeedancePreflightError extends Error {
   constructor(message: string) {
@@ -187,9 +180,10 @@ export function estimateSeedanceProviderCost(input: {
     input.sourceDurationSeconds
   );
   const billedSeconds = input.sourceDurationSeconds + outputSeconds;
-  const providerCostUsd =
-    billedSeconds *
-    SEEDANCE_VIDEO_REFERENCE_RATE_USD_PER_BILLED_SECOND[input.resolution];
+  const providerCostUsd = estimateSeedanceListCost({
+    durationSeconds: input.sourceDurationSeconds,
+    resolution: input.resolution,
+  });
 
   return {
     providerCostUsd,
