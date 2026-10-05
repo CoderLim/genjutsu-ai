@@ -107,10 +107,17 @@ async function fetchRange(url: string, range: string) {
     throw new Error('Invalid source-video URL protocol');
   }
 
+  // Cloudflare Workers reject redirect:"error". Use "manual" and refuse
+  // redirects ourselves so signed R2 URLs cannot be silently rewritten.
   const response = await fetch(parsed, {
     headers: { Range: range },
-    redirect: 'error',
+    redirect: 'manual',
   });
+
+  if (response.status >= 300 && response.status < 400) {
+    response.body?.cancel().catch(() => undefined);
+    throw new Error('Source-video URL redirected unexpectedly');
+  }
 
   if (response.status !== 206) {
     response.body?.cancel().catch(() => undefined);
