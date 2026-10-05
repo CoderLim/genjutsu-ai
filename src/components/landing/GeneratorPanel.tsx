@@ -13,7 +13,11 @@ import { createPortal } from 'react-dom';
 import { toast } from 'sonner';
 
 import { useSession } from '@/core/auth/client';
-import { estimateGenjutsuCredits } from '@/modules/genjutsu/pricing';
+import {
+  estimateGenjutsuCredits,
+  getSmallestSufficientCreditPack,
+  type GenjutsuCreditPack,
+} from '@/modules/genjutsu/pricing';
 import {
   ApiError,
   apiGet,
@@ -900,6 +904,13 @@ type GenerationPoll = {
   providerError?: string;
   reservedCredits?: number;
   refundedCredits?: number;
+  requiredCredits?: number;
+  balance?: number;
+};
+
+type CreditGateState = {
+  balance: number;
+  requiredCredits: number;
 };
 
 type PersistedGeneration = {
@@ -914,6 +925,126 @@ const sleep = (ms: number) =>
 
 const activeGenerationKey = (userId: string) =>
   `genjutsu_active_generation:${userId}`;
+
+function formatCreditPackPrice(pack: GenjutsuCreditPack) {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: (pack.currency || 'usd').toUpperCase(),
+  }).format(pack.priceCents / 100);
+}
+
+function InsufficientCreditsModal({
+  gate,
+  pack,
+  checkoutLoading,
+  onClose,
+  onBuy,
+}: {
+  gate: CreditGateState | null;
+  pack: GenjutsuCreditPack | null;
+  checkoutLoading: boolean;
+  onClose: () => void;
+  onBuy: () => void;
+}) {
+  useEffect(() => {
+    if (!gate) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !checkoutLoading) onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [checkoutLoading, gate, onClose]);
+
+  if (!gate || typeof document === 'undefined') return null;
+
+  const deficit = Math.max(0, gate.requiredCredits - gate.balance);
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[500] flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="insufficient-credits-title"
+    >
+      <button
+        type="button"
+        aria-label="Close insufficient credits dialog"
+        className="absolute inset-0 bg-black/75 backdrop-blur-sm"
+        onClick={() => {
+          if (!checkoutLoading) onClose();
+        }}
+      />
+      <div className="relative z-10 w-full max-w-[420px] rounded-2xl border border-white/10 bg-[rgb(31,24,20)] p-5 text-[rgb(237,234,222)] shadow-2xl sm:p-6">
+        <button
+          type="button"
+          aria-label="Close"
+          disabled={checkoutLoading}
+          onClick={onClose}
+          className="absolute top-4 right-4 flex size-8 items-center justify-center rounded-full text-white/45 transition-colors hover:bg-white/8 hover:text-white/80 disabled:pointer-events-none disabled:opacity-40"
+        >
+          <CloseIcon className="size-4" />
+        </button>
+
+        <div className="pr-10">
+          <h2
+            id="insufficient-credits-title"
+            className="text-lg font-semibold tracking-tight"
+          >
+            Not enough credits
+          </h2>
+          <p className="mt-1.5 text-sm leading-6 text-white/55">
+            This generation needs {gate.requiredCredits.toLocaleString()}{' '}
+            credits.
+          </p>
+        </div>
+
+        <div className="mt-5 rounded-xl border border-white/8 bg-black/15 px-4 py-3 text-sm">
+          <div className="flex items-center justify-between py-1 text-white/58">
+            <span>Your balance</span>
+            <span className="tabular-nums">
+              {gate.balance.toLocaleString()}
+            </span>
+          </div>
+          <div className="flex items-center justify-between py-1 text-white/58">
+            <span>Required</span>
+            <span className="tabular-nums">
+              {gate.requiredCredits.toLocaleString()}
+            </span>
+          </div>
+          <div className="my-2 h-px bg-white/8" />
+          <div className="flex items-center justify-between py-1 font-medium">
+            <span>You need</span>
+            <span className="tabular-nums text-[rgb(220,155,99)]">
+              {deficit.toLocaleString()} more
+            </span>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          disabled={!pack || checkoutLoading}
+          onClick={onBuy}
+          className="mt-5 inline-flex h-10 w-full items-center justify-center rounded-xl bg-[rgb(204,144,92)] px-4 text-sm font-semibold text-[rgb(247,246,243)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-55"
+        >
+          {checkoutLoading
+            ? 'Opening checkout…'
+            : pack
+              ? `Buy ${pack.credits.toLocaleString()} credits · ${formatCreditPackPrice(pack)}`
+              : 'Buy credits'}
+        </button>
+        <button
+          type="button"
+          disabled={checkoutLoading}
+          onClick={onClose}
+          className="mt-2 inline-flex h-9 w-full items-center justify-center rounded-lg text-sm text-white/45 transition-colors hover:bg-white/5 hover:text-white/70 disabled:pointer-events-none disabled:opacity-40"
+        >
+          Maybe later
+        </button>
+      </div>
+    </div>,
+    document.body
+  );
+}
 
 function ResultPanel({
   status,
@@ -1029,7 +1160,8 @@ export function GeneratorPanel({
   const [status, setStatus] = useState<GenerationStatus>('idle');
   const [result, setResult] = useState<GenerationResult | null>(null);
   const [error, setError] = useState('');
-  const [needsCredits, setNeedsCredits] = useState(false);
+  const [creditGate, setCreditGate] = useState<CreditGateState | null>(null);
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
 
   const settingsRef = useRef<HTMLDivElement>(null);
   const generationRunRef = useRef(0);
@@ -1037,6 +1169,31 @@ export function GeneratorPanel({
   useEffect(() => {
     setSettingsOpen(false);
   }, [mode]);
+
+  useEffect(() => {
+    if (!session?.user) return;
+    const refreshCredits = () => {
+      void creditsQuery.refetch();
+    };
+    window.addEventListener('focus', refreshCredits);
+    return () => window.removeEventListener('focus', refreshCredits);
+  }, [creditsQuery.refetch, session?.user]);
+
+  useEffect(() => {
+    const balance = creditsQuery.data?.balance;
+    if (!creditGate || typeof balance !== 'number') return;
+
+    if (balance >= creditGate.requiredCredits) {
+      setCreditGate(null);
+      return;
+    }
+
+    if (balance !== creditGate.balance) {
+      setCreditGate((current) =>
+        current ? { ...current, balance } : current
+      );
+    }
+  }, [creditGate, creditsQuery.data?.balance]);
 
   useEffect(() => {
     return () => {
@@ -1130,7 +1287,7 @@ export function GeneratorPanel({
           localStorage.removeItem(activeGenerationKey(active.userId));
           setStatus('idle');
           setResult(null);
-          setNeedsCredits(false);
+          setCreditGate(null);
           setError(
             polled.providerStatus === 'ready'
               ? 'Upload completed, but generation was not started. Click Generate to try again.'
@@ -1180,11 +1337,26 @@ export function GeneratorPanel({
           localStorage.removeItem(activeGenerationKey(active.userId));
           setStatus('idle');
           setResult(null);
-          setNeedsCredits(polled.providerStatus === 'insufficient_credits');
           logProviderFailureDebug(
             polled as unknown as Record<string, unknown>,
             'status'
           );
+          const insufficient =
+            polled.providerStatus === 'insufficient_credits';
+          const requiredCredits = Number(polled.requiredCredits);
+          const balance = Number(polled.balance);
+
+          if (
+            insufficient &&
+            Number.isFinite(requiredCredits) &&
+            Number.isFinite(balance)
+          ) {
+            setCreditGate({ requiredCredits, balance });
+            setError('');
+            return;
+          }
+
+          setCreditGate(null);
           const uiError =
             generationFailureUiMessage(polled.error, polled.errorCode) ||
             `Generation failed (${polled.providerStatus})`;
@@ -1225,7 +1397,7 @@ export function GeneratorPanel({
 
       const runId = ++generationRunRef.current;
       setError('');
-      setNeedsCredits(false);
+      setCreditGate(null);
       setResult({
         ...active.draft,
         reservedCredits: active.reservedCredits,
@@ -1272,6 +1444,20 @@ export function GeneratorPanel({
       return;
     }
 
+    const knownBalance = creditsQuery.data?.balance;
+    if (
+      estimatedCredits != null &&
+      typeof knownBalance === 'number' &&
+      knownBalance < estimatedCredits
+    ) {
+      setError('');
+      setCreditGate({
+        balance: knownBalance,
+        requiredCredits: estimatedCredits,
+      });
+      return;
+    }
+
     const runId = ++generationRunRef.current;
     const generationId =
       typeof crypto !== 'undefined' && 'randomUUID' in crypto
@@ -1288,7 +1474,7 @@ export function GeneratorPanel({
     };
 
     setError('');
-    setNeedsCredits(false);
+    setCreditGate(null);
     setResult(draft);
     setStatus('generating');
 
@@ -1411,7 +1597,21 @@ export function GeneratorPanel({
         localStorage.removeItem(activeGenerationKey(session.user.id));
         setStatus('idle');
         setResult(null);
-        setNeedsCredits(insufficient);
+
+        if (insufficient) {
+          const requiredCredits = Number(apiData?.requiredCredits);
+          const balance = Number(apiData?.balance);
+          if (
+            Number.isFinite(requiredCredits) &&
+            Number.isFinite(balance)
+          ) {
+            setCreditGate({ requiredCredits, balance });
+            setError('');
+            return;
+          }
+        }
+
+        setCreditGate(null);
         const likenessRejected =
           apiData?.code === 'PROVIDER_LIKENESS_REJECTED' ||
           (typeof cause.message === 'string' &&
@@ -1429,7 +1629,7 @@ export function GeneratorPanel({
       if (raw) {
         try {
           const active = JSON.parse(raw) as PersistedGeneration;
-          setNeedsCredits(false);
+          setCreditGate(null);
           setResult({
             ...active.draft,
             reservedCredits: active.reservedCredits,
@@ -1451,12 +1651,60 @@ export function GeneratorPanel({
 
       setStatus('idle');
       setResult(null);
-      setNeedsCredits(insufficient);
+      setCreditGate(null);
       setError(
         cause instanceof Error
           ? cause.message
           : 'Generation failed unexpectedly'
       );
+    }
+  };
+
+  const recommendedCreditPack = useMemo(
+    () =>
+      creditGate
+        ? getSmallestSufficientCreditPack({
+            balance: creditGate.balance,
+            requiredCredits: creditGate.requiredCredits,
+            email: session?.user?.email,
+          })
+        : null,
+    [creditGate, session?.user?.email]
+  );
+
+  const handleBuyCredits = async () => {
+    if (!creditGate || !recommendedCreditPack || checkoutLoading) return;
+
+    const checkoutWindow = window.open('', '_blank');
+    if (checkoutWindow) checkoutWindow.opener = null;
+
+    setCheckoutLoading(true);
+    try {
+      const redirect = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+      const checkout = await apiPost<{ checkout_url?: string }>(
+        '/api/payment/checkout',
+        {
+          product_id: recommendedCreditPack.id,
+          redirect,
+        }
+      );
+
+      if (!checkout.checkout_url) {
+        throw new Error('Checkout URL was not returned');
+      }
+
+      if (checkoutWindow && !checkoutWindow.closed) {
+        checkoutWindow.location.href = checkout.checkout_url;
+      } else {
+        window.location.href = checkout.checkout_url;
+      }
+    } catch (cause) {
+      if (checkoutWindow && !checkoutWindow.closed) checkoutWindow.close();
+      toast.error(
+        cause instanceof Error ? cause.message : 'Could not open checkout'
+      );
+    } finally {
+      setCheckoutLoading(false);
     }
   };
 
@@ -1609,16 +1857,16 @@ export function GeneratorPanel({
         >
           <p className="font-medium">Generation failed</p>
           <p className="mt-1 text-xs text-red-100/65">{error}</p>
-          {needsCredits ? (
-            <a
-              href="/pricing"
-              className="mt-2 inline-flex text-xs font-semibold text-red-50 underline underline-offset-2"
-            >
-              Buy credits
-            </a>
-          ) : null}
         </div>
       ) : null}
+
+      <InsufficientCreditsModal
+        gate={creditGate}
+        pack={recommendedCreditPack}
+        checkoutLoading={checkoutLoading}
+        onClose={() => setCreditGate(null)}
+        onBuy={() => void handleBuyCredits()}
+      />
     </div>
   );
 }
