@@ -11,7 +11,7 @@ The page follows the Genjutsu generator interaction pattern:
 1. Upload one reference image.
 2. Upload one motion reference video.
 3. Select Kling model, quality mode, and character orientation.
-4. Optionally enter a prompt and choose sound/watermark behavior.
+4. Optionally enter a prompt and choose original-sound behavior.
 5. Generate, then poll the Kling task until it succeeds or fails.
 
 The test page does **not** use Genjutsu credits, checkout, billing reservation, `aiTask` generation records, or the existing `/api/genjutsu/*` routes.
@@ -47,7 +47,7 @@ All three routes require `admin.*` permission.
 - `POST /v1/videos/motion-control`
 - `GET /v1/videos/motion-control/{task_id}`
 
-The wrapper supports `kling-v2-6` and `kling-v3`, `std` / `pro`, `image` / `video` character orientation, original-sound preservation, and provider watermark output.
+The wrapper supports `kling-v2-6` and `kling-v3`, `std` / `pro`, `image` / `video` character orientation, original-sound preservation, and the API watermark option. The test UI keeps watermark output disabled by default.
 
 ## Input limits enforced by the test UI / upload route
 
