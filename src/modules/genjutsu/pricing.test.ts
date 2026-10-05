@@ -8,6 +8,7 @@ import {
   estimateGenjutsuListCost,
   GENJUTSU_CREDIT_PACKS,
   GENJUTSU_SMOKE_CREDIT_PACK,
+  getSmallestSufficientCreditPack,
   listVisibleCreditPacks,
 } from './pricing';
 
@@ -85,5 +86,44 @@ test('list-rate fallback for 720p max clip reserves known credits', () => {
       })
     ),
     3474
+  );
+});
+
+
+test('credit gate chooses the smallest pack that covers the deficit', () => {
+  assert.equal(
+    getSmallestSufficientCreditPack({
+      balance: 310,
+      requiredCredits: 820,
+      email: 'alice@example.com',
+    })?.id,
+    'creator'
+  );
+  assert.equal(
+    getSmallestSufficientCreditPack({
+      balance: 320,
+      requiredCredits: 820,
+      email: 'alice@example.com',
+    })?.id,
+    'starter'
+  );
+});
+
+test('credit gate supports the internal smoke pack and large deficits', () => {
+  assert.equal(
+    getSmallestSufficientCreditPack({
+      balance: 100,
+      requiredCredits: 140,
+      email: 'gengliming110@gmail.com',
+    })?.id,
+    'smoke'
+  );
+  assert.equal(
+    getSmallestSufficientCreditPack({
+      balance: 0,
+      requiredCredits: 9000,
+      email: 'alice@example.com',
+    })?.id,
+    'studio'
   );
 });
