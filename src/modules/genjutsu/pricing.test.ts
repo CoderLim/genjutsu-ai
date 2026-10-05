@@ -6,6 +6,7 @@ import {
   canSeeSmokeCreditPack,
   estimateGenjutsuCredits,
   estimateGenjutsuListCost,
+  estimateSeedanceCredits,
   GENJUTSU_CREDIT_PACKS,
   GENJUTSU_SMOKE_CREDIT_PACK,
   getSmallestSufficientCreditPack,
@@ -109,7 +110,7 @@ test('credit gate chooses the smallest pack that covers the deficit', () => {
   );
 });
 
-test('credit gate supports the internal smoke pack and large deficits', () => {
+test('credit gate supports the internal smoke pack and does not under-sell large deficits', () => {
   assert.equal(
     getSmallestSufficientCreditPack({
       balance: 100,
@@ -123,7 +124,24 @@ test('credit gate supports the internal smoke pack and large deficits', () => {
       balance: 0,
       requiredCredits: 9000,
       email: 'alice@example.com',
-    })?.id,
-    'studio'
+    }),
+    null
+  );
+});
+
+test('Seedance early-gate estimate matches the server customer quote without whole-second rounding', () => {
+  assert.equal(
+    estimateSeedanceCredits({
+      durationSeconds: 4.1,
+      resolution: '720p',
+    }),
+    475
+  );
+  assert.equal(
+    estimateSeedanceCredits({
+      durationSeconds: 30,
+      resolution: '1080p',
+    }),
+    8546
   );
 });
