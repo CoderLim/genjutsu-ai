@@ -9,6 +9,7 @@ import {
   Download,
   LoaderCircle,
   Play,
+  RotateCcw,
   Sparkles,
   Upload,
 } from 'lucide-react';
@@ -18,11 +19,7 @@ import { useSession } from '@/core/auth/client';
 import { Link } from '@/core/i18n/navigation';
 import {
   estimateHotelLobbyCredits,
-  HOTEL_LOBBY_ASPECT_RATIOS,
-  HOTEL_LOBBY_MAX_DURATION_SECONDS,
-  HOTEL_LOBBY_MIN_DURATION_SECONDS,
   HOTEL_LOBBY_RESOLUTIONS,
-  type HotelLobbyAspectRatio,
   type HotelLobbyResolution,
 } from '@/modules/hotel-lobby/pricing';
 import {
@@ -31,26 +28,37 @@ import {
   apiPost,
   uploadToSignedUrl,
 } from '@/lib/api-client';
-import { cn } from '@/lib/cn';
 import { useUserCredits } from '@/hooks/use-user-credits';
 import {
   CloseIcon,
   FilmIcon,
   ImageModeIcon,
-  PlusIcon,
 } from '@/components/icons';
 
 type MediaItem = {
   id: string;
   file: File;
   url: string;
-  durationSeconds?: number;
 };
+
+type VideoSource =
+  | {
+      kind: 'template';
+      url: string;
+      durationSeconds?: number;
+    }
+  | {
+      kind: 'upload';
+      file: File;
+      url: string;
+      durationSeconds: number;
+    };
 
 type SignedUpload = {
   uploadUrl: string;
   uploadHeaders: Record<string, string>;
   storageKey: string;
+  index: number;
 };
 
 type UploadSetup = {
@@ -73,14 +81,11 @@ type GenerationPoll = {
   refundedCredits?: number;
 };
 
+const TEMPLATE_URL = '/api/hotel-lobby/template';
 const MAX_VIDEO_BYTES = 80 * 1024 * 1024;
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
-const MAX_IMAGES = 9;
-const MIN_REFERENCE_VIDEO_SECONDS = 2;
+const MIN_REFERENCE_VIDEO_SECONDS = 5;
 const MAX_REFERENCE_VIDEO_SECONDS = 15;
-
-const DEFAULT_PROMPT =
-  'Replace the people in Video 1 with the matching subjects from the reference images. Preserve the original motion, timing, camera movement, framing, lighting, and hotel lobby scene.';
 
 function createMediaItem(file: File): MediaItem {
   return {
@@ -121,6 +126,11 @@ function readVideoDuration(file: File): Promise<number> {
   });
 }
 
+function normalizeDuration(seconds: number | undefined) {
+  if (!seconds || !Number.isFinite(seconds)) return 5;
+  return Math.min(15, Math.max(5, Math.round(seconds)));
+}
+
 function redirectToSignIn() {
   const callbackUrl = encodeURIComponent(
     `${window.location.pathname}${window.location.search}`
@@ -128,32 +138,70 @@ function redirectToSignIn() {
   window.location.href = `/sign-in?callbackUrl=${callbackUrl}`;
 }
 
-function SettingSelect<T extends string>({
-  label,
-  value,
-  values,
-  onChange,
+function PersonSlot({
+  title,
+  note,
+  item,
+  onPick,
+  onRemove,
+  inputRef,
+  disabled,
 }: {
-  label: string;
-  value: T;
-  values: readonly T[];
-  onChange: (value: T) => void;
+  title: string;
+  note: string;
+  item: MediaItem | null;
+  onPick: (file: File | null) => void;
+  onRemove: () => void;
+  inputRef: React.RefObject<HTMLInputElement | null>;
+  disabled: boolean;
 }) {
   return (
-    <label className="flex min-w-0 flex-1 flex-col gap-1.5">
-      <span className="text-[11px] font-medium text-white/45">{label}</span>
-      <select
-        value={value}
-        onChange={(event) => onChange(event.target.value as T)}
-        className="h-9 rounded-xl border border-white/10 bg-black/20 px-3 text-sm text-white/85 outline-none transition focus:border-[rgb(204,144,92)]"
-      >
-        {values.map((item) => (
-          <option key={item} value={item} className="bg-[rgb(32,25,21)]">
-            {item}
-          </option>
-        ))}
-      </select>
-    </label>
+    <div className="min-w-0">
+      <div className="mb-2">
+        <p className="text-sm font-semibold text-white/90">{title}</p>
+        <p className="mt-0.5 text-xs leading-5 text-white/40">{note}</p>
+      </div>
+
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/*"
+        className="hidden"
+        onChange={(event: ChangeEvent<HTMLInputElement>) => {
+          onPick(event.target.files?.[0] || null);
+          event.target.value = '';
+        }}
+      />
+
+      {item ? (
+        <div className="group relative aspect-[4/5] overflow-hidden rounded-2xl border border-white/10 bg-black/30">
+          <img
+            src={item.url}
+            alt={title}
+            className="size-full object-cover"
+          />
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={onRemove}
+            aria-label={`Remove ${title.toLowerCase()}`}
+            className="absolute top-2 right-2 flex size-8 items-center justify-center rounded-full bg-black/70 text-white/80 backdrop-blur transition hover:bg-black/90 disabled:opacity-40"
+          >
+            <CloseIcon className="size-4" />
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => inputRef.current?.click()}
+          className="flex aspect-[4/5] w-full flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-white/14 bg-white/[0.025] text-center text-white/42 transition hover:border-[rgba(204,144,92,0.55)] hover:bg-[rgba(204,144,92,0.05)] hover:text-[rgb(220,155,99)] disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <ImageModeIcon className="size-6" />
+          <span className="text-xs font-medium">Add photo</span>
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -161,18 +209,20 @@ export function HotelLobbyGeneratorPanel() {
   const { data: session, isPending: sessionPending } = useSession();
   const creditsQuery = useUserCredits(Boolean(session?.user));
   const videoInputRef = useRef<HTMLInputElement>(null);
-  const imageInputRef = useRef<HTMLInputElement>(null);
+  const firstImageInputRef = useRef<HTMLInputElement>(null);
+  const secondImageInputRef = useRef<HTMLInputElement>(null);
   const mountedRef = useRef(true);
-  const mediaUrlsRef = useRef<Set<string>>(new Set());
+  const localUrlsRef = useRef<Set<string>>(new Set());
 
-  const [video, setVideo] = useState<MediaItem | null>(null);
-  const [images, setImages] = useState<MediaItem[]>([]);
-  const [prompt, setPrompt] = useState(DEFAULT_PROMPT);
-  const [duration, setDuration] = useState(5);
+  const [video, setVideo] = useState<VideoSource>({
+    kind: 'template',
+    url: TEMPLATE_URL,
+  });
+  const [templateAvailable, setTemplateAvailable] = useState(true);
+  const [firstImage, setFirstImage] = useState<MediaItem | null>(null);
+  const [secondImage, setSecondImage] = useState<MediaItem | null>(null);
   const [resolution, setResolution] =
     useState<HotelLobbyResolution>('480P');
-  const [aspectRatio, setAspectRatio] =
-    useState<HotelLobbyAspectRatio>('16:9');
   const [phase, setPhase] = useState<
     'idle' | 'uploading' | 'starting' | 'generating' | 'saving' | 'done'
   >('idle');
@@ -185,36 +235,74 @@ export function HotelLobbyGeneratorPanel() {
   } | null>(null);
 
   const busy = !['idle', 'done'].includes(phase);
+  const imageItems = [firstImage, secondImage].filter(
+    (item): item is MediaItem => Boolean(item)
+  );
+  const duration = normalizeDuration(video?.durationSeconds);
+
   const estimatedCredits = useMemo(() => {
-    if (images.length < 1) return null;
+    const imageCount =
+      (firstImage ? 1 : 0) + (secondImage ? 1 : 0);
+    if (!video || imageCount < 1) return null;
     try {
       return estimateHotelLobbyCredits({
-        duration,
+        duration: normalizeDuration(video.durationSeconds),
         resolution,
-        imageCount: images.length,
+        imageCount,
       });
     } catch {
       return null;
     }
-  }, [duration, images.length, resolution]);
+  }, [video, firstImage, secondImage, resolution]);
 
   useEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
-      mediaUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
-      mediaUrlsRef.current.clear();
+      localUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+      localUrlsRef.current.clear();
     };
   }, []);
 
-  const replaceVideo = async (file: File | null) => {
+  const setImageAt = (slot: 'first' | 'second', file: File | null) => {
     if (!file) return;
-    if (!session?.user) {
-      redirectToSignIn();
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please choose an image file');
       return;
     }
-    if (!file.type.startsWith('video/')) {
-      toast.error('Please choose a video file');
+    if (file.size <= 0 || file.size > MAX_IMAGE_BYTES) {
+      toast.error('Reference images must be 12 MB or smaller');
+      return;
+    }
+
+    const next = createMediaItem(file);
+    localUrlsRef.current.add(next.url);
+
+    const setter = slot === 'first' ? setFirstImage : setSecondImage;
+    const current = slot === 'first' ? firstImage : secondImage;
+    if (current) {
+      URL.revokeObjectURL(current.url);
+      localUrlsRef.current.delete(current.url);
+    }
+    setter(next);
+    setResultUrl(null);
+    setPhase('idle');
+  };
+
+  const clearImageAt = (slot: 'first' | 'second') => {
+    const setter = slot === 'first' ? setFirstImage : setSecondImage;
+    const current = slot === 'first' ? firstImage : secondImage;
+    if (current) {
+      URL.revokeObjectURL(current.url);
+      localUrlsRef.current.delete(current.url);
+    }
+    setter(null);
+  };
+
+  const replaceVideo = async (file: File | null) => {
+    if (!file) return;
+    if (!['video/mp4', 'video/quicktime'].includes(file.type)) {
+      toast.error('Use an MP4 or MOV reference video');
       return;
     }
     if (file.size <= 0 || file.size > MAX_VIDEO_BYTES) {
@@ -225,76 +313,51 @@ export function HotelLobbyGeneratorPanel() {
     try {
       const durationSeconds = await readVideoDuration(file);
       if (
-        durationSeconds < MIN_REFERENCE_VIDEO_SECONDS ||
-        durationSeconds > MAX_REFERENCE_VIDEO_SECONDS
+        durationSeconds < MIN_REFERENCE_VIDEO_SECONDS - 0.1 ||
+        durationSeconds > MAX_REFERENCE_VIDEO_SECONDS + 0.2
       ) {
-        toast.error('Reference video must be between 2 and 15 seconds');
+        toast.error('Reference video must be between 5 and 15 seconds');
         return;
       }
 
-      const next = {
-        ...createMediaItem(file),
-        durationSeconds,
-      };
-      mediaUrlsRef.current.add(next.url);
-      if (video) {
+      const url = URL.createObjectURL(file);
+      localUrlsRef.current.add(url);
+      if (video?.kind === 'upload') {
         URL.revokeObjectURL(video.url);
-        mediaUrlsRef.current.delete(video.url);
+        localUrlsRef.current.delete(video.url);
       }
-      setVideo(next);
+
+      setVideo({
+        kind: 'upload',
+        file,
+        url,
+        durationSeconds,
+      });
       setResultUrl(null);
       setPhase('idle');
     } catch {
-      toast.error('Could not read this video. Try MP4, MOV, or WebM.');
+      toast.error('Could not read this video. Try MP4 or MOV.');
     }
-  };
-
-  const addImages = (list: FileList | null) => {
-    if (!list?.length) return;
-    if (!session?.user) {
-      redirectToSignIn();
-      return;
-    }
-
-    const room = MAX_IMAGES - images.length;
-    const accepted = Array.from(list)
-      .filter((file) => file.type.startsWith('image/'))
-      .slice(0, room)
-      .filter((file) => {
-        if (file.size <= 0 || file.size > MAX_IMAGE_BYTES) {
-          toast.error(`${file.name} must be 12 MB or smaller`);
-          return false;
-        }
-        return true;
-      })
-      .map(createMediaItem);
-
-    if (accepted.length) {
-      accepted.forEach((item) => mediaUrlsRef.current.add(item.url));
-      setImages((current) => [...current, ...accepted]);
-      setResultUrl(null);
-      setPhase('idle');
-    }
-  };
-
-  const removeImage = (id: string) => {
-    setImages((current) => {
-      const target = current.find((item) => item.id === id);
-      if (target) {
-        URL.revokeObjectURL(target.url);
-        mediaUrlsRef.current.delete(target.url);
-      }
-      return current.filter((item) => item.id !== id);
-    });
   };
 
   const clearVideo = () => {
-    if (video) {
+    if (video?.kind === 'upload') {
       URL.revokeObjectURL(video.url);
-      mediaUrlsRef.current.delete(video.url);
+      localUrlsRef.current.delete(video.url);
     }
-    setVideo(null);
+    setVideo(null as unknown as VideoSource);
     if (videoInputRef.current) videoInputRef.current.value = '';
+  };
+
+  const restoreTemplate = () => {
+    if (video?.kind === 'upload') {
+      URL.revokeObjectURL(video.url);
+      localUrlsRef.current.delete(video.url);
+    }
+    setTemplateAvailable(true);
+    setVideo({ kind: 'template', url: TEMPLATE_URL });
+    setResultUrl(null);
+    setPhase('idle');
   };
 
   const pollUntilComplete = async (id: string) => {
@@ -317,7 +380,6 @@ export function HotelLobbyGeneratorPanel() {
       }
 
       setProviderStatus(poll.providerStatus || '');
-
       if (poll.providerStatus === 'persisting') setPhase('saving');
 
       if (poll.status === 'completed' && poll.videoUrl) {
@@ -336,7 +398,7 @@ export function HotelLobbyGeneratorPanel() {
 
     setPhase('idle');
     throw new Error(
-      'Generation is still running. Please keep this generation ID and check again before starting a duplicate job.'
+      'Generation is still running. Keep this generation ID before starting another job.'
     );
   };
 
@@ -348,15 +410,11 @@ export function HotelLobbyGeneratorPanel() {
       return;
     }
     if (!video) {
-      toast.error('Add a 2–15s reference video first');
+      toast.error('Use the preset template or upload a reference video');
       return;
     }
-    if (images.length < 1) {
-      toast.error('Add at least one reference image');
-      return;
-    }
-    if (!prompt.trim()) {
-      toast.error('Add a prompt describing the replacement');
+    if (!firstImage) {
+      toast.error('Add the first person photo');
       return;
     }
 
@@ -365,7 +423,7 @@ export function HotelLobbyGeneratorPanel() {
       estimateHotelLobbyCredits({
         duration,
         resolution,
-        imageCount: images.length,
+        imageCount: imageItems.length,
       });
     const balance = creditsQuery.data?.balance ?? 0;
 
@@ -380,13 +438,18 @@ export function HotelLobbyGeneratorPanel() {
 
     const id = crypto.randomUUID();
     setGenerationId(id);
-    const files = [video.file, ...images.map((item) => item.file)];
+
+    const useDefaultTemplate = video.kind === 'template';
+    const files = useDefaultTemplate
+      ? imageItems.map((item) => item.file)
+      : [video.file, ...imageItems.map((item) => item.file)];
     const contentTypes = files.map((file) => file.type);
     const contentLengths = files.map((file) => file.size);
 
     try {
       const setup = await apiPost<UploadSetup>('/api/hotel-lobby/upload-url', {
         generationId: id,
+        useDefaultTemplate,
         contentTypes,
         contentLengths,
       });
@@ -404,18 +467,19 @@ export function HotelLobbyGeneratorPanel() {
         });
       }
 
+      const sortedUploads = [...setup.uploads].sort((a, b) => a.index - b.index);
+      const videoUpload = sortedUploads.find((item) => item.index === 0);
+      const imageUploads = sortedUploads.filter((item) => item.index > 0);
+
       setPhase('starting');
       const start = await apiPost<GenerationStart>(
         '/api/hotel-lobby/generate',
         {
           generationId: id,
-          prompt: prompt.trim(),
-          duration,
+          useDefaultTemplate,
           resolution,
-          aspectRatio,
-          promptExpansionMode: 'disabled',
-          videoKey: setup.uploads[0].storageKey,
-          imageKeys: setup.uploads.slice(1).map((item) => item.storageKey),
+          videoKey: videoUpload?.storageKey,
+          imageKeys: imageUploads.map((item) => item.storageKey),
           contentTypes,
           contentLengths,
         }
@@ -461,7 +525,7 @@ export function HotelLobbyGeneratorPanel() {
 
   const phaseLabel =
     phase === 'uploading'
-      ? 'Uploading references…'
+      ? 'Uploading photos…'
       : phase === 'starting'
         ? 'Starting MiniMax H3…'
         : phase === 'generating'
@@ -470,25 +534,26 @@ export function HotelLobbyGeneratorPanel() {
             : 'Generating…'
           : phase === 'saving'
             ? 'Saving your video…'
-            : 'Generate video';
+            : 'Make My Hotel Lobby Clip';
 
   return (
     <div className="mx-auto w-full max-w-[1120px]">
       <div className="overflow-hidden rounded-[26px] border border-white/10 bg-[rgba(30,23,19,0.92)] shadow-[0_30px_90px_-30px_rgba(0,0,0,0.85)] backdrop-blur-2xl">
-        <div className="grid gap-0 lg:grid-cols-[1.06fr_0.94fr]">
+        <div className="grid gap-0 lg:grid-cols-[0.95fr_1.05fr]">
           <div className="border-b border-white/8 p-4 sm:p-5 lg:border-r lg:border-b-0">
-            <div className="mb-3 flex items-center justify-between gap-3">
+            <div className="mb-3 flex items-start justify-between gap-3">
               <div>
                 <p className="text-sm font-semibold text-white/90">
-                  Reference video
+                  Reference performance
                 </p>
-                <p className="mt-0.5 text-xs text-white/42">
-                  2–15s · motion, timing, camera and scene
+                <p className="mt-0.5 text-xs leading-5 text-white/40">
+                  The Hotel Lobby preset is loaded by default. Remove it to use
+                  your own 5–15s motion reference.
                 </p>
               </div>
-              {video?.durationSeconds ? (
-                <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-white/55">
-                  {video.durationSeconds.toFixed(1)}s
+              {video?.kind === 'template' ? (
+                <span className="shrink-0 rounded-full border border-[rgba(204,144,92,0.18)] bg-[rgba(204,144,92,0.08)] px-2.5 py-1 text-[10px] font-semibold text-[rgb(220,155,99)]">
+                  Preset
                 </span>
               ) : null}
             </div>
@@ -496,7 +561,7 @@ export function HotelLobbyGeneratorPanel() {
             <input
               ref={videoInputRef}
               type="file"
-              accept="video/mp4,video/quicktime,video/webm,video/*"
+              accept="video/mp4,video/quicktime"
               className="hidden"
               onChange={(event: ChangeEvent<HTMLInputElement>) => {
                 void replaceVideo(event.target.files?.[0] || null);
@@ -505,13 +570,32 @@ export function HotelLobbyGeneratorPanel() {
             />
 
             {video ? (
-              <div className="group relative aspect-video overflow-hidden rounded-2xl border border-[rgba(204,144,92,0.28)] bg-black">
+              <div className="relative aspect-video overflow-hidden rounded-2xl border border-[rgba(204,144,92,0.24)] bg-black">
                 <video
+                  key={video.url}
                   src={video.url}
                   controls
+                  muted
                   playsInline
                   preload="metadata"
                   className="size-full object-contain"
+                  onLoadedMetadata={(event) => {
+                    if (video.kind !== 'template') return;
+                    const seconds = event.currentTarget.duration;
+                    if (Number.isFinite(seconds) && seconds > 0) {
+                      setVideo((current) =>
+                        current?.kind === 'template'
+                          ? { ...current, durationSeconds: seconds }
+                          : current
+                      );
+                    }
+                  }}
+                  onError={() => {
+                    if (video.kind === 'template') {
+                      setTemplateAvailable(false);
+                      setVideo(null as unknown as VideoSource);
+                    }
+                  }}
                 />
                 <button
                   type="button"
@@ -524,161 +608,102 @@ export function HotelLobbyGeneratorPanel() {
                 </button>
               </div>
             ) : (
-              <button
-                type="button"
-                disabled={busy || sessionPending}
-                onClick={() =>
-                  session?.user
-                    ? videoInputRef.current?.click()
-                    : redirectToSignIn()
-                }
-                className="flex aspect-video w-full flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-[rgba(204,144,92,0.35)] bg-[rgba(204,144,92,0.04)] text-center transition hover:border-[rgba(204,144,92,0.62)] hover:bg-[rgba(204,144,92,0.07)] disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <span className="flex size-12 items-center justify-center rounded-full bg-[rgba(204,144,92,0.12)] text-[rgb(220,155,99)]">
-                  <FilmIcon className="size-6" />
-                </span>
-                <span>
-                  <span className="block text-sm font-medium text-white/82">
-                    Add reference video
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => videoInputRef.current?.click()}
+                  className="flex aspect-video w-full flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-[rgba(204,144,92,0.35)] bg-[rgba(204,144,92,0.04)] text-center transition hover:border-[rgba(204,144,92,0.62)] hover:bg-[rgba(204,144,92,0.07)] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <span className="flex size-12 items-center justify-center rounded-full bg-[rgba(204,144,92,0.12)] text-[rgb(220,155,99)]">
+                    <FilmIcon className="size-6" />
                   </span>
-                  <span className="mt-1 block text-xs text-white/38">
-                    MP4, MOV or WebM · up to 80 MB
+                  <span>
+                    <span className="block text-sm font-medium text-white/82">
+                      Upload reference video
+                    </span>
+                    <span className="mt-1 block text-xs text-white/38">
+                      MP4 or MOV · 5–15s · up to 80 MB
+                    </span>
                   </span>
-                </span>
-              </button>
+                </button>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={restoreTemplate}
+                  className="inline-flex items-center gap-1.5 text-xs font-medium text-[rgb(220,155,99)] transition hover:text-[rgb(235,174,119)] disabled:opacity-50"
+                >
+                  <RotateCcw className="size-3.5" />
+                  {templateAvailable ? 'Use preset template' : 'Retry preset template'}
+                </button>
+              </div>
             )}
           </div>
 
-          <div className="flex min-w-0 flex-col p-4 sm:p-5">
+          <div className="p-4 sm:p-5">
             <div className="mb-3">
               <p className="text-sm font-semibold text-white/90">
-                Reference images
+                Cast your duo
               </p>
-              <p className="mt-0.5 text-xs text-white/42">
-                Up to 9 images · people, outfits, objects or style references
+              <p className="mt-0.5 text-xs leading-5 text-white/40">
+                Use one photo with both of you, or one photo per performer.
+                Pets and illustrated characters work too.
               </p>
             </div>
 
-            <input
-              ref={imageInputRef}
-              type="file"
-              accept="image/*"
-              multiple
-              className="hidden"
-              onChange={(event: ChangeEvent<HTMLInputElement>) => {
-                addImages(event.target.files);
-                event.target.value = '';
-              }}
-            />
-
-            <div className="grid min-h-[174px] grid-cols-4 gap-2 sm:grid-cols-5 lg:grid-cols-4 xl:grid-cols-5">
-              {images.map((item, index) => (
-                <div
-                  key={item.id}
-                  className="group relative aspect-[3/4] overflow-hidden rounded-xl border border-white/10 bg-black/30"
-                >
-                  <img
-                    src={item.url}
-                    alt={`Reference ${index + 1}`}
-                    className="size-full object-cover"
-                  />
-                  <span className="absolute bottom-1.5 left-1.5 rounded bg-black/65 px-1.5 py-0.5 text-[9px] font-medium text-white/80">
-                    Image {index + 1}
-                  </span>
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() => removeImage(item.id)}
-                    aria-label={`Remove reference image ${index + 1}`}
-                    className="absolute top-1.5 right-1.5 flex size-6 items-center justify-center rounded-full bg-black/70 text-white/80 opacity-0 transition group-hover:opacity-100 disabled:hidden"
-                  >
-                    <CloseIcon className="size-3.5" />
-                  </button>
-                </div>
-              ))}
-
-              {images.length < MAX_IMAGES ? (
-                <button
-                  type="button"
-                  disabled={busy || sessionPending}
-                  onClick={() =>
-                    session?.user
-                      ? imageInputRef.current?.click()
-                      : redirectToSignIn()
-                  }
-                  className={cn(
-                    'flex aspect-[3/4] flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-white/14 bg-white/[0.025] text-white/45 transition',
-                    'hover:border-[rgba(204,144,92,0.5)] hover:bg-[rgba(204,144,92,0.05)] hover:text-[rgb(220,155,99)]',
-                    'disabled:cursor-not-allowed disabled:opacity-50'
-                  )}
-                >
-                  {images.length === 0 ? (
-                    <ImageModeIcon className="size-5" />
-                  ) : (
-                    <PlusIcon className="size-5" />
-                  )}
-                  <span className="text-[10px]">
-                    {images.length === 0 ? 'Add images' : 'Add more'}
-                  </span>
-                </button>
-              ) : null}
+            <div className="grid grid-cols-2 gap-3">
+              <PersonSlot
+                title="First person"
+                note="Required · left performer, or a photo containing both subjects."
+                item={firstImage}
+                inputRef={firstImageInputRef}
+                disabled={busy}
+                onPick={(file) => setImageAt('first', file)}
+                onRemove={() => clearImageAt('first')}
+              />
+              <PersonSlot
+                title="Second person"
+                note="Optional · right performer when using separate photos."
+                item={secondImage}
+                inputRef={secondImageInputRef}
+                disabled={busy}
+                onPick={(file) => setImageAt('second', file)}
+                onRemove={() => clearImageAt('second')}
+              />
             </div>
-
-            <p className="mt-2 text-right text-[10px] text-white/30">
-              {images.length}/{MAX_IMAGES}
-            </p>
           </div>
         </div>
 
         <div className="border-t border-white/8 p-4 sm:p-5">
-          <label className="block">
-            <span className="mb-2 block text-sm font-semibold text-white/90">
-              Prompt
-            </span>
-            <textarea
-              value={prompt}
-              disabled={busy}
-              onChange={(event) => setPrompt(event.target.value)}
-              rows={3}
-              placeholder="Example: Replace the two people in Video 1 with Image 1 and Image 2."
-              className="min-h-[88px] w-full resize-y rounded-2xl border border-white/10 bg-black/18 px-4 py-3 text-sm leading-6 text-white/82 outline-none transition placeholder:text-white/25 focus:border-[rgba(204,144,92,0.6)] disabled:opacity-60"
-            />
-          </label>
-
-          <div className="mt-4 grid gap-3 sm:grid-cols-[1.2fr_1fr_1fr]">
-            <label className="flex min-w-0 flex-1 flex-col gap-1.5">
+          <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+            <label className="flex min-w-0 flex-col gap-1.5">
               <span className="text-[11px] font-medium text-white/45">
-                Duration
+                Resolution
               </span>
-              <div className="flex h-9 items-center gap-3 rounded-xl border border-white/10 bg-black/20 px-3">
-                <input
-                  type="range"
-                  min={HOTEL_LOBBY_MIN_DURATION_SECONDS}
-                  max={HOTEL_LOBBY_MAX_DURATION_SECONDS}
-                  step={1}
-                  value={duration}
-                  disabled={busy}
-                  onChange={(event) => setDuration(Number(event.target.value))}
-                  className="min-w-0 flex-1 accent-[rgb(204,144,92)]"
-                />
-                <span className="w-7 text-right text-xs font-medium tabular-nums text-white/75">
-                  {duration}s
-                </span>
-              </div>
+              <select
+                value={resolution}
+                disabled={busy}
+                onChange={(event) =>
+                  setResolution(event.target.value as HotelLobbyResolution)
+                }
+                className="h-10 rounded-xl border border-white/10 bg-black/20 px-3 text-sm text-white/85 outline-none transition focus:border-[rgb(204,144,92)] disabled:opacity-60"
+              >
+                {HOTEL_LOBBY_RESOLUTIONS.map((item) => (
+                  <option
+                    key={item}
+                    value={item}
+                    className="bg-[rgb(32,25,21)]"
+                  >
+                    {item}
+                  </option>
+                ))}
+              </select>
             </label>
 
-            <SettingSelect
-              label="Resolution"
-              value={resolution}
-              values={HOTEL_LOBBY_RESOLUTIONS}
-              onChange={setResolution}
-            />
-            <SettingSelect
-              label="Aspect ratio"
-              value={aspectRatio}
-              values={HOTEL_LOBBY_ASPECT_RATIOS}
-              onChange={setAspectRatio}
-            />
+            <div className="flex items-center gap-2 text-xs text-white/38 sm:pb-3">
+              <Sparkles className="size-3.5 text-[rgb(204,144,92)]" />
+              <span>9:16 · output length follows the reference video</span>
+            </div>
           </div>
 
           {creditError ? (
@@ -702,42 +727,53 @@ export function HotelLobbyGeneratorPanel() {
           ) : null}
 
           <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-2 text-xs text-white/38">
-              <Sparkles className="size-3.5 text-[rgb(204,144,92)]" />
-              <span>MiniMax H3 · safety checker enabled</span>
-              {creditsQuery.data ? (
-                <>
-                  <span className="text-white/18">•</span>
-                  <span>
-                    {creditsQuery.data.balance.toLocaleString()} credits
-                  </span>
-                </>
-              ) : null}
+            <div className="text-xs leading-5 text-white/38">
+              <p>Use photos of yourself, or people who agreed to appear.</p>
+              <p className="text-white/26">
+                Files stay on your device until you sign in and press generate.
+              </p>
             </div>
 
-            <button
-              type="button"
-              disabled={busy || sessionPending}
-              onClick={() => void generate()}
-              className="inline-flex h-11 min-w-[190px] items-center justify-center gap-2 rounded-xl bg-[linear-gradient(135deg,rgb(222,151,92),rgb(189,111,64))] px-5 text-sm font-semibold text-white shadow-[0_12px_32px_-12px_rgba(218,134,75,0.7)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-55"
-            >
-              {busy ? (
-                <LoaderCircle className="size-4 animate-spin" />
-              ) : session?.user ? (
-                <Play className="size-4 fill-current" />
-              ) : (
-                <Upload className="size-4" />
-              )}
-              <span>
-                {session?.user
-                  ? busy
-                    ? phaseLabel
-                    : estimatedCredits
-                      ? `Generate · ~${estimatedCredits} credits`
-                      : 'Generate video'
-                  : 'Sign in to generate'}
-              </span>
-            </button>
+            <div className="flex flex-col items-stretch gap-2 sm:items-end">
+              <button
+                type="button"
+                disabled={busy || sessionPending}
+                onClick={() => void generate()}
+                className="inline-flex h-11 min-w-[240px] items-center justify-center gap-2 rounded-xl bg-[linear-gradient(135deg,rgb(222,151,92),rgb(189,111,64))] px-5 text-sm font-semibold text-white shadow-[0_12px_32px_-12px_rgba(218,134,75,0.7)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-55"
+              >
+                {busy ? (
+                  <LoaderCircle className="size-4 animate-spin" />
+                ) : session?.user ? (
+                  <Play className="size-4 fill-current" />
+                ) : (
+                  <Upload className="size-4" />
+                )}
+                <span>
+                  {session?.user
+                    ? busy
+                      ? phaseLabel
+                      : 'Make My Hotel Lobby Clip'
+                    : 'Sign in to generate'}
+                </span>
+              </button>
+              <div className="flex justify-end gap-2 text-[10px] text-white/30">
+                <span>{resolution}</span>
+                <span>·</span>
+                <span>9:16</span>
+                {estimatedCredits ? (
+                  <>
+                    <span>·</span>
+                    <span>~{estimatedCredits} credits</span>
+                  </>
+                ) : null}
+                {creditsQuery.data ? (
+                  <>
+                    <span>·</span>
+                    <span>{creditsQuery.data.balance.toLocaleString()} balance</span>
+                  </>
+                ) : null}
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -748,7 +784,7 @@ export function HotelLobbyGeneratorPanel() {
             <div>
               <p className="text-sm font-semibold text-white/90">Your video</p>
               <p className="mt-0.5 text-xs text-white/38">
-                MiniMax H3 · {duration}s · {resolution}
+                MiniMax H3 · {resolution} · 9:16
               </p>
             </div>
             <a
@@ -765,7 +801,7 @@ export function HotelLobbyGeneratorPanel() {
             controls
             autoPlay
             playsInline
-            className="aspect-video w-full rounded-2xl bg-black object-contain"
+            className="mx-auto aspect-[9/16] max-h-[720px] w-auto max-w-full rounded-2xl bg-black object-contain"
           />
           {generationId ? (
             <p className="mt-2 px-1 text-[10px] text-white/25">
