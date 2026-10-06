@@ -31,6 +31,32 @@ export class HotelLobbyPreflightError extends Error {
   }
 }
 
+export function buildHotelLobbyPrompt(imageCount: number) {
+  if (imageCount === 1) {
+    return [
+      'Use Video 1 as the exact performance reference for motion, timing, gestures, camera, framing, microphone position, orange booth, lighting, and shot progression.',
+      'Image 1 contains the replacement subject or pair. Replace the performers in Video 1 with the subject or subjects from Image 1 while preserving their left-to-right order when two people are visible.',
+      'Keep identity, face, hair, clothing, body proportions, and species consistent with Image 1 throughout the clip.',
+      'Preserve the original booth, hanging microphone, choreography, timing, camera, composition, and background as closely as possible.',
+      'Do not introduce extra people, props, scene changes, camera moves, or unrelated visual changes.',
+    ].join('\n');
+  }
+
+  if (imageCount === 2) {
+    return [
+      'Use Video 1 as the exact performance reference for motion, timing, gestures, camera, framing, microphone position, orange booth, lighting, and shot progression.',
+      'Replace the left performer in Video 1 with Image 1 and the right performer with Image 2.',
+      'Keep each replacement identity, face, hair, clothing, body proportions, and species consistent with its matching image throughout the clip.',
+      'Preserve the original booth, hanging microphone, choreography, timing, camera, composition, and background as closely as possible.',
+      'Do not swap the two identities, blend them together, add extra people, or alter unrelated parts of the shot.',
+    ].join('\n');
+  }
+
+  throw new HotelLobbyPreflightError(
+    'Hotel Lobby requires one or two reference images'
+  );
+}
+
 async function getFalProvider() {
   const apiKey = (await getConfig('fal_api_key'))?.trim();
   if (!apiKey) {
@@ -86,7 +112,7 @@ export function validateHotelLobbyInput(input: {
     input.imageUrls.length > HOTEL_LOBBY_MAX_REFERENCE_IMAGES
   ) {
     throw new HotelLobbyPreflightError(
-      'Provide between 1 and 9 reference images'
+      'Provide one or two reference images'
     );
   }
   input.imageUrls.forEach((url, index) =>
