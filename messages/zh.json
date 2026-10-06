@@ -901,6 +901,7 @@
   "admin.generations.all_scenes": "全部场景",
   "admin.generations.scene.genjutsu": "Genjutsu",
   "admin.generations.scene.hotel_lobby": "Hotel Lobby",
+  "admin.generations.scene.chuttamalle": "Chuttamalle",
   "creations.nav": "我的作品",
   "creations.title": "我的作品",
   "creations.description": "查看你生成的视频，以及仍在处理中的任务状态。",
@@ -927,5 +928,6 @@
   "creations.page": "第 {page} / {pages} 页",
   "creations.load_error": "无法加载作品，请稍后重试。",
   "creations.scene.genjutsu": "Genjutsu",
-  "creations.scene.hotel_lobby": "Hotel Lobby"
+  "creations.scene.hotel_lobby": "Hotel Lobby",
+  "creations.scene.chuttamalle": "Chuttamalle"
 }

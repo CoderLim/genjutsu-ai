@@ -4,6 +4,12 @@ import { and, count, desc, eq, inArray, like, or, type SQL } from 'drizzle-orm';
 import { getAuth } from '@/core/auth';
 import { db } from '@/core/db';
 import { aiTask, order, subscription, user } from '@/config/db/schema';
+import { CHUTTAMALLE_SCENE } from '@/modules/chuttamalle/billing';
+import {
+  CHUTTAMALLE_RESOLUTIONS,
+  estimateChuttamalleCredits,
+  type ChuttamalleResolution,
+} from '@/modules/chuttamalle/pricing';
 import {
   generationMediaBasePath,
   isListableGenerationScene,
@@ -83,6 +89,15 @@ function isHotelLobbyResolution(value: unknown): value is HotelLobbyResolution {
   );
 }
 
+function isChuttamalleResolution(
+  value: unknown
+): value is ChuttamalleResolution {
+  return (
+    typeof value === 'string' &&
+    (CHUTTAMALLE_RESOLUTIONS as readonly string[]).includes(value)
+  );
+}
+
 function resolveEstimatedCredits(input: {
   scene: string;
   provider: string;
@@ -119,6 +134,25 @@ function resolveEstimatedCredits(input: {
     }
     try {
       return estimateHotelLobbyCredits({
+        duration: input.duration,
+        resolution: input.resolution,
+        imageCount: Math.max(1, input.imageCount),
+      });
+    } catch {
+      return null;
+    }
+  }
+
+  if (input.scene === CHUTTAMALLE_SCENE) {
+    if (
+      !isChuttamalleResolution(input.resolution) ||
+      input.duration == null ||
+      !Number.isInteger(input.duration)
+    ) {
+      return null;
+    }
+    try {
+      return estimateChuttamalleCredits({
         duration: input.duration,
         resolution: input.resolution,
         imageCount: Math.max(1, input.imageCount),
@@ -308,7 +342,9 @@ async function GET({ request }: { request: Request }) {
             ? options.mode
             : row.scene === HOTEL_LOBBY_SCENE
               ? 'Hotel Lobby'
-              : null,
+              : row.scene === CHUTTAMALLE_SCENE
+                ? 'Chuttamalle'
+                : null,
         resolution:
           typeof options?.resolution === 'string' ? options.resolution : null,
         aspectRatio:

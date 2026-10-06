@@ -2,6 +2,14 @@ import { createFileRoute } from '@tanstack/react-router';
 
 import { getAuth } from '@/core/auth';
 import {
+  CHUTTAMALLE_SCENE,
+  getChuttamalleTaskByGenerationId,
+} from '@/modules/chuttamalle/billing';
+import {
+  assertChuttamalleSealedInputKeysOwned,
+  createChuttamalleR2ReadUrl,
+} from '@/modules/chuttamalle/storage';
+import {
   GENJUTSU_SCENE,
   getGenjutsuTaskByGenerationId,
 } from '@/modules/genjutsu/billing';
@@ -66,10 +74,14 @@ async function GET({
   if (!isAdmin) return errorResponse('Forbidden', 403);
 
   const hotelTask = await getHotelLobbyTaskByGenerationId(params.generationId);
-  const genjutsuTask = hotelTask
+  const chuttamalleTask = hotelTask
     ? null
-    : await getGenjutsuTaskByGenerationId(params.generationId);
-  const task = hotelTask ?? genjutsuTask;
+    : await getChuttamalleTaskByGenerationId(params.generationId);
+  const genjutsuTask =
+    hotelTask || chuttamalleTask
+      ? null
+      : await getGenjutsuTaskByGenerationId(params.generationId);
+  const task = hotelTask ?? chuttamalleTask ?? genjutsuTask;
   if (!task) return errorResponse('Generation not found', 404);
 
   const options = parseOptions(task.options);
@@ -105,6 +117,23 @@ async function GET({
     const storageKey = index === 0 ? videoKey : imageKeys[index - 1];
     if (!storageKey) return errorResponse('Generation input not found', 404);
     return redirectResponse(await createHotelLobbyR2ReadUrl(storageKey));
+  }
+
+  if (task.scene === CHUTTAMALLE_SCENE) {
+    try {
+      assertChuttamalleSealedInputKeysOwned({
+        userId: task.userId,
+        generationId: task.id,
+        videoKey,
+        imageKeys,
+      });
+    } catch {
+      return errorResponse('Generation input not found', 404);
+    }
+
+    const storageKey = index === 0 ? videoKey : imageKeys[index - 1];
+    if (!storageKey) return errorResponse('Generation input not found', 404);
+    return redirectResponse(await createChuttamalleR2ReadUrl(storageKey));
   }
 
   if (task.scene !== GENJUTSU_SCENE) {

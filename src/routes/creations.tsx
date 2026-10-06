@@ -230,7 +230,9 @@ function GenerationCard({
             <span>
               {generation.scene === 'hotel-lobby'
                 ? m['creations.scene.hotel_lobby']()
-                : m['creations.scene.genjutsu']()}
+                : generation.scene === 'chuttamalle'
+                  ? m['creations.scene.chuttamalle']()
+                  : m['creations.scene.genjutsu']()}
             </span>
             {generation.mode ? <span>{generation.mode}</span> : null}
             {generation.resolution ? (
@@ -314,7 +316,9 @@ function CreationsPage() {
       const statusPath =
         generation.scene === 'hotel-lobby'
           ? `/api/hotel-lobby/status?generationId=${encodeURIComponent(generation.id)}`
-          : `/api/genjutsu/status?generationId=${encodeURIComponent(generation.id)}`;
+          : generation.scene === 'chuttamalle'
+            ? `/api/chuttamalle/status?generationId=${encodeURIComponent(generation.id)}`
+            : `/api/genjutsu/status?generationId=${encodeURIComponent(generation.id)}`;
       return apiGet<GenerationStatus>(statusPath);
     },
     onSuccess: () => {

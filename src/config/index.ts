@@ -31,6 +31,14 @@ export const envConfigs: Record<string, string> = {
     publicEnv('VITE_HOTEL_LOBBY_EXAMPLE_UPLOAD_DATE') ?? '',
   hotel_lobby_example_duration:
     publicEnv('VITE_HOTEL_LOBBY_EXAMPLE_DURATION') ?? '',
+  chuttamalle_example_video_url:
+    publicEnv('VITE_CHUTTAMALLE_EXAMPLE_VIDEO_URL') ?? '',
+  chuttamalle_example_thumbnail_url:
+    publicEnv('VITE_CHUTTAMALLE_EXAMPLE_THUMBNAIL_URL') ?? '',
+  chuttamalle_example_upload_date:
+    publicEnv('VITE_CHUTTAMALLE_EXAMPLE_UPLOAD_DATE') ?? '',
+  chuttamalle_example_duration:
+    publicEnv('VITE_CHUTTAMALLE_EXAMPLE_DURATION') ?? '',
 
   // Database
   database_url: procEnv.DATABASE_URL ?? '',
@@ -117,8 +125,7 @@ export const envConfigs: Record<string, string> = {
 
   // Genjutsu workflow routing. Keep Higgsfield as the safe default; Seedance
   // can be enabled independently per workflow for controlled rollout/A-B tests.
-  genjutsu_motion_provider:
-    procEnv.GENJUTSU_MOTION_PROVIDER ?? 'higgsfield',
+  genjutsu_motion_provider: procEnv.GENJUTSU_MOTION_PROVIDER ?? 'higgsfield',
   genjutsu_object_swap_provider:
     procEnv.GENJUTSU_OBJECT_SWAP_PROVIDER ?? 'higgsfield',
   seedance_genjutsu_model:
@@ -136,8 +143,7 @@ export const envConfigs: Record<string, string> = {
   seedance_volcengine_model:
     procEnv.SEEDANCE_VOLCENGINE_MODEL ?? 'doubao-seedance-2-5-260628',
   seedance_volcengine_video_input_rate_cny_per_million_tokens:
-    procEnv.SEEDANCE_VOLCENGINE_VIDEO_INPUT_RATE_CNY_PER_MILLION_TOKENS ??
-    '42',
+    procEnv.SEEDANCE_VOLCENGINE_VIDEO_INPUT_RATE_CNY_PER_MILLION_TOKENS ?? '42',
   seedance_volcengine_cny_per_usd:
     procEnv.SEEDANCE_VOLCENGINE_CNY_PER_USD ?? '7',
 
@@ -148,6 +154,12 @@ export const envConfigs: Record<string, string> = {
   hotel_lobby_template_video_key:
     procEnv.HOTEL_LOBBY_TEMPLATE_VIDEO_KEY ??
     'hotel-lobby/templates/default.mp4',
+
+  // Chuttamalle preset (server-only). Store the default dance template in R2
+  // under this key; the page can still replace it with a user-uploaded clip.
+  chuttamalle_template_video_key:
+    procEnv.CHUTTAMALLE_TEMPLATE_VIDEO_KEY ??
+    'chuttamalle/templates/default.mp4',
 
   // Locale (public)
   locale: publicEnv('VITE_DEFAULT_LOCALE') ?? 'en',
