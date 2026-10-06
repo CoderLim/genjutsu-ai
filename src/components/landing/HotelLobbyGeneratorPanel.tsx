@@ -199,6 +199,7 @@ export function HotelLobbyGeneratorPanel() {
   }, [duration, images.length, resolution]);
 
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
       mountedRef.current = false;
       mediaUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
@@ -297,13 +298,24 @@ export function HotelLobbyGeneratorPanel() {
   };
 
   const pollUntilComplete = async (id: string) => {
+    let consecutivePollErrors = 0;
+
     for (let attempt = 0; attempt < 240; attempt += 1) {
       await new Promise((resolve) => setTimeout(resolve, 2_000));
       if (!mountedRef.current) return;
 
-      const poll = await apiGet<GenerationPoll>(
-        `/api/hotel-lobby/status?generationId=${encodeURIComponent(id)}`
-      );
+      let poll: GenerationPoll;
+      try {
+        poll = await apiGet<GenerationPoll>(
+          `/api/hotel-lobby/status?generationId=${encodeURIComponent(id)}`
+        );
+        consecutivePollErrors = 0;
+      } catch (error) {
+        consecutivePollErrors += 1;
+        if (consecutivePollErrors < 5) continue;
+        throw error;
+      }
+
       setProviderStatus(poll.providerStatus || '');
 
       if (poll.providerStatus === 'persisting') setPhase('saving');
@@ -324,7 +336,7 @@ export function HotelLobbyGeneratorPanel() {
 
     setPhase('idle');
     throw new Error(
-      'Generation is still running. You can check your creations again later.'
+      'Generation is still running. Please keep this generation ID and check again before starting a duplicate job.'
     );
   };
 
