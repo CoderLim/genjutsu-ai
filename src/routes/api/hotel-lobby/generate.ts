@@ -14,29 +14,24 @@ import {
 import {
   estimateHotelLobbyCredits,
   estimateHotelLobbyProviderCost,
-  HOTEL_LOBBY_ASPECT_RATIOS,
   HOTEL_LOBBY_MODEL,
   HOTEL_LOBBY_RESOLUTIONS,
-  type HotelLobbyAspectRatio,
   type HotelLobbyResolution,
 } from '@/modules/hotel-lobby/pricing';
 import {
+  buildHotelLobbyPrompt,
   submitHotelLobby,
-  type HotelLobbyPromptExpansionMode,
 } from '@/modules/hotel-lobby/service';
 import {
   resolveHotelLobbyInputUrls,
   sealHotelLobbyInputs,
 } from '@/modules/hotel-lobby/storage';
+import { probeHotelLobbyDurationSeconds } from '@/modules/hotel-lobby/video-metadata';
 import { enforceMinIntervalRateLimit } from '@/lib/rate-limit';
 import { respData, respErr, respJson } from '@/lib/resp';
 
-const PROMPT_EXPANSION_MODES = new Set<HotelLobbyPromptExpansionMode>([
-  'disabled',
-  'fast',
-  'balanced',
-  'quality',
-]);
+const HOTEL_LOBBY_ASPECT_RATIO = '9:16' as const;
+const HOTEL_LOBBY_PROMPT_EXPANSION_MODE = 'disabled' as const;
 
 function taskResponse(task: any) {
   return {
@@ -72,26 +67,14 @@ async function POST({ request }: { request: Request }) {
     });
     if (existing) return respData(taskResponse(existing));
 
-    const prompt = typeof body.prompt === 'string' ? body.prompt.trim() : '';
-    const duration = Number(body.duration);
+    const useDefaultTemplate = body.useDefaultTemplate === true;
     const resolution = body.resolution as HotelLobbyResolution;
-    const aspectRatio = body.aspectRatio as HotelLobbyAspectRatio;
-    const promptExpansionMode =
-      body.promptExpansionMode as HotelLobbyPromptExpansionMode;
-
-    if (!prompt) return respErr('Prompt is required', { status: 400 });
     if (!HOTEL_LOBBY_RESOLUTIONS.includes(resolution)) {
       return respErr('Invalid resolution', { status: 400 });
     }
-    if (!HOTEL_LOBBY_ASPECT_RATIOS.includes(aspectRatio)) {
-      return respErr('Invalid aspect ratio', { status: 400 });
-    }
-    if (!PROMPT_EXPANSION_MODES.has(promptExpansionMode)) {
-      return respErr('Invalid prompt expansion mode', { status: 400 });
-    }
 
     const videoKey =
-      typeof body.videoKey === 'string' ? body.videoKey : '';
+      typeof body.videoKey === 'string' ? body.videoKey : undefined;
     const imageKeys = Array.isArray(body.imageKeys)
       ? body.imageKeys.filter(
           (value: unknown): value is string => typeof value === 'string'
@@ -106,32 +89,25 @@ async function POST({ request }: { request: Request }) {
       ? body.contentLengths.map((value: unknown) => Number(value))
       : [];
 
+    if (imageKeys.length < 1 || imageKeys.length > 2) {
+      return respErr('Provide one or two reference images', { status: 400 });
+    }
+
+    const expectedUploadCount = imageKeys.length + (useDefaultTemplate ? 0 : 1);
     if (
-      !videoKey ||
-      imageKeys.length < 1 ||
-      imageKeys.length > 9 ||
-      contentTypes.length !== imageKeys.length + 1 ||
-      contentLengths.length !== contentTypes.length
+      (!useDefaultTemplate && !videoKey) ||
+      contentTypes.length !== expectedUploadCount ||
+      contentLengths.length !== expectedUploadCount
     ) {
       return respErr('Uploaded reference media is incomplete', {
         status: 400,
       });
     }
 
-    const providerCostUsd = estimateHotelLobbyProviderCost({
-      duration,
-      resolution,
-      imageCount: imageKeys.length,
-    });
-    const credits = estimateHotelLobbyCredits({
-      duration,
-      resolution,
-      imageCount: imageKeys.length,
-    });
-
     const sealed = await sealHotelLobbyInputs({
       userId,
       generationId,
+      useDefaultTemplate,
       videoKey,
       imageKeys,
       contentTypes,
@@ -143,6 +119,25 @@ async function POST({ request }: { request: Request }) {
       ...sealed,
     });
 
+    // The output duration is intentionally not a user setting on this preset.
+    // It follows the server-validated reference video duration, rounded to the
+    // integer range MiniMax H3 accepts.
+    const duration = await probeHotelLobbyDurationSeconds(
+      providerInput.videoUrl
+    );
+
+    const prompt = buildHotelLobbyPrompt(imageKeys.length);
+    const providerCostUsd = estimateHotelLobbyProviderCost({
+      duration,
+      resolution,
+      imageCount: imageKeys.length,
+    });
+    const credits = estimateHotelLobbyCredits({
+      duration,
+      resolution,
+      imageCount: imageKeys.length,
+    });
+
     const task = await reserveHotelLobbyGeneration({
       generationId,
       userId,
@@ -151,8 +146,8 @@ async function POST({ request }: { request: Request }) {
       prompt,
       duration,
       resolution,
-      aspectRatio,
-      promptExpansionMode,
+      aspectRatio: HOTEL_LOBBY_ASPECT_RATIO,
+      promptExpansionMode: HOTEL_LOBBY_PROMPT_EXPANSION_MODE,
       ...sealed,
       providerCostUsd,
       credits,
@@ -177,8 +172,8 @@ async function POST({ request }: { request: Request }) {
         prompt,
         duration,
         resolution,
-        aspectRatio,
-        promptExpansionMode,
+        aspectRatio: HOTEL_LOBBY_ASPECT_RATIO,
+        promptExpansionMode: HOTEL_LOBBY_PROMPT_EXPANSION_MODE,
         ...providerInput,
       });
 
