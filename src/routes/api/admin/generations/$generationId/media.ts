@@ -1,7 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router';
 
 import { getAuth } from '@/core/auth';
-import { getGenjutsuTaskByGenerationId } from '@/modules/genjutsu/billing';
+import {
+  GENJUTSU_SCENE,
+  getGenjutsuTaskByGenerationId,
+} from '@/modules/genjutsu/billing';
 import {
   getGenjutsuE2EUrlForStorageKey,
   isGenjutsuE2EMockEnabled,
@@ -12,6 +15,14 @@ import {
   assertGenjutsuSourceVideoKeyOwned,
   createGenjutsuR2ReadUrl,
 } from '@/modules/genjutsu/storage';
+import {
+  getHotelLobbyTaskByGenerationId,
+  HOTEL_LOBBY_SCENE,
+} from '@/modules/hotel-lobby/billing';
+import {
+  assertHotelLobbySealedInputKeysOwned,
+  createHotelLobbyR2ReadUrl,
+} from '@/modules/hotel-lobby/storage';
 import { hasPermission } from '@/modules/rbac/service';
 
 function errorResponse(message: string, status: number) {
@@ -54,7 +65,11 @@ async function GET({
   const isAdmin = await hasPermission(session.user.id, 'admin.*');
   if (!isAdmin) return errorResponse('Forbidden', 403);
 
-  const task = await getGenjutsuTaskByGenerationId(params.generationId);
+  const hotelTask = await getHotelLobbyTaskByGenerationId(params.generationId);
+  const genjutsuTask = hotelTask
+    ? null
+    : await getGenjutsuTaskByGenerationId(params.generationId);
+  const task = hotelTask ?? genjutsuTask;
   if (!task) return errorResponse('Generation not found', 404);
 
   const options = parseOptions(task.options);
@@ -73,6 +88,27 @@ async function GET({
   const index = rawIndex == null ? Number.NaN : Number(rawIndex);
   if (!Number.isInteger(index) || index < 0 || index > imageKeys.length) {
     return errorResponse('Invalid media index', 400);
+  }
+
+  if (task.scene === HOTEL_LOBBY_SCENE) {
+    try {
+      assertHotelLobbySealedInputKeysOwned({
+        userId: task.userId,
+        generationId: task.id,
+        videoKey,
+        imageKeys,
+      });
+    } catch {
+      return errorResponse('Generation input not found', 404);
+    }
+
+    const storageKey = index === 0 ? videoKey : imageKeys[index - 1];
+    if (!storageKey) return errorResponse('Generation input not found', 404);
+    return redirectResponse(await createHotelLobbyR2ReadUrl(storageKey));
+  }
+
+  if (task.scene !== GENJUTSU_SCENE) {
+    return errorResponse('Generation not found', 404);
   }
 
   try {

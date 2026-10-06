@@ -866,7 +866,7 @@
   "genjutsu.estimate.help_aria": "About estimated credits",
   "admin.nav.generations": "Generations",
   "admin.generations.title": "Generation Records",
-  "admin.generations.description": "View user Genjutsu video generation jobs and usage",
+  "admin.generations.description": "View user Genjutsu and Hotel Lobby video generation jobs and usage",
   "admin.generations.empty": "No generation records yet",
   "admin.generations.search_placeholder": "Search user, generation ID, request ID, model, or prompt...",
   "admin.generations.user": "User",
@@ -898,6 +898,9 @@
   "admin.generations.created_at": "Created At",
   "admin.generations.all_providers": "All Providers",
   "admin.generations.all_statuses": "All Statuses",
+  "admin.generations.all_scenes": "All scenes",
+  "admin.generations.scene.genjutsu": "Genjutsu",
+  "admin.generations.scene.hotel_lobby": "Hotel Lobby",
   "creations.nav": "My Creations",
   "creations.title": "My Creations",
   "creations.description": "View your generated videos and check jobs that are still processing.",
@@ -922,5 +925,7 @@
   "creations.previous": "Previous",
   "creations.next": "Next",
   "creations.page": "Page {page} of {pages}",
-  "creations.load_error": "Couldn't load your creations. Please try again."
+  "creations.load_error": "Couldn't load your creations. Please try again.",
+  "creations.scene.genjutsu": "Genjutsu",
+  "creations.scene.hotel_lobby": "Hotel Lobby"
 }

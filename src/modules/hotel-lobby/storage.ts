@@ -296,6 +296,44 @@ function assertHotelLobbyInputKey(params: {
   }
 }
 
+export function assertHotelLobbySealedInputKeysOwned(params: {
+  userId: string;
+  generationId: string;
+  videoKey: string;
+  imageKeys: string[];
+}) {
+  assertHotelLobbyInputKey({
+    userId: params.userId,
+    generationId: params.generationId,
+    index: 0,
+    key: params.videoKey,
+    sealed: true,
+  });
+  params.imageKeys.forEach((key, imageIndex) => {
+    assertHotelLobbyInputKey({
+      userId: params.userId,
+      generationId: params.generationId,
+      index: imageIndex + 1,
+      key,
+      sealed: true,
+    });
+  });
+}
+
+export function assertHotelLobbySourceVideoKeyOwned(params: {
+  userId: string;
+  generationId: string;
+  videoKey: string;
+}) {
+  assertHotelLobbyInputKey({
+    userId: params.userId,
+    generationId: params.generationId,
+    index: 0,
+    key: params.videoKey,
+    sealed: true,
+  });
+}
+
 export async function createHotelLobbyUploadDescriptor(params: {
   userId: string;
   generationId: string;

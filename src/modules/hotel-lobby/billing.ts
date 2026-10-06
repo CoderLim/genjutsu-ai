@@ -2,17 +2,10 @@ import { and, eq, inArray } from 'drizzle-orm';
 
 import { db } from '@/core/db';
 import { aiTask } from '@/config/db/schema';
-import {
-  consume,
-  getBalance,
-  revoke,
-} from '@/modules/credits/service';
+import { consume, getBalance, revoke } from '@/modules/credits/service';
 import { getUuid } from '@/lib/hash';
 
-import type {
-  HotelLobbyAspectRatio,
-  HotelLobbyResolution,
-} from './pricing';
+import type { HotelLobbyAspectRatio, HotelLobbyResolution } from './pricing';
 import type { HotelLobbyPromptExpansionMode } from './service';
 
 export const HOTEL_LOBBY_SCENE = 'hotel-lobby';
@@ -89,6 +82,17 @@ export async function getHotelLobbyTaskById(params: {
         eq(aiTask.userId, params.userId),
         eq(aiTask.scene, HOTEL_LOBBY_SCENE)
       )
+    )
+    .limit(1);
+  return task ?? null;
+}
+
+export async function getHotelLobbyTaskByGenerationId(generationId: string) {
+  const [task] = await db()
+    .select()
+    .from(aiTask)
+    .where(
+      and(eq(aiTask.id, generationId), eq(aiTask.scene, HOTEL_LOBBY_SCENE))
     )
     .limit(1);
   return task ?? null;

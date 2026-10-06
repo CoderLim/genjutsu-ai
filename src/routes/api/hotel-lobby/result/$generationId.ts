@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router';
 
 import { getAuth } from '@/core/auth';
 import {
+  getHotelLobbyTaskByGenerationId,
   getHotelLobbyTaskById,
   parseHotelLobbyTask,
 } from '@/modules/hotel-lobby/billing';
@@ -9,6 +10,7 @@ import {
   assertHotelLobbyResultKeyOwned,
   createHotelLobbyR2ReadUrl,
 } from '@/modules/hotel-lobby/storage';
+import { hasPermission } from '@/modules/rbac/service';
 
 function errorResponse(message: string, status: number) {
   return new Response(message, {
@@ -28,10 +30,13 @@ async function GET({
   const session = await auth.api.getSession({ headers: request.headers });
   if (!session?.user) return errorResponse('Unauthorized', 401);
 
-  const task = await getHotelLobbyTaskById({
-    generationId: params.generationId,
-    userId: session.user.id,
-  });
+  const isAdmin = await hasPermission(session.user.id, 'admin.*');
+  const task = isAdmin
+    ? await getHotelLobbyTaskByGenerationId(params.generationId)
+    : await getHotelLobbyTaskById({
+        generationId: params.generationId,
+        userId: session.user.id,
+      });
   if (!task || task.status !== 'completed') {
     return errorResponse('Generation result not found', 404);
   }
