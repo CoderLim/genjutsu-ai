@@ -135,6 +135,12 @@ export const envConfigs: Record<string, string> = {
 
   genjutsu_e2e_mock: procEnv.GENJUTSU_E2E_MOCK ?? 'false',
 
+  // Hotel Lobby preset (server-only). Store the licensed/default template in R2
+  // under this key; the page can still replace it with a user-uploaded clip.
+  hotel_lobby_template_video_key:
+    procEnv.HOTEL_LOBBY_TEMPLATE_VIDEO_KEY ??
+    'hotel-lobby/templates/default.mp4',
+
   // Locale (public)
   locale: publicEnv('VITE_DEFAULT_LOCALE') ?? 'en',
 };
