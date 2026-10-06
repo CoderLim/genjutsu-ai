@@ -25,22 +25,21 @@ test('MiniMax H3 Hotel Lobby estimate follows published per-second rates', () =>
   );
 });
 
-test('first five reference images are included and later images add $0.08 each', () => {
+test('Hotel Lobby preset accepts one or two subject references only', () => {
   assert.equal(
     estimateHotelLobbyProviderCost({
       duration: 10,
       resolution: '768P',
-      imageCount: 5,
+      imageCount: 1,
     }),
     0.6
   );
-  assert.equal(
+  assert.throws(() =>
     estimateHotelLobbyProviderCost({
       duration: 10,
       resolution: '768P',
-      imageCount: 7,
-    }),
-    0.76
+      imageCount: 3,
+    })
   );
 });
 
