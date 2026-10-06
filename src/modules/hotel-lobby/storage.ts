@@ -1,5 +1,6 @@
 import { AwsClient } from 'aws4fetch';
 
+import { envConfigs } from '@/config';
 import { getAllConfigs } from '@/modules/config/service';
 import { getStorage } from '@/modules/storage/service';
 
@@ -8,11 +9,11 @@ const READ_EXPIRES_SECONDS = 60 * 60;
 
 export const HOTEL_LOBBY_MAX_VIDEO_BYTES = 80 * 1024 * 1024;
 export const HOTEL_LOBBY_MAX_IMAGE_BYTES = 12 * 1024 * 1024;
+export const HOTEL_LOBBY_MAX_REFERENCE_IMAGES = 2;
 
 const VIDEO_CONTENT_TYPES: Record<string, string> = {
   'video/mp4': 'mp4',
   'video/quicktime': 'mov',
-  'video/webm': 'webm',
 };
 
 const IMAGE_CONTENT_TYPES: Record<string, string> = {
@@ -186,7 +187,7 @@ function contentTypeExtension(contentType: string, index: number) {
   if (!ext) {
     throw new Error(
       index === 0
-        ? 'Unsupported reference-video content type'
+        ? 'Unsupported reference-video content type. Use MP4 or MOV.'
         : 'Unsupported reference-image content type'
     );
   }
@@ -239,9 +240,10 @@ export function getHotelLobbyInputKey(params: {
   index: number;
   contentType: string;
 }) {
-  if (!Number.isInteger(params.index) || params.index < 0 || params.index > 9) {
+  if (!Number.isInteger(params.index) || params.index < 0 || params.index > 2) {
     throw new Error('Invalid Hotel Lobby input index');
   }
+
   const normalized = contentTypeExtension(params.contentType, params.index);
   const prefix = getHotelLobbyInputPrefix(params);
   const key =
@@ -267,12 +269,16 @@ function assertHotelLobbyInputKey(params: {
 
   if (params.index === 0) {
     const pattern = new RegExp(
-      `^${escapedPrefix}video\\.(?:mp4|mov|webm)$`
+      `^${escapedPrefix}video\\.(?:mp4|mov)$`
     );
     if (!pattern.test(params.key)) {
       throw new Error('Invalid Hotel Lobby reference-video key');
     }
     return;
+  }
+
+  if (params.index < 1 || params.index > HOTEL_LOBBY_MAX_REFERENCE_IMAGES) {
+    throw new Error('Invalid Hotel Lobby reference-image index');
   }
 
   const name = `image-${String(params.index).padStart(2, '0')}`;
@@ -308,6 +314,7 @@ export async function createHotelLobbyUploadDescriptor(params: {
       'Content-Type': normalized.contentType,
     },
     storageKey: normalized.key,
+    index: params.index,
   };
 }
 
@@ -346,93 +353,202 @@ async function copyR2Object(params: {
   }
 }
 
+export function getHotelLobbyTemplateVideoKey() {
+  const key =
+    envConfigs.hotel_lobby_template_video_key?.trim() ||
+    'hotel-lobby/templates/default.mp4';
+  assertSafeObjectKey(key);
+  if (!key.startsWith('hotel-lobby/')) {
+    throw new Error('Hotel Lobby template must use the hotel-lobby/ R2 prefix');
+  }
+  return key;
+}
+
+export async function getHotelLobbyTemplatePreviewUrl() {
+  const key = getHotelLobbyTemplateVideoKey();
+  const metadata = await headR2Object(key);
+  assertHotelLobbyUploadSize(0, metadata.contentLength);
+  if (!VIDEO_CONTENT_TYPES[metadata.contentType]) {
+    throw new Error('Hotel Lobby template must be MP4 or MOV');
+  }
+  return createHotelLobbyR2ReadUrl(key);
+}
+
 export async function sealHotelLobbyInputs(params: {
   userId: string;
   generationId: string;
-  videoKey: string;
+  useDefaultTemplate: boolean;
+  videoKey?: string;
   imageKeys: string[];
   contentTypes: string[];
   contentLengths: number[];
 }) {
   if (
     params.imageKeys.length < 1 ||
-    params.imageKeys.length > 9 ||
-    params.contentTypes.length !== params.imageKeys.length + 1 ||
-    params.contentLengths.length !== params.contentTypes.length
+    params.imageKeys.length > HOTEL_LOBBY_MAX_REFERENCE_IMAGES
+  ) {
+    throw new Error('Hotel Lobby requires one or two reference images');
+  }
+
+  const expectedUploadCount =
+    params.imageKeys.length + (params.useDefaultTemplate ? 0 : 1);
+  if (
+    params.contentTypes.length !== expectedUploadCount ||
+    params.contentLengths.length !== expectedUploadCount
   ) {
     throw new Error('Invalid Hotel Lobby input set');
   }
 
-  const sourceKeys = [params.videoKey, ...params.imageKeys];
+  const stagingPrefix = getHotelLobbyInputPrefix(params);
+  const sealedPrefix = getHotelLobbySealedInputPrefix(params);
 
-  sourceKeys.forEach((key, index) =>
+  const uploadedEntries: Array<{
+    key: string;
+    index: number;
+    expectedContentType: string;
+    expectedContentLength: number;
+  }> = [];
+
+  if (!params.useDefaultTemplate) {
+    if (!params.videoKey) {
+      throw new Error('A custom reference video is required');
+    }
+    uploadedEntries.push({
+      key: params.videoKey,
+      index: 0,
+      expectedContentType: params.contentTypes[0],
+      expectedContentLength: params.contentLengths[0],
+    });
+  }
+
+  params.imageKeys.forEach((key, imageIndex) => {
+    const contentOffset = params.useDefaultTemplate ? imageIndex : imageIndex + 1;
+    uploadedEntries.push({
+      key,
+      index: imageIndex + 1,
+      expectedContentType: params.contentTypes[contentOffset],
+      expectedContentLength: params.contentLengths[contentOffset],
+    });
+  });
+
+  uploadedEntries.forEach((entry) =>
     assertHotelLobbyInputKey({
       userId: params.userId,
       generationId: params.generationId,
-      index,
-      key,
+      index: entry.index,
+      key: entry.key,
       sealed: false,
     })
   );
 
-  const metadata = await Promise.all(sourceKeys.map((key) => headR2Object(key)));
-  metadata.forEach((item, index) => {
-    assertHotelLobbyUploadSize(index, item.contentLength);
+  const uploadedMetadata = await Promise.all(
+    uploadedEntries.map((entry) => headR2Object(entry.key))
+  );
+
+  uploadedMetadata.forEach((item, arrayIndex) => {
+    const entry = uploadedEntries[arrayIndex];
+    assertHotelLobbyUploadSize(entry.index, item.contentLength);
     const expectedType =
-      params.contentTypes[index]
-        ?.split(';', 1)[0]
-        ?.trim()
-        .toLowerCase() || '';
+      entry.expectedContentType?.split(';', 1)[0]?.trim().toLowerCase() || '';
     if (!expectedType || item.contentType !== expectedType) {
       throw new Error('Uploaded media content type changed before generation');
     }
-    if (item.contentLength !== params.contentLengths[index]) {
+    if (item.contentLength !== entry.expectedContentLength) {
       throw new Error('Uploaded media size changed before generation');
     }
   });
 
-  const stagingPrefix = getHotelLobbyInputPrefix(params);
-  const sealedPrefix = getHotelLobbySealedInputPrefix(params);
-  const sealedKeys = sourceKeys.map((key) => {
+  let sourceVideoKey: string;
+  let sourceVideoMetadata: ObjectMetadata;
+  let sealedVideoKey: string;
+
+  if (params.useDefaultTemplate) {
+    sourceVideoKey = getHotelLobbyTemplateVideoKey();
+    sourceVideoMetadata = await headR2Object(sourceVideoKey);
+    assertHotelLobbyUploadSize(0, sourceVideoMetadata.contentLength);
+    const videoExt = VIDEO_CONTENT_TYPES[sourceVideoMetadata.contentType];
+    if (!videoExt) {
+      throw new Error('Hotel Lobby template must be MP4 or MOV');
+    }
+    sealedVideoKey = `${sealedPrefix}video.${videoExt}`;
+  } else {
+    sourceVideoKey = params.videoKey as string;
+    sourceVideoMetadata = uploadedMetadata[0];
+    const filename = sourceVideoKey.slice(stagingPrefix.length);
+    if (!filename || filename.includes('/')) {
+      throw new Error('Invalid Hotel Lobby staging video key');
+    }
+    sealedVideoKey = `${sealedPrefix}${filename}`;
+  }
+
+  const imageEntryOffset = params.useDefaultTemplate ? 0 : 1;
+  const sealedImageKeys = params.imageKeys.map((key) => {
     const filename = key.slice(stagingPrefix.length);
     if (!filename || filename.includes('/')) {
-      throw new Error('Invalid Hotel Lobby staging key');
+      throw new Error('Invalid Hotel Lobby staging image key');
     }
     return `${sealedPrefix}${filename}`;
   });
 
+  await copyR2Object({
+    sourceKey: sourceVideoKey,
+    destinationKey: sealedVideoKey,
+    sourceEtag: sourceVideoMetadata.etag,
+  });
+
   await Promise.all(
-    sourceKeys.map((sourceKey, index) =>
+    params.imageKeys.map((sourceKey, index) =>
       copyR2Object({
         sourceKey,
-        destinationKey: sealedKeys[index],
-        sourceEtag: metadata[index].etag,
+        destinationKey: sealedImageKeys[index],
+        sourceEtag: uploadedMetadata[index + imageEntryOffset]?.etag,
       })
     )
   );
 
-  const sealedMetadata = await Promise.all(
-    sealedKeys.map((key) => headR2Object(key))
-  );
-  sealedMetadata.forEach((item, index) => {
+  assertHotelLobbyInputKey({
+    userId: params.userId,
+    generationId: params.generationId,
+    index: 0,
+    key: sealedVideoKey,
+    sealed: true,
+  });
+  sealedImageKeys.forEach((key, index) =>
     assertHotelLobbyInputKey({
       userId: params.userId,
       generationId: params.generationId,
-      index,
-      key: sealedKeys[index],
+      index: index + 1,
+      key,
       sealed: true,
-    });
+    })
+  );
+
+  const sealedMetadata = await Promise.all(
+    [sealedVideoKey, ...sealedImageKeys].map((key) => headR2Object(key))
+  );
+
+  if (
+    sealedMetadata[0].contentLength !== sourceVideoMetadata.contentLength ||
+    sealedMetadata[0].contentType !== sourceVideoMetadata.contentType
+  ) {
+    throw new Error('Sealed Hotel Lobby video does not match its source');
+  }
+
+  sealedImageKeys.forEach((_, index) => {
+    const sourceMetadata = uploadedMetadata[index + imageEntryOffset];
+    const sealed = sealedMetadata[index + 1];
     if (
-      item.contentLength !== metadata[index].contentLength ||
-      item.contentType !== metadata[index].contentType
+      !sourceMetadata ||
+      sealed.contentLength !== sourceMetadata.contentLength ||
+      sealed.contentType !== sourceMetadata.contentType
     ) {
-      throw new Error('Sealed Hotel Lobby input does not match uploaded media');
+      throw new Error('Sealed Hotel Lobby image does not match uploaded media');
     }
   });
 
   return {
-    videoKey: sealedKeys[0],
-    imageKeys: sealedKeys.slice(1),
+    videoKey: sealedVideoKey,
+    imageKeys: sealedImageKeys,
   };
 }
 
@@ -455,8 +571,11 @@ export async function resolveHotelLobbyInputUrls(params: {
   videoKey: string;
   imageKeys: string[];
 }) {
-  if (params.imageKeys.length < 1 || params.imageKeys.length > 9) {
-    throw new Error('Provide between 1 and 9 reference images');
+  if (
+    params.imageKeys.length < 1 ||
+    params.imageKeys.length > HOTEL_LOBBY_MAX_REFERENCE_IMAGES
+  ) {
+    throw new Error('Hotel Lobby requires one or two reference images');
   }
 
   const keys = [params.videoKey, ...params.imageKeys];
