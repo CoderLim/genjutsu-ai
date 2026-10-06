@@ -6,14 +6,7 @@ import {
   type ChangeEvent,
   type RefObject,
 } from 'react';
-import {
-  Download,
-  LoaderCircle,
-  Play,
-  RotateCcw,
-  Sparkles,
-  Upload,
-} from 'lucide-react';
+import { Download, LoaderCircle, Play, RotateCcw, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useSession } from '@/core/auth/client';
@@ -23,18 +16,9 @@ import {
   HOTEL_LOBBY_RESOLUTIONS,
   type HotelLobbyResolution,
 } from '@/modules/hotel-lobby/pricing';
-import {
-  ApiError,
-  apiGet,
-  apiPost,
-  uploadToSignedUrl,
-} from '@/lib/api-client';
+import { ApiError, apiGet, apiPost, uploadToSignedUrl } from '@/lib/api-client';
 import { useUserCredits } from '@/hooks/use-user-credits';
-import {
-  CloseIcon,
-  FilmIcon,
-  ImageModeIcon,
-} from '@/components/icons';
+import { CloseIcon, FilmIcon, ImageModeIcon } from '@/components/icons';
 
 type MediaItem = {
   id: string;
@@ -176,11 +160,7 @@ function PersonSlot({
 
       {item ? (
         <div className="group relative aspect-[4/5] overflow-hidden rounded-2xl border border-white/10 bg-black/30">
-          <img
-            src={item.url}
-            alt={title}
-            className="size-full object-cover"
-          />
+          <img src={item.url} alt={title} className="size-full object-cover" />
           <button
             type="button"
             disabled={disabled}
@@ -222,8 +202,7 @@ export function HotelLobbyGeneratorPanel() {
   const [templateAvailable, setTemplateAvailable] = useState(true);
   const [firstImage, setFirstImage] = useState<MediaItem | null>(null);
   const [secondImage, setSecondImage] = useState<MediaItem | null>(null);
-  const [resolution, setResolution] =
-    useState<HotelLobbyResolution>('480P');
+  const [resolution, setResolution] = useState<HotelLobbyResolution>('480P');
   const [phase, setPhase] = useState<
     'idle' | 'uploading' | 'starting' | 'generating' | 'saving' | 'done'
   >('idle');
@@ -242,9 +221,11 @@ export function HotelLobbyGeneratorPanel() {
   const duration = normalizeDuration(video?.durationSeconds);
 
   const estimatedCredits = useMemo(() => {
-    const imageCount =
-      (firstImage ? 1 : 0) + (secondImage ? 1 : 0);
-    if (!video || imageCount < 1) return null;
+    if (!video) return null;
+    const imageCount = Math.max(
+      1,
+      (firstImage ? 1 : 0) + (secondImage ? 1 : 0)
+    );
     try {
       return estimateHotelLobbyCredits({
         duration: normalizeDuration(video.durationSeconds),
@@ -468,7 +449,9 @@ export function HotelLobbyGeneratorPanel() {
         });
       }
 
-      const sortedUploads = [...setup.uploads].sort((a, b) => a.index - b.index);
+      const sortedUploads = [...setup.uploads].sort(
+        (a, b) => a.index - b.index
+      );
       const videoUpload = sortedUploads.find((item) => item.index === 0);
       const imageUploads = sortedUploads.filter((item) => item.index > 0);
 
@@ -535,7 +518,7 @@ export function HotelLobbyGeneratorPanel() {
             : 'Generating…'
           : phase === 'saving'
             ? 'Saving your video…'
-            : 'Make My Hotel Lobby Clip';
+            : 'Generate';
 
   return (
     <div className="mx-auto w-full max-w-[1120px]">
@@ -635,23 +618,15 @@ export function HotelLobbyGeneratorPanel() {
                   className="inline-flex items-center gap-1.5 text-xs font-medium text-[rgb(220,155,99)] transition hover:text-[rgb(235,174,119)] disabled:opacity-50"
                 >
                   <RotateCcw className="size-3.5" />
-                  {templateAvailable ? 'Use preset template' : 'Retry preset template'}
+                  {templateAvailable
+                    ? 'Use preset template'
+                    : 'Retry preset template'}
                 </button>
               </div>
             )}
           </div>
 
           <div className="p-4 sm:p-5">
-            <div className="mb-3">
-              <p className="text-sm font-semibold text-white/90">
-                Cast your duo
-              </p>
-              <p className="mt-0.5 text-xs leading-5 text-white/40">
-                Use one photo with both of you, or one photo per performer.
-                Pets and illustrated characters work too.
-              </p>
-            </div>
-
             <div className="grid grid-cols-2 gap-3">
               <PersonSlot
                 title="First person"
@@ -676,39 +651,8 @@ export function HotelLobbyGeneratorPanel() {
         </div>
 
         <div className="border-t border-white/8 p-4 sm:p-5">
-          <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
-            <label className="flex min-w-0 flex-col gap-1.5">
-              <span className="text-[11px] font-medium text-white/45">
-                Resolution
-              </span>
-              <select
-                value={resolution}
-                disabled={busy}
-                onChange={(event) =>
-                  setResolution(event.target.value as HotelLobbyResolution)
-                }
-                className="h-10 rounded-xl border border-white/10 bg-black/20 px-3 text-sm text-white/85 outline-none transition focus:border-[rgb(204,144,92)] disabled:opacity-60"
-              >
-                {HOTEL_LOBBY_RESOLUTIONS.map((item) => (
-                  <option
-                    key={item}
-                    value={item}
-                    className="bg-[rgb(32,25,21)]"
-                  >
-                    {item}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <div className="flex items-center gap-2 text-xs text-white/38 sm:pb-3">
-              <Sparkles className="size-3.5 text-[rgb(204,144,92)]" />
-              <span>9:16 · output length follows the reference video</span>
-            </div>
-          </div>
-
           {creditError ? (
-            <div className="mt-4 flex flex-col gap-3 rounded-xl border border-amber-400/20 bg-amber-400/[0.06] px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+            <div className="mb-4 flex flex-col gap-3 rounded-xl border border-amber-400/20 bg-amber-400/[0.06] px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="font-medium text-amber-100/90">
                   Not enough credits
@@ -727,54 +671,46 @@ export function HotelLobbyGeneratorPanel() {
             </div>
           ) : null}
 
-          <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="text-xs leading-5 text-white/38">
-              <p>Use photos of yourself, or people who agreed to appear.</p>
-              <p className="text-white/26">
-                Files stay on your device until you sign in and press generate.
-              </p>
-            </div>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end sm:gap-3">
+            <select
+              value={resolution}
+              disabled={busy}
+              aria-label="Resolution"
+              onChange={(event) =>
+                setResolution(event.target.value as HotelLobbyResolution)
+              }
+              className="h-11 w-full rounded-xl border border-white/10 bg-black/20 px-3 text-sm text-white/85 transition outline-none focus:border-[rgb(204,144,92)] disabled:opacity-60 sm:w-[140px]"
+            >
+              {HOTEL_LOBBY_RESOLUTIONS.map((item) => (
+                <option key={item} value={item} className="bg-[rgb(32,25,21)]">
+                  {item}
+                </option>
+              ))}
+            </select>
 
-            <div className="flex flex-col items-stretch gap-2 sm:items-end">
-              <button
-                type="button"
-                disabled={busy || sessionPending}
-                onClick={() => void generate()}
-                className="inline-flex h-11 min-w-[240px] items-center justify-center gap-2 rounded-xl bg-[linear-gradient(135deg,rgb(222,151,92),rgb(189,111,64))] px-5 text-sm font-semibold text-white shadow-[0_12px_32px_-12px_rgba(218,134,75,0.7)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-55"
-              >
-                {busy ? (
-                  <LoaderCircle className="size-4 animate-spin" />
-                ) : session?.user ? (
-                  <Play className="size-4 fill-current" />
-                ) : (
-                  <Upload className="size-4" />
-                )}
-                <span>
-                  {session?.user
-                    ? busy
-                      ? phaseLabel
-                      : 'Make My Hotel Lobby Clip'
-                    : 'Sign in to generate'}
-                </span>
-              </button>
-              <div className="flex justify-end gap-2 text-[10px] text-white/30">
-                <span>{resolution}</span>
-                <span>·</span>
-                <span>9:16</span>
-                {estimatedCredits ? (
-                  <>
-                    <span>·</span>
-                    <span>~{estimatedCredits} credits</span>
-                  </>
-                ) : null}
-                {creditsQuery.data ? (
-                  <>
-                    <span>·</span>
-                    <span>{creditsQuery.data.balance.toLocaleString()} balance</span>
-                  </>
-                ) : null}
-              </div>
-            </div>
+            <button
+              type="button"
+              disabled={busy || sessionPending}
+              onClick={() => void generate()}
+              className="inline-flex h-11 w-full min-w-[240px] items-center justify-center gap-2 rounded-xl bg-[linear-gradient(135deg,rgb(222,151,92),rgb(189,111,64))] px-5 text-sm font-semibold text-white shadow-[0_12px_32px_-12px_rgba(218,134,75,0.7)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-55 sm:w-auto"
+            >
+              {busy ? (
+                <LoaderCircle className="size-4 animate-spin" />
+              ) : session?.user ? (
+                <Play className="size-4 fill-current" />
+              ) : (
+                <Upload className="size-4" />
+              )}
+              <span>
+                {!session?.user
+                  ? 'Sign in to generate'
+                  : busy
+                    ? phaseLabel
+                    : estimatedCredits
+                      ? `Generate (~${estimatedCredits} credits)`
+                      : 'Generate'}
+              </span>
+            </button>
           </div>
         </div>
       </div>
