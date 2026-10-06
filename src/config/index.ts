@@ -23,6 +23,12 @@ export const envConfigs: Record<string, string> = {
   app_logo: publicEnv('VITE_APP_LOGO') ?? '/logo.webp',
   app_support_email:
     publicEnv('VITE_APP_SUPPORT_EMAIL') ?? 'support@genjutsuai.net',
+  hotel_lobby_example_video_url:
+    publicEnv('VITE_HOTEL_LOBBY_EXAMPLE_VIDEO_URL') ?? '',
+  hotel_lobby_example_thumbnail_url:
+    publicEnv('VITE_HOTEL_LOBBY_EXAMPLE_THUMBNAIL_URL') ?? '',
+  hotel_lobby_example_upload_date:
+    publicEnv('VITE_HOTEL_LOBBY_EXAMPLE_UPLOAD_DATE') ?? '',
 
   // Database
   database_url: procEnv.DATABASE_URL ?? '',
