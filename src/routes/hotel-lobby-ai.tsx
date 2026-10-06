@@ -10,7 +10,7 @@ import {
 
 import { Link } from '@/core/i18n/navigation';
 import { envConfigs } from '@/config';
-import { localeLinks, socialMeta } from '@/lib/seo';
+import { absoluteUrl, localeLinks, socialMeta } from '@/lib/seo';
 import { getLocale } from '@/paraglide/runtime.js';
 import { HotelLobbyGeneratorPanel } from '@/components/landing/HotelLobbyGeneratorPanel';
 import { SiteHeader } from '@/components/landing/SiteHeader';
@@ -132,8 +132,10 @@ function howToJsonLd() {
 }
 
 function videoJsonLd() {
-  const contentUrl = envConfigs.hotel_lobby_example_video_url?.trim();
-  const thumbnailUrl = envConfigs.hotel_lobby_example_thumbnail_url?.trim();
+  const rawContentUrl = envConfigs.hotel_lobby_example_video_url?.trim();
+  const rawThumbnailUrl = envConfigs.hotel_lobby_example_thumbnail_url?.trim();
+  const contentUrl = rawContentUrl ? absoluteUrl(rawContentUrl) : '';
+  const thumbnailUrl = rawThumbnailUrl ? absoluteUrl(rawThumbnailUrl) : '';
   const uploadDate = envConfigs.hotel_lobby_example_upload_date?.trim();
   const duration = envConfigs.hotel_lobby_example_duration?.trim();
 
@@ -162,9 +164,15 @@ function JsonLd({ value }: { value: Record<string, unknown> }) {
 }
 
 function HotelLobbyAiPage() {
-  const exampleVideoUrl = envConfigs.hotel_lobby_example_video_url?.trim();
-  const exampleThumbnailUrl =
+  const rawExampleVideoUrl = envConfigs.hotel_lobby_example_video_url?.trim();
+  const rawExampleThumbnailUrl =
     envConfigs.hotel_lobby_example_thumbnail_url?.trim();
+  const exampleVideoUrl = rawExampleVideoUrl
+    ? absoluteUrl(rawExampleVideoUrl)
+    : '';
+  const exampleThumbnailUrl = rawExampleThumbnailUrl
+    ? absoluteUrl(rawExampleThumbnailUrl)
+    : '';
   const videoSchema = videoJsonLd();
 
   return (
