@@ -10,7 +10,7 @@ import {
 
 import { Link } from '@/core/i18n/navigation';
 import { envConfigs } from '@/config';
-import { absoluteUrl, localeLinks, socialMeta } from '@/lib/seo';
+import { localeLinks, socialMeta } from '@/lib/seo';
 import { getLocale } from '@/paraglide/runtime.js';
 import { HotelLobbyGeneratorPanel } from '@/components/landing/HotelLobbyGeneratorPanel';
 import { SiteHeader } from '@/components/landing/SiteHeader';
