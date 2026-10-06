@@ -24,6 +24,7 @@ async function POST({ request }: { request: Request }) {
 
     const body = await request.json().catch(() => ({}));
     const generationId = assertHotelLobbyGenerationId(body.generationId);
+    const useDefaultTemplate = body.useDefaultTemplate === true;
     const contentTypes = Array.isArray(body.contentTypes)
       ? body.contentTypes.filter(
           (value: unknown): value is string => typeof value === 'string'
@@ -33,33 +34,39 @@ async function POST({ request }: { request: Request }) {
       ? body.contentLengths.map((value: unknown) => Number(value))
       : [];
 
+    const minFiles = useDefaultTemplate ? 1 : 2;
+    const maxFiles = useDefaultTemplate ? 2 : 3;
+
     if (
-      contentTypes.length < 2 ||
-      contentTypes.length > 10 ||
+      contentTypes.length < minFiles ||
+      contentTypes.length > maxFiles ||
       contentLengths.length !== contentTypes.length
     ) {
       return respErr(
-        'Provide one 2–15s reference video plus 1–9 reference images',
+        useDefaultTemplate
+          ? 'Provide one or two reference images'
+          : 'Provide one 5–15s reference video plus one or two reference images',
         { status: 400 }
       );
     }
 
     const uploads = [];
-    for (let index = 0; index < contentTypes.length; index += 1) {
-      assertHotelLobbyUploadSize(index, contentLengths[index]);
+    for (let fileIndex = 0; fileIndex < contentTypes.length; fileIndex += 1) {
+      const storageIndex = useDefaultTemplate ? fileIndex + 1 : fileIndex;
+      assertHotelLobbyUploadSize(storageIndex, contentLengths[fileIndex]);
       const normalized = getHotelLobbyInputKey({
         userId: session.user.id,
         generationId,
-        index,
-        contentType: contentTypes[index],
+        index: storageIndex,
+        contentType: contentTypes[fileIndex],
       });
       uploads.push(
         await createHotelLobbyUploadDescriptor({
           userId: session.user.id,
           generationId,
-          index,
+          index: storageIndex,
           contentType: normalized.contentType,
-          contentLength: contentLengths[index],
+          contentLength: contentLengths[fileIndex],
         })
       );
     }
