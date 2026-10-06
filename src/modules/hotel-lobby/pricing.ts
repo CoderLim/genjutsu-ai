@@ -19,7 +19,7 @@ export type HotelLobbyAspectRatio =
 
 export const HOTEL_LOBBY_MIN_DURATION_SECONDS = 5;
 export const HOTEL_LOBBY_MAX_DURATION_SECONDS = 15;
-export const HOTEL_LOBBY_MAX_REFERENCE_IMAGES = 9;
+export const HOTEL_LOBBY_MAX_REFERENCE_IMAGES = 2;
 
 const OUTPUT_RATE_USD_PER_SECOND: Record<HotelLobbyResolution, number> = {
   '480P': 0.05,
@@ -57,7 +57,7 @@ export function estimateHotelLobbyProviderCost(input: {
     input.imageCount < 1 ||
     input.imageCount > HOTEL_LOBBY_MAX_REFERENCE_IMAGES
   ) {
-    throw new Error('Provide between 1 and 9 reference images');
+    throw new Error('Provide one or two reference images');
   }
 
   const outputCost =
