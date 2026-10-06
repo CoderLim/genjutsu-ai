@@ -424,10 +424,12 @@ function HotelLobbyAiPage() {
                 <ShieldCheck className="size-5" />
               </div>
               <h2 className="mt-5 text-3xl font-semibold tracking-tight">
-                Private by default
+                Free to set up, private by default
               </h2>
               <p className="mt-4 text-sm leading-7 text-white/46">
-                Choosing a file only creates a local browser preview. Your
+                You can load the preset, choose photos, and preview your setup
+                without spending credits. Choosing a file only creates a local
+                browser preview. Your
                 photos and custom reference video are not uploaded until you
                 sign in and press generate. Generation inputs are stored
                 privately for the job rather than published to a public
