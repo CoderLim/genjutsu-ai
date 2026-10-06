@@ -12,6 +12,7 @@ const STATIC_PATHS = [
   '',
   '/pricing',
   '/genjutsu-prompts',
+  '/hotel-lobby-ai',
   '/text-to-image',
   '/blog',
   '/privacy-policy',
