@@ -4,6 +4,7 @@ import {
   useRef,
   useState,
   type ChangeEvent,
+  type RefObject,
 } from 'react';
 import {
   Download,
@@ -152,7 +153,7 @@ function PersonSlot({
   item: MediaItem | null;
   onPick: (file: File | null) => void;
   onRemove: () => void;
-  inputRef: React.RefObject<HTMLInputElement | null>;
+  inputRef: RefObject<HTMLInputElement | null>;
   disabled: boolean;
 }) {
   return (
@@ -214,7 +215,7 @@ export function HotelLobbyGeneratorPanel() {
   const mountedRef = useRef(true);
   const localUrlsRef = useRef<Set<string>>(new Set());
 
-  const [video, setVideo] = useState<VideoSource>({
+  const [video, setVideo] = useState<VideoSource | null>({
     kind: 'template',
     url: TEMPLATE_URL,
   });
@@ -345,7 +346,7 @@ export function HotelLobbyGeneratorPanel() {
       URL.revokeObjectURL(video.url);
       localUrlsRef.current.delete(video.url);
     }
-    setVideo(null as unknown as VideoSource);
+    setVideo(null);
     if (videoInputRef.current) videoInputRef.current.value = '';
   };
 
@@ -593,7 +594,7 @@ export function HotelLobbyGeneratorPanel() {
                   onError={() => {
                     if (video.kind === 'template') {
                       setTemplateAvailable(false);
-                      setVideo(null as unknown as VideoSource);
+                      setVideo(null);
                     }
                   }}
                 />
