@@ -4,6 +4,8 @@ import { envConfigs } from '@/config';
 import { getAllConfigs } from '@/modules/config/service';
 import { getStorage } from '@/modules/storage/service';
 
+import { probeHotelLobbyDurationSeconds } from './video-metadata';
+
 const UPLOAD_EXPIRES_SECONDS = 10 * 60;
 const READ_EXPIRES_SECONDS = 60 * 60;
 
@@ -268,9 +270,7 @@ function assertHotelLobbyInputKey(params: {
   const escapedPrefix = escapeRegExp(prefix);
 
   if (params.index === 0) {
-    const pattern = new RegExp(
-      `^${escapedPrefix}video\\.(?:mp4|mov)$`
-    );
+    const pattern = new RegExp(`^${escapedPrefix}video\\.(?:mp4|mov)$`);
     if (!pattern.test(params.key)) {
       throw new Error('Invalid Hotel Lobby reference-video key');
     }
@@ -374,6 +374,11 @@ export async function getHotelLobbyTemplatePreviewUrl() {
   return createHotelLobbyR2ReadUrl(key);
 }
 
+export async function getHotelLobbyTemplateDurationSeconds() {
+  const url = await getHotelLobbyTemplatePreviewUrl();
+  return probeHotelLobbyDurationSeconds(url);
+}
+
 export async function sealHotelLobbyInputs(params: {
   userId: string;
   generationId: string;
@@ -422,7 +427,9 @@ export async function sealHotelLobbyInputs(params: {
   }
 
   params.imageKeys.forEach((key, imageIndex) => {
-    const contentOffset = params.useDefaultTemplate ? imageIndex : imageIndex + 1;
+    const contentOffset = params.useDefaultTemplate
+      ? imageIndex
+      : imageIndex + 1;
     uploadedEntries.push({
       key,
       index: imageIndex + 1,

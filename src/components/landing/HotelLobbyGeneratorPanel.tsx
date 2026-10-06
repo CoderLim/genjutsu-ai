@@ -111,9 +111,11 @@ function readVideoDuration(file: File): Promise<number> {
   });
 }
 
-function normalizeDuration(seconds: number | undefined) {
-  if (!seconds || !Number.isFinite(seconds)) return 5;
-  return Math.min(15, Math.max(5, Math.round(seconds)));
+function clampReferenceDuration(seconds: number) {
+  return Math.min(
+    MAX_REFERENCE_VIDEO_SECONDS,
+    Math.max(MIN_REFERENCE_VIDEO_SECONDS, Math.round(seconds))
+  );
 }
 
 function redirectToSignIn() {
@@ -218,24 +220,27 @@ export function HotelLobbyGeneratorPanel() {
   const imageItems = [firstImage, secondImage].filter(
     (item): item is MediaItem => Boolean(item)
   );
-  const duration = normalizeDuration(video?.durationSeconds);
+  const hasKnownDuration =
+    typeof video?.durationSeconds === 'number' &&
+    Number.isFinite(video.durationSeconds) &&
+    video.durationSeconds > 0;
 
   const estimatedCredits = useMemo(() => {
-    if (!video) return null;
+    if (!video || !hasKnownDuration) return null;
     const imageCount = Math.max(
       1,
       (firstImage ? 1 : 0) + (secondImage ? 1 : 0)
     );
     try {
       return estimateHotelLobbyCredits({
-        duration: normalizeDuration(video.durationSeconds),
+        duration: clampReferenceDuration(video.durationSeconds as number),
         resolution,
         imageCount,
       });
     } catch {
       return null;
     }
-  }, [video, firstImage, secondImage, resolution]);
+  }, [video, hasKnownDuration, firstImage, secondImage, resolution]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -245,6 +250,31 @@ export function HotelLobbyGeneratorPanel() {
       localUrlsRef.current.clear();
     };
   }, []);
+
+  useEffect(() => {
+    if (video?.kind !== 'template') return;
+    if (hasKnownDuration) return;
+
+    let cancelled = false;
+    void apiGet<{ durationSeconds: number }>('/api/hotel-lobby/template-meta')
+      .then((data) => {
+        if (cancelled) return;
+        const seconds = data.durationSeconds;
+        if (!Number.isFinite(seconds) || seconds <= 0) return;
+        setVideo((current) =>
+          current?.kind === 'template'
+            ? { ...current, durationSeconds: seconds }
+            : current
+        );
+      })
+      .catch(() => {
+        // Browser metadata / retry may still fill durationSeconds.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [video?.kind, video?.url, hasKnownDuration]);
 
   const setImageAt = (slot: 'first' | 'second', file: File | null) => {
     if (!file) return;
@@ -399,14 +429,14 @@ export function HotelLobbyGeneratorPanel() {
       toast.error('Add the first person photo');
       return;
     }
+    if (!hasKnownDuration || !estimatedCredits) {
+      toast.error(
+        'Still reading the reference video length. Try again in a moment.'
+      );
+      return;
+    }
 
-    const requiredCredits =
-      estimatedCredits ??
-      estimateHotelLobbyCredits({
-        duration,
-        resolution,
-        imageCount: imageItems.length,
-      });
+    const requiredCredits = estimatedCredits;
     const balance = creditsQuery.data?.balance ?? 0;
 
     if (!creditsQuery.isPending && balance < requiredCredits) {
@@ -569,7 +599,10 @@ export function HotelLobbyGeneratorPanel() {
                     if (Number.isFinite(seconds) && seconds > 0) {
                       setVideo((current) =>
                         current?.kind === 'template'
-                          ? { ...current, durationSeconds: seconds }
+                          ? {
+                              ...current,
+                              durationSeconds: clampReferenceDuration(seconds),
+                            }
                           : current
                       );
                     }
