@@ -23,6 +23,14 @@ export const envConfigs: Record<string, string> = {
   app_logo: publicEnv('VITE_APP_LOGO') ?? '/logo.webp',
   app_support_email:
     publicEnv('VITE_APP_SUPPORT_EMAIL') ?? 'support@genjutsuai.net',
+  hotel_lobby_example_video_url:
+    publicEnv('VITE_HOTEL_LOBBY_EXAMPLE_VIDEO_URL') ?? '',
+  hotel_lobby_example_thumbnail_url:
+    publicEnv('VITE_HOTEL_LOBBY_EXAMPLE_THUMBNAIL_URL') ?? '',
+  hotel_lobby_example_upload_date:
+    publicEnv('VITE_HOTEL_LOBBY_EXAMPLE_UPLOAD_DATE') ?? '',
+  hotel_lobby_example_duration:
+    publicEnv('VITE_HOTEL_LOBBY_EXAMPLE_DURATION') ?? '',
 
   // Database
   database_url: procEnv.DATABASE_URL ?? '',
@@ -134,6 +142,12 @@ export const envConfigs: Record<string, string> = {
     procEnv.SEEDANCE_VOLCENGINE_CNY_PER_USD ?? '7',
 
   genjutsu_e2e_mock: procEnv.GENJUTSU_E2E_MOCK ?? 'false',
+
+  // Hotel Lobby preset (server-only). Store the licensed/default template in R2
+  // under this key; the page can still replace it with a user-uploaded clip.
+  hotel_lobby_template_video_key:
+    procEnv.HOTEL_LOBBY_TEMPLATE_VIDEO_KEY ??
+    'hotel-lobby/templates/default.mp4',
 
   // Locale (public)
   locale: publicEnv('VITE_DEFAULT_LOCALE') ?? 'en',

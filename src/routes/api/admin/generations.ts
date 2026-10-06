@@ -4,13 +4,23 @@ import { and, count, desc, eq, inArray, like, or, type SQL } from 'drizzle-orm';
 import { getAuth } from '@/core/auth';
 import { db } from '@/core/db';
 import { aiTask, order, subscription, user } from '@/config/db/schema';
-import { GENJUTSU_SCENE } from '@/modules/genjutsu/billing';
+import {
+  generationMediaBasePath,
+  isListableGenerationScene,
+  LISTABLE_GENERATION_SCENES,
+} from '@/modules/generations/scenes';
 import {
   calculateGenjutsuCredits,
   estimateGenjutsuCredits,
   type GenjutsuBillableResolution,
 } from '@/modules/genjutsu/pricing';
 import { estimateSeedanceProviderCost } from '@/modules/genjutsu/seedance';
+import { HOTEL_LOBBY_SCENE } from '@/modules/hotel-lobby/billing';
+import {
+  estimateHotelLobbyCredits,
+  HOTEL_LOBBY_RESOLUTIONS,
+  type HotelLobbyResolution,
+} from '@/modules/hotel-lobby/pricing';
 import { hasPermission } from '@/modules/rbac/service';
 import { respErr, respPage } from '@/lib/resp';
 
@@ -66,15 +76,29 @@ function isBillableResolution(
  * Best-effort credit estimate for admin display — mirrors GeneratorPanel /
  * generate.ts list-rate fallback when the task never reached reservation.
  */
+function isHotelLobbyResolution(value: unknown): value is HotelLobbyResolution {
+  return (
+    typeof value === 'string' &&
+    (HOTEL_LOBBY_RESOLUTIONS as readonly string[]).includes(value)
+  );
+}
+
 function resolveEstimatedCredits(input: {
+  scene: string;
   provider: string;
   providerCostUsd: number | null;
   sourceDurationSeconds: number | null;
+  duration: number | null;
   resolution: unknown;
+  imageCount: number;
   requiredCredits: number | null;
+  costCredits: number | null;
 }): number | null {
   if (input.requiredCredits != null && input.requiredCredits > 0) {
     return input.requiredCredits;
+  }
+  if (input.costCredits != null && input.costCredits > 0) {
+    return input.costCredits;
   }
 
   if (input.providerCostUsd != null && input.providerCostUsd > 0) {
@@ -82,6 +106,25 @@ function resolveEstimatedCredits(input: {
       return calculateGenjutsuCredits(input.providerCostUsd);
     } catch {
       // fall through to list-rate estimate
+    }
+  }
+
+  if (input.scene === HOTEL_LOBBY_SCENE) {
+    if (
+      !isHotelLobbyResolution(input.resolution) ||
+      input.duration == null ||
+      !Number.isInteger(input.duration)
+    ) {
+      return null;
+    }
+    try {
+      return estimateHotelLobbyCredits({
+        duration: input.duration,
+        resolution: input.resolution,
+        imageCount: Math.max(1, input.imageCount),
+      });
+    } catch {
+      return null;
     }
   }
 
@@ -131,9 +174,14 @@ async function GET({ request }: { request: Request }) {
     const search = searchParams.get('search')?.trim();
     const status = searchParams.get('status')?.trim();
     const provider = searchParams.get('provider')?.trim();
+    const scene = searchParams.get('scene')?.trim();
     const userId = searchParams.get('userId')?.trim();
 
-    const conditions: SQL[] = [eq(aiTask.scene, GENJUTSU_SCENE)];
+    const conditions: SQL[] = [
+      scene && isListableGenerationScene(scene)
+        ? eq(aiTask.scene, scene)
+        : inArray(aiTask.scene, [...LISTABLE_GENERATION_SCENES]),
+    ];
     if (status && status !== 'all') conditions.push(eq(aiTask.status, status));
     if (provider && provider !== 'all') {
       conditions.push(eq(aiTask.provider, provider));
@@ -166,6 +214,7 @@ async function GET({ request }: { request: Request }) {
         userId: aiTask.userId,
         userName: user.name,
         userEmail: user.email,
+        scene: aiTask.scene,
         provider: aiTask.provider,
         model: aiTask.model,
         prompt: aiTask.prompt,
@@ -238,17 +287,32 @@ async function GET({ request }: { request: Request }) {
           url: `/api/admin/generations/${encodeURIComponent(row.id)}/media?index=${imageIndex + 1}`,
         })),
       ];
+      const mediaBase = generationMediaBasePath(row.scene);
+      const duration =
+        typeof options?.duration === 'number' ? options.duration : null;
+      const sourceDurationSeconds =
+        typeof info?.sourceDurationSeconds === 'number'
+          ? info.sourceDurationSeconds
+          : duration;
       return {
         id: row.id,
         userId: row.userId,
         userName: row.userName,
         userEmail: row.userEmail,
+        scene: row.scene,
         provider: row.provider,
         model: row.model,
         prompt: row.prompt,
-        mode: typeof options?.mode === 'string' ? options.mode : null,
+        mode:
+          typeof options?.mode === 'string'
+            ? options.mode
+            : row.scene === HOTEL_LOBBY_SCENE
+              ? 'Hotel Lobby'
+              : null,
         resolution:
           typeof options?.resolution === 'string' ? options.resolution : null,
+        aspectRatio:
+          typeof options?.aspectRatio === 'string' ? options.aspectRatio : null,
         status: row.status,
         attemptStage:
           typeof info?.attemptStage === 'string' ? info.attemptStage : null,
@@ -381,15 +445,13 @@ async function GET({ request }: { request: Request }) {
           typeof info?.providerCostUsd === 'number'
             ? info.providerCostUsd
             : null,
-        sourceDurationSeconds:
-          typeof info?.sourceDurationSeconds === 'number'
-            ? info.sourceDurationSeconds
-            : null,
+        sourceDurationSeconds,
         requiredCredits:
           typeof result?.requiredCredits === 'number'
             ? result.requiredCredits
             : null,
         estimatedCredits: resolveEstimatedCredits({
+          scene: row.scene,
           provider: row.provider,
           providerCostUsd:
             typeof info?.providerCostUsd === 'number'
@@ -399,19 +461,22 @@ async function GET({ request }: { request: Request }) {
             typeof info?.sourceDurationSeconds === 'number'
               ? info.sourceDurationSeconds
               : null,
+          duration,
           resolution: options?.resolution,
+          imageCount: imageKeys.length,
           requiredCredits:
             typeof result?.requiredCredits === 'number'
               ? result.requiredCredits
               : null,
+          costCredits: row.costCredits,
         }),
         inputMedia,
         sourceVideoUrl: hasSourceVideo
-          ? `/api/genjutsu/source/${encodeURIComponent(row.id)}`
+          ? `${mediaBase}/source/${encodeURIComponent(row.id)}`
           : null,
         videoUrl:
           row.status === 'completed'
-            ? `/api/genjutsu/result/${encodeURIComponent(row.id)}`
+            ? `${mediaBase}/result/${encodeURIComponent(row.id)}`
             : null,
         createdAt: row.createdAt,
         updatedAt: row.updatedAt,

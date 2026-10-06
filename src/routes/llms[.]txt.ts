@@ -7,6 +7,11 @@ import { getLocalPosts, mergePosts } from '@/content/posts';
 const STATIC_PAGES: { path: string; title: string; description: string }[] = [
   { path: '', title: 'Home', description: 'Landing page' },
   { path: '/pricing', title: 'Pricing', description: 'Pricing plans' },
+  {
+    path: '/hotel-lobby-ai',
+    title: 'Hotel Lobby AI Video Generator',
+    description: 'Preset two-photo Hotel Lobby AI video generator powered by MiniMax H3',
+  },
   { path: '/blog', title: 'Blog', description: 'Blog posts and articles' },
 ];
 

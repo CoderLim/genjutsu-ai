@@ -52,11 +52,13 @@ interface Generation {
   userName: string | null;
   userEmail: string;
   isPaid: boolean;
+  scene: string;
   provider: string;
   model: string;
   prompt: string;
   mode: string | null;
   resolution: string | null;
+  aspectRatio: string | null;
   status: string;
   attemptStage: string | null;
   taskId: string | null;
@@ -125,6 +127,7 @@ const STATUSES = [
   'reserved',
   'submitting',
   'submitted',
+  'completing',
   'completed',
   'submission_unknown',
   'refunding',
@@ -402,6 +405,7 @@ const GenerationsTable = memo(function GenerationsTable({
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [status, setStatus] = useState('all');
   const [provider, setProvider] = useState('all');
+  const [scene, setScene] = useState('all');
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 300);
@@ -410,10 +414,17 @@ const GenerationsTable = memo(function GenerationsTable({
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, status, provider]);
+  }, [debouncedSearch, status, provider, scene]);
 
   const query = useQuery({
-    queryKey: ['admin-generations', page, debouncedSearch, status, provider],
+    queryKey: [
+      'admin-generations',
+      page,
+      debouncedSearch,
+      status,
+      provider,
+      scene,
+    ],
     queryFn: () => {
       const params = new URLSearchParams({
         page: String(page),
@@ -422,6 +433,7 @@ const GenerationsTable = memo(function GenerationsTable({
       if (debouncedSearch) params.set('search', debouncedSearch);
       if (status !== 'all') params.set('status', status);
       if (provider !== 'all') params.set('provider', provider);
+      if (scene !== 'all') params.set('scene', scene);
       return apiGet<PageResult<Generation>>(
         `/api/admin/generations?${params.toString()}`
       );
@@ -477,7 +489,12 @@ const GenerationsTable = memo(function GenerationsTable({
           <div className="text-sm">
             <div>{g.mode || '—'}</div>
             <div className="text-muted-foreground text-xs">
-              {g.resolution || '—'}
+              {[g.resolution, g.aspectRatio].filter(Boolean).join(' · ') || '—'}
+            </div>
+            <div className="text-muted-foreground mt-1 text-[11px]">
+              {g.scene === 'hotel-lobby'
+                ? m['admin.generations.scene.hotel_lobby']()
+                : m['admin.generations.scene.genjutsu']()}
             </div>
           </div>
         ),
@@ -624,6 +641,25 @@ const GenerationsTable = memo(function GenerationsTable({
           toolbar={
             <div className="flex gap-2">
               <Select
+                value={scene}
+                onValueChange={(value) => setScene(value || 'all')}
+              >
+                <SelectTrigger className="h-8 w-[140px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">
+                    {m['admin.generations.all_scenes']()}
+                  </SelectItem>
+                  <SelectItem value="genjutsu">
+                    {m['admin.generations.scene.genjutsu']()}
+                  </SelectItem>
+                  <SelectItem value="hotel-lobby">
+                    {m['admin.generations.scene.hotel_lobby']()}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <Select
                 value={provider}
                 onValueChange={(value) => setProvider(value || 'all')}
               >
@@ -636,6 +672,7 @@ const GenerationsTable = memo(function GenerationsTable({
                   </SelectItem>
                   <SelectItem value="seedance">Seedance</SelectItem>
                   <SelectItem value="higgsfield">Higgsfield</SelectItem>
+                  <SelectItem value="fal">Fal</SelectItem>
                 </SelectContent>
               </Select>
               <Select
@@ -754,6 +791,11 @@ function GenerationsPage() {
                   <div className="text-muted-foreground text-xs">
                     {detail.model || '—'}
                   </div>
+                  <div className="text-muted-foreground mt-1 text-xs">
+                    {detail.scene === 'hotel-lobby'
+                      ? m['admin.generations.scene.hotel_lobby']()
+                      : m['admin.generations.scene.genjutsu']()}
+                  </div>
                 </div>
                 <div>
                   <div className="text-muted-foreground text-xs">
@@ -762,7 +804,9 @@ function GenerationsPage() {
                   <div className="mt-1">{detail.mode || '—'}</div>
                   <div className="text-muted-foreground text-xs">
                     {m['admin.generations.requested_resolution']()}:{' '}
-                    {detail.resolution || '—'}
+                    {[detail.resolution, detail.aspectRatio]
+                      .filter(Boolean)
+                      .join(' · ') || '—'}
                   </div>
                 </div>
                 <div>

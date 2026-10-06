@@ -1,10 +1,14 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { and, count, desc, eq, isNull } from 'drizzle-orm';
+import { and, count, desc, eq, inArray, isNull } from 'drizzle-orm';
 
 import { getAuth } from '@/core/auth';
 import { db } from '@/core/db';
 import { aiTask } from '@/config/db/schema';
-import { GENJUTSU_SCENE } from '@/modules/genjutsu/billing';
+import {
+  generationMediaBasePath,
+  LISTABLE_GENERATION_SCENES,
+} from '@/modules/generations/scenes';
+import { HOTEL_LOBBY_SCENE } from '@/modules/hotel-lobby/billing';
 import { respErr, respPage } from '@/lib/resp';
 
 function parseJson(value: string | null) {
@@ -34,7 +38,7 @@ async function GET({ request }: { request: Request }) {
     const offset = (page - 1) * pageSize;
 
     const where = and(
-      eq(aiTask.scene, GENJUTSU_SCENE),
+      inArray(aiTask.scene, [...LISTABLE_GENERATION_SCENES]),
       eq(aiTask.userId, session.user.id),
       isNull(aiTask.deletedAt)
     );
@@ -47,6 +51,7 @@ async function GET({ request }: { request: Request }) {
     const rows = await db()
       .select({
         id: aiTask.id,
+        scene: aiTask.scene,
         prompt: aiTask.prompt,
         status: aiTask.status,
         options: aiTask.options,
@@ -64,20 +69,32 @@ async function GET({ request }: { request: Request }) {
       const options = parseJson(row.options);
       const hasSourceVideo =
         typeof options?.videoKey === 'string' && options.videoKey.length > 0;
+      const mediaBase = generationMediaBasePath(row.scene);
+      const mode =
+        typeof options?.mode === 'string'
+          ? options.mode
+          : row.scene === HOTEL_LOBBY_SCENE
+            ? 'Hotel Lobby'
+            : null;
       return {
         id: row.id,
+        scene: row.scene,
         prompt: row.prompt,
         status: row.status,
-        mode: typeof options?.mode === 'string' ? options.mode : null,
+        mode,
         resolution:
           typeof options?.resolution === 'string' ? options.resolution : null,
+        aspectRatio:
+          typeof options?.aspectRatio === 'string' ? options.aspectRatio : null,
+        duration:
+          typeof options?.duration === 'number' ? options.duration : null,
         costCredits: row.costCredits,
         sourceVideoUrl: hasSourceVideo
-          ? `/api/genjutsu/source/${encodeURIComponent(row.id)}`
+          ? `${mediaBase}/source/${encodeURIComponent(row.id)}`
           : null,
         videoUrl:
           row.status === 'completed'
-            ? `/api/genjutsu/result/${encodeURIComponent(row.id)}`
+            ? `${mediaBase}/result/${encodeURIComponent(row.id)}`
             : null,
         createdAt: row.createdAt,
         updatedAt: row.updatedAt,

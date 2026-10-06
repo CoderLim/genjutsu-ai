@@ -134,7 +134,20 @@ export class FalProvider implements AIProvider {
     const statusResp = await fetch(statusUrl, { method: 'GET', headers });
 
     if (!statusResp.ok) {
-      throw new Error(`request failed with status: ${statusResp.status}`);
+      const detail = await statusResp.text().catch(() => '');
+      return {
+        taskId,
+        taskStatus: AITaskStatus.FAILED,
+        taskInfo: {
+          status: String(statusResp.status),
+          errorCode: String(statusResp.status),
+          errorMessage:
+            detail || `request failed with status: ${statusResp.status}`,
+        },
+        taskResult: {
+          error: detail || `request failed with status: ${statusResp.status}`,
+        },
+      };
     }
 
     const statusData = await statusResp.json();
@@ -147,7 +160,12 @@ export class FalProvider implements AIProvider {
         taskInfo: {
           status: statusData.status,
           errorCode: '',
-          errorMessage: '',
+          errorMessage:
+            typeof statusData.error === 'string'
+              ? statusData.error
+              : typeof statusData.message === 'string'
+                ? statusData.message
+                : '',
         },
         taskResult: statusData,
       };
@@ -157,7 +175,20 @@ export class FalProvider implements AIProvider {
     const resultResp = await fetch(resultUrl, { method: 'GET', headers });
 
     if (!resultResp.ok) {
-      throw new Error(`request failed with status: ${resultResp.status}`);
+      const detail = await resultResp.text().catch(() => '');
+      return {
+        taskId,
+        taskStatus: AITaskStatus.FAILED,
+        taskInfo: {
+          status: String(resultResp.status),
+          errorCode: String(resultResp.status),
+          errorMessage:
+            detail || `request failed with status: ${resultResp.status}`,
+        },
+        taskResult: {
+          error: detail || `request failed with status: ${resultResp.status}`,
+        },
+      };
     }
 
     const data = await resultResp.json();
@@ -285,9 +316,11 @@ export class FalProvider implements AIProvider {
     if (!model) {
       return '';
     }
-    const parts = model.split('/');
+    // Fal queue status/result GETs use the app id (owner/name). Nested
+    // submit paths like minimax/h3/reference-to-video return 405 on GET.
+    const parts = model.replace(/^\/+/, '').split('/').filter(Boolean);
     if (parts.length <= 2) {
-      return model;
+      return parts.join('/');
     }
     return `${parts[0]}/${parts[1]}`;
   }

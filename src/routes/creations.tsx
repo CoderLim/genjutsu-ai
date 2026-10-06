@@ -28,10 +28,13 @@ import {
 
 interface Generation {
   id: string;
+  scene: string;
   prompt: string;
   status: string;
   mode: string | null;
   resolution: string | null;
+  aspectRatio: string | null;
+  duration: number | null;
   costCredits: number;
   sourceVideoUrl: string | null;
   videoUrl: string | null;
@@ -67,6 +70,7 @@ function statusLabel(status: string) {
     status === 'reserved' ||
     status === 'submitting' ||
     status === 'submitted' ||
+    status === 'completing' ||
     status === 'submission_unknown' ||
     status === 'refunding'
   ) {
@@ -134,7 +138,7 @@ function GenerationCard({
   onPreview,
 }: {
   generation: Generation;
-  onRefresh: (id: string) => void;
+  onRefresh: (generation: Generation) => void;
   refreshing: boolean;
   onPreview: (preview: VideoPreview) => void;
 }) {
@@ -223,9 +227,20 @@ function GenerationCard({
             {generation.prompt || m['creations.untitled']()}
           </h2>
           <div className="text-muted-foreground mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs">
+            <span>
+              {generation.scene === 'hotel-lobby'
+                ? m['creations.scene.hotel_lobby']()
+                : m['creations.scene.genjutsu']()}
+            </span>
             {generation.mode ? <span>{generation.mode}</span> : null}
             {generation.resolution ? (
               <span>{generation.resolution}</span>
+            ) : null}
+            {generation.aspectRatio ? (
+              <span>{generation.aspectRatio}</span>
+            ) : null}
+            {generation.duration != null ? (
+              <span>{generation.duration}s</span>
             ) : null}
             <span>
               {m['creations.credits']({ count: generation.costCredits })}
@@ -260,7 +275,7 @@ function GenerationCard({
           ) : (
             <Button
               variant="outline"
-              onClick={() => onRefresh(generation.id)}
+              onClick={() => onRefresh(generation)}
               disabled={refreshing}
             >
               <RefreshCw
@@ -295,10 +310,13 @@ function CreationsPage() {
   });
 
   const refreshMutation = useMutation({
-    mutationFn: (generationId: string) =>
-      apiGet<GenerationStatus>(
-        `/api/genjutsu/status?generationId=${encodeURIComponent(generationId)}`
-      ),
+    mutationFn: (generation: Generation) => {
+      const statusPath =
+        generation.scene === 'hotel-lobby'
+          ? `/api/hotel-lobby/status?generationId=${encodeURIComponent(generation.id)}`
+          : `/api/genjutsu/status?generationId=${encodeURIComponent(generation.id)}`;
+      return apiGet<GenerationStatus>(statusPath);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['user-generations', userId] });
     },
@@ -395,10 +413,10 @@ function CreationsPage() {
                   key={generation.id}
                   generation={generation}
                   onPreview={setPreview}
-                  onRefresh={(id) => refreshMutation.mutate(id)}
+                  onRefresh={(item) => refreshMutation.mutate(item)}
                   refreshing={
                     refreshMutation.isPending &&
-                    refreshMutation.variables === generation.id
+                    refreshMutation.variables?.id === generation.id
                   }
                 />
               ))}
