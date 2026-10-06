@@ -29,6 +29,8 @@ export const envConfigs: Record<string, string> = {
     publicEnv('VITE_HOTEL_LOBBY_EXAMPLE_THUMBNAIL_URL') ?? '',
   hotel_lobby_example_upload_date:
     publicEnv('VITE_HOTEL_LOBBY_EXAMPLE_UPLOAD_DATE') ?? '',
+  hotel_lobby_example_duration:
+    publicEnv('VITE_HOTEL_LOBBY_EXAMPLE_DURATION') ?? '',
 
   // Database
   database_url: procEnv.DATABASE_URL ?? '',
