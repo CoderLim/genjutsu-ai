@@ -4,7 +4,10 @@ import { envConfigs } from '@/config';
 import { getAllConfigs } from '@/modules/config/service';
 import { getStorage } from '@/modules/storage/service';
 
-import { probeHotelLobbyDurationSeconds } from './video-metadata';
+import {
+  normalizeHotelLobbyDuration,
+  probeHotelLobbyDurationSecondsRaw,
+} from './video-metadata';
 
 const UPLOAD_EXPIRES_SECONDS = 10 * 60;
 const READ_EXPIRES_SECONDS = 60 * 60;
@@ -16,6 +19,7 @@ export const HOTEL_LOBBY_MAX_REFERENCE_IMAGES = 2;
 const VIDEO_CONTENT_TYPES: Record<string, string> = {
   'video/mp4': 'mp4',
   'video/quicktime': 'mov',
+  'video/webm': 'webm',
 };
 
 const IMAGE_CONTENT_TYPES: Record<string, string> = {
@@ -270,7 +274,7 @@ function assertHotelLobbyInputKey(params: {
   const escapedPrefix = escapeRegExp(prefix);
 
   if (params.index === 0) {
-    const pattern = new RegExp(`^${escapedPrefix}video\\.(?:mp4|mov)$`);
+    const pattern = new RegExp(`^${escapedPrefix}video\\.(?:mp4|mov|webm)$`);
     if (!pattern.test(params.key)) {
       throw new Error('Invalid Hotel Lobby reference-video key');
     }
@@ -374,9 +378,15 @@ export async function getHotelLobbyTemplatePreviewUrl() {
   return createHotelLobbyR2ReadUrl(key);
 }
 
-export async function getHotelLobbyTemplateDurationSeconds() {
+export async function getHotelLobbyTemplateDurationSecondsRaw() {
   const url = await getHotelLobbyTemplatePreviewUrl();
-  return probeHotelLobbyDurationSeconds(url);
+  return probeHotelLobbyDurationSecondsRaw(url);
+}
+
+export async function getHotelLobbyTemplateDurationSeconds() {
+  return normalizeHotelLobbyDuration(
+    await getHotelLobbyTemplateDurationSecondsRaw()
+  );
 }
 
 export async function sealHotelLobbyInputs(params: {

@@ -17,8 +17,10 @@ import {
   type HotelLobbyResolution,
 } from '@/modules/hotel-lobby/pricing';
 import { ApiError, apiGet, apiPost, uploadToSignedUrl } from '@/lib/api-client';
+import { trimVideoToFile } from '@/lib/trim-video';
 import { useUserCredits } from '@/hooks/use-user-credits';
 import { CloseIcon, FilmIcon, ImageModeIcon } from '@/components/icons';
+import { HotelLobbyTrimBar } from '@/components/landing/hotel-lobby-trim-bar';
 
 type MediaItem = {
   id: string;
@@ -67,10 +69,19 @@ type GenerationPoll = {
 };
 
 const TEMPLATE_URL = '/api/hotel-lobby/template';
+const TEMPLATE_FILE_URL = '/api/hotel-lobby/template-file';
 const MAX_VIDEO_BYTES = 80 * 1024 * 1024;
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
 const MIN_REFERENCE_VIDEO_SECONDS = 5;
 const MAX_REFERENCE_VIDEO_SECONDS = 15;
+
+function isFullSourceClip(
+  startSeconds: number,
+  endSeconds: number,
+  sourceSeconds: number
+) {
+  return startSeconds <= 0.05 && Math.abs(endSeconds - sourceSeconds) <= 0.2;
+}
 
 function createMediaItem(file: File): MediaItem {
   return {
@@ -197,6 +208,7 @@ export function HotelLobbyGeneratorPanel() {
   const mountedRef = useRef(true);
   const localUrlsRef = useRef<Set<string>>(new Set());
 
+  const previewVideoRef = useRef<HTMLVideoElement>(null);
   const [video, setVideo] = useState<VideoSource | null>({
     kind: 'template',
     url: TEMPLATE_URL,
@@ -205,6 +217,9 @@ export function HotelLobbyGeneratorPanel() {
   const [firstImage, setFirstImage] = useState<MediaItem | null>(null);
   const [secondImage, setSecondImage] = useState<MediaItem | null>(null);
   const [resolution, setResolution] = useState<HotelLobbyResolution>('480P');
+  const [trimStart, setTrimStart] = useState(0);
+  const [trimEnd, setTrimEnd] = useState(0);
+  const [trimming, setTrimming] = useState(false);
   const [phase, setPhase] = useState<
     'idle' | 'uploading' | 'starting' | 'generating' | 'saving' | 'done'
   >('idle');
@@ -216,31 +231,38 @@ export function HotelLobbyGeneratorPanel() {
     balance: number;
   } | null>(null);
 
-  const busy = !['idle', 'done'].includes(phase);
+  const busy = !['idle', 'done'].includes(phase) || trimming;
   const imageItems = [firstImage, secondImage].filter(
     (item): item is MediaItem => Boolean(item)
   );
-  const hasKnownDuration =
+  const sourceDuration =
     typeof video?.durationSeconds === 'number' &&
     Number.isFinite(video.durationSeconds) &&
-    video.durationSeconds > 0;
+    video.durationSeconds > 0
+      ? video.durationSeconds
+      : null;
+  const hasKnownDuration = sourceDuration != null;
+  const clipDurationSeconds = Math.max(0, trimEnd - trimStart);
+  const billedDuration = hasKnownDuration
+    ? clampReferenceDuration(clipDurationSeconds)
+    : null;
 
   const estimatedCredits = useMemo(() => {
-    if (!video || !hasKnownDuration) return null;
+    if (!billedDuration) return null;
     const imageCount = Math.max(
       1,
       (firstImage ? 1 : 0) + (secondImage ? 1 : 0)
     );
     try {
       return estimateHotelLobbyCredits({
-        duration: clampReferenceDuration(video.durationSeconds as number),
+        duration: billedDuration,
         resolution,
         imageCount,
       });
     } catch {
       return null;
     }
-  }, [video, hasKnownDuration, firstImage, secondImage, resolution]);
+  }, [billedDuration, firstImage, secondImage, resolution]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -275,6 +297,73 @@ export function HotelLobbyGeneratorPanel() {
       cancelled = true;
     };
   }, [video?.kind, video?.url, hasKnownDuration]);
+
+  useEffect(() => {
+    if (sourceDuration == null) {
+      setTrimStart(0);
+      setTrimEnd(0);
+      return;
+    }
+    setTrimStart(0);
+    setTrimEnd(sourceDuration);
+  }, [video?.url, sourceDuration]);
+
+  const applyTrim = async () => {
+    if (!video || sourceDuration == null || trimming) return;
+
+    if (
+      clipDurationSeconds < MIN_REFERENCE_VIDEO_SECONDS - 0.1 ||
+      clipDurationSeconds > MAX_REFERENCE_VIDEO_SECONDS + 0.2
+    ) {
+      toast.error('Trim the clip to between 5 and 15 seconds');
+      return;
+    }
+
+    if (isFullSourceClip(trimStart, trimEnd, sourceDuration)) {
+      toast.message('Selection already covers the full reference video');
+      return;
+    }
+
+    setTrimming(true);
+    try {
+      const sourceUrl =
+        video.kind === 'template' ? TEMPLATE_FILE_URL : video.url;
+      const trimmed = await trimVideoToFile({
+        sourceUrl,
+        startSeconds: trimStart,
+        endSeconds: trimEnd,
+      });
+
+      if (trimmed.size <= 0 || trimmed.size > MAX_VIDEO_BYTES) {
+        throw new Error('Trimmed clip must be 80 MB or smaller');
+      }
+
+      const url = URL.createObjectURL(trimmed);
+      localUrlsRef.current.add(url);
+
+      if (video.kind === 'upload') {
+        URL.revokeObjectURL(video.url);
+        localUrlsRef.current.delete(video.url);
+      }
+
+      setTemplateAvailable(true);
+      setVideo({
+        kind: 'upload',
+        file: trimmed,
+        url,
+        durationSeconds: clipDurationSeconds,
+      });
+      setResultUrl(null);
+      setPhase('idle');
+      toast.success(`Clipped to ${clipDurationSeconds.toFixed(1)}s`);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : 'Could not trim this video'
+      );
+    } finally {
+      setTrimming(false);
+    }
+  };
 
   const setImageAt = (slot: 'first' | 'second', file: File | null) => {
     if (!file) return;
@@ -421,7 +510,7 @@ export function HotelLobbyGeneratorPanel() {
       redirectToSignIn();
       return;
     }
-    if (!video) {
+    if (!video || sourceDuration == null) {
       toast.error('Use the preset template or upload a reference video');
       return;
     }
@@ -429,7 +518,14 @@ export function HotelLobbyGeneratorPanel() {
       toast.error('Add the first person photo');
       return;
     }
-    if (!hasKnownDuration || !estimatedCredits) {
+    if (
+      clipDurationSeconds < MIN_REFERENCE_VIDEO_SECONDS - 0.1 ||
+      clipDurationSeconds > MAX_REFERENCE_VIDEO_SECONDS + 0.2
+    ) {
+      toast.error('Trim the clip to between 5 and 15 seconds');
+      return;
+    }
+    if (!estimatedCredits) {
       toast.error(
         'Still reading the reference video length. Try again in a moment.'
       );
@@ -451,14 +547,38 @@ export function HotelLobbyGeneratorPanel() {
     const id = crypto.randomUUID();
     setGenerationId(id);
 
-    const useDefaultTemplate = video.kind === 'template';
-    const files = useDefaultTemplate
-      ? imageItems.map((item) => item.file)
-      : [video.file, ...imageItems.map((item) => item.file)];
-    const contentTypes = files.map((file) => file.type);
-    const contentLengths = files.map((file) => file.size);
+    const useFullTemplate =
+      video.kind === 'template' &&
+      isFullSourceClip(trimStart, trimEnd, sourceDuration);
 
     try {
+      let referenceVideoFile: File | null = null;
+      if (!useFullTemplate) {
+        if (
+          video.kind === 'upload' &&
+          isFullSourceClip(trimStart, trimEnd, sourceDuration)
+        ) {
+          referenceVideoFile = video.file;
+        } else {
+          const sourceUrl =
+            video.kind === 'template' ? TEMPLATE_FILE_URL : video.url;
+          referenceVideoFile = await trimVideoToFile({
+            sourceUrl,
+            startSeconds: trimStart,
+            endSeconds: trimEnd,
+          });
+        }
+      }
+
+      const useDefaultTemplate = useFullTemplate;
+      const files = useDefaultTemplate
+        ? imageItems.map((item) => item.file)
+        : [referenceVideoFile as File, ...imageItems.map((item) => item.file)];
+      const contentTypes = files.map(
+        (file) => file.type || 'application/octet-stream'
+      );
+      const contentLengths = files.map((file) => file.size);
+
       const setup = await apiPost<UploadSetup>('/api/hotel-lobby/upload-url', {
         generationId: id,
         useDefaultTemplate,
@@ -496,6 +616,7 @@ export function HotelLobbyGeneratorPanel() {
           imageKeys: imageUploads.map((item) => item.storageKey),
           contentTypes,
           contentLengths,
+          durationSeconds: billedDuration,
         }
       );
 
@@ -539,7 +660,7 @@ export function HotelLobbyGeneratorPanel() {
 
   const phaseLabel =
     phase === 'uploading'
-      ? 'Uploading photos…'
+      ? 'Preparing clip…'
       : phase === 'starting'
         ? 'Starting MiniMax H3…'
         : phase === 'generating'
@@ -561,8 +682,8 @@ export function HotelLobbyGeneratorPanel() {
                   Reference performance
                 </p>
                 <p className="mt-0.5 text-xs leading-5 text-white/40">
-                  The Hotel Lobby preset is loaded by default. Remove it to use
-                  your own 5–15s motion reference.
+                  The Hotel Lobby preset is loaded by default. Trim below, or
+                  remove it to use your own 5–15s motion reference.
                 </p>
               </div>
               {video?.kind === 'template' ? (
@@ -584,45 +705,77 @@ export function HotelLobbyGeneratorPanel() {
             />
 
             {video ? (
-              <div className="relative aspect-video overflow-hidden rounded-2xl border border-[rgba(204,144,92,0.24)] bg-black">
-                <video
-                  key={video.url}
-                  src={video.url}
-                  controls
-                  muted
-                  playsInline
-                  preload="metadata"
-                  className="size-full object-contain"
-                  onLoadedMetadata={(event) => {
-                    if (video.kind !== 'template') return;
-                    const seconds = event.currentTarget.duration;
-                    if (Number.isFinite(seconds) && seconds > 0) {
-                      setVideo((current) =>
-                        current?.kind === 'template'
-                          ? {
-                              ...current,
-                              durationSeconds: clampReferenceDuration(seconds),
-                            }
-                          : current
-                      );
+              <div>
+                <div className="relative aspect-video overflow-hidden rounded-2xl border border-[rgba(204,144,92,0.24)] bg-black">
+                  <video
+                    ref={previewVideoRef}
+                    key={video.url}
+                    src={video.url}
+                    controls
+                    muted
+                    playsInline
+                    preload="metadata"
+                    className="size-full object-contain"
+                    onLoadedMetadata={(event) => {
+                      const seconds = event.currentTarget.duration;
+                      if (!Number.isFinite(seconds) || seconds <= 0) return;
+                      if (video.kind === 'template') {
+                        setVideo((current) =>
+                          current?.kind === 'template'
+                            ? { ...current, durationSeconds: seconds }
+                            : current
+                        );
+                      }
+                    }}
+                    onError={() => {
+                      if (video.kind === 'template') {
+                        setTemplateAvailable(false);
+                        setVideo(null);
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={clearVideo}
+                    disabled={busy}
+                    aria-label="Remove reference video"
+                    className="absolute top-2 right-2 flex size-8 items-center justify-center rounded-full bg-black/70 text-white/80 backdrop-blur transition hover:bg-black/90 disabled:opacity-40"
+                  >
+                    <CloseIcon className="size-4" />
+                  </button>
+                </div>
+                {sourceDuration != null ? (
+                  <HotelLobbyTrimBar
+                    durationSeconds={sourceDuration}
+                    startSeconds={trimStart}
+                    endSeconds={trimEnd}
+                    minClipSeconds={MIN_REFERENCE_VIDEO_SECONDS}
+                    maxClipSeconds={MAX_REFERENCE_VIDEO_SECONDS}
+                    disabled={busy && !trimming}
+                    applying={trimming}
+                    canApply={
+                      !isFullSourceClip(trimStart, trimEnd, sourceDuration) &&
+                      clipDurationSeconds >=
+                        MIN_REFERENCE_VIDEO_SECONDS - 0.1 &&
+                      clipDurationSeconds <= MAX_REFERENCE_VIDEO_SECONDS + 0.2
                     }
-                  }}
-                  onError={() => {
-                    if (video.kind === 'template') {
-                      setTemplateAvailable(false);
-                      setVideo(null);
-                    }
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={clearVideo}
-                  disabled={busy}
-                  aria-label="Remove reference video"
-                  className="absolute top-2 right-2 flex size-8 items-center justify-center rounded-full bg-black/70 text-white/80 backdrop-blur transition hover:bg-black/90 disabled:opacity-40"
-                >
-                  <CloseIcon className="size-4" />
-                </button>
+                    onChange={({ startSeconds, endSeconds }) => {
+                      setTrimStart(startSeconds);
+                      setTrimEnd(endSeconds);
+                      const preview = previewVideoRef.current;
+                      if (preview) {
+                        try {
+                          preview.currentTime = startSeconds;
+                        } catch {
+                          // Ignore seek errors while metadata is still loading.
+                        }
+                      }
+                    }}
+                    onApply={() => {
+                      void applyTrim();
+                    }}
+                  />
+                ) : null}
               </div>
             ) : (
               <div className="space-y-2">
@@ -754,12 +907,20 @@ export function HotelLobbyGeneratorPanel() {
             <div>
               <p className="text-sm font-semibold text-white/90">Your video</p>
               <p className="mt-0.5 text-xs text-white/38">
-                MiniMax H3 · {resolution} · 9:16
+                MiniMax H3 · {resolution} · 16:9
               </p>
             </div>
             <a
-              href={resultUrl}
-              download
+              href={
+                generationId
+                  ? `/api/hotel-lobby/result/${encodeURIComponent(generationId)}?download=1`
+                  : resultUrl
+              }
+              download={
+                generationId
+                  ? `hotel-lobby-${generationId.slice(0, 8)}.mp4`
+                  : undefined
+              }
               className="inline-flex h-9 items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 text-xs font-medium text-white/70 transition hover:bg-white/10 hover:text-white"
             >
               <Download className="size-3.5" />
@@ -771,7 +932,7 @@ export function HotelLobbyGeneratorPanel() {
             controls
             autoPlay
             playsInline
-            className="mx-auto aspect-[9/16] max-h-[720px] w-auto max-w-full rounded-2xl bg-black object-contain"
+            className="mx-auto aspect-video max-h-[720px] w-full max-w-full rounded-2xl bg-black object-contain"
           />
           {generationId ? (
             <p className="mt-2 px-1 text-[10px] text-white/25">

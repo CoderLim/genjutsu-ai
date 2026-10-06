@@ -15,10 +15,9 @@ import { getLocale } from '@/paraglide/runtime.js';
 import { HotelLobbyGeneratorPanel } from '@/components/landing/HotelLobbyGeneratorPanel';
 import { SiteHeader } from '@/components/landing/SiteHeader';
 
-const PAGE_TITLE =
-  'Hotel Lobby AI Video Generator: 2 Photos, One Orange Booth';
+const PAGE_TITLE = 'Hotel Lobby AI Video Generator: 2 Photos, One Orange Booth';
 const PAGE_DESCRIPTION =
-  'Turn two photos into the viral Hotel Lobby AI video: your faces in the orange booth, trading bars at one hanging mic. Vertical 9:16 and ready to post.';
+  'Turn two photos into the viral Hotel Lobby AI video: your faces in the orange booth, trading bars at one hanging mic. Landscape 16:9 and ready to post.';
 
 const FAQ_ITEMS = [
   {
@@ -29,7 +28,7 @@ const FAQ_ITEMS = [
   {
     question: 'How do you do the Hotel Lobby AI video?',
     answer:
-      'Use the preset performance already loaded on this page, upload one photo with both subjects or one photo per performer, choose a resolution, and press generate. The output is vertical 9:16 and its length follows the reference performance.',
+      'Use the preset performance already loaded on this page, upload one photo with both subjects or one photo per performer, choose a resolution, and press generate. The output is landscape 16:9 and its length follows the reference performance.',
   },
   {
     question: 'Is Hotel Lobby AI free?',
@@ -74,12 +73,21 @@ const FAQ_ITEMS = [
 ] as const;
 
 const CAST_IDEAS = [
-  ['You and your best friend', 'The default, and still the easiest joke to land.'],
+  [
+    'You and your best friend',
+    'The default, and still the easiest joke to land.',
+  ],
   ['A couple', 'One photo of the two of you can be enough.'],
   ['Two coworkers', 'A Friday team-chat version practically writes itself.'],
-  ['Your parents', 'Formal outfits in the orange booth work surprisingly well.'],
+  [
+    'Your parents',
+    'Formal outfits in the orange booth work surprisingly well.',
+  ],
   ['Your pets', 'Use one clear photo per pet, ideally facing the camera.'],
-  ['Characters or mascots', 'Illustrated and fictional subjects can work when the face is clear.'],
+  [
+    'Characters or mascots',
+    'Illustrated and fictional subjects can work when the face is clear.',
+  ],
 ] as const;
 
 const PHOTO_TIPS = [
@@ -203,7 +211,7 @@ function HotelLobbyAiPage() {
             </h1>
             <p className="mx-auto mt-5 max-w-3xl text-base leading-7 text-white/58 sm:text-lg">
               One or two photos in, one orange-booth clip out. Put your duo at
-              the hanging mic in a vertical 9:16 video, ready for TikTok,
+              the hanging mic in a landscape 16:9 video, ready for YouTube,
               Reels, or Shorts.
             </p>
 
@@ -234,7 +242,7 @@ function HotelLobbyAiPage() {
                   hair, outfits, and overall appearance.
                 </p>
                 <p className="mt-4 text-sm leading-7 text-white/48 sm:text-base">
-                  Output is vertical 9:16. Its length follows the reference
+                  Output is landscape 16:9. Its length follows the reference
                   video automatically, from 5 to 15 seconds. For the original
                   song when you post, choose the licensed <em>Hotel Lobby</em>{' '}
                   sound inside TikTok or Instagram rather than bundling the
@@ -250,7 +258,7 @@ function HotelLobbyAiPage() {
                     controls
                     playsInline
                     preload="metadata"
-                    className="mx-auto aspect-[9/16] max-h-[620px] w-auto max-w-full rounded-2xl bg-black object-contain"
+                    className="mx-auto aspect-video max-h-[620px] w-full max-w-full rounded-2xl bg-black object-contain"
                   />
                   <p className="px-1 pt-3 text-center text-xs text-white/34">
                     Real Hotel Lobby AI output
@@ -269,7 +277,8 @@ function HotelLobbyAiPage() {
                 <p>
                   The orange set, one microphone hanging from the ceiling, and
                   two people trading verses comes from Quavo and Takeoff’s 2022
-                  A COLORS SHOW performance of <em>HOTEL LOBBY (Unc &amp; Phew)</em>.
+                  A COLORS SHOW performance of{' '}
+                  <em>HOTEL LOBBY (Unc &amp; Phew)</em>.
                 </p>
                 <p>
                   In September 2026, AI remixes of that performance spread
@@ -377,11 +386,31 @@ function HotelLobbyAiPage() {
                   </thead>
                   <tbody className="divide-y divide-white/7 text-white/46">
                     {[
-                      ['What you upload', '1–2 photos; preset video included', '4–30s source clip + references'],
-                      ['Copies source motion', 'Yes, from the preset or your replacement clip', 'Yes, in Motion Transfer'],
-                      ['Need to find the Hotel Lobby clip', 'No', 'Yes, if that is the motion you want'],
-                      ['Default output', '480P · 9:16 · reference length', 'Up to 1080p · source-driven'],
-                      ['Prompt writing', 'No fixed prompt exposed', 'Optional / workflow-dependent'],
+                      [
+                        'What you upload',
+                        '1–2 photos; preset video included',
+                        '4–30s source clip + references',
+                      ],
+                      [
+                        'Copies source motion',
+                        'Yes, from the preset or your replacement clip',
+                        'Yes, in Motion Transfer',
+                      ],
+                      [
+                        'Need to find the Hotel Lobby clip',
+                        'No',
+                        'Yes, if that is the motion you want',
+                      ],
+                      [
+                        'Default output',
+                        '480P · 16:9 · reference length',
+                        'Up to 1080p · source-driven',
+                      ],
+                      [
+                        'Prompt writing',
+                        'No fixed prompt exposed',
+                        'Optional / workflow-dependent',
+                      ],
                     ].map((row) => (
                       <tr key={row[0]}>
                         {row.map((cell, index) => (
@@ -411,7 +440,10 @@ function HotelLobbyAiPage() {
               </h2>
               <ul className="mt-6 space-y-4">
                 {PHOTO_TIPS.map((tip) => (
-                  <li key={tip} className="flex gap-3 text-sm leading-6 text-white/46">
+                  <li
+                    key={tip}
+                    className="flex gap-3 text-sm leading-6 text-white/46"
+                  >
                     <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-[rgb(204,144,92)]" />
                     <span>{tip}</span>
                   </li>
@@ -429,11 +461,10 @@ function HotelLobbyAiPage() {
               <p className="mt-4 text-sm leading-7 text-white/46">
                 You can load the preset, choose photos, and preview your setup
                 without spending credits. Choosing a file only creates a local
-                browser preview. Your
-                photos and custom reference video are not uploaded until you
-                sign in and press generate. Generation inputs are stored
-                privately for the job rather than published to a public
-                gallery.
+                browser preview. Your photos and custom reference video are not
+                uploaded until you sign in and press generate. Generation inputs
+                are stored privately for the job rather than published to a
+                public gallery.
               </p>
               <p className="mt-4 text-sm leading-7 text-white/46">
                 Provider failures automatically refund reserved credits. Use
@@ -494,13 +525,22 @@ function HotelLobbyAiPage() {
             COLORS, Quavo, or Takeoff.
           </p>
           <div className="flex flex-wrap items-center justify-center gap-4">
-            <Link href="/privacy-policy" className="transition hover:text-white/65">
+            <Link
+              href="/privacy-policy"
+              className="transition hover:text-white/65"
+            >
               Privacy
             </Link>
-            <Link href="/terms-of-service" className="transition hover:text-white/65">
+            <Link
+              href="/terms-of-service"
+              className="transition hover:text-white/65"
+            >
               Terms
             </Link>
-            <Link href="/refund-policy" className="transition hover:text-white/65">
+            <Link
+              href="/refund-policy"
+              className="transition hover:text-white/65"
+            >
               Refunds
             </Link>
             <a

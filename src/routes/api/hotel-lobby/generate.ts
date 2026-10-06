@@ -6,8 +6,8 @@ import {
   claimHotelLobbySubmission,
   getHotelLobbyTaskById,
   HotelLobbyInsufficientCreditsError,
-  markHotelLobbySubmitted,
   markHotelLobbySubmissionUnknown,
+  markHotelLobbySubmitted,
   refundHotelLobbyGeneration,
   reserveHotelLobbyGeneration,
 } from '@/modules/hotel-lobby/billing';
@@ -30,7 +30,7 @@ import { probeHotelLobbyDurationSeconds } from '@/modules/hotel-lobby/video-meta
 import { enforceMinIntervalRateLimit } from '@/lib/rate-limit';
 import { respData, respErr, respJson } from '@/lib/resp';
 
-const HOTEL_LOBBY_ASPECT_RATIO = '9:16' as const;
+const HOTEL_LOBBY_ASPECT_RATIO = '16:9' as const;
 const HOTEL_LOBBY_PROMPT_EXPANSION_MODE = 'disabled' as const;
 
 function taskResponse(task: any) {
@@ -120,10 +120,22 @@ async function POST({ request }: { request: Request }) {
     });
 
     // The output duration is intentionally not a user setting on this preset.
-    // It follows the server-validated reference video duration, rounded to the
-    // integer range MiniMax H3 accepts.
+    // It follows the reference video duration (probed from MP4/MOV/WebM, with
+    // a client-provided fallback for MediaRecorder WebM clips that omit
+    // Duration metadata), rounded to the integer range MiniMax H3 accepts.
+    const clientDurationHint =
+      typeof body.durationSeconds === 'number'
+        ? body.durationSeconds
+        : typeof body.durationSeconds === 'string'
+          ? Number(body.durationSeconds)
+          : undefined;
     const duration = await probeHotelLobbyDurationSeconds(
-      providerInput.videoUrl
+      providerInput.videoUrl,
+      {
+        fallbackSeconds: Number.isFinite(clientDurationHint)
+          ? clientDurationHint
+          : undefined,
+      }
     );
 
     const prompt = buildHotelLobbyPrompt(imageKeys.length);
