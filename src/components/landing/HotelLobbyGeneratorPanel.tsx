@@ -163,6 +163,7 @@ export function HotelLobbyGeneratorPanel() {
   const videoInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const mountedRef = useRef(true);
+  const mediaUrlsRef = useRef<Set<string>>(new Set());
 
   const [video, setVideo] = useState<MediaItem | null>(null);
   const [images, setImages] = useState<MediaItem[]>([]);
@@ -200,10 +201,10 @@ export function HotelLobbyGeneratorPanel() {
   useEffect(() => {
     return () => {
       mountedRef.current = false;
-      if (video) URL.revokeObjectURL(video.url);
-      images.forEach((item) => URL.revokeObjectURL(item.url));
+      mediaUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+      mediaUrlsRef.current.clear();
     };
-  }, [video, images]);
+  }, []);
 
   const replaceVideo = async (file: File | null) => {
     if (!file) return;
@@ -234,7 +235,11 @@ export function HotelLobbyGeneratorPanel() {
         ...createMediaItem(file),
         durationSeconds,
       };
-      if (video) URL.revokeObjectURL(video.url);
+      mediaUrlsRef.current.add(next.url);
+      if (video) {
+        URL.revokeObjectURL(video.url);
+        mediaUrlsRef.current.delete(video.url);
+      }
       setVideo(next);
       setResultUrl(null);
       setPhase('idle');
@@ -264,6 +269,7 @@ export function HotelLobbyGeneratorPanel() {
       .map(createMediaItem);
 
     if (accepted.length) {
+      accepted.forEach((item) => mediaUrlsRef.current.add(item.url));
       setImages((current) => [...current, ...accepted]);
       setResultUrl(null);
       setPhase('idle');
@@ -273,13 +279,19 @@ export function HotelLobbyGeneratorPanel() {
   const removeImage = (id: string) => {
     setImages((current) => {
       const target = current.find((item) => item.id === id);
-      if (target) URL.revokeObjectURL(target.url);
+      if (target) {
+        URL.revokeObjectURL(target.url);
+        mediaUrlsRef.current.delete(target.url);
+      }
       return current.filter((item) => item.id !== id);
     });
   };
 
   const clearVideo = () => {
-    if (video) URL.revokeObjectURL(video.url);
+    if (video) {
+      URL.revokeObjectURL(video.url);
+      mediaUrlsRef.current.delete(video.url);
+    }
     setVideo(null);
     if (videoInputRef.current) videoInputRef.current.value = '';
   };
