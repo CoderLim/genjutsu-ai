@@ -205,7 +205,13 @@ function HotelLobbyAiPage() {
           </section>
 
           <section className="mx-auto max-w-6xl px-4 py-14 md:px-5 md:py-20">
-            <div className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
+            <div
+              className={
+                exampleVideoUrl
+                  ? 'grid gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-center'
+                  : 'mx-auto max-w-3xl'
+              }
+            >
               <div>
                 <p className="text-xs font-semibold tracking-[0.18em] text-[rgb(204,144,92)] uppercase">
                   The result
@@ -242,25 +248,7 @@ function HotelLobbyAiPage() {
                     Real Hotel Lobby AI output
                   </p>
                 </div>
-              ) : (
-                <div className="rounded-[24px] border border-white/8 bg-white/[0.025] p-6">
-                  <div className="flex items-center gap-3">
-                    <span className="flex size-11 items-center justify-center rounded-xl bg-[rgba(204,144,92,0.1)] text-[rgb(220,155,99)]">
-                      <Film className="size-5" />
-                    </span>
-                    <div>
-                      <p className="text-sm font-semibold text-white/82">
-                        Real-output showcase is wired in
-                      </p>
-                      <p className="mt-1 text-xs leading-5 text-white/38">
-                        Add a real generated MP4 + thumbnail in the production
-                        example settings and this block also emits VideoObject
-                        structured data.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
+              ) : null}
             </div>
           </section>
 
