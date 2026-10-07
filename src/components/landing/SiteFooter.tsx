@@ -133,7 +133,7 @@ export function SiteFooter() {
             <a
               href="https://submito.net"
               target="_blank"
-              rel="nofollow sponsored noopener noreferrer"
+              rel="noopener noreferrer"
               title="Listed on Submito"
             >
               <img
@@ -147,13 +147,27 @@ export function SiteFooter() {
             <a
               href="https://findly.tools/genjutsu-ai?utm_source=genjutsu-ai"
               target="_blank"
-              rel="nofollow sponsored noopener noreferrer"
+              rel="noopener noreferrer"
             >
               <img
                 src="https://findly.tools/badges/findly-tools-badge-light.svg"
                 alt="Featured on Findly.tools"
                 width={175}
                 height={55}
+                loading="lazy"
+                decoding="async"
+                className="h-[27px] w-auto"
+              />
+            </a>
+            <a
+              href="https://goodaitools.com/ai/genjutsuai"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <img
+                src="https://goodaitools.com/assets/images/badge.png"
+                alt="Good AI Tools"
+                height={54}
                 loading="lazy"
                 decoding="async"
                 className="h-[27px] w-auto"
