@@ -18,7 +18,15 @@ export type HotelLobbyAspectRatio = (typeof HOTEL_LOBBY_ASPECT_RATIOS)[number];
 
 export const HOTEL_LOBBY_MIN_DURATION_SECONDS = 5;
 export const HOTEL_LOBBY_MAX_DURATION_SECONDS = 15;
+/** Hotel Lobby product preset: one or two subject photos. */
 export const HOTEL_LOBBY_MAX_REFERENCE_IMAGES = 2;
+/** MiniMax H3 model limit for `reference_image_urls`. */
+export const H3_MAX_REFERENCE_IMAGES = 9;
+/**
+ * Fal OpenAPI `maxLength` for `minimax/h3/reference-to-video` prompt
+ * (https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=minimax/h3/reference-to-video).
+ */
+export const H3_MAX_PROMPT_LENGTH = 50_000;
 
 /**
  * Fal published rates for `minimax/h3/reference-to-video`
@@ -56,17 +64,31 @@ export function estimateHotelLobbyProviderCost(input: {
   duration: number;
   resolution: HotelLobbyResolution;
   imageCount: number;
+  /** Defaults to Hotel Lobby's 2-image product cap. Use `H3_MAX_REFERENCE_IMAGES` for lab. */
+  maxImages?: number;
 }) {
   assertHotelLobbyDuration(input.duration);
   if (!HOTEL_LOBBY_RESOLUTIONS.includes(input.resolution)) {
     throw new Error('Unsupported MiniMax H3 resolution');
   }
+  const maxImages = input.maxImages ?? HOTEL_LOBBY_MAX_REFERENCE_IMAGES;
+  if (
+    !Number.isInteger(maxImages) ||
+    maxImages < 1 ||
+    maxImages > H3_MAX_REFERENCE_IMAGES
+  ) {
+    throw new Error('Invalid max reference-image count');
+  }
   if (
     !Number.isInteger(input.imageCount) ||
     input.imageCount < 1 ||
-    input.imageCount > HOTEL_LOBBY_MAX_REFERENCE_IMAGES
+    input.imageCount > maxImages
   ) {
-    throw new Error('Provide one or two reference images');
+    throw new Error(
+      maxImages === 1
+        ? 'Provide one reference image'
+        : `Provide between 1 and ${maxImages} reference images`
+    );
   }
 
   const outputCost =
@@ -82,6 +104,29 @@ export function estimateHotelLobbyCredits(input: {
   duration: number;
   resolution: HotelLobbyResolution;
   imageCount: number;
+  maxImages?: number;
 }) {
   return calculateGenjutsuCredits(estimateHotelLobbyProviderCost(input));
+}
+
+export function estimateH3LabProviderCost(input: {
+  duration: number;
+  resolution: HotelLobbyResolution;
+  imageCount: number;
+}) {
+  return estimateHotelLobbyProviderCost({
+    ...input,
+    maxImages: H3_MAX_REFERENCE_IMAGES,
+  });
+}
+
+export function estimateH3LabCredits(input: {
+  duration: number;
+  resolution: HotelLobbyResolution;
+  imageCount: number;
+}) {
+  return estimateHotelLobbyCredits({
+    ...input,
+    maxImages: H3_MAX_REFERENCE_IMAGES,
+  });
 }

@@ -157,4 +157,4 @@ Use the same source/reference pairs against both providers:
 
 Record success rate, subject consistency, motion fidelity, unintended edits,
 latency, provider cost, and retry rate. Do not pick the default from one or two
-good demos.
+good demos. Append concrete runs to [model-test-results.md](./model-test-results.md).

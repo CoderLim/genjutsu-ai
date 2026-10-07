@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  estimateH3LabProviderCost,
   estimateHotelLobbyCredits,
   estimateHotelLobbyProviderCost,
   HOTEL_LOBBY_OUTPUT_RATE_USD_PER_SECOND,
@@ -61,6 +62,32 @@ test('Hotel Lobby preset accepts one or two subject references only', () => {
       duration: 10,
       resolution: '768P',
       imageCount: 3,
+    })
+  );
+});
+
+test('H3 lab allows up to 9 reference images with Fal free-image allowance', () => {
+  assert.equal(
+    estimateH3LabProviderCost({
+      duration: 5,
+      resolution: '480P',
+      imageCount: 5,
+    }),
+    0.25
+  );
+  assert.equal(
+    estimateH3LabProviderCost({
+      duration: 5,
+      resolution: '480P',
+      imageCount: 9,
+    }),
+    0.25 + 4 * 0.08
+  );
+  assert.throws(() =>
+    estimateH3LabProviderCost({
+      duration: 5,
+      resolution: '480P',
+      imageCount: 10,
     })
   );
 });

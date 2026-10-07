@@ -5,6 +5,10 @@ import { getAllConfigs } from '@/modules/config/service';
 import { getStorage } from '@/modules/storage/service';
 
 import {
+  H3_MAX_REFERENCE_IMAGES,
+  HOTEL_LOBBY_MAX_REFERENCE_IMAGES,
+} from './pricing';
+import {
   normalizeHotelLobbyDuration,
   probeHotelLobbyDurationSecondsRaw,
 } from './video-metadata';
@@ -14,7 +18,7 @@ const READ_EXPIRES_SECONDS = 60 * 60;
 
 export const HOTEL_LOBBY_MAX_VIDEO_BYTES = 80 * 1024 * 1024;
 export const HOTEL_LOBBY_MAX_IMAGE_BYTES = 12 * 1024 * 1024;
-export const HOTEL_LOBBY_MAX_REFERENCE_IMAGES = 2;
+export { H3_MAX_REFERENCE_IMAGES, HOTEL_LOBBY_MAX_REFERENCE_IMAGES };
 
 const VIDEO_CONTENT_TYPES: Record<string, string> = {
   'video/mp4': 'mp4',
@@ -246,7 +250,11 @@ export function getHotelLobbyInputKey(params: {
   index: number;
   contentType: string;
 }) {
-  if (!Number.isInteger(params.index) || params.index < 0 || params.index > 2) {
+  if (
+    !Number.isInteger(params.index) ||
+    params.index < 0 ||
+    params.index > H3_MAX_REFERENCE_IMAGES
+  ) {
     throw new Error('Invalid Hotel Lobby input index');
   }
 
@@ -281,7 +289,7 @@ function assertHotelLobbyInputKey(params: {
     return;
   }
 
-  if (params.index < 1 || params.index > HOTEL_LOBBY_MAX_REFERENCE_IMAGES) {
+  if (params.index < 1 || params.index > H3_MAX_REFERENCE_IMAGES) {
     throw new Error('Invalid Hotel Lobby reference-image index');
   }
 
@@ -435,12 +443,24 @@ export async function sealHotelLobbyInputs(params: {
   imageKeys: string[];
   contentTypes: string[];
   contentLengths: number[];
+  maxReferenceImages?: number;
 }) {
+  const maxReferenceImages =
+    params.maxReferenceImages ?? HOTEL_LOBBY_MAX_REFERENCE_IMAGES;
+  if (
+    !Number.isInteger(maxReferenceImages) ||
+    maxReferenceImages < 1 ||
+    maxReferenceImages > H3_MAX_REFERENCE_IMAGES
+  ) {
+    throw new Error('Invalid max reference-image count');
+  }
   if (
     params.imageKeys.length < 1 ||
-    params.imageKeys.length > HOTEL_LOBBY_MAX_REFERENCE_IMAGES
+    params.imageKeys.length > maxReferenceImages
   ) {
-    throw new Error('Hotel Lobby requires one or two reference images');
+    throw new Error(
+      `Provide between 1 and ${maxReferenceImages} reference images`
+    );
   }
 
   const expectedUploadCount =
@@ -625,12 +645,24 @@ export async function resolveHotelLobbyInputUrls(params: {
   generationId: string;
   videoKey: string;
   imageKeys: string[];
+  maxReferenceImages?: number;
 }) {
+  const maxReferenceImages =
+    params.maxReferenceImages ?? HOTEL_LOBBY_MAX_REFERENCE_IMAGES;
+  if (
+    !Number.isInteger(maxReferenceImages) ||
+    maxReferenceImages < 1 ||
+    maxReferenceImages > H3_MAX_REFERENCE_IMAGES
+  ) {
+    throw new Error('Invalid max reference-image count');
+  }
   if (
     params.imageKeys.length < 1 ||
-    params.imageKeys.length > HOTEL_LOBBY_MAX_REFERENCE_IMAGES
+    params.imageKeys.length > maxReferenceImages
   ) {
-    throw new Error('Hotel Lobby requires one or two reference images');
+    throw new Error(
+      `Provide between 1 and ${maxReferenceImages} reference images`
+    );
   }
 
   const keys = [params.videoKey, ...params.imageKeys];

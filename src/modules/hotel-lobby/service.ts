@@ -2,11 +2,13 @@ import { AIMediaType, AITaskStatus, FalProvider } from '@/core/ai';
 import { getConfig } from '@/modules/config/service';
 
 import {
+  assertHotelLobbyDuration,
+  H3_MAX_PROMPT_LENGTH,
+  H3_MAX_REFERENCE_IMAGES,
   HOTEL_LOBBY_ASPECT_RATIOS,
   HOTEL_LOBBY_MAX_REFERENCE_IMAGES,
   HOTEL_LOBBY_MODEL,
   HOTEL_LOBBY_RESOLUTIONS,
-  assertHotelLobbyDuration,
   type HotelLobbyAspectRatio,
   type HotelLobbyResolution,
 } from './pricing';
@@ -86,11 +88,15 @@ export function validateHotelLobbyInput(input: {
   promptExpansionMode: HotelLobbyPromptExpansionMode;
   videoUrl: string;
   imageUrls: string[];
+  enableSafetyChecker?: boolean;
+  maxReferenceImages?: number;
 }) {
   const prompt = input.prompt.trim();
   if (!prompt) throw new HotelLobbyPreflightError('Prompt is required');
-  if (prompt.length > 4000) {
-    throw new HotelLobbyPreflightError('Prompt is too long');
+  if (prompt.length > H3_MAX_PROMPT_LENGTH) {
+    throw new HotelLobbyPreflightError(
+      `Prompt is too long (max ${H3_MAX_PROMPT_LENGTH} characters)`
+    );
   }
 
   assertHotelLobbyDuration(input.duration);
@@ -105,21 +111,36 @@ export function validateHotelLobbyInput(input: {
     throw new HotelLobbyPreflightError('Unsupported prompt expansion mode');
   }
 
+  const maxReferenceImages =
+    input.maxReferenceImages ?? HOTEL_LOBBY_MAX_REFERENCE_IMAGES;
+  if (
+    !Number.isInteger(maxReferenceImages) ||
+    maxReferenceImages < 1 ||
+    maxReferenceImages > H3_MAX_REFERENCE_IMAGES
+  ) {
+    throw new HotelLobbyPreflightError('Invalid max reference-image count');
+  }
+
   assertHttpUrl(input.videoUrl, 'Reference video URL');
   if (
     !Array.isArray(input.imageUrls) ||
     input.imageUrls.length < 1 ||
-    input.imageUrls.length > HOTEL_LOBBY_MAX_REFERENCE_IMAGES
+    input.imageUrls.length > maxReferenceImages
   ) {
     throw new HotelLobbyPreflightError(
-      'Provide one or two reference images'
+      `Provide between 1 and ${maxReferenceImages} reference images`
     );
   }
   input.imageUrls.forEach((url, index) =>
     assertHttpUrl(url, `Reference image ${index + 1} URL`)
   );
 
-  return { ...input, prompt };
+  return {
+    ...input,
+    prompt,
+    enableSafetyChecker: input.enableSafetyChecker !== false,
+    maxReferenceImages,
+  };
 }
 
 export async function submitHotelLobby(input: {
@@ -130,6 +151,8 @@ export async function submitHotelLobby(input: {
   promptExpansionMode: HotelLobbyPromptExpansionMode;
   videoUrl: string;
   imageUrls: string[];
+  enableSafetyChecker?: boolean;
+  maxReferenceImages?: number;
 }) {
   const normalized = validateHotelLobbyInput(input);
   const provider = await getFalProvider();
@@ -142,7 +165,7 @@ export async function submitHotelLobby(input: {
       options: {
         duration: normalized.duration,
         resolution: normalized.resolution,
-        enable_safety_checker: true,
+        enable_safety_checker: normalized.enableSafetyChecker,
         sync_mode: false,
         prompt_expansion_mode: normalized.promptExpansionMode,
         aspect_ratio: normalized.aspectRatio,
