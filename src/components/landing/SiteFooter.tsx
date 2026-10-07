@@ -173,6 +173,22 @@ export function SiteFooter() {
                 className="h-[27px] w-auto"
               />
             </a>
+            <a
+              href="https://openhunts.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              title="OpenHunts Club"
+            >
+              <img
+                src="https://cdn.openhunts.com/badges/club.webp"
+                alt="OpenHunts Club Member"
+                width={486}
+                height={105}
+                loading="lazy"
+                decoding="async"
+                className="h-[27px] w-auto"
+              />
+            </a>
           </div>
         </footer>
       </div>
