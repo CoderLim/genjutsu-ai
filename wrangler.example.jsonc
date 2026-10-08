@@ -37,5 +37,6 @@
   //
   // Other optional bindings — uncomment when needed:
   // "kv_namespaces":  [{ "binding": "CACHE",  "id": "..." }],
-  // "r2_buckets":     [{ "binding": "BUCKET", "bucket_name": "..." }]
+  // Genjutsu proxy uploads (PUT /api/genjutsu/upload/...) stream into this binding.
+  // "r2_buckets":     [{ "binding": "R2_BUCKET", "bucket_name": "YOUR_R2_BUCKET" }]
 }

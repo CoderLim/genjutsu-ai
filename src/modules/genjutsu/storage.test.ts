@@ -9,8 +9,10 @@ import {
   assertGenjutsuSourceVideoKeyOwned,
   assertGenjutsuStagingKeyOwned,
   assertGenjutsuUploadSize,
+  createGenjutsuProxyUploadDescriptor,
   GENJUTSU_MAX_IMAGE_BYTES,
   GENJUTSU_MAX_VIDEO_BYTES,
+  GENJUTSU_PROXY_UPLOAD_MAX_BYTES,
   getGenjutsuInputPrefix,
   getGenjutsuResultKey,
   getGenjutsuSealedInputKey,
@@ -223,6 +225,42 @@ test('Genjutsu upload sizes enforce the business limits', () => {
   assert.throws(
     () => assertGenjutsuUploadSize(1, GENJUTSU_MAX_IMAGE_BYTES + 1),
     /12 MB/
+  );
+});
+
+test('Genjutsu proxy upload descriptor is same-origin and sized', () => {
+  const request = new Request(
+    'https://genjutsuai.net/api/genjutsu/upload-url',
+    {
+      method: 'POST',
+    }
+  );
+  const descriptor = createGenjutsuProxyUploadDescriptor(request, {
+    userId: 'user-123',
+    generationId: 'gen-456789',
+    index: 0,
+    contentType: 'video/mp4',
+    contentLength: 1024,
+  });
+
+  assert.equal(
+    descriptor.uploadUrl,
+    'https://genjutsuai.net/api/genjutsu/upload/gen-456789/0'
+  );
+  assert.equal(descriptor.uploadHeaders['Content-Type'], 'video/mp4');
+  assert.equal(descriptor.uploadMode, 'proxy');
+  assert.match(descriptor.storageKey, /\/source\.mp4$/);
+
+  assert.throws(
+    () =>
+      createGenjutsuProxyUploadDescriptor(request, {
+        userId: 'user-123',
+        generationId: 'gen-456789',
+        index: 0,
+        contentType: 'video/mp4',
+        contentLength: GENJUTSU_PROXY_UPLOAD_MAX_BYTES + 1,
+      }),
+    /Proxy upload supports/
   );
 });
 

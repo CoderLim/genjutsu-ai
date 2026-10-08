@@ -3,9 +3,10 @@ import handler from '@tanstack/react-start/server-entry';
 import { getCookieFromHeader } from './lib/cookie';
 import { paraglideMiddleware } from './paraglide/server.js';
 
-// On Cloudflare Workers, stash the binding env (D1, ASSETS, …) on globalThis
-// so synchronous code paths (e.g. the db() singleton with DATABASE_PROVIDER=d1)
-// can reach bindings without threading the request context through every call.
+// On Cloudflare Workers, stash the binding env (D1, R2_BUCKET, ASSETS, …) on
+// globalThis so synchronous code paths (e.g. the db() singleton with
+// DATABASE_PROVIDER=d1, Genjutsu proxy uploads via R2 binding) can reach
+// bindings without threading the request context through every call.
 // The specifier is kept non-literal so bundlers leave the import to runtime;
 // outside workerd the import rejects and we just move on.
 const CF_WORKERS_MODULE = 'cloudflare:workers';

@@ -92,6 +92,26 @@ export class SignedUploadError extends Error {
   }
 }
 
+function uploadFetchCredentials(url: string): RequestCredentials {
+  // Same-origin proxy uploads need the session cookie; cross-origin R2
+  // signed URLs must stay credential-less (CORS + no cookies).
+  try {
+    const parsed = new URL(
+      url,
+      typeof window !== 'undefined' ? window.location.href : 'http://localhost'
+    );
+    if (
+      typeof window !== 'undefined' &&
+      parsed.origin === window.location.origin
+    ) {
+      return 'same-origin';
+    }
+  } catch {
+    // Fall through to omit.
+  }
+  return 'omit';
+}
+
 async function putSignedUploadOnce(params: {
   url: string;
   file: File;
@@ -105,7 +125,7 @@ async function putSignedUploadOnce(params: {
       method: 'PUT',
       headers: params.headers,
       body: params.file,
-      credentials: 'omit',
+      credentials: uploadFetchCredentials(params.url),
       signal: controller.signal,
     });
     if (!response.ok) {
