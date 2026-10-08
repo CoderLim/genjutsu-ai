@@ -1,5 +1,7 @@
 # Genjutsu AI pricing
 
+> **V2 (2026-10-08):** See [Genjutsu AI Pricing V2 — Implementation Plan](./genjutsu-pricing-v2-plan.md) for the approved **proposed** three-tier pricing ($14.99 / $49.99 / $99.99; 1,100 / 3,900 / 8,400 credits), checkout migration and rollout steps. **V2 is not implemented or deployed.** This document is the historical first-launch baseline until cutover.
+
 Status: approved for first launch  
 Decision date: 2026-09-30
 
