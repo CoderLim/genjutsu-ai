@@ -8,6 +8,89 @@ const READ_EXPIRES_SECONDS = 60 * 60;
 
 export const GENJUTSU_MAX_VIDEO_BYTES = 200 * 1024 * 1024;
 export const GENJUTSU_MAX_IMAGE_BYTES = 12 * 1024 * 1024;
+/** Cloudflare Workers request body limit is 100 MiB — stay under it for proxy uploads. */
+export const GENJUTSU_PROXY_UPLOAD_MAX_BYTES = 95 * 1024 * 1024;
+
+export type R2BucketBinding = {
+  put(
+    key: string,
+    value:
+      | ReadableStream
+      | ArrayBuffer
+      | ArrayBufferView
+      | string
+      | Blob
+      | null,
+    options?: {
+      httpMetadata?: { contentType?: string };
+    }
+  ): Promise<unknown>;
+};
+
+/** Thrown when Workers runtime has no R2_BUCKET binding (misconfigured deploy). */
+export class GenjutsuR2BindingMissingError extends Error {
+  readonly statusCode = 503;
+  constructor() {
+    super(
+      'R2_BUCKET binding is not configured. Add r2_buckets to wrangler.jsonc and redeploy.'
+    );
+    this.name = 'GenjutsuR2BindingMissingError';
+  }
+}
+
+export function isCloudflareWorkersRuntime() {
+  const env = (globalThis as any).__CF_ENV__ ?? (globalThis as any).__env__;
+  return Boolean(env);
+}
+
+export function getR2BucketBinding(): R2BucketBinding | null {
+  const env = (globalThis as any).__CF_ENV__ ?? (globalThis as any).__env__;
+  const binding = env?.R2_BUCKET ?? env?.BUCKET;
+  return binding && typeof binding.put === 'function'
+    ? (binding as R2BucketBinding)
+    : null;
+}
+
+/** Map put/proxy failures to HTTP status so the client can retry 5xx. */
+export function statusForGenjutsuProxyUploadError(error: unknown): number {
+  if (error instanceof GenjutsuR2BindingMissingError) {
+    return error.statusCode;
+  }
+  if (error instanceof Error) {
+    const message = error.message;
+    if (
+      /mismatch|Invalid|Unsupported|must be|not an? |Provide |Missing body/i.test(
+        message
+      )
+    ) {
+      return 400;
+    }
+  }
+  // R2 put / config / unexpected — retryable from the browser.
+  return 502;
+}
+
+export function buildGenjutsuR2ObjectKey(uploadPath: string, key: string) {
+  return [trimSlashes(uploadPath), key].filter(Boolean).join('/');
+}
+
+export async function putGenjutsuStagingObjectViaBinding(params: {
+  bucket: R2BucketBinding;
+  uploadPath: string;
+  key: string;
+  body: ReadableStream | ArrayBuffer | ArrayBufferView | Blob;
+  contentType: string;
+}) {
+  assertSafeObjectKey(params.key);
+  if (!params.key.startsWith('genjutsu/inputs/')) {
+    throw new Error('Invalid Genjutsu staging key');
+  }
+  const objectKey = buildGenjutsuR2ObjectKey(params.uploadPath, params.key);
+  await params.bucket.put(objectKey, params.body, {
+    httpMetadata: { contentType: params.contentType },
+  });
+  return { via: 'binding' as const, objectKey };
+}
 
 const VIDEO_CONTENT_TYPES: Record<string, string> = {
   'video/mp4': 'mp4',
@@ -591,7 +674,131 @@ export async function createGenjutsuR2UploadDescriptor(params: {
       'Content-Type': normalized.contentType,
     },
     storageKey: normalized.key,
+    uploadMode: 'signed' as const,
   };
+}
+
+/**
+ * Same-origin upload URL (browser → Worker → R2). Avoids Android Chrome
+ * Failed-to-fetch against `*.r2.cloudflarestorage.com`.
+ */
+export function createGenjutsuProxyUploadDescriptor(
+  request: Request,
+  params: {
+    userId: string;
+    generationId: string;
+    index: number;
+    contentType: string;
+    contentLength: number;
+  }
+) {
+  assertGenjutsuUploadSize(params.index, params.contentLength);
+  if (params.contentLength > GENJUTSU_PROXY_UPLOAD_MAX_BYTES) {
+    throw new Error(
+      `Proxy upload supports files up to ${Math.floor(GENJUTSU_PROXY_UPLOAD_MAX_BYTES / 1024 / 1024)} MB`
+    );
+  }
+
+  const normalized = getGenjutsuInputKey(params);
+  const origin = new URL(request.url).origin;
+  const uploadUrl = `${origin}/api/genjutsu/upload/${encodeURIComponent(
+    params.generationId
+  )}/${params.index}`;
+
+  return {
+    uploadUrl,
+    uploadHeaders: {
+      'Content-Type': normalized.contentType,
+    },
+    storageKey: normalized.key,
+    uploadMode: 'proxy' as const,
+  };
+}
+
+/**
+ * Write a staging object via the Workers R2 binding (streamed).
+ *
+ * On Cloudflare Workers, missing R2_BUCKET fails hard (no in-memory buffer
+ * fallback — that risks OOM near the 95 MiB proxy cap). Local Node without
+ * bindings may still use the S3-compatible API for development.
+ */
+export async function putGenjutsuStagingObject(params: {
+  key: string;
+  body: ReadableStream | ArrayBuffer | ArrayBufferView | Blob;
+  contentType: string;
+  contentLength: number;
+}) {
+  assertSafeObjectKey(params.key);
+  if (!params.key.startsWith('genjutsu/inputs/')) {
+    throw new Error('Invalid Genjutsu staging key');
+  }
+  assertGenjutsuUploadSize(
+    params.key.includes('/source.') ? 0 : 1,
+    params.contentLength
+  );
+
+  const binding = getR2BucketBinding();
+  if (binding) {
+    const config = await getR2SigningConfig();
+    return putGenjutsuStagingObjectViaBinding({
+      bucket: binding,
+      uploadPath: config.uploadPath,
+      key: params.key,
+      body: params.body,
+      contentType: params.contentType,
+    });
+  }
+
+  if (isCloudflareWorkersRuntime()) {
+    throw new GenjutsuR2BindingMissingError();
+  }
+
+  // Local Node only: buffer + signed PUT (dev-sized files).
+  const config = await getR2SigningConfig();
+  const objectKey = buildGenjutsuR2ObjectKey(config.uploadPath, params.key);
+  const bytes =
+    params.body instanceof ReadableStream
+      ? new Uint8Array(await new Response(params.body).arrayBuffer())
+      : params.body instanceof Blob
+        ? new Uint8Array(await params.body.arrayBuffer())
+        : params.body instanceof ArrayBuffer
+          ? new Uint8Array(params.body)
+          : new Uint8Array(
+              params.body.buffer,
+              params.body.byteOffset,
+              params.body.byteLength
+            );
+
+  if (bytes.byteLength !== params.contentLength) {
+    throw new Error(
+      `Upload size mismatch: expected ${params.contentLength}, got ${bytes.byteLength}`
+    );
+  }
+
+  const headers = new Headers({
+    'Content-Type': params.contentType,
+    'Content-Length': String(bytes.byteLength),
+    'x-amz-content-sha256': 'UNSIGNED-PAYLOAD',
+  });
+
+  const response = await createR2Client(config).fetch(
+    new Request(buildR2ObjectUrl(config, params.key), {
+      method: 'PUT',
+      headers,
+      body: bytes,
+    })
+  );
+
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '');
+    throw new Error(
+      `Failed to upload to R2: HTTP ${response.status}${
+        detail ? ` - ${detail.slice(0, 300)}` : ''
+      }`
+    );
+  }
+
+  return { via: 's3' as const, objectKey };
 }
 
 export async function createGenjutsuR2ReadUrl(key: string) {

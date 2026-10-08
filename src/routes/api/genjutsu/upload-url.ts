@@ -15,7 +15,9 @@ import {
 import { resolveGenjutsuProviderTarget } from '@/modules/genjutsu/service';
 import {
   assertGenjutsuUploadSize,
+  createGenjutsuProxyUploadDescriptor,
   createGenjutsuR2UploadDescriptor,
+  GENJUTSU_PROXY_UPLOAD_MAX_BYTES,
   getGenjutsuInputKey,
 } from '@/modules/genjutsu/storage';
 import { enforceMinIntervalRateLimit } from '@/lib/rate-limit';
@@ -129,9 +131,21 @@ async function POST({ request }: { request: Request }) {
             storageKey: normalized.key,
           })
         );
-      } else {
+      } else if (contentLength > GENJUTSU_PROXY_UPLOAD_MAX_BYTES) {
+        // Workers request body cap ~100 MiB — keep direct signed PUT for huge videos.
         uploads.push(
           await createGenjutsuR2UploadDescriptor({
+            userId: session.user.id,
+            generationId,
+            index,
+            contentType,
+            contentLength,
+          })
+        );
+      } else {
+        // Same-origin proxy — Android Chrome cannot reliably PUT to R2 S3 host.
+        uploads.push(
+          createGenjutsuProxyUploadDescriptor(request, {
             userId: session.user.id,
             generationId,
             index,

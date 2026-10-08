@@ -64,6 +64,11 @@ jobs:
 
           cp wrangler.example.jsonc wrangler.jsonc
 
+          if ! grep -q '"binding": "R2_BUCKET"' wrangler.jsonc; then
+            echo "wrangler.jsonc is missing R2_BUCKET binding (required for Genjutsu proxy uploads)."
+            exit 1
+          fi
+
           D1_JSON="$(npx wrangler d1 list --json)"
           D1_ID="$(D1_JSON="$D1_JSON" node - <<'NODE'
           const raw = JSON.parse(process.env.D1_JSON || '[]');
