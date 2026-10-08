@@ -996,7 +996,7 @@ function InsufficientCreditsModal({
           <div className="my-2 h-px bg-white/8" />
           <div className="flex items-center justify-between py-1 font-medium">
             <span>{m['genjutsu.credits.need_label']()}</span>
-            <span className="tabular-nums text-[rgb(220,155,99)]">
+            <span className="text-[rgb(220,155,99)] tabular-nums">
               {m['genjutsu.credits.need_more']({
                 count: deficit.toLocaleString(),
               })}
@@ -1184,9 +1184,7 @@ export function GeneratorPanel({
     }
 
     if (balance !== creditGate.balance) {
-      setCreditGate((current) =>
-        current ? { ...current, balance } : current
-      );
+      setCreditGate((current) => (current ? { ...current, balance } : current));
     }
   }, [creditGate, creditsQuery.data?.balance]);
 
@@ -1220,11 +1218,11 @@ export function GeneratorPanel({
   const placeholder =
     mode === 'objects-swap'
       ? images.length > 1
-        ? 'e.g. Replace the man with Reference 1 and the phone with Reference 2 (optional)...'
-        : 'Describe what to swap in the video (optional)...'
+        ? 'e.g. Replace the man with @Image1 and the phone with @Image2 (optional)...'
+        : 'Describe what to swap. Use @Video1 / @Image1 to reference assets (optional)...'
       : images.length > 1
-        ? 'e.g. Use Reference 1 for the main character and Reference 2 for the outfit (optional)...'
-        : 'Describe the new scene, style, product, or object (optional)...';
+        ? 'e.g. Use @Image1 for the main character and @Image2 for the outfit (optional)...'
+        : 'Describe the new scene, style, product, or object. Use @Video1 / @Image1 to reference assets (optional)...';
 
   const pollGeneration = useCallback(
     async (active: PersistedGeneration, runId: number) => {
@@ -1336,8 +1334,7 @@ export function GeneratorPanel({
             polled as unknown as Record<string, unknown>,
             'status'
           );
-          const insufficient =
-            polled.providerStatus === 'insufficient_credits';
+          const insufficient = polled.providerStatus === 'insufficient_credits';
           const requiredCredits = Number(polled.requiredCredits);
           const balance = Number(polled.balance);
 
@@ -1596,10 +1593,7 @@ export function GeneratorPanel({
         if (insufficient) {
           const requiredCredits = Number(apiData?.requiredCredits);
           const balance = Number(apiData?.balance);
-          if (
-            Number.isFinite(requiredCredits) &&
-            Number.isFinite(balance)
-          ) {
+          if (Number.isFinite(requiredCredits) && Number.isFinite(balance)) {
             setCreditGate({ requiredCredits, balance });
             setError('');
             return;
@@ -1749,8 +1743,7 @@ export function GeneratorPanel({
             <div className="mt-auto flex items-end justify-between gap-3 pb-1 text-[11px] text-white/45">
               {images.length > 1 ? (
                 <span className="max-w-[75%] leading-snug">
-                  Use Reference 1, Reference 2, etc. to map each image to a
-                  target.
+                  Use @Image1, @Image2, etc. to map each image to a target.
                 </span>
               ) : (
                 <span />
