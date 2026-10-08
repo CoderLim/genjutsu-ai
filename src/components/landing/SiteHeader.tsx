@@ -3,8 +3,8 @@ import { useState } from 'react';
 import { useSession } from '@/core/auth/client';
 import { Link } from '@/core/i18n/navigation';
 import { envConfigs } from '@/config';
-import { m } from '@/paraglide/messages.js';
 import { cn } from '@/lib/cn';
+import { m } from '@/paraglide/messages.js';
 import { GlobeIcon, MenuIcon, RaphaelLogo } from '@/components/icons';
 import { SiteUserMenu } from '@/components/site-user-menu';
 import {
@@ -16,7 +16,6 @@ import {
 } from '@/components/ui/sheet';
 
 const NAV_LINKS = [
-  { label: 'Introduction', href: '/#introduction' },
   { label: 'Feature', href: '/#feature' },
   { label: 'How it works', href: '/#how-it-works' },
   { label: 'Pricing', href: '/#pricing' },

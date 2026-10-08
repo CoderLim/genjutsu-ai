@@ -647,10 +647,6 @@ export const FOOTER_COLUMNS: FooterColumn[] = [
         href: '/hotel-lobby-ai',
       },
       {
-        label: 'Chuttamalle AI',
-        href: '/chuttamalle-ai',
-      },
-      {
         label: 'Person Remover',
         href: 'https://personremover.org',
       },
