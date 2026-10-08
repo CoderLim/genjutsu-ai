@@ -9,14 +9,20 @@ import {
   assertGenjutsuSourceVideoKeyOwned,
   assertGenjutsuStagingKeyOwned,
   assertGenjutsuUploadSize,
+  buildGenjutsuR2ObjectKey,
   createGenjutsuProxyUploadDescriptor,
   GENJUTSU_MAX_IMAGE_BYTES,
   GENJUTSU_MAX_VIDEO_BYTES,
   GENJUTSU_PROXY_UPLOAD_MAX_BYTES,
+  GenjutsuR2BindingMissingError,
   getGenjutsuInputPrefix,
   getGenjutsuResultKey,
   getGenjutsuSealedInputKey,
   getGenjutsuSealedInputPrefix,
+  getR2BucketBinding,
+  putGenjutsuStagingObject,
+  putGenjutsuStagingObjectViaBinding,
+  statusForGenjutsuProxyUploadError,
 } from './storage';
 
 test('Genjutsu input keys are scoped to user and generation', () => {
@@ -262,6 +268,120 @@ test('Genjutsu proxy upload descriptor is same-origin and sized', () => {
       }),
     /Proxy upload supports/
   );
+});
+
+test('Genjutsu R2 object keys include the configured upload path', () => {
+  assert.equal(
+    buildGenjutsuR2ObjectKey('uploads', 'genjutsu/inputs/u/g/source.mp4'),
+    'uploads/genjutsu/inputs/u/g/source.mp4'
+  );
+  assert.equal(
+    buildGenjutsuR2ObjectKey('/uploads/', 'genjutsu/inputs/u/g/source.mp4'),
+    'uploads/genjutsu/inputs/u/g/source.mp4'
+  );
+});
+
+test('Genjutsu proxy upload maps binding miss and R2 put errors to 5xx', () => {
+  assert.equal(
+    statusForGenjutsuProxyUploadError(new GenjutsuR2BindingMissingError()),
+    503
+  );
+  assert.equal(
+    statusForGenjutsuProxyUploadError(
+      new Error('Failed to upload to R2: HTTP 500')
+    ),
+    502
+  );
+  assert.equal(
+    statusForGenjutsuProxyUploadError(new Error('Content-Type mismatch')),
+    400
+  );
+});
+
+test('Genjutsu proxy put via binding streams to the expected object key', async () => {
+  const puts: Array<{ key: string; contentType?: string }> = [];
+  const bucket = {
+    async put(
+      key: string,
+      _body: unknown,
+      options?: { httpMetadata?: { contentType?: string } }
+    ) {
+      puts.push({
+        key,
+        contentType: options?.httpMetadata?.contentType,
+      });
+    },
+  };
+
+  const result = await putGenjutsuStagingObjectViaBinding({
+    bucket,
+    uploadPath: 'uploads',
+    key: 'genjutsu/inputs/user-123/gen-456789/source.mp4',
+    body: new Uint8Array([1, 2, 3]),
+    contentType: 'video/mp4',
+  });
+
+  assert.equal(result.via, 'binding');
+  assert.equal(
+    result.objectKey,
+    'uploads/genjutsu/inputs/user-123/gen-456789/source.mp4'
+  );
+  assert.deepEqual(puts, [
+    {
+      key: 'uploads/genjutsu/inputs/user-123/gen-456789/source.mp4',
+      contentType: 'video/mp4',
+    },
+  ]);
+});
+
+test('Genjutsu proxy put fails hard on Workers when R2_BUCKET is missing', async () => {
+  const previousCf = (globalThis as any).__CF_ENV__;
+  const previousEnv = (globalThis as any).__env__;
+  (globalThis as any).__CF_ENV__ = { DB: {} };
+  delete (globalThis as any).__env__;
+
+  try {
+    assert.equal(getR2BucketBinding(), null);
+    await assert.rejects(
+      () =>
+        putGenjutsuStagingObject({
+          key: 'genjutsu/inputs/user-123/gen-456789/source.mp4',
+          body: new Uint8Array([1, 2, 3]),
+          contentType: 'video/mp4',
+          contentLength: 3,
+        }),
+      (error: unknown) => {
+        assert.ok(error instanceof GenjutsuR2BindingMissingError);
+        assert.equal(statusForGenjutsuProxyUploadError(error), 503);
+        return true;
+      }
+    );
+  } finally {
+    (globalThis as any).__CF_ENV__ = previousCf;
+    (globalThis as any).__env__ = previousEnv;
+  }
+});
+
+test('Genjutsu proxy put via binding surfaces R2 failures as retryable 502', async () => {
+  const bucket = {
+    async put() {
+      throw new Error('R2 put failed: internal error');
+    },
+  };
+
+  try {
+    await putGenjutsuStagingObjectViaBinding({
+      bucket,
+      uploadPath: 'uploads',
+      key: 'genjutsu/inputs/user-123/gen-456789/source.mp4',
+      body: new Uint8Array([1, 2, 3]),
+      contentType: 'video/mp4',
+    });
+    assert.fail('expected put to throw');
+  } catch (error) {
+    assert.match(String((error as Error).message), /R2 put failed/);
+    assert.equal(statusForGenjutsuProxyUploadError(error), 502);
+  }
 });
 
 test('Genjutsu post-upload metadata rejects oversized or wrong-type objects', () => {

@@ -11,7 +11,7 @@ export const GENJUTSU_MAX_IMAGE_BYTES = 12 * 1024 * 1024;
 /** Cloudflare Workers request body limit is 100 MiB — stay under it for proxy uploads. */
 export const GENJUTSU_PROXY_UPLOAD_MAX_BYTES = 95 * 1024 * 1024;
 
-type R2BucketBinding = {
+export type R2BucketBinding = {
   put(
     key: string,
     value:
@@ -27,12 +27,69 @@ type R2BucketBinding = {
   ): Promise<unknown>;
 };
 
-function getR2BucketBinding(): R2BucketBinding | null {
+/** Thrown when Workers runtime has no R2_BUCKET binding (misconfigured deploy). */
+export class GenjutsuR2BindingMissingError extends Error {
+  readonly statusCode = 503;
+  constructor() {
+    super(
+      'R2_BUCKET binding is not configured. Add r2_buckets to wrangler.jsonc and redeploy.'
+    );
+    this.name = 'GenjutsuR2BindingMissingError';
+  }
+}
+
+export function isCloudflareWorkersRuntime() {
+  const env = (globalThis as any).__CF_ENV__ ?? (globalThis as any).__env__;
+  return Boolean(env);
+}
+
+export function getR2BucketBinding(): R2BucketBinding | null {
   const env = (globalThis as any).__CF_ENV__ ?? (globalThis as any).__env__;
   const binding = env?.R2_BUCKET ?? env?.BUCKET;
   return binding && typeof binding.put === 'function'
     ? (binding as R2BucketBinding)
     : null;
+}
+
+/** Map put/proxy failures to HTTP status so the client can retry 5xx. */
+export function statusForGenjutsuProxyUploadError(error: unknown): number {
+  if (error instanceof GenjutsuR2BindingMissingError) {
+    return error.statusCode;
+  }
+  if (error instanceof Error) {
+    const message = error.message;
+    if (
+      /mismatch|Invalid|Unsupported|must be|not an? |Provide |Missing body/i.test(
+        message
+      )
+    ) {
+      return 400;
+    }
+  }
+  // R2 put / config / unexpected — retryable from the browser.
+  return 502;
+}
+
+export function buildGenjutsuR2ObjectKey(uploadPath: string, key: string) {
+  return [trimSlashes(uploadPath), key].filter(Boolean).join('/');
+}
+
+export async function putGenjutsuStagingObjectViaBinding(params: {
+  bucket: R2BucketBinding;
+  uploadPath: string;
+  key: string;
+  body: ReadableStream | ArrayBuffer | ArrayBufferView | Blob;
+  contentType: string;
+}) {
+  assertSafeObjectKey(params.key);
+  if (!params.key.startsWith('genjutsu/inputs/')) {
+    throw new Error('Invalid Genjutsu staging key');
+  }
+  const objectKey = buildGenjutsuR2ObjectKey(params.uploadPath, params.key);
+  await params.bucket.put(objectKey, params.body, {
+    httpMetadata: { contentType: params.contentType },
+  });
+  return { via: 'binding' as const, objectKey };
 }
 
 const VIDEO_CONTENT_TYPES: Record<string, string> = {
@@ -659,8 +716,11 @@ export function createGenjutsuProxyUploadDescriptor(
 }
 
 /**
- * Write a staging object. Prefers the Workers R2 binding (streamed); falls
- * back to the S3-compatible API for local Node without a binding.
+ * Write a staging object via the Workers R2 binding (streamed).
+ *
+ * On Cloudflare Workers, missing R2_BUCKET fails hard (no in-memory buffer
+ * fallback — that risks OOM near the 95 MiB proxy cap). Local Node without
+ * bindings may still use the S3-compatible API for development.
  */
 export async function putGenjutsuStagingObject(params: {
   key: string;
@@ -677,18 +737,25 @@ export async function putGenjutsuStagingObject(params: {
     params.contentLength
   );
 
-  const config = await getR2SigningConfig();
-  const objectKey = [config.uploadPath, params.key].filter(Boolean).join('/');
   const binding = getR2BucketBinding();
-
   if (binding) {
-    await binding.put(objectKey, params.body, {
-      httpMetadata: { contentType: params.contentType },
+    const config = await getR2SigningConfig();
+    return putGenjutsuStagingObjectViaBinding({
+      bucket: binding,
+      uploadPath: config.uploadPath,
+      key: params.key,
+      body: params.body,
+      contentType: params.contentType,
     });
-    return { via: 'binding' as const, objectKey };
   }
 
-  // Local / non-Workers: buffer + signed PUT (fine for dev-sized files).
+  if (isCloudflareWorkersRuntime()) {
+    throw new GenjutsuR2BindingMissingError();
+  }
+
+  // Local Node only: buffer + signed PUT (dev-sized files).
+  const config = await getR2SigningConfig();
+  const objectKey = buildGenjutsuR2ObjectKey(config.uploadPath, params.key);
   const bytes =
     params.body instanceof ReadableStream
       ? new Uint8Array(await new Response(params.body).arrayBuffer())

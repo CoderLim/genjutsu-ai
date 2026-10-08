@@ -9,7 +9,9 @@ import {
 import {
   assertGenjutsuStagingKeyOwned,
   GENJUTSU_PROXY_UPLOAD_MAX_BYTES,
+  GenjutsuR2BindingMissingError,
   putGenjutsuStagingObject,
+  statusForGenjutsuProxyUploadError,
 } from '@/modules/genjutsu/storage';
 import { enforceMinIntervalRateLimit } from '@/lib/rate-limit';
 
@@ -38,7 +40,13 @@ async function PUT({
     const session = await auth.api.getSession({ headers: request.headers });
     if (!session?.user) return errorResponse('Unauthorized', 401);
 
-    const generationId = assertGenerationId(params.generationId);
+    let generationId: string;
+    try {
+      generationId = assertGenerationId(params.generationId);
+    } catch {
+      return errorResponse('Invalid generation ID', 400);
+    }
+
     const fileIndex = Number(params.fileIndex);
     if (!Number.isInteger(fileIndex) || fileIndex < 0 || fileIndex > 8) {
       return errorResponse('Invalid file index', 400);
@@ -76,12 +84,16 @@ async function PUT({
       return errorResponse('File too large for proxy upload', 413);
     }
 
-    assertGenjutsuStagingKeyOwned({
-      userId: session.user.id,
-      generationId,
-      fileIndex,
-      key: storageKey,
-    });
+    try {
+      assertGenjutsuStagingKeyOwned({
+        userId: session.user.id,
+        generationId,
+        fileIndex,
+        key: storageKey,
+      });
+    } catch (error: any) {
+      return errorResponse(error?.message || 'Invalid storage key', 400);
+    }
 
     const contentType =
       request.headers
@@ -106,12 +118,23 @@ async function PUT({
 
     if (!request.body) return errorResponse('Missing body', 400);
 
-    await putGenjutsuStagingObject({
-      key: storageKey,
-      body: request.body,
-      contentType: expectedType,
-      contentLength,
-    });
+    try {
+      await putGenjutsuStagingObject({
+        key: storageKey,
+        body: request.body,
+        contentType: expectedType,
+        contentLength,
+      });
+    } catch (putError: any) {
+      console.error('genjutsu proxy upload put failed:', putError);
+      const status = statusForGenjutsuProxyUploadError(putError);
+      return errorResponse(
+        putError instanceof GenjutsuR2BindingMissingError
+          ? putError.message
+          : putError?.message || 'Upload failed',
+        status
+      );
+    }
 
     return new Response(null, {
       status: 204,
@@ -119,7 +142,8 @@ async function PUT({
     });
   } catch (error: any) {
     console.error('genjutsu proxy upload failed:', error);
-    return errorResponse(error?.message || 'Upload failed', 400);
+    // Auth/DB/unexpected — treat as retryable server error, not client 400.
+    return errorResponse(error?.message || 'Upload failed', 500);
   }
 }
 
