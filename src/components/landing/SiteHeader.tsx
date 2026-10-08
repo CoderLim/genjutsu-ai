@@ -20,6 +20,7 @@ const NAV_LINKS = [
   { label: 'Feature', href: '/#feature' },
   { label: 'How it works', href: '/#how-it-works' },
   { label: 'Pricing', href: '/#pricing' },
+  { label: 'Blog', href: '/blog' },
 ] as const;
 
 const navLinkClass =
