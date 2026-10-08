@@ -635,6 +635,7 @@ export const FOOTER_COLUMNS: FooterColumn[] = [
     links: [
       { label: 'Features', href: '/#feature' },
       { label: 'Pricing', href: '/pricing' },
+      { label: 'Blog', href: '/blog' },
       { label: 'Partners', href: '/partners' },
     ],
   },
