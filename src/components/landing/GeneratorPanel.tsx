@@ -57,6 +57,16 @@ import {
 
 export type GeneratorMode = 'motion-transfer' | 'objects-swap';
 
+/** Temporary: upload + seal only — skip paid generate for Android upload repro. */
+const UPLOAD_ONLY_TEST_EMAIL = 'gengliming110@gmail.com';
+
+function isUploadOnlyTestUser(email: string | null | undefined) {
+  return (
+    typeof email === 'string' &&
+    email.trim().toLowerCase() === UPLOAD_ONLY_TEST_EMAIL
+  );
+}
+
 type GeneratorPanelProps = {
   mode?: GeneratorMode;
   className?: string;
@@ -1436,8 +1446,10 @@ export function GeneratorPanel({
       return;
     }
 
+    const uploadOnly = isUploadOnlyTestUser(session.user.email);
     const knownBalance = creditsQuery.data?.balance;
     if (
+      !uploadOnly &&
       estimatedCredits != null &&
       typeof knownBalance === 'number' &&
       knownBalance < estimatedCredits
@@ -1541,6 +1553,18 @@ export function GeneratorPanel({
       await apiPost('/api/genjutsu/seal-inputs', {
         generationId,
       });
+
+      // Upload-path repro for the allowlisted account — never start paid generate.
+      if (uploadOnly) {
+        if (generationRunRef.current !== runId) return;
+        localStorage.removeItem(activeGenerationKey(session.user.id));
+        setStatus('idle');
+        setResult(null);
+        toast.success(
+          'Upload-only test: inputs uploaded and sealed (generate skipped).'
+        );
+        return;
+      }
 
       // Persist before the paid POST. A refresh may reconcile an already-paid
       // job, but must never auto-start a still-unpaid ready attempt.
