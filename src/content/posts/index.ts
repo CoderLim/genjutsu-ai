@@ -11,9 +11,11 @@ import { baseLocale } from '@/paraglide/runtime.js';
  * fetched through the server functions in ./server.ts and merged with the
  * local posts via the pure helpers below.
  *
- * Local MDX slugs only — empty until Genjutsu posts are written.
+ * Local MDX slugs registered for the blog list, detail loader and sitemap.
  */
-export const BLOG_POST_SLUGS: readonly string[] = [];
+export const BLOG_POST_SLUGS: readonly string[] = [
+  'higgsfield-genjutsu-alternative',
+];
 
 export type BlogPostMeta = {
   title: string;
