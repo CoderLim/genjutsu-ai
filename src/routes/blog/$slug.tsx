@@ -7,8 +7,8 @@ import { envConfigs } from '@/config';
 import { localeLinks, socialMeta } from '@/lib/seo';
 import { m } from '@/paraglide/messages.js';
 import { getLocale } from '@/paraglide/runtime.js';
-import { Footer } from '@/blocks/footer';
-import { Header } from '@/blocks/header';
+import { SiteFooter } from '@/components/landing/SiteFooter';
+import { SiteHeader } from '@/components/landing/SiteHeader';
 import { MarkdownContent } from '@/components/markdown-content';
 import { mdxComponents } from '@/components/mdx-components';
 import { formatPostDate, loadLocalPost } from '@/content/posts';
@@ -39,6 +39,29 @@ export const Route = createFileRoute('/blog/$slug')({
         }),
       ],
       links: [{ rel: 'canonical', href: canonical }, ...alternates],
+      scripts: [
+        {
+          type: 'application/ld+json',
+          children: JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'BlogPosting',
+            headline: post.title,
+            description: post.description,
+            datePublished: post.createdAt,
+            dateModified: post.createdAt,
+            inLanguage: locale,
+            mainEntityOfPage: canonical,
+            author: {
+              '@type': 'Organization',
+              name: post.authorName || envConfigs.app_name,
+            },
+            publisher: {
+              '@type': 'Organization',
+              name: envConfigs.app_name,
+            },
+          }),
+        },
+      ],
     };
   },
   component: BlogPostPage,
@@ -54,7 +77,7 @@ function BlogPostPage() {
 
   return (
     <div className="bg-background text-foreground flex min-h-screen flex-col">
-      <Header />
+      <SiteHeader />
       <main className="flex-1 px-6 py-12 md:px-8 md:py-16">
         <article className="mx-auto max-w-3xl">
           <Link
@@ -113,7 +136,7 @@ function BlogPostPage() {
           )}
         </article>
       </main>
-      <Footer />
+      <SiteFooter />
     </div>
   );
 }
