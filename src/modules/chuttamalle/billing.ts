@@ -1,9 +1,12 @@
 import { and, eq, inArray } from 'drizzle-orm';
 
-import { FAL_QUERY_PERMANENT_ERROR_THRESHOLD } from '@/core/ai';
 import { db } from '@/core/db';
 import { aiTask } from '@/config/db/schema';
 import { consume, getBalance, revoke } from '@/modules/credits/service';
+import {
+  applyAiTaskProviderQueryError,
+  clearAiTaskProviderQueryErrors,
+} from '@/lib/fal-query-error-cas';
 import { getUuid } from '@/lib/hash';
 
 import type { ChuttamalleAspectRatio, ChuttamalleResolution } from './pricing';
@@ -301,92 +304,15 @@ export async function markChuttamalleSubmissionUnknown(params: {
     );
 }
 
-/**
- * Atomically bump consecutive permanent Fal status-lookup errors.
- * If the threshold is reached, park as submission_unknown in the same
- * transaction so a concurrent successful clear cannot race past us.
- */
 export async function applyChuttamalleProviderQueryError(params: {
   generationId: string;
   userId: string;
   error: string;
   providerStatus: string;
 }): Promise<{ count: number; unresolved: boolean }> {
-  const errorMessage =
-    params.error ||
-    'Provider status lookup failed permanently. Credits remain reserved.';
-
-  return db().transaction(async (tx: any) => {
-    const lockedQuery = tx
-      .select()
-      .from(aiTask)
-      .where(
-        and(
-          eq(aiTask.id, params.generationId),
-          eq(aiTask.userId, params.userId),
-          eq(aiTask.scene, CHUTTAMALLE_SCENE)
-        )
-      )
-      .limit(1);
-    const [task] = await (lockedQuery.for
-      ? lockedQuery.for('update')
-      : lockedQuery);
-
-    if (!task || task.status !== 'submitted') {
-      return { count: 0, unresolved: false };
-    }
-
-    const existing = parseJson(task.taskResult) ?? {};
-    const previous =
-      typeof existing.queryPermanentErrorCount === 'number'
-        ? existing.queryPermanentErrorCount
-        : 0;
-    const count = previous + 1;
-
-    if (count >= FAL_QUERY_PERMANENT_ERROR_THRESHOLD) {
-      await tx
-        .update(aiTask)
-        .set({
-          status: 'submission_unknown',
-          taskResult: JSON.stringify({
-            error: errorMessage,
-            providerStatus: params.providerStatus,
-            stage: 'provider_query',
-            queryPermanentErrorCount: count,
-          }),
-        })
-        .where(
-          and(
-            eq(aiTask.id, params.generationId),
-            eq(aiTask.userId, params.userId),
-            eq(aiTask.scene, CHUTTAMALLE_SCENE),
-            eq(aiTask.status, 'submitted')
-          )
-        );
-      return { count, unresolved: true };
-    }
-
-    await tx
-      .update(aiTask)
-      .set({
-        taskResult: JSON.stringify({
-          ...existing,
-          queryPermanentErrorCount: count,
-          lastQueryError: errorMessage,
-          providerStatus: params.providerStatus,
-          stage: 'provider_query',
-        }),
-      })
-      .where(
-        and(
-          eq(aiTask.id, params.generationId),
-          eq(aiTask.userId, params.userId),
-          eq(aiTask.scene, CHUTTAMALLE_SCENE),
-          eq(aiTask.status, 'submitted')
-        )
-      );
-
-    return { count, unresolved: false };
+  return applyAiTaskProviderQueryError({
+    scene: CHUTTAMALLE_SCENE,
+    ...params,
   });
 }
 
@@ -395,40 +321,9 @@ export async function clearChuttamalleProviderQueryErrors(params: {
   generationId: string;
   userId: string;
 }) {
-  await db().transaction(async (tx: any) => {
-    const lockedQuery = tx
-      .select()
-      .from(aiTask)
-      .where(
-        and(
-          eq(aiTask.id, params.generationId),
-          eq(aiTask.userId, params.userId),
-          eq(aiTask.scene, CHUTTAMALLE_SCENE)
-        )
-      )
-      .limit(1);
-    const [task] = await (lockedQuery.for
-      ? lockedQuery.for('update')
-      : lockedQuery);
-
-    if (!task || task.status !== 'submitted') return;
-
-    const existing = parseJson(task.taskResult);
-    if (!existing?.queryPermanentErrorCount && !existing?.lastQueryError) {
-      return;
-    }
-
-    await tx
-      .update(aiTask)
-      .set({ taskResult: null })
-      .where(
-        and(
-          eq(aiTask.id, params.generationId),
-          eq(aiTask.userId, params.userId),
-          eq(aiTask.scene, CHUTTAMALLE_SCENE),
-          eq(aiTask.status, 'submitted')
-        )
-      );
+  await clearAiTaskProviderQueryErrors({
+    scene: CHUTTAMALLE_SCENE,
+    ...params,
   });
 }
 
