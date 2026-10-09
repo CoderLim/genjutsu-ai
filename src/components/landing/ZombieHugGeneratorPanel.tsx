@@ -7,7 +7,7 @@ import {
   type ChangeEvent,
   type RefObject,
 } from 'react';
-import { Download, LoaderCircle, Play, Upload } from 'lucide-react';
+import { CircleHelp, Download } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useSession } from '@/core/auth/client';
@@ -19,8 +19,16 @@ import {
   ZOMBIE_HUG_TEMPLATE_DURATION_SECONDS,
 } from '@/modules/zombie-hug/prompt';
 import { ApiError, apiGet, apiPost, uploadToSignedUrl } from '@/lib/api-client';
+import { cn } from '@/lib/cn';
+import { m } from '@/paraglide/messages.js';
 import { useUserCredits } from '@/hooks/use-user-credits';
 import { CloseIcon, ImageModeIcon } from '@/components/icons';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 type MediaItem = {
   id: string;
@@ -161,7 +169,6 @@ export function ZombieHugGeneratorPanel() {
   const [phase, setPhase] = useState<
     'idle' | 'uploading' | 'starting' | 'generating' | 'saving' | 'locked'
   >('idle');
-  const [providerStatus, setProviderStatus] = useState('');
   const [generationId, setGenerationId] = useState<string | null>(null);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [jobError, setJobError] = useState('');
@@ -295,7 +302,6 @@ export function ZombieHugGeneratorPanel() {
         }
 
         notFoundCount = 0;
-        setProviderStatus(poll.providerStatus || '');
 
         if (
           typeof poll.reservedCredits === 'number' &&
@@ -553,7 +559,6 @@ export function ZombieHugGeneratorPanel() {
     // Higgsfield's server-side quote and credit reservation are authoritative.
 
     setResultUrl(null);
-    setProviderStatus('');
     setCreditError(null);
     setJobError('');
     setPhase('uploading');
@@ -720,20 +725,8 @@ export function ZombieHugGeneratorPanel() {
     }
   };
 
-  const phaseLabel =
-    phase === 'uploading'
-      ? 'Uploading photos…'
-      : phase === 'starting'
-        ? 'Starting Genjutsu…'
-        : phase === 'generating'
-          ? providerStatus
-            ? `Generating · ${providerStatus}`
-            : 'Generating…'
-          : phase === 'saving'
-            ? 'Saving your video…'
-            : phase === 'locked'
-              ? 'Job locked'
-              : 'Generate';
+  const canGenerate =
+    Boolean(survivorImage && lovedOneImage) && !busy && !sessionPending;
 
   return (
     <div className="mx-auto w-full max-w-[1120px]">
@@ -750,7 +743,7 @@ export function ZombieHugGeneratorPanel() {
                   two photos.
                 </p>
               </div>
-              <span className="shrink-0 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2.5 py-1 text-[10px] font-semibold text-emerald-200/90">
+              <span className="border-primary/20 bg-primary/10 text-primary shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-semibold">
                 Preset
               </span>
             </div>
@@ -814,7 +807,7 @@ export function ZombieHugGeneratorPanel() {
               </div>
               <Link
                 href="/pricing"
-                className="inline-flex h-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/90 px-3 text-xs font-semibold text-white transition hover:brightness-105"
+                className="inline-flex h-8 shrink-0 items-center justify-center rounded-lg bg-[rgb(204,144,92)] px-3 text-xs font-semibold text-[rgb(247,246,243)] transition hover:brightness-105"
               >
                 Buy credits
               </Link>
@@ -827,27 +820,46 @@ export function ZombieHugGeneratorPanel() {
             </div>
           ) : null}
 
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end sm:gap-3">
+          <div className="ml-auto flex w-full items-center justify-end gap-2 sm:w-auto">
+            {estimatedCredits != null ? (
+              <div className="flex shrink-0 items-center gap-1 text-[12px] text-white/50 tabular-nums">
+                <span>
+                  {m['genjutsu.estimate.credits']({
+                    count: estimatedCredits.toLocaleString(),
+                  })}
+                </span>
+                <TooltipProvider delay={200}>
+                  <Tooltip>
+                    <TooltipTrigger
+                      type="button"
+                      className="inline-flex size-4 items-center justify-center rounded-full text-current/70 transition-colors hover:text-current"
+                      aria-label={m['genjutsu.estimate.help_aria']()}
+                    >
+                      <CircleHelp className="size-3.5" aria-hidden />
+                    </TooltipTrigger>
+                    <TooltipContent
+                      side="top"
+                      align="end"
+                      className="max-w-[240px] text-left leading-snug"
+                    >
+                      {m['genjutsu.estimate.tooltip']()}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+            ) : null}
             <button
               type="button"
-              disabled={busy || sessionPending}
+              disabled={!canGenerate}
               onClick={() => void generate()}
-              className="inline-flex h-11 w-full min-w-[240px] items-center justify-center gap-2 rounded-xl bg-[linear-gradient(135deg,rgb(52,180,120),rgb(28,120,88))] px-5 text-sm font-semibold text-white shadow-[0_12px_32px_-12px_rgba(40,160,110,0.7)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-55 sm:w-auto"
-            >
-              {busy ? (
-                <LoaderCircle className="size-4 animate-spin" />
-              ) : session?.user ? (
-                <Play className="size-4 fill-current" />
-              ) : (
-                <Upload className="size-4" />
+              className={cn(
+                'relative inline-flex h-8 flex-1 items-center justify-center rounded-lg px-3.5 text-sm font-semibold tracking-wide shadow-none transition-all duration-200 active:scale-95 sm:w-auto sm:flex-none',
+                canGenerate
+                  ? 'bg-[rgb(204,144,92)] text-[rgb(247,246,243)] hover:brightness-105'
+                  : 'bg-[rgba(126,128,132,0.28)] text-[rgb(237,234,222)]/38'
               )}
-              <span>
-                {!session?.user
-                  ? 'Sign in to generate'
-                  : busy
-                    ? phaseLabel
-                    : `Make my zombie hug video (~${estimatedCredits} credits est.)`}
-              </span>
+            >
+              {busy ? 'Generating…' : 'Generate'}
             </button>
           </div>
         </div>
