@@ -53,6 +53,11 @@ interface VideoPreview {
 
 const PAGE_SIZE = 12;
 const AUTO_POLL_INTERVAL_MS = 4_000;
+/** Match server min-interval on status routes (per pathname + user). */
+const STATUS_ROUTE_GAP_MS = 1_100;
+
+const sleep = (ms: number) =>
+  new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 const PROCESSING_STATUSES = new Set([
   'initiated',
@@ -357,14 +362,23 @@ function CreationsPage() {
 
       pollingRef.current = true;
       try {
-        // Sequential to stay under per-route min-interval rate limits.
+        // Sequential + ≥1s gap per status pathname so multi-job users do not
+        // trip enforceMinIntervalRateLimit (keyed by method+pathname+user).
+        const lastRequestAtByPath = new Map<string, number>();
         for (const generation of processingGenerations) {
           if (cancelled) return;
+          const statusPath = statusPathFor(generation);
+          const pathname = statusPath.split('?', 1)[0] || statusPath;
+          const lastAt = lastRequestAtByPath.get(pathname) ?? 0;
+          const waitMs = STATUS_ROUTE_GAP_MS - (Date.now() - lastAt);
+          if (waitMs > 0) await sleep(waitMs);
+          if (cancelled) return;
           try {
-            await apiGet<GenerationStatus>(statusPathFor(generation));
+            await apiGet<GenerationStatus>(statusPath);
           } catch {
-            // Keep polling; transient provider/network errors are expected.
+            // Keep polling; transient provider/network/429 errors are expected.
           }
+          lastRequestAtByPath.set(pathname, Date.now());
         }
         if (!cancelled) {
           await queryClient.invalidateQueries({

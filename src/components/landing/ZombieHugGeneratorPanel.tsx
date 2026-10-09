@@ -253,6 +253,11 @@ export function ZombieHugGeneratorPanel() {
     async (active: PersistedGeneration, runId: number) => {
       let delayMs = 1_500;
       let notFoundCount = 0;
+      let resumeAttempts = 0;
+      let preReservePolls = 0;
+      const MAX_RESUME_GENERATE = 5;
+      // Let an in-flight /generate finish quoting before we POST resume.
+      const RESUME_GRACE_POLLS = 2;
 
       for (let attempt = 0; attempt < 240; attempt += 1) {
         await sleep(delayMs);
@@ -293,21 +298,6 @@ export function ZombieHugGeneratorPanel() {
         setProviderStatus(poll.providerStatus || '');
 
         if (
-          poll.providerStatus === 'initiated' ||
-          poll.providerStatus === 'sealing' ||
-          poll.providerStatus === 'ready'
-        ) {
-          localStorage.removeItem(activeGenerationKey(active.userId));
-          setPhase('idle');
-          setJobError(
-            poll.providerStatus === 'ready'
-              ? 'Upload completed, but generation was not started. Click Generate to try again.'
-              : 'The previous upload did not finish starting a generation. Click Generate to try again.'
-          );
-          return;
-        }
-
-        if (
           typeof poll.reservedCredits === 'number' &&
           poll.reservedCredits > 0 &&
           poll.reservedCredits !== active.reservedCredits
@@ -317,6 +307,141 @@ export function ZombieHugGeneratorPanel() {
             activeGenerationKey(active.userId),
             JSON.stringify(active)
           );
+        }
+
+        // Pre-reserve states are NOT safe to unlock: an interrupted /generate
+        // may still be quoting/reserving. Keep this generationId and resume
+        // via the server's idempotent generate path instead of a new UUID.
+        if (
+          poll.providerStatus === 'initiated' ||
+          poll.providerStatus === 'sealing' ||
+          poll.providerStatus === 'ready'
+        ) {
+          preReservePolls += 1;
+
+          if (poll.providerStatus === 'sealing') {
+            setPhase('starting');
+            setJobError('Finishing upload seal for the previous generation…');
+            delayMs = Math.min(5_000, Math.ceil(delayMs * 1.2));
+            continue;
+          }
+
+          if (preReservePolls < RESUME_GRACE_POLLS) {
+            setPhase('starting');
+            setJobError(
+              'Waiting to confirm whether the previous generation already started…'
+            );
+            delayMs = Math.min(5_000, Math.ceil(delayMs * 1.2));
+            continue;
+          }
+
+          if (resumeAttempts >= MAX_RESUME_GENERATE) {
+            setPhase('locked');
+            setJobError(
+              'Could not confirm whether the previous generation reserved credits. This job stays locked to avoid a duplicate charge — refresh to keep checking, or contact support.'
+            );
+            return;
+          }
+
+          resumeAttempts += 1;
+          setPhase('starting');
+          setJobError('Resuming the previous generation with the same job id…');
+          try {
+            const start = await apiPost<GenerationStart>(
+              '/api/zombie-hug/generate',
+              { generationId: active.generationId }
+            );
+            if (generationRunRef.current !== runId) return;
+
+            active.generationId = start.generationId;
+            active.reservedCredits = start.reservedCredits || 0;
+            localStorage.setItem(
+              activeGenerationKey(active.userId),
+              JSON.stringify(active)
+            );
+            await creditsQuery.refetch();
+
+            if (start.status === 'submission_unknown') {
+              setPhase('locked');
+              setJobError(
+                'Submission result is uncertain. Credits remain reserved; do not retry this generation.'
+              );
+              return;
+            }
+            if (start.status === 'refunded') {
+              localStorage.removeItem(activeGenerationKey(active.userId));
+              setPhase('idle');
+              setJobError('Generation could not be started');
+              toast.error('Generation could not be started');
+              return;
+            }
+
+            setPhase('generating');
+            setJobError('');
+          } catch (cause) {
+            if (generationRunRef.current !== runId) return;
+            const data =
+              cause instanceof ApiError &&
+              cause.data &&
+              typeof cause.data === 'object'
+                ? (cause.data as Record<string, unknown>)
+                : null;
+            const code = typeof data?.code === 'string' ? data.code : undefined;
+
+            if (code === 'SUBMISSION_UNKNOWN') {
+              setPhase('locked');
+              setJobError(
+                cause instanceof Error
+                  ? cause.message
+                  : 'Submission result is uncertain. Credits remain reserved; do not retry this generation.'
+              );
+              return;
+            }
+
+            // Only unlock when the server proves no credits were held.
+            if (
+              code === 'INSUFFICIENT_CREDITS' ||
+              code === 'TEMPLATE_NOT_CONFIGURED' ||
+              code === 'GENERATION_NOT_FOUND'
+            ) {
+              localStorage.removeItem(activeGenerationKey(active.userId));
+              setPhase('idle');
+              if (code === 'INSUFFICIENT_CREDITS') {
+                const required = Number(data?.requiredCredits);
+                const balance = Number(data?.balance);
+                if (
+                  Number.isFinite(required) &&
+                  required > 0 &&
+                  Number.isFinite(balance) &&
+                  balance >= 0
+                ) {
+                  setCreditError({ required, balance });
+                  setJobError('');
+                  return;
+                }
+              }
+              setJobError(
+                cause instanceof Error
+                  ? cause.message
+                  : 'Generation failed to start'
+              );
+              toast.error(
+                cause instanceof Error
+                  ? cause.message
+                  : 'Generation failed to start'
+              );
+              return;
+            }
+
+            // Unknown / in-progress errors: keep locked and poll again.
+            setPhase('generating');
+            setJobError(
+              'Still confirming the previous generation. Waiting before allowing another submit…'
+            );
+          }
+
+          delayMs = Math.min(5_000, Math.ceil(delayMs * 1.2));
+          continue;
         }
 
         if (poll.providerStatus === 'submission_unknown') {
@@ -507,27 +632,39 @@ export function ZombieHugGeneratorPanel() {
     } catch (error) {
       if (generationRunRef.current !== runId) return;
 
-      if (error instanceof ApiError) {
-        const data =
-          error.data && typeof error.data === 'object'
-            ? (error.data as Record<string, unknown>)
-            : null;
+      const data =
+        error instanceof ApiError &&
+        error.data &&
+        typeof error.data === 'object'
+          ? (error.data as Record<string, unknown>)
+          : null;
+      const code = typeof data?.code === 'string' ? data.code : undefined;
 
-        if (data?.code === 'SUBMISSION_UNKNOWN') {
-          setPhase('locked');
-          setJobError(
-            error.message ||
-              'Submission result is uncertain. Credits remain reserved; do not retry this generation.'
-          );
-          return;
-        }
+      // Only these codes prove credits were not held (or the attempt never
+      // existed). Everything else — including unexpected 5xx / DB errors —
+      // must keep the job and reconcile via status before unlocking.
+      const safeToClear =
+        code === 'INSUFFICIENT_CREDITS' ||
+        code === 'TEMPLATE_NOT_CONFIGURED' ||
+        code === 'GENERATION_NOT_FOUND';
 
+      if (code === 'SUBMISSION_UNKNOWN') {
+        setPhase('locked');
+        setJobError(
+          error instanceof Error
+            ? error.message
+            : 'Submission result is uncertain. Credits remain reserved; do not retry this generation.'
+        );
+        return;
+      }
+
+      if (error instanceof ApiError && safeToClear) {
         localStorage.removeItem(activeGenerationKey(session.user.id));
         setPhase('idle');
 
-        if (data?.code === 'INSUFFICIENT_CREDITS') {
-          const required = Number(data.requiredCredits);
-          const balance = Number(data.balance);
+        if (code === 'INSUFFICIENT_CREDITS') {
+          const required = Number(data?.requiredCredits);
+          const balance = Number(data?.balance);
           if (
             Number.isFinite(required) &&
             required > 0 &&
@@ -538,7 +675,7 @@ export function ZombieHugGeneratorPanel() {
             return;
           }
         }
-        if (data?.code === 'TEMPLATE_NOT_CONFIGURED') {
+        if (code === 'TEMPLATE_NOT_CONFIGURED') {
           toast.error(
             error.message ||
               'Zombie hug template is not configured in storage. Contact support.'
@@ -551,7 +688,7 @@ export function ZombieHugGeneratorPanel() {
         return;
       }
 
-      // Network failure after the paid POST may still have reserved credits.
+      // Network / unknown ApiError after persist: paid path may have started.
       const raw = localStorage.getItem(activeGenerationKey(session.user.id));
       if (raw) {
         try {
@@ -559,7 +696,7 @@ export function ZombieHugGeneratorPanel() {
           if (active.generationId === id) {
             setPhase('generating');
             setJobError(
-              'Connection interrupted while starting. Resuming status checks for the reserved job…'
+              'Connection interrupted while starting. Checking the existing job before allowing another submission…'
             );
             await pollGeneration(active, runId);
             return;
