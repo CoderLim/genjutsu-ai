@@ -18,6 +18,10 @@ export const HOTEL_LOBBY_OUTPUT_RATE_USD_PER_SECOND = 0.126;
 export const HOTEL_LOBBY_MIN_DURATION_SECONDS = 3;
 export const HOTEL_LOBBY_MAX_DURATION_SECONDS = 15;
 
+/** Kling O3 reference video edge length (OpenAPI min/max width & height). */
+export const HOTEL_LOBBY_MIN_VIDEO_EDGE_PX = 720;
+export const HOTEL_LOBBY_MAX_VIDEO_EDGE_PX = 3840;
+
 /**
  * Fal OpenAPI `maxLength` for Kling O3 V2V edit prompt
  * (https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=fal-ai/kling-video/o3/standard/video-to-video/edit).

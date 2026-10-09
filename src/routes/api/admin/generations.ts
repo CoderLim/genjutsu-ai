@@ -22,7 +22,13 @@ import {
 } from '@/modules/genjutsu/pricing';
 import { estimateSeedanceProviderCost } from '@/modules/genjutsu/seedance';
 import { HOTEL_LOBBY_SCENE } from '@/modules/hotel-lobby/billing';
-import { estimateHotelLobbyCredits } from '@/modules/hotel-lobby/pricing';
+import {
+  estimateH3LabCredits,
+  estimateHotelLobbyCredits,
+  H3_LAB_MODEL,
+  HOTEL_LOBBY_RESOLUTIONS,
+  type HotelLobbyResolution,
+} from '@/modules/hotel-lobby/pricing';
 import { hasPermission } from '@/modules/rbac/service';
 import { respErr, respPage } from '@/lib/resp';
 
@@ -87,9 +93,26 @@ function isChuttamalleResolution(
   );
 }
 
+function isHotelLobbyH3Model(model: unknown): boolean {
+  return (
+    typeof model === 'string' &&
+    (model === H3_LAB_MODEL ||
+      model.includes('minimax/h3') ||
+      model.includes('minimax_h3'))
+  );
+}
+
+function isHotelLobbyResolution(value: unknown): value is HotelLobbyResolution {
+  return (
+    typeof value === 'string' &&
+    (HOTEL_LOBBY_RESOLUTIONS as readonly string[]).includes(value)
+  );
+}
+
 function resolveEstimatedCredits(input: {
   scene: string;
   provider: string;
+  model?: string | null;
   providerCostUsd: number | null;
   sourceDurationSeconds: number | null;
   duration: number | null;
@@ -118,6 +141,14 @@ function resolveEstimatedCredits(input: {
       return null;
     }
     try {
+      if (isHotelLobbyH3Model(input.model)) {
+        if (!isHotelLobbyResolution(input.resolution)) return null;
+        return estimateH3LabCredits({
+          duration: input.duration,
+          resolution: input.resolution,
+          imageCount: Math.max(1, input.imageCount),
+        });
+      }
       return estimateHotelLobbyCredits({
         duration: input.duration,
         imageCount: Math.max(1, input.imageCount),
@@ -473,6 +504,7 @@ async function GET({ request }: { request: Request }) {
         estimatedCredits: resolveEstimatedCredits({
           scene: row.scene,
           provider: row.provider,
+          model: row.model,
           providerCostUsd:
             typeof info?.providerCostUsd === 'number'
               ? info.providerCostUsd

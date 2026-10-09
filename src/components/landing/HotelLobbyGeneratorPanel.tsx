@@ -11,7 +11,11 @@ import { toast } from 'sonner';
 
 import { useSession } from '@/core/auth/client';
 import { Link } from '@/core/i18n/navigation';
-import { estimateHotelLobbyCredits } from '@/modules/hotel-lobby/pricing';
+import {
+  estimateHotelLobbyCredits,
+  HOTEL_LOBBY_MAX_VIDEO_EDGE_PX,
+  HOTEL_LOBBY_MIN_VIDEO_EDGE_PX,
+} from '@/modules/hotel-lobby/pricing';
 import { ApiError, apiGet, apiPost, uploadToSignedUrl } from '@/lib/api-client';
 import { trimVideoToFile } from '@/lib/trim-video';
 import { useUserCredits } from '@/hooks/use-user-credits';
@@ -89,7 +93,11 @@ function createMediaItem(file: File): MediaItem {
   };
 }
 
-function readVideoDuration(file: File): Promise<number> {
+function readVideoMetadata(file: File): Promise<{
+  duration: number;
+  width: number;
+  height: number;
+}> {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
     const video = document.createElement('video');
@@ -103,19 +111,43 @@ function readVideoDuration(file: File): Promise<number> {
 
     video.onloadedmetadata = () => {
       const duration = video.duration;
+      const width = video.videoWidth;
+      const height = video.videoHeight;
       cleanup();
       if (!Number.isFinite(duration) || duration <= 0) {
         reject(new Error('Could not read video duration'));
         return;
       }
-      resolve(duration);
+      if (
+        !Number.isFinite(width) ||
+        !Number.isFinite(height) ||
+        width < 1 ||
+        height < 1
+      ) {
+        reject(new Error('Could not read video resolution'));
+        return;
+      }
+      resolve({ duration, width, height });
     };
     video.onerror = () => {
       cleanup();
-      reject(new Error('Could not read video duration'));
+      reject(new Error('Could not read video metadata'));
     };
     video.src = url;
   });
+}
+
+function assertClientVideoDimensions(width: number, height: number) {
+  if (
+    width < HOTEL_LOBBY_MIN_VIDEO_EDGE_PX ||
+    height < HOTEL_LOBBY_MIN_VIDEO_EDGE_PX ||
+    width > HOTEL_LOBBY_MAX_VIDEO_EDGE_PX ||
+    height > HOTEL_LOBBY_MAX_VIDEO_EDGE_PX
+  ) {
+    throw new Error(
+      `Reference video must be between ${HOTEL_LOBBY_MIN_VIDEO_EDGE_PX}×${HOTEL_LOBBY_MIN_VIDEO_EDGE_PX} and ${HOTEL_LOBBY_MAX_VIDEO_EDGE_PX}×${HOTEL_LOBBY_MAX_VIDEO_EDGE_PX} pixels`
+    );
+  }
 }
 
 function clampReferenceDuration(seconds: number) {
@@ -306,8 +338,8 @@ export function HotelLobbyGeneratorPanel() {
     if (!video || sourceDuration == null || trimming) return;
 
     if (
-      clipDurationSeconds < MIN_REFERENCE_VIDEO_SECONDS - 0.1 ||
-      clipDurationSeconds > MAX_REFERENCE_VIDEO_SECONDS + 0.2
+      clipDurationSeconds < MIN_REFERENCE_VIDEO_SECONDS ||
+      clipDurationSeconds > MAX_REFERENCE_VIDEO_SECONDS
     ) {
       toast.error('Trim the clip to between 3 and 15 seconds');
       return;
@@ -406,12 +438,23 @@ export function HotelLobbyGeneratorPanel() {
     }
 
     try {
-      const durationSeconds = await readVideoDuration(file);
+      const meta = await readVideoMetadata(file);
+      const durationSeconds = meta.duration;
       if (
-        durationSeconds < MIN_REFERENCE_VIDEO_SECONDS - 0.1 ||
-        durationSeconds > MAX_REFERENCE_VIDEO_SECONDS + 0.2
+        durationSeconds < MIN_REFERENCE_VIDEO_SECONDS ||
+        durationSeconds > MAX_REFERENCE_VIDEO_SECONDS
       ) {
         toast.error('Reference video must be between 3 and 15 seconds');
+        return;
+      }
+      try {
+        assertClientVideoDimensions(meta.width, meta.height);
+      } catch (error) {
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : 'Unsupported video resolution'
+        );
         return;
       }
 
@@ -513,8 +556,8 @@ export function HotelLobbyGeneratorPanel() {
       return;
     }
     if (
-      clipDurationSeconds < MIN_REFERENCE_VIDEO_SECONDS - 0.1 ||
-      clipDurationSeconds > MAX_REFERENCE_VIDEO_SECONDS + 0.2
+      clipDurationSeconds < MIN_REFERENCE_VIDEO_SECONDS ||
+      clipDurationSeconds > MAX_REFERENCE_VIDEO_SECONDS
     ) {
       toast.error('Trim the clip to between 3 and 15 seconds');
       return;
@@ -748,9 +791,8 @@ export function HotelLobbyGeneratorPanel() {
                     applying={trimming}
                     canApply={
                       !isFullSourceClip(trimStart, trimEnd, sourceDuration) &&
-                      clipDurationSeconds >=
-                        MIN_REFERENCE_VIDEO_SECONDS - 0.1 &&
-                      clipDurationSeconds <= MAX_REFERENCE_VIDEO_SECONDS + 0.2
+                      clipDurationSeconds >= MIN_REFERENCE_VIDEO_SECONDS &&
+                      clipDurationSeconds <= MAX_REFERENCE_VIDEO_SECONDS
                     }
                     onChange={({ startSeconds, endSeconds }) => {
                       setTrimStart(startSeconds);
@@ -786,7 +828,7 @@ export function HotelLobbyGeneratorPanel() {
                       Upload reference video
                     </span>
                     <span className="mt-1 block text-xs text-white/38">
-                      MP4 or MOV · 3–15s · up to 80 MB
+                      MP4 or MOV · 3–15s · 720–3840px · up to 80 MB
                     </span>
                   </span>
                 </button>
@@ -883,7 +925,7 @@ export function HotelLobbyGeneratorPanel() {
           <div className="mb-3 flex items-center justify-between gap-3 px-1">
             <div>
               <p className="text-sm font-semibold text-white/90">Your video</p>
-              <p className="mt-0.5 text-xs text-white/38">Kling O3 · 16:9</p>
+              <p className="mt-0.5 text-xs text-white/38">Kling O3</p>
             </div>
             <a
               href={

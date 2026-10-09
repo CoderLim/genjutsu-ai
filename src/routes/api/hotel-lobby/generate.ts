@@ -25,7 +25,10 @@ import {
   resolveHotelLobbyInputUrls,
   sealHotelLobbyInputs,
 } from '@/modules/hotel-lobby/storage';
-import { probeHotelLobbyDurationSeconds } from '@/modules/hotel-lobby/video-metadata';
+import {
+  probeHotelLobbyDurationSeconds,
+  probeHotelLobbyVideoDimensions,
+} from '@/modules/hotel-lobby/video-metadata';
 import { enforceMinIntervalRateLimit } from '@/lib/rate-limit';
 import { respData, respErr, respJson } from '@/lib/resp';
 
@@ -130,6 +133,8 @@ async function POST({ request }: { request: Request }) {
           : undefined,
       }
     );
+    // Kling O3 rejects out-of-range pixels; fail before credit reservation.
+    await probeHotelLobbyVideoDimensions(providerInput.videoUrl);
 
     const prompt = buildHotelLobbyPrompt(imageKeys.length);
     const providerCostUsd = estimateHotelLobbyProviderCost({

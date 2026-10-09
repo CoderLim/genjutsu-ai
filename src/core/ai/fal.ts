@@ -134,12 +134,14 @@ export class FalProvider implements AIProvider {
     const statusResp = await fetch(statusUrl, { method: 'GET', headers });
 
     if (!statusResp.ok) {
+      // Transient status transport errors (429/5xx) are not terminal model
+      // failures — keep the task retryable so callers do not refund early.
       const detail = await statusResp.text().catch(() => '');
       return {
         taskId,
-        taskStatus: AITaskStatus.FAILED,
+        taskStatus: AITaskStatus.PROCESSING,
         taskInfo: {
-          status: String(statusResp.status),
+          status: 'QUERY_ERROR',
           errorCode: String(statusResp.status),
           errorMessage:
             detail || `request failed with status: ${statusResp.status}`,
@@ -175,12 +177,13 @@ export class FalProvider implements AIProvider {
     const resultResp = await fetch(resultUrl, { method: 'GET', headers });
 
     if (!resultResp.ok) {
+      // Status was COMPLETED but result fetch failed — treat as transient.
       const detail = await resultResp.text().catch(() => '');
       return {
         taskId,
-        taskStatus: AITaskStatus.FAILED,
+        taskStatus: AITaskStatus.PROCESSING,
         taskInfo: {
-          status: String(resultResp.status),
+          status: 'RESULT_FETCH_ERROR',
           errorCode: String(resultResp.status),
           errorMessage:
             detail || `request failed with status: ${resultResp.status}`,

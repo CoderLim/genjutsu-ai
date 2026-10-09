@@ -63,7 +63,7 @@ const FAQ_ITEMS = [
   {
     question: 'Can I make it longer or in HD?',
     answer:
-      'Yes. The output length follows the reference video, which must be 3–15 seconds. Kling O3 returns a single native output resolution for this edit endpoint.',
+      'Yes. The output length follows the reference video, which must be 3–15 seconds and between 720×720 and 3840×3840 pixels. Custom clips keep their own framing; the preset booth template is landscape.',
   },
   {
     question: 'Can I replace the preset Hotel Lobby template?',
@@ -242,11 +242,11 @@ function HotelLobbyAiPage() {
                   hair, outfits, and overall appearance.
                 </p>
                 <p className="mt-4 text-sm leading-7 text-white/48 sm:text-base">
-                  Output is landscape 16:9. Its length follows the reference
-                  video automatically, from 5 to 15 seconds. For the original
-                  song when you post, choose the licensed <em>Hotel Lobby</em>{' '}
-                  sound inside TikTok or Instagram rather than bundling the
-                  track into the generated file.
+                  With the preset booth clip, output is landscape. Length
+                  follows the reference video automatically, from 5 to 15
+                  seconds. For the original song when you post, choose the
+                  licensed <em>Hotel Lobby</em> sound inside TikTok or Instagram
+                  rather than bundling the track into the generated file.
                 </p>
               </div>
 
@@ -403,7 +403,7 @@ function HotelLobbyAiPage() {
                       ],
                       [
                         'Default output',
-                        '16:9 · reference length',
+                        'Matches the reference clip',
                         'Up to 1080p · source-driven',
                       ],
                       [
