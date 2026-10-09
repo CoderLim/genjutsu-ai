@@ -4,6 +4,7 @@ import { getAuth } from '@/core/auth';
 import {
   assertHotelLobbyGenerationId,
   getHotelLobbyTaskById,
+  markHotelLobbyProviderQueryUnresolved,
   parseHotelLobbyTask,
   refundHotelLobbyGeneration,
   settleHotelLobbyGeneration,
@@ -105,6 +106,29 @@ async function GET({ request }: { request: Request }) {
       task.taskId,
       typeof task.model === 'string' && task.model ? task.model : undefined
     );
+
+    if (provider.status === 'unresolved') {
+      console.error('hotel-lobby provider query unresolved:', {
+        generationId,
+        providerStatus: provider.providerStatus,
+        error: provider.error,
+      });
+      await markHotelLobbyProviderQueryUnresolved({
+        generationId,
+        userId: session.user.id,
+        providerStatus: provider.providerStatus,
+        error:
+          provider.error ||
+          'Provider status lookup failed permanently. Credits remain reserved.',
+      });
+      return respData({
+        status: 'failed',
+        providerStatus: 'submission_unknown',
+        videoUrl: null,
+        error:
+          'Provider status lookup failed permanently. Credits remain reserved; contact support before retrying.',
+      });
+    }
 
     if (provider.status === 'failed') {
       const refunded = await refundHotelLobbyGeneration({

@@ -300,6 +300,33 @@ export async function markChuttamalleSubmissionUnknown(params: {
     );
 }
 
+export async function markChuttamalleProviderQueryUnresolved(params: {
+  generationId: string;
+  userId: string;
+  error: string;
+  providerStatus: string;
+}) {
+  await db()
+    .update(aiTask)
+    .set({
+      status: 'submission_unknown',
+      taskResult: JSON.stringify({
+        error: params.error,
+        providerStatus: params.providerStatus,
+        stage: 'provider_query',
+      }),
+    })
+    .where(
+      and(
+        eq(aiTask.id, params.generationId),
+        eq(aiTask.userId, params.userId),
+        eq(aiTask.scene, CHUTTAMALLE_SCENE),
+        eq(aiTask.status, 'submitted')
+      )
+    );
+  return getChuttamalleTaskById(params);
+}
+
 export async function settleChuttamalleGeneration(params: {
   generationId: string;
   userId: string;

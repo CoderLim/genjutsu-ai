@@ -1,4 +1,9 @@
-import { AIMediaType, AITaskStatus, FalProvider } from '@/core/ai';
+import {
+  AIMediaType,
+  AITaskStatus,
+  FalProvider,
+  isFalPermanentQueryFailure,
+} from '@/core/ai';
 import { getConfig } from '@/modules/config/service';
 
 import {
@@ -320,8 +325,22 @@ export async function getHotelLobbyProviderStatus(
     const payload = result.taskResult as Record<string, unknown> | undefined;
     const error =
       (typeof payload?.error === 'string' && payload.error) ||
+      (typeof result.taskInfo?.errorMessage === 'string' &&
+        result.taskInfo.errorMessage) ||
       (typeof payload?.message === 'string' && payload.message) ||
       'Video generation failed';
+
+    // Permanent status/result lookup failures are not confirmed model fails —
+    // hold credits for manual recovery instead of auto-refunding.
+    if (isFalPermanentQueryFailure(result.taskInfo)) {
+      return {
+        status: 'unresolved' as const,
+        providerStatus: result.taskInfo?.status || 'QUERY_PERMANENT_ERROR',
+        videoUrl: null,
+        error,
+      };
+    }
+
     return {
       status: 'failed' as const,
       providerStatus: result.taskStatus,

@@ -1,4 +1,9 @@
-import { AIMediaType, AITaskStatus, FalProvider } from '@/core/ai';
+import {
+  AIMediaType,
+  AITaskStatus,
+  FalProvider,
+  isFalPermanentQueryFailure,
+} from '@/core/ai';
 import { getConfig } from '@/modules/config/service';
 
 import {
@@ -194,8 +199,20 @@ export async function getChuttamalleProviderStatus(requestId: string) {
     const payload = result.taskResult as Record<string, unknown> | undefined;
     const error =
       (typeof payload?.error === 'string' && payload.error) ||
+      (typeof result.taskInfo?.errorMessage === 'string' &&
+        result.taskInfo.errorMessage) ||
       (typeof payload?.message === 'string' && payload.message) ||
       'MiniMax H3 generation failed';
+
+    if (isFalPermanentQueryFailure(result.taskInfo)) {
+      return {
+        status: 'unresolved' as const,
+        providerStatus: result.taskInfo?.status || 'QUERY_PERMANENT_ERROR',
+        videoUrl: null,
+        error,
+      };
+    }
+
     return {
       status: 'failed' as const,
       providerStatus: result.taskStatus,

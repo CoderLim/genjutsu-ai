@@ -14,6 +14,23 @@ import {
 
 const defaultUuid: UuidFunction = () => crypto.randomUUID();
 
+/** Retryable Fal queue transport failures (not terminal model outcomes). */
+function isTransientFalHttpStatus(status: number) {
+  return status === 408 || status === 429 || status >= 500;
+}
+
+export function isFalPermanentQueryFailure(
+  taskInfo?: {
+    status?: string;
+  } | null
+) {
+  const status = taskInfo?.status;
+  return (
+    status === 'QUERY_PERMANENT_ERROR' ||
+    status === 'RESULT_FETCH_PERMANENT_ERROR'
+  );
+}
+
 /**
  * Fal configs
  * @docs https://fal.ai/
@@ -134,21 +151,21 @@ export class FalProvider implements AIProvider {
     const statusResp = await fetch(statusUrl, { method: 'GET', headers });
 
     if (!statusResp.ok) {
-      // Transient status transport errors (429/5xx) are not terminal model
-      // failures — keep the task retryable so callers do not refund early.
       const detail = await statusResp.text().catch(() => '');
+      const message =
+        detail || `request failed with status: ${statusResp.status}`;
+      // 429/5xx (and 408): retryable. 4xx like 401/403/404: permanent lookup
+      // failure — callers must not keep polling forever or auto-refund.
+      const transient = isTransientFalHttpStatus(statusResp.status);
       return {
         taskId,
-        taskStatus: AITaskStatus.PROCESSING,
+        taskStatus: transient ? AITaskStatus.PROCESSING : AITaskStatus.FAILED,
         taskInfo: {
-          status: 'QUERY_ERROR',
+          status: transient ? 'QUERY_ERROR' : 'QUERY_PERMANENT_ERROR',
           errorCode: String(statusResp.status),
-          errorMessage:
-            detail || `request failed with status: ${statusResp.status}`,
+          errorMessage: message,
         },
-        taskResult: {
-          error: detail || `request failed with status: ${statusResp.status}`,
-        },
+        taskResult: { error: message },
       };
     }
 
@@ -177,20 +194,21 @@ export class FalProvider implements AIProvider {
     const resultResp = await fetch(resultUrl, { method: 'GET', headers });
 
     if (!resultResp.ok) {
-      // Status was COMPLETED but result fetch failed — treat as transient.
       const detail = await resultResp.text().catch(() => '');
+      const message =
+        detail || `request failed with status: ${resultResp.status}`;
+      const transient = isTransientFalHttpStatus(resultResp.status);
       return {
         taskId,
-        taskStatus: AITaskStatus.PROCESSING,
+        taskStatus: transient ? AITaskStatus.PROCESSING : AITaskStatus.FAILED,
         taskInfo: {
-          status: 'RESULT_FETCH_ERROR',
+          status: transient
+            ? 'RESULT_FETCH_ERROR'
+            : 'RESULT_FETCH_PERMANENT_ERROR',
           errorCode: String(resultResp.status),
-          errorMessage:
-            detail || `request failed with status: ${resultResp.status}`,
+          errorMessage: message,
         },
-        taskResult: {
-          error: detail || `request failed with status: ${resultResp.status}`,
-        },
+        taskResult: { error: message },
       };
     }
 

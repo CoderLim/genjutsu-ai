@@ -1,6 +1,8 @@
 import { parseIsoBmffDurationSeconds } from '@/modules/genjutsu/video-metadata';
 
 import {
+  H3_MAX_DURATION_SECONDS,
+  H3_MIN_DURATION_SECONDS,
   HOTEL_LOBBY_MAX_VIDEO_EDGE_PX,
   HOTEL_LOBBY_MIN_VIDEO_EDGE_PX,
 } from './pricing';
@@ -320,6 +322,33 @@ export async function probeHotelLobbyDurationSeconds(
   options?: { fallbackSeconds?: number }
 ) {
   return normalizeHotelLobbyDuration(
+    await probeHotelLobbyDurationSecondsRaw(videoUrl, options)
+  );
+}
+
+/** H3 Lab: validate raw clip against MiniMax 5–15s before rounding for billing. */
+export function normalizeH3LabDuration(seconds: number) {
+  if (
+    !Number.isFinite(seconds) ||
+    seconds < H3_MIN_DURATION_SECONDS - DURATION_EPSILON_SECONDS ||
+    seconds > H3_MAX_DURATION_SECONDS + DURATION_EPSILON_SECONDS
+  ) {
+    throw new Error(
+      `Reference video must be between ${H3_MIN_DURATION_SECONDS} and ${H3_MAX_DURATION_SECONDS} seconds`
+    );
+  }
+
+  return Math.min(
+    H3_MAX_DURATION_SECONDS,
+    Math.max(H3_MIN_DURATION_SECONDS, Math.round(seconds))
+  );
+}
+
+export async function probeH3LabDurationSeconds(
+  videoUrl: string,
+  options?: { fallbackSeconds?: number }
+) {
+  return normalizeH3LabDuration(
     await probeHotelLobbyDurationSecondsRaw(videoUrl, options)
   );
 }

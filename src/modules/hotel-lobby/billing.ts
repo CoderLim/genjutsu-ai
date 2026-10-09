@@ -300,6 +300,34 @@ export async function markHotelLobbySubmissionUnknown(params: {
     );
 }
 
+/** Submitted task whose Fal status lookup failed permanently — no refund. */
+export async function markHotelLobbyProviderQueryUnresolved(params: {
+  generationId: string;
+  userId: string;
+  error: string;
+  providerStatus: string;
+}) {
+  await db()
+    .update(aiTask)
+    .set({
+      status: 'submission_unknown',
+      taskResult: JSON.stringify({
+        error: params.error,
+        providerStatus: params.providerStatus,
+        stage: 'provider_query',
+      }),
+    })
+    .where(
+      and(
+        eq(aiTask.id, params.generationId),
+        eq(aiTask.userId, params.userId),
+        eq(aiTask.scene, HOTEL_LOBBY_SCENE),
+        eq(aiTask.status, 'submitted')
+      )
+    );
+  return getHotelLobbyTaskById(params);
+}
+
 export async function settleHotelLobbyGeneration(params: {
   generationId: string;
   userId: string;

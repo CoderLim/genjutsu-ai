@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import {
   assertHotelLobbyVideoDimensions,
+  normalizeH3LabDuration,
   normalizeHotelLobbyDuration,
   parseIsoBmffVideoDimensions,
 } from './video-metadata';
@@ -39,4 +40,10 @@ test('duration accepts exact 3–15s and rejects 2.9 / 15.2', () => {
   assert.equal(normalizeHotelLobbyDuration(3.4), 3);
   assert.throws(() => normalizeHotelLobbyDuration(2.9));
   assert.throws(() => normalizeHotelLobbyDuration(15.2));
+});
+
+test('H3 Lab duration rejects sub-5s raw clips (no Kling round-up)', () => {
+  assert.throws(() => normalizeH3LabDuration(4.6));
+  assert.equal(normalizeH3LabDuration(5), 5);
+  assert.equal(normalizeH3LabDuration(5.4), 5);
 });

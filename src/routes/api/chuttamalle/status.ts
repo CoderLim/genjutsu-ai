@@ -4,6 +4,7 @@ import { getAuth } from '@/core/auth';
 import {
   assertChuttamalleGenerationId,
   getChuttamalleTaskById,
+  markChuttamalleProviderQueryUnresolved,
   parseChuttamalleTask,
   refundChuttamalleGeneration,
   settleChuttamalleGeneration,
@@ -102,6 +103,29 @@ async function GET({ request }: { request: Request }) {
     }
 
     const provider = await getChuttamalleProviderStatus(task.taskId);
+
+    if (provider.status === 'unresolved') {
+      console.error('chuttamalle provider query unresolved:', {
+        generationId,
+        providerStatus: provider.providerStatus,
+        error: provider.error,
+      });
+      await markChuttamalleProviderQueryUnresolved({
+        generationId,
+        userId: session.user.id,
+        providerStatus: provider.providerStatus,
+        error:
+          provider.error ||
+          'Provider status lookup failed permanently. Credits remain reserved.',
+      });
+      return respData({
+        status: 'failed',
+        providerStatus: 'submission_unknown',
+        videoUrl: null,
+        error:
+          'Provider status lookup failed permanently. Credits remain reserved; contact support before retrying.',
+      });
+    }
 
     if (provider.status === 'failed') {
       const refunded = await refundChuttamalleGeneration({
