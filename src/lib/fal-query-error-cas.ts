@@ -6,8 +6,9 @@ import { aiTask } from '@/config/db/schema';
 
 /**
  * D1 has no real transactions / FOR UPDATE (see withSqliteCompat in
- * create-db.ts). These helpers use compare-and-swap on the exact prior
- * `taskResult` string and verify after write, with retry on contention.
+ * create-db.ts). These helpers compare-and-swap on the exact prior
+ * `taskResult` string and judge success via UPDATE rows-affected — never
+ * via a post-write SELECT (that can mis-count under concurrent writers).
  */
 
 const CAS_MAX_ATTEMPTS = 5;
@@ -26,6 +27,23 @@ export function nextQueryPermanentErrorCount(
 
 export function shouldParkQueryErrorsAsUnknown(count: number) {
   return count >= FAL_QUERY_PERMANENT_ERROR_THRESHOLD;
+}
+
+/** Normalize dialect-specific UPDATE result shapes to rows written. */
+export function rowsAffectedFromUpdate(result: unknown): number {
+  if (result == null) return 0;
+  if (typeof result !== 'object') return 0;
+  const r = result as Record<string, unknown>;
+  const meta = r.meta;
+  if (meta && typeof meta === 'object') {
+    const changes = (meta as Record<string, unknown>).changes;
+    if (typeof changes === 'number') return changes;
+  }
+  if (typeof r.changes === 'number') return r.changes;
+  if (typeof r.rowsAffected === 'number') return r.rowsAffected;
+  if (typeof r.rowCount === 'number') return r.rowCount;
+  if (typeof r.affectedRows === 'number') return r.affectedRows;
+  return 0;
 }
 
 function parseJson(value: string | null | undefined) {
@@ -67,7 +85,20 @@ export async function applyAiTaskProviderQueryError(params: {
       )
       .limit(1);
 
-    if (!task || task.status !== 'submitted') {
+    if (!task) {
+      return { count: 0, unresolved: false };
+    }
+
+    if (task.status === 'submission_unknown') {
+      const parked = parseJson(task.taskResult);
+      const parkedCount =
+        typeof parked?.queryPermanentErrorCount === 'number'
+          ? parked.queryPermanentErrorCount
+          : 0;
+      return { count: parkedCount, unresolved: true };
+    }
+
+    if (task.status !== 'submitted') {
       return { count: 0, unresolved: false };
     }
 
@@ -84,7 +115,7 @@ export async function applyAiTaskProviderQueryError(params: {
         queryPermanentErrorCount: count,
       });
 
-      await db()
+      const result = await db()
         .update(aiTask)
         .set({
           status: 'submission_unknown',
@@ -100,28 +131,11 @@ export async function applyAiTaskProviderQueryError(params: {
           )
         );
 
-      const [after] = await db()
-        .select()
-        .from(aiTask)
-        .where(eq(aiTask.id, params.generationId))
-        .limit(1);
-
-      if (
-        after?.status === 'submission_unknown' &&
-        after.taskResult === nextResult
-      ) {
+      if (rowsAffectedFromUpdate(result) > 0) {
         return { count, unresolved: true };
       }
 
-      if (after?.status === 'submission_unknown') {
-        const parked = parseJson(after.taskResult);
-        const parkedCount =
-          typeof parked?.queryPermanentErrorCount === 'number'
-            ? parked.queryPermanentErrorCount
-            : count;
-        return { count: parkedCount, unresolved: true };
-      }
-
+      // Lost CAS — another writer moved the row; re-read on next attempt.
       continue;
     }
 
@@ -133,7 +147,7 @@ export async function applyAiTaskProviderQueryError(params: {
       stage: 'provider_query',
     });
 
-    await db()
+    const result = await db()
       .update(aiTask)
       .set({ taskResult: nextResult })
       .where(
@@ -146,23 +160,8 @@ export async function applyAiTaskProviderQueryError(params: {
         )
       );
 
-    const [after] = await db()
-      .select()
-      .from(aiTask)
-      .where(eq(aiTask.id, params.generationId))
-      .limit(1);
-
-    if (after?.status === 'submitted' && after.taskResult === nextResult) {
+    if (rowsAffectedFromUpdate(result) > 0) {
       return { count, unresolved: false };
-    }
-
-    if (after?.status === 'submission_unknown') {
-      const parked = parseJson(after.taskResult);
-      const parkedCount =
-        typeof parked?.queryPermanentErrorCount === 'number'
-          ? parked.queryPermanentErrorCount
-          : count;
-      return { count: parkedCount, unresolved: true };
     }
   }
 
@@ -175,51 +174,39 @@ export async function clearAiTaskProviderQueryErrors(params: {
   generationId: string;
   userId: string;
 }) {
-  for (let attempt = 0; attempt < CAS_MAX_ATTEMPTS; attempt += 1) {
-    const [task] = await db()
-      .select()
-      .from(aiTask)
-      .where(
-        and(
-          eq(aiTask.id, params.generationId),
-          eq(aiTask.userId, params.userId),
-          eq(aiTask.scene, params.scene)
-        )
+  const [task] = await db()
+    .select()
+    .from(aiTask)
+    .where(
+      and(
+        eq(aiTask.id, params.generationId),
+        eq(aiTask.userId, params.userId),
+        eq(aiTask.scene, params.scene)
       )
-      .limit(1);
+    )
+    .limit(1);
 
-    if (!task || task.status !== 'submitted') return;
+  if (!task || task.status !== 'submitted') return;
 
-    const previousResult =
-      typeof task.taskResult === 'string' ? task.taskResult : null;
-    const existing = parseJson(previousResult);
-    if (!existing?.queryPermanentErrorCount && !existing?.lastQueryError) {
-      return;
-    }
-
-    await db()
-      .update(aiTask)
-      .set({ taskResult: null })
-      .where(
-        and(
-          eq(aiTask.id, params.generationId),
-          eq(aiTask.userId, params.userId),
-          eq(aiTask.scene, params.scene),
-          eq(aiTask.status, 'submitted'),
-          taskResultCasClause(previousResult)
-        )
-      );
-
-    const [after] = await db()
-      .select()
-      .from(aiTask)
-      .where(eq(aiTask.id, params.generationId))
-      .limit(1);
-
-    if (!after || after.status !== 'submitted') return;
-    if (after.taskResult == null) return;
-
-    const next = parseJson(after.taskResult);
-    if (!next?.queryPermanentErrorCount && !next?.lastQueryError) return;
+  const previousResult =
+    typeof task.taskResult === 'string' ? task.taskResult : null;
+  const existing = parseJson(previousResult);
+  if (!existing?.queryPermanentErrorCount && !existing?.lastQueryError) {
+    return;
   }
+
+  // Single CAS attempt: if another writer already changed taskResult, do not
+  // retry against the new value — that would erase a concurrent error bump.
+  await db()
+    .update(aiTask)
+    .set({ taskResult: null })
+    .where(
+      and(
+        eq(aiTask.id, params.generationId),
+        eq(aiTask.userId, params.userId),
+        eq(aiTask.scene, params.scene),
+        eq(aiTask.status, 'submitted'),
+        taskResultCasClause(previousResult)
+      )
+    );
 }

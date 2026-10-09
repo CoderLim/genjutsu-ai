@@ -4,11 +4,12 @@ import { getAuth } from '@/core/auth';
 import {
   applyChuttamalleProviderQueryError,
   assertChuttamalleGenerationId,
+  claimChuttamalleCompletion,
   clearChuttamalleProviderQueryErrors,
+  finalizeChuttamalleGeneration,
   getChuttamalleTaskById,
   parseChuttamalleTask,
   refundChuttamalleGeneration,
-  settleChuttamalleGeneration,
 } from '@/modules/chuttamalle/billing';
 import { getChuttamalleProviderStatus } from '@/modules/chuttamalle/service';
 import { persistChuttamalleResultToR2 } from '@/modules/chuttamalle/storage';
@@ -84,7 +85,6 @@ async function GET({ request }: { request: Request }) {
     if (
       task.status === 'reserved' ||
       task.status === 'submitting' ||
-      task.status === 'completing' ||
       task.status === 'refunding'
     ) {
       return respData({
@@ -95,7 +95,11 @@ async function GET({ request }: { request: Request }) {
       });
     }
 
-    if (task.status !== 'submitted' || !task.taskId) {
+    // `completing` may resume R2 persistence after a prior claim.
+    if (
+      (task.status !== 'submitted' && task.status !== 'completing') ||
+      !task.taskId
+    ) {
       return respData({
         status: 'processing',
         providerStatus: task.status,
@@ -105,7 +109,7 @@ async function GET({ request }: { request: Request }) {
 
     const provider = await getChuttamalleProviderStatus(task.taskId);
 
-    if (provider.status === 'unresolved') {
+    if (task.status === 'submitted' && provider.status === 'unresolved') {
       const outcome = await applyChuttamalleProviderQueryError({
         generationId,
         userId: session.user.id,
@@ -150,14 +154,14 @@ async function GET({ request }: { request: Request }) {
       });
     }
 
-    if (provider.status === 'processing') {
+    if (task.status === 'submitted' && provider.status === 'processing') {
       await clearChuttamalleProviderQueryErrors({
         generationId,
         userId: session.user.id,
       });
     }
 
-    if (provider.status === 'failed') {
+    if (task.status === 'submitted' && provider.status === 'failed') {
       const refunded = await refundChuttamalleGeneration({
         generationId,
         userId: session.user.id,
@@ -182,13 +186,49 @@ async function GET({ request }: { request: Request }) {
 
     if (provider.status === 'completed' && provider.videoUrl) {
       try {
+        if (task.status === 'submitted') {
+          const ownership = await claimChuttamalleCompletion({
+            generationId,
+            userId: session.user.id,
+          });
+          if (ownership === 'unavailable') {
+            const current = await getChuttamalleTaskById({
+              generationId,
+              userId: session.user.id,
+            });
+            if (current?.status === 'completed') {
+              return respData({
+                status: 'completed',
+                providerStatus: provider.providerStatus,
+                videoUrl: stableResultUrl(generationId),
+                reservedCredits: task.costCredits || 0,
+              });
+            }
+            if (current?.status === 'submission_unknown') {
+              return respData({
+                status: 'failed',
+                providerStatus: 'submission_unknown',
+                videoUrl: null,
+                error:
+                  'Submission result is uncertain. Please contact support before retrying.',
+              });
+            }
+            return respData({
+              status: 'processing',
+              providerStatus: current?.status || 'processing',
+              videoUrl: null,
+              reservedCredits: task.costCredits || 0,
+            });
+          }
+        }
+
         const persisted = await persistChuttamalleResultToR2({
           userId: session.user.id,
           generationId,
           sourceUrl: provider.videoUrl,
         });
 
-        await settleChuttamalleGeneration({
+        await finalizeChuttamalleGeneration({
           generationId,
           userId: session.user.id,
           providerStatus: provider.providerStatus,

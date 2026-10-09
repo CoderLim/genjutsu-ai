@@ -6,6 +6,7 @@ import { consume, getBalance, revoke } from '@/modules/credits/service';
 import {
   applyAiTaskProviderQueryError,
   clearAiTaskProviderQueryErrors,
+  rowsAffectedFromUpdate,
 } from '@/lib/fal-query-error-cas';
 import { getUuid } from '@/lib/hash';
 
@@ -327,14 +328,16 @@ export async function clearHotelLobbyProviderQueryErrors(params: {
   });
 }
 
-export async function settleHotelLobbyGeneration(params: {
+/**
+ * Take ownership before R2 persistence so concurrent query-error CAS cannot
+ * park the task as submission_unknown while the result is being saved.
+ */
+export async function claimHotelLobbyCompletion(params: {
   generationId: string;
   userId: string;
-  providerStatus: string;
-  videoKey: string;
-}) {
+}): Promise<'claimed' | 'already_completing' | 'unavailable'> {
   const claim = getUuid();
-  await db()
+  const result = await db()
     .update(aiTask)
     .set({
       status: 'completing',
@@ -349,15 +352,19 @@ export async function settleHotelLobbyGeneration(params: {
       )
     );
 
-  const claimed = await getHotelLobbyTaskById(params);
-  if (
-    !claimed ||
-    claimed.status !== 'completing' ||
-    parseJson(claimed.taskResult)?.completionClaim !== claim
-  ) {
-    return claimed;
-  }
+  if (rowsAffectedFromUpdate(result) > 0) return 'claimed';
 
+  const current = await getHotelLobbyTaskById(params);
+  if (current?.status === 'completing') return 'already_completing';
+  return 'unavailable';
+}
+
+export async function finalizeHotelLobbyGeneration(params: {
+  generationId: string;
+  userId: string;
+  providerStatus: string;
+  videoKey: string;
+}) {
   await db()
     .update(aiTask)
     .set({

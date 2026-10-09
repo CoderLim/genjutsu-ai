@@ -4,11 +4,12 @@ import { getAuth } from '@/core/auth';
 import {
   applyHotelLobbyProviderQueryError,
   assertHotelLobbyGenerationId,
+  claimHotelLobbyCompletion,
   clearHotelLobbyProviderQueryErrors,
+  finalizeHotelLobbyGeneration,
   getHotelLobbyTaskById,
   parseHotelLobbyTask,
   refundHotelLobbyGeneration,
-  settleHotelLobbyGeneration,
 } from '@/modules/hotel-lobby/billing';
 import { getHotelLobbyProviderStatus } from '@/modules/hotel-lobby/service';
 import { persistHotelLobbyResultToR2 } from '@/modules/hotel-lobby/storage';
@@ -84,7 +85,6 @@ async function GET({ request }: { request: Request }) {
     if (
       task.status === 'reserved' ||
       task.status === 'submitting' ||
-      task.status === 'completing' ||
       task.status === 'refunding'
     ) {
       return respData({
@@ -95,7 +95,12 @@ async function GET({ request }: { request: Request }) {
       });
     }
 
-    if (task.status !== 'submitted' || !task.taskId) {
+    // `completing` may resume R2 persistence after a prior claim; do not
+    // early-return before the provider completed branch below.
+    if (
+      (task.status !== 'submitted' && task.status !== 'completing') ||
+      !task.taskId
+    ) {
       return respData({
         status: 'processing',
         providerStatus: task.status,
@@ -108,7 +113,8 @@ async function GET({ request }: { request: Request }) {
       typeof task.model === 'string' && task.model ? task.model : undefined
     );
 
-    if (provider.status === 'unresolved') {
+    // Query-error parking only applies while still `submitted`.
+    if (task.status === 'submitted' && provider.status === 'unresolved') {
       const outcome = await applyHotelLobbyProviderQueryError({
         generationId,
         userId: session.user.id,
@@ -153,14 +159,14 @@ async function GET({ request }: { request: Request }) {
       });
     }
 
-    if (provider.status === 'processing') {
+    if (task.status === 'submitted' && provider.status === 'processing') {
       await clearHotelLobbyProviderQueryErrors({
         generationId,
         userId: session.user.id,
       });
     }
 
-    if (provider.status === 'failed') {
+    if (task.status === 'submitted' && provider.status === 'failed') {
       const refunded = await refundHotelLobbyGeneration({
         generationId,
         userId: session.user.id,
@@ -185,13 +191,50 @@ async function GET({ request }: { request: Request }) {
 
     if (provider.status === 'completed' && provider.videoUrl) {
       try {
+        // Claim before R2 so concurrent polls cannot park as submission_unknown.
+        if (task.status === 'submitted') {
+          const ownership = await claimHotelLobbyCompletion({
+            generationId,
+            userId: session.user.id,
+          });
+          if (ownership === 'unavailable') {
+            const current = await getHotelLobbyTaskById({
+              generationId,
+              userId: session.user.id,
+            });
+            if (current?.status === 'completed') {
+              return respData({
+                status: 'completed',
+                providerStatus: provider.providerStatus,
+                videoUrl: stableResultUrl(generationId),
+                reservedCredits: task.costCredits || 0,
+              });
+            }
+            if (current?.status === 'submission_unknown') {
+              return respData({
+                status: 'failed',
+                providerStatus: 'submission_unknown',
+                videoUrl: null,
+                error:
+                  'Submission result is uncertain. Please contact support before retrying.',
+              });
+            }
+            return respData({
+              status: 'processing',
+              providerStatus: current?.status || 'processing',
+              videoUrl: null,
+              reservedCredits: task.costCredits || 0,
+            });
+          }
+        }
+
         const persisted = await persistHotelLobbyResultToR2({
           userId: session.user.id,
           generationId,
           sourceUrl: provider.videoUrl,
         });
 
-        await settleHotelLobbyGeneration({
+        await finalizeHotelLobbyGeneration({
           generationId,
           userId: session.user.id,
           providerStatus: provider.providerStatus,
