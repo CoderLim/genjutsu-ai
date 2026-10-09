@@ -1,11 +1,14 @@
 import { createFileRoute } from '@tanstack/react-router';
 
+import { FAL_QUERY_PERMANENT_ERROR_THRESHOLD } from '@/core/ai';
 import { getAuth } from '@/core/auth';
 import {
   assertChuttamalleGenerationId,
+  clearChuttamalleProviderQueryErrors,
   getChuttamalleTaskById,
   markChuttamalleProviderQueryUnresolved,
   parseChuttamalleTask,
+  recordChuttamalleProviderQueryError,
   refundChuttamalleGeneration,
   settleChuttamalleGeneration,
 } from '@/modules/chuttamalle/billing';
@@ -105,8 +108,33 @@ async function GET({ request }: { request: Request }) {
     const provider = await getChuttamalleProviderStatus(task.taskId);
 
     if (provider.status === 'unresolved') {
+      const errorCount = await recordChuttamalleProviderQueryError({
+        generationId,
+        userId: session.user.id,
+        providerStatus: provider.providerStatus,
+        error:
+          provider.error ||
+          'Provider status lookup failed permanently. Credits remain reserved.',
+      });
+
+      if (errorCount < FAL_QUERY_PERMANENT_ERROR_THRESHOLD) {
+        console.warn('chuttamalle provider query error (retrying):', {
+          generationId,
+          errorCount,
+          providerStatus: provider.providerStatus,
+          error: provider.error,
+        });
+        return respData({
+          status: 'processing',
+          providerStatus: provider.providerStatus,
+          videoUrl: null,
+          reservedCredits: task.costCredits || 0,
+        });
+      }
+
       console.error('chuttamalle provider query unresolved:', {
         generationId,
+        errorCount,
         providerStatus: provider.providerStatus,
         error: provider.error,
       });
@@ -124,6 +152,13 @@ async function GET({ request }: { request: Request }) {
         videoUrl: null,
         error:
           'Provider status lookup failed permanently. Credits remain reserved; contact support before retrying.',
+      });
+    }
+
+    if (provider.status === 'processing') {
+      await clearChuttamalleProviderQueryErrors({
+        generationId,
+        userId: session.user.id,
       });
     }
 

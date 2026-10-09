@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
 
+import { classifyFalSubmitFailure } from '@/core/ai';
 import { getAuth } from '@/core/auth';
 import {
   assertHotelLobbyGenerationId,
@@ -267,7 +268,7 @@ async function POST({ request }: { request: Request }) {
       const message =
         error instanceof Error ? error.message : 'MiniMax H3 submission failed';
 
-      if (/request failed with status:/i.test(message)) {
+      if (classifyFalSubmitFailure(message) === 'refund') {
         await refundHotelLobbyGeneration({
           generationId,
           userId,

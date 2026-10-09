@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
 
+import { classifyFalSubmitFailure } from '@/core/ai';
 import { getAuth } from '@/core/auth';
 import {
   assertHotelLobbyGenerationId,
@@ -202,7 +203,9 @@ async function POST({ request }: { request: Request }) {
       const message =
         error instanceof Error ? error.message : 'Kling O3 submission failed';
 
-      if (/request failed with status:/i.test(message)) {
+      // Only definite 4xx rejections are safe to refund. 5xx/429/network
+      // uncertainty keeps credits reserved for manual recovery.
+      if (classifyFalSubmitFailure(message) === 'refund') {
         await refundHotelLobbyGeneration({
           generationId,
           userId,

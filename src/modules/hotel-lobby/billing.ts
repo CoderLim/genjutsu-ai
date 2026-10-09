@@ -300,6 +300,75 @@ export async function markHotelLobbySubmissionUnknown(params: {
     );
 }
 
+/**
+ * Bump consecutive permanent Fal status-lookup errors while keeping
+ * status=submitted and requestId so later polls can still recover.
+ */
+export async function recordHotelLobbyProviderQueryError(params: {
+  generationId: string;
+  userId: string;
+  error: string;
+  providerStatus: string;
+}): Promise<number> {
+  const task = await getHotelLobbyTaskById(params);
+  if (!task || task.status !== 'submitted') return 0;
+
+  const existing = parseJson(task.taskResult) ?? {};
+  const previous =
+    typeof existing.queryPermanentErrorCount === 'number'
+      ? existing.queryPermanentErrorCount
+      : 0;
+  const count = previous + 1;
+
+  await db()
+    .update(aiTask)
+    .set({
+      taskResult: JSON.stringify({
+        ...existing,
+        queryPermanentErrorCount: count,
+        lastQueryError: params.error,
+        providerStatus: params.providerStatus,
+        stage: 'provider_query',
+      }),
+    })
+    .where(
+      and(
+        eq(aiTask.id, params.generationId),
+        eq(aiTask.userId, params.userId),
+        eq(aiTask.scene, HOTEL_LOBBY_SCENE),
+        eq(aiTask.status, 'submitted')
+      )
+    );
+
+  return count;
+}
+
+/** Clear query-error counters after a healthy Fal status read. */
+export async function clearHotelLobbyProviderQueryErrors(params: {
+  generationId: string;
+  userId: string;
+}) {
+  const task = await getHotelLobbyTaskById(params);
+  if (!task || task.status !== 'submitted') return;
+
+  const existing = parseJson(task.taskResult);
+  if (!existing?.queryPermanentErrorCount && !existing?.lastQueryError) {
+    return;
+  }
+
+  await db()
+    .update(aiTask)
+    .set({ taskResult: null })
+    .where(
+      and(
+        eq(aiTask.id, params.generationId),
+        eq(aiTask.userId, params.userId),
+        eq(aiTask.scene, HOTEL_LOBBY_SCENE),
+        eq(aiTask.status, 'submitted')
+      )
+    );
+}
+
 /** Submitted task whose Fal status lookup failed permanently — no refund. */
 export async function markHotelLobbyProviderQueryUnresolved(params: {
   generationId: string;

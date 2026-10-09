@@ -15,8 +15,40 @@ import {
 const defaultUuid: UuidFunction = () => crypto.randomUUID();
 
 /** Retryable Fal queue transport failures (not terminal model outcomes). */
-function isTransientFalHttpStatus(status: number) {
+export function isTransientFalHttpStatus(status: number) {
   return status === 408 || status === 429 || status >= 500;
+}
+
+/**
+ * Parse `request failed with status: NNN` from FalProvider.generate errors.
+ * Returns null when the message is not an HTTP status failure.
+ */
+export function parseFalHttpStatusFromError(message: string): number | null {
+  const match = /request failed with status:\s*(\d+)/i.exec(message);
+  if (!match) return null;
+  const status = Number(match[1]);
+  return Number.isInteger(status) ? status : null;
+}
+
+/**
+ * Submit-time HTTP codes that clearly mean Fal rejected the request
+ * (safe to refund). Excludes 408/429 (retryable) and all 5xx (uncertain).
+ */
+export function isDefiniteFalSubmitRejection(status: number) {
+  return (
+    Number.isInteger(status) &&
+    status >= 400 &&
+    status < 500 &&
+    !isTransientFalHttpStatus(status)
+  );
+}
+
+export function classifyFalSubmitFailure(
+  message: string
+): 'refund' | 'uncertain' {
+  const status = parseFalHttpStatusFromError(message);
+  if (status == null) return 'uncertain';
+  return isDefiniteFalSubmitRejection(status) ? 'refund' : 'uncertain';
 }
 
 export function isFalPermanentQueryFailure(
@@ -30,6 +62,9 @@ export function isFalPermanentQueryFailure(
     status === 'RESULT_FETCH_PERMANENT_ERROR'
   );
 }
+
+/** Consecutive permanent status-lookup failures before parking the task. */
+export const FAL_QUERY_PERMANENT_ERROR_THRESHOLD = 3;
 
 /**
  * Fal configs
