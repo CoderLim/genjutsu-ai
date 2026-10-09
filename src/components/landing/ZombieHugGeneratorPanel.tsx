@@ -838,21 +838,6 @@ export function ZombieHugGeneratorPanel() {
       <div className="overflow-hidden rounded-[26px] border border-white/10 bg-[rgba(22,24,28,0.94)] shadow-[0_30px_90px_-30px_rgba(0,0,0,0.85)] backdrop-blur-2xl">
         <div className="grid gap-0 lg:grid-cols-[0.9fr_1.1fr]">
           <div className="border-b border-white/8 p-4 sm:p-5 lg:border-r lg:border-b-0">
-            <div className="mb-3 flex items-start justify-between gap-3">
-              <div>
-                <p className="text-sm font-semibold text-white/90">
-                  Motion template
-                </p>
-                <p className="mt-0.5 text-xs leading-5 text-white/40">
-                  Fixed zombie hug performance · {aspectRatio} · ~24 sec. You
-                  only upload two photos.
-                </p>
-              </div>
-              <span className="border-primary/20 bg-primary/10 text-primary shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-semibold">
-                Preset
-              </span>
-            </div>
-
             <div
               className={cn(
                 'relative mx-auto max-h-[420px] overflow-hidden rounded-2xl border border-white/10 bg-black',
@@ -875,10 +860,6 @@ export function ZombieHugGeneratorPanel() {
                 }}
               />
             </div>
-            <p className="mt-3 text-center text-[11px] text-white/34">
-              Trending · October 2026 ｜ 24 sec · {aspectRatio} ｜ Ready in ~10
-              minutes
-            </p>
           </div>
 
           <div className="p-4 sm:p-5">
