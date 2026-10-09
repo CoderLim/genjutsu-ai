@@ -3,9 +3,9 @@ import { createFileRoute } from '@tanstack/react-router';
 import { envConfigs } from '@/config';
 import { localeLinks, socialMeta } from '@/lib/seo';
 import { getLocale } from '@/paraglide/runtime.js';
-import { Footer } from '@/blocks/footer';
-import { Header } from '@/blocks/header';
 import { Pricing } from '@/blocks/pricing';
+import { SiteFooter } from '@/components/landing/SiteFooter';
+import { SiteHeader } from '@/components/landing/SiteHeader';
 
 const PAGE_TITLE = `Genjutsu AI Pricing | ${envConfigs.app_name}`;
 const PAGE_DESCRIPTION =
@@ -38,11 +38,11 @@ export const Route = createFileRoute('/pricing')({
 function PricingPage() {
   return (
     <div className="bg-background text-foreground flex min-h-screen flex-col">
-      <Header />
+      <SiteHeader />
       <main className="flex-1">
         <Pricing />
       </main>
-      <Footer />
+      <SiteFooter />
     </div>
   );
 }

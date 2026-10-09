@@ -68,3 +68,6 @@ package-lock.json
 
 # Launch pipeline generated GA id (set via scripts/set-ga-id.mjs)
 scripts/.ga-id.json
+
+# Local ops backups (Waffo cutover mappings etc.)
+backups/
