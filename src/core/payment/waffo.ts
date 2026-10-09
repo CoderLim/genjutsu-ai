@@ -1,5 +1,6 @@
 import {
   Environment,
+  TaxCategory,
   verifyWebhook,
   WaffoPancake,
   WebhookEventType,
@@ -17,6 +18,7 @@ import {
   PaymentProvider,
   PaymentSession,
   PaymentStatus,
+  PaymentType,
   SubscriptionCycleType,
   SubscriptionInfo,
   SubscriptionStatus,
@@ -79,6 +81,28 @@ export function waffoAmountToCents(amount: string, currency: string): number {
   if (!Number.isFinite(n)) return 0;
   if (ZERO_DECIMAL.has(code)) return Math.round(n);
   return Math.round(n * 100);
+}
+
+/**
+ * Authenticated Waffo checkout supports a per-session price snapshot.
+ * This keeps the amount paid equal to the immutable local order amount even
+ * during a pricing/product mapping migration. Waffo is still the payment
+ * authority and we verify paid amount/currency before granting credits.
+ */
+export function getWaffoOneTimePriceSnapshot(order: PaymentOrder) {
+  const amount = order.price?.amount;
+  if (
+    order.type !== PaymentType.ONE_TIME ||
+    typeof amount !== 'number' ||
+    !Number.isSafeInteger(amount) ||
+    amount <= 0
+  ) {
+    return undefined;
+  }
+  return {
+    amount: centsToWaffoAmount(amount, order.price!.currency),
+    taxCategory: TaxCategory.SaaS,
+  };
 }
 
 /**
@@ -207,11 +231,14 @@ export class WaffoProvider implements PaymentProvider {
     const currency = (order.price?.currency || 'USD').toUpperCase();
     const orderNo = order.orderNo || '';
 
-    // Product prices live on the Waffo product — do not override with
-    // catalog cents unless the caller explicitly opts into priceSnapshot.
+    // The server-authoritative local order snapshot determines the amount.
+    // Waffo's product price might still be V1 during the V2 SKU cutover.
+    // Subscriptions retain the original product price and renewal semantics.
+    const priceSnapshot = getWaffoOneTimePriceSnapshot(order);
     const params: Parameters<typeof this.client.checkout.createSession>[0] = {
       productId: order.productId,
       currency,
+      ...(priceSnapshot ? { priceSnapshot } : {}),
       buyerEmail: order.customer?.email,
       successUrl: order.successUrl,
       orderMerchantExternalId: orderNo || undefined,
