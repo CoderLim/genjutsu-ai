@@ -67,6 +67,22 @@ export function isFalPermanentQueryFailure(
 export const FAL_QUERY_PERMANENT_ERROR_THRESHOLD = 3;
 
 /**
+ * Fal queue status/result URLs use the app id (`owner/name`) only.
+ * Nested submit paths (e.g. `.../video-to-video/edit`, `minimax/h3/...`)
+ * return HTTP 405 on GET when the full path is used — verified against
+ * `fal-ai/kling-video/o3/standard/video-to-video/edit`.
+ */
+export function falQueueQueryModel(model?: string): string {
+  if (!model) return '';
+  const normalized = model.replace(/^\/+/, '');
+  const parts = normalized.split('/').filter(Boolean);
+  if (parts.length <= 2) {
+    return parts.join('/');
+  }
+  return `${parts[0]}/${parts[1]}`;
+}
+
+/**
  * Fal configs
  * @docs https://fal.ai/
  */
@@ -369,25 +385,7 @@ export class FalProvider implements AIProvider {
   }
 
   private getQueryModel(model?: string): string {
-    if (!model) {
-      return '';
-    }
-    const normalized = model.replace(/^\/+/, '');
-    // Kling nested video-to-video/edit endpoints expose status/result on the
-    // full path (see OpenAPI for fal-ai/kling-video/o3/.../video-to-video/edit).
-    if (
-      normalized.startsWith('fal-ai/kling-video/') &&
-      normalized.includes('/video-to-video/')
-    ) {
-      return normalized;
-    }
-    // Other nested submit paths (e.g. minimax/h3/reference-to-video) return
-    // 405 on GET — Fal queue status uses the app id (owner/name) only.
-    const parts = normalized.split('/').filter(Boolean);
-    if (parts.length <= 2) {
-      return parts.join('/');
-    }
-    return `${parts[0]}/${parts[1]}`;
+    return falQueueQueryModel(model);
   }
 
   private formatInput({

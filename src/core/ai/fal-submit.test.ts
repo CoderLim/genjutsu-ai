@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import {
   classifyFalSubmitFailure,
+  falQueueQueryModel,
   isDefiniteFalSubmitRejection,
   isTransientFalHttpStatus,
   parseFalHttpStatusFromError,
@@ -59,4 +60,17 @@ test('HTTP status helpers match Fal transport rules', () => {
   assert.equal(isTransientFalHttpStatus(502), true);
   assert.equal(isDefiniteFalSubmitRejection(502), false);
   assert.equal(isDefiniteFalSubmitRejection(404), true);
+});
+
+test('queue status/result uses Fal app id, not nested submit path', () => {
+  assert.equal(
+    falQueueQueryModel('fal-ai/kling-video/o3/standard/video-to-video/edit'),
+    'fal-ai/kling-video'
+  );
+  assert.equal(
+    falQueueQueryModel('minimax/h3/reference-to-video'),
+    'minimax/h3'
+  );
+  assert.equal(falQueueQueryModel('fal-ai/flux/schnell'), 'fal-ai/flux');
+  assert.equal(falQueueQueryModel('fal-ai/kling-video'), 'fal-ai/kling-video');
 });
