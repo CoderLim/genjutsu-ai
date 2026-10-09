@@ -103,6 +103,18 @@ export async function getHotelLobbyTaskByGenerationId(generationId: string) {
   return task ?? null;
 }
 
+/** Fal webhook lookup — request_id is unique per Hotel Lobby submission. */
+export async function getHotelLobbyTaskByRequestIdAnyUser(requestId: string) {
+  const [task] = await db()
+    .select()
+    .from(aiTask)
+    .where(
+      and(eq(aiTask.taskId, requestId), eq(aiTask.scene, HOTEL_LOBBY_SCENE))
+    )
+    .limit(1);
+  return task ?? null;
+}
+
 function assertTaskMatches(
   task: any,
   params: {

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   keepPreviousData,
   useMutation,
@@ -52,6 +52,30 @@ interface VideoPreview {
 }
 
 const PAGE_SIZE = 12;
+const AUTO_POLL_INTERVAL_MS = 4_000;
+
+const PROCESSING_STATUSES = new Set([
+  'initiated',
+  'sealing',
+  'ready',
+  'reserving',
+  'reserved',
+  'submitting',
+  'submitted',
+  'completing',
+  'submission_unknown',
+  'refunding',
+]);
+
+function isProcessingStatus(status: string) {
+  return PROCESSING_STATUSES.has(status);
+}
+
+function statusPathFor(generation: Pick<Generation, 'id' | 'scene'>) {
+  return generation.scene === 'hotel-lobby'
+    ? `/api/hotel-lobby/status?generationId=${encodeURIComponent(generation.id)}`
+    : `/api/genjutsu/status?generationId=${encodeURIComponent(generation.id)}`;
+}
 
 function statusLabel(status: string) {
   if (status === 'completed') return m['creations.status.completed']();
@@ -62,18 +86,7 @@ function statusLabel(status: string) {
   ) {
     return m['creations.status.failed']();
   }
-  if (
-    status === 'initiated' ||
-    status === 'sealing' ||
-    status === 'ready' ||
-    status === 'reserving' ||
-    status === 'reserved' ||
-    status === 'submitting' ||
-    status === 'submitted' ||
-    status === 'completing' ||
-    status === 'submission_unknown' ||
-    status === 'refunding'
-  ) {
+  if (isProcessingStatus(status)) {
     return m['creations.status.processing']();
   }
   return m['creations.status.unknown']();
@@ -309,14 +322,83 @@ function CreationsPage() {
     placeholderData: keepPreviousData,
   });
 
+  const processingGenerations = useMemo(
+    () =>
+      (query.data?.items ?? []).filter((generation) =>
+        isProcessingStatus(generation.status)
+      ),
+    [query.data?.items]
+  );
+
+  const processingKey = useMemo(
+    () =>
+      processingGenerations
+        .map((generation) => `${generation.scene}:${generation.id}`)
+        .join('|'),
+    [processingGenerations]
+  );
+
+  const pollingRef = useRef(false);
+
+  useEffect(() => {
+    if (!userId || processingGenerations.length === 0) return;
+
+    let cancelled = false;
+
+    const pollOnce = async () => {
+      if (
+        cancelled ||
+        pollingRef.current ||
+        (typeof document !== 'undefined' &&
+          document.visibilityState === 'hidden')
+      ) {
+        return;
+      }
+
+      pollingRef.current = true;
+      try {
+        // Sequential to stay under per-route min-interval rate limits.
+        for (const generation of processingGenerations) {
+          if (cancelled) return;
+          try {
+            await apiGet<GenerationStatus>(statusPathFor(generation));
+          } catch {
+            // Keep polling; transient provider/network errors are expected.
+          }
+        }
+        if (!cancelled) {
+          await queryClient.invalidateQueries({
+            queryKey: ['user-generations', userId],
+          });
+        }
+      } finally {
+        pollingRef.current = false;
+      }
+    };
+
+    void pollOnce();
+    const timer = window.setInterval(() => {
+      void pollOnce();
+    }, AUTO_POLL_INTERVAL_MS);
+
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') void pollOnce();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+    // processingKey captures identity of in-flight rows; avoid resetting on
+    // every list refetch that returns the same processing set.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional
+  }, [userId, processingKey, queryClient]);
+
   const refreshMutation = useMutation({
-    mutationFn: (generation: Generation) => {
-      const statusPath =
-        generation.scene === 'hotel-lobby'
-          ? `/api/hotel-lobby/status?generationId=${encodeURIComponent(generation.id)}`
-          : `/api/genjutsu/status?generationId=${encodeURIComponent(generation.id)}`;
-      return apiGet<GenerationStatus>(statusPath);
-    },
+    mutationFn: (generation: Generation) =>
+      apiGet<GenerationStatus>(statusPathFor(generation)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['user-generations', userId] });
     },

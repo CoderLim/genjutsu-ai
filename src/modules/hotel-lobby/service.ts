@@ -4,6 +4,7 @@ import {
   FalProvider,
   isFalPermanentQueryFailure,
 } from '@/core/ai';
+import { envConfigs } from '@/config';
 import { getConfig } from '@/modules/config/service';
 
 import {
@@ -79,6 +80,16 @@ function buildKlingElements(imageUrls: string[]) {
     // Kling requires at least one reference image per element; reuse frontal.
     reference_image_urls: [url],
   }));
+}
+
+function getHotelLobbyWebhookUrl() {
+  const appUrl = envConfigs.app_url?.trim();
+  if (!appUrl || !appUrl.startsWith('https://')) return null;
+  try {
+    return new URL('/api/hotel-lobby/webhook', appUrl).toString();
+  } catch {
+    return null;
+  }
 }
 
 async function getFalProvider() {
@@ -164,12 +175,14 @@ export async function submitHotelLobby(input: {
 }) {
   const normalized = validateHotelLobbyInput(input);
   const provider = await getFalProvider();
+  const callbackUrl = getHotelLobbyWebhookUrl() ?? undefined;
 
   const result = await provider.generate({
     params: {
       mediaType: AIMediaType.VIDEO,
       model: HOTEL_LOBBY_MODEL,
       prompt: normalized.prompt,
+      callbackUrl,
       options: {
         video_url: normalized.videoUrl,
         elements: buildKlingElements(normalized.imageUrls),
