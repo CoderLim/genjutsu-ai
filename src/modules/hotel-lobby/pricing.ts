@@ -1,9 +1,50 @@
 import { calculateGenjutsuCredits } from '@/modules/genjutsu/pricing';
 
-export const HOTEL_LOBBY_MODEL = 'minimax/h3/reference-to-video';
+/** Hotel Lobby product: Kling O3 standard video-to-video edit. */
+export const HOTEL_LOBBY_MODEL =
+  'fal-ai/kling-video/o3/standard/video-to-video/edit';
 
-export const HOTEL_LOBBY_RESOLUTIONS = ['480P', '768P', '2K', '4K'] as const;
-export type HotelLobbyResolution = (typeof HOTEL_LOBBY_RESOLUTIONS)[number];
+/** Internal H3 lab still uses MiniMax H3 reference-to-video. */
+export const H3_LAB_MODEL = 'minimax/h3/reference-to-video';
+
+/**
+ * Fal published rate for Kling O3 standard V2V edit
+ * (https://fal.ai/models/fal-ai/kling-video/o3/standard/video-to-video/edit):
+ * $0.126 per second of generated video.
+ */
+export const HOTEL_LOBBY_OUTPUT_RATE_USD_PER_SECOND = 0.126;
+
+/** Kling O3 accepts 3–15s reference video (OpenAPI max_duration 15.05). */
+export const HOTEL_LOBBY_MIN_DURATION_SECONDS = 3;
+export const HOTEL_LOBBY_MAX_DURATION_SECONDS = 15;
+
+/** Kling O3 reference video edge length (OpenAPI min/max width & height). */
+export const HOTEL_LOBBY_MIN_VIDEO_EDGE_PX = 720;
+export const HOTEL_LOBBY_MAX_VIDEO_EDGE_PX = 3840;
+
+/**
+ * Fal OpenAPI `maxLength` for Kling O3 V2V edit prompt
+ * (https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=fal-ai/kling-video/o3/standard/video-to-video/edit).
+ */
+export const HOTEL_LOBBY_MAX_PROMPT_LENGTH = 2500;
+
+/** Hotel Lobby product preset: one or two subject photos → Elements. */
+export const HOTEL_LOBBY_MAX_REFERENCE_IMAGES = 2;
+
+/**
+ * Billing / options placeholder — Kling O3 does not take a resolution
+ * parameter. Kept so reserved-task matching and admin tooling stay stable.
+ */
+export const HOTEL_LOBBY_BILLING_RESOLUTION = '480P' as const;
+
+// --- MiniMax H3 (internal lab only) -----------------------------------------
+
+export const H3_RESOLUTIONS = ['480P', '768P', '2K', '4K'] as const;
+export type H3Resolution = (typeof H3_RESOLUTIONS)[number];
+
+/** @deprecated Prefer H3_RESOLUTIONS — alias kept for lab + admin imports. */
+export const HOTEL_LOBBY_RESOLUTIONS = H3_RESOLUTIONS;
+export type HotelLobbyResolution = H3Resolution;
 
 export const HOTEL_LOBBY_ASPECT_RATIOS = [
   'adaptive',
@@ -16,10 +57,6 @@ export const HOTEL_LOBBY_ASPECT_RATIOS = [
 ] as const;
 export type HotelLobbyAspectRatio = (typeof HOTEL_LOBBY_ASPECT_RATIOS)[number];
 
-export const HOTEL_LOBBY_MIN_DURATION_SECONDS = 5;
-export const HOTEL_LOBBY_MAX_DURATION_SECONDS = 15;
-/** Hotel Lobby product preset: one or two subject photos. */
-export const HOTEL_LOBBY_MAX_REFERENCE_IMAGES = 2;
 /** MiniMax H3 model limit for `reference_image_urls`. */
 export const H3_MAX_REFERENCE_IMAGES = 9;
 /**
@@ -28,25 +65,28 @@ export const H3_MAX_REFERENCE_IMAGES = 9;
  */
 export const H3_MAX_PROMPT_LENGTH = 50_000;
 
+export const H3_MIN_DURATION_SECONDS = 5;
+export const H3_MAX_DURATION_SECONDS = 15;
+
 /**
  * Fal published rates for `minimax/h3/reference-to-video`
  * (https://fal.ai/models/minimax/h3/reference-to-video):
  * output $0.05/0.06/0.13/0.16 per second at 480P/768P/2K/4K;
  * first 5 reference images free, then $0.08 each.
- * Fal does not publish a separate reference-video surcharge on this endpoint.
  */
-export const HOTEL_LOBBY_OUTPUT_RATE_USD_PER_SECOND: Record<
-  HotelLobbyResolution,
-  number
-> = {
+export const H3_OUTPUT_RATE_USD_PER_SECOND: Record<H3Resolution, number> = {
   '480P': 0.05,
   '768P': 0.06,
   '2K': 0.13,
   '4K': 0.16,
 };
 
-export const HOTEL_LOBBY_FREE_REFERENCE_IMAGES = 5;
-export const HOTEL_LOBBY_EXTRA_REFERENCE_IMAGE_USD = 0.08;
+/** @deprecated Prefer H3_OUTPUT_RATE_USD_PER_SECOND. */
+export const HOTEL_LOBBY_OUTPUT_RATE_USD_PER_SECOND_BY_RESOLUTION =
+  H3_OUTPUT_RATE_USD_PER_SECOND;
+
+export const H3_FREE_REFERENCE_IMAGES = 5;
+export const H3_EXTRA_REFERENCE_IMAGE_USD = 0.08;
 
 export function assertHotelLobbyDuration(duration: number) {
   if (
@@ -60,22 +100,29 @@ export function assertHotelLobbyDuration(duration: number) {
   }
 }
 
+export function assertH3LabDuration(duration: number) {
+  if (
+    !Number.isInteger(duration) ||
+    duration < H3_MIN_DURATION_SECONDS ||
+    duration > H3_MAX_DURATION_SECONDS
+  ) {
+    throw new Error(
+      `Duration must be an integer between ${H3_MIN_DURATION_SECONDS} and ${H3_MAX_DURATION_SECONDS} seconds`
+    );
+  }
+}
+
 export function estimateHotelLobbyProviderCost(input: {
   duration: number;
-  resolution: HotelLobbyResolution;
   imageCount: number;
-  /** Defaults to Hotel Lobby's 2-image product cap. Use `H3_MAX_REFERENCE_IMAGES` for lab. */
   maxImages?: number;
 }) {
   assertHotelLobbyDuration(input.duration);
-  if (!HOTEL_LOBBY_RESOLUTIONS.includes(input.resolution)) {
-    throw new Error('Unsupported MiniMax H3 resolution');
-  }
   const maxImages = input.maxImages ?? HOTEL_LOBBY_MAX_REFERENCE_IMAGES;
   if (
     !Number.isInteger(maxImages) ||
     maxImages < 1 ||
-    maxImages > H3_MAX_REFERENCE_IMAGES
+    maxImages > HOTEL_LOBBY_MAX_REFERENCE_IMAGES
   ) {
     throw new Error('Invalid max reference-image count');
   }
@@ -91,22 +138,26 @@ export function estimateHotelLobbyProviderCost(input: {
     );
   }
 
-  const outputCost =
-    input.duration * HOTEL_LOBBY_OUTPUT_RATE_USD_PER_SECOND[input.resolution];
-  const referenceImageCost =
-    Math.max(0, input.imageCount - HOTEL_LOBBY_FREE_REFERENCE_IMAGES) *
-    HOTEL_LOBBY_EXTRA_REFERENCE_IMAGE_USD;
-
-  return outputCost + referenceImageCost;
+  // Avoid binary float noise (e.g. 15 * 0.126 → 1.8900000000000001).
+  return Number(
+    (input.duration * HOTEL_LOBBY_OUTPUT_RATE_USD_PER_SECOND).toFixed(6)
+  );
 }
 
 export function estimateHotelLobbyCredits(input: {
   duration: number;
-  resolution: HotelLobbyResolution;
   imageCount: number;
   maxImages?: number;
+  /** Ignored — Kling O3 has no resolution tiers. Accepted for call-site compat. */
+  resolution?: HotelLobbyResolution;
 }) {
-  return calculateGenjutsuCredits(estimateHotelLobbyProviderCost(input));
+  return calculateGenjutsuCredits(
+    estimateHotelLobbyProviderCost({
+      duration: input.duration,
+      imageCount: input.imageCount,
+      maxImages: input.maxImages,
+    })
+  );
 }
 
 export function estimateH3LabProviderCost(input: {
@@ -114,10 +165,27 @@ export function estimateH3LabProviderCost(input: {
   resolution: HotelLobbyResolution;
   imageCount: number;
 }) {
-  return estimateHotelLobbyProviderCost({
-    ...input,
-    maxImages: H3_MAX_REFERENCE_IMAGES,
-  });
+  assertH3LabDuration(input.duration);
+  if (!H3_RESOLUTIONS.includes(input.resolution)) {
+    throw new Error('Unsupported MiniMax H3 resolution');
+  }
+  if (
+    !Number.isInteger(input.imageCount) ||
+    input.imageCount < 1 ||
+    input.imageCount > H3_MAX_REFERENCE_IMAGES
+  ) {
+    throw new Error(
+      `Provide between 1 and ${H3_MAX_REFERENCE_IMAGES} reference images`
+    );
+  }
+
+  const outputCost =
+    input.duration * H3_OUTPUT_RATE_USD_PER_SECOND[input.resolution];
+  const referenceImageCost =
+    Math.max(0, input.imageCount - H3_FREE_REFERENCE_IMAGES) *
+    H3_EXTRA_REFERENCE_IMAGE_USD;
+
+  return outputCost + referenceImageCost;
 }
 
 export function estimateH3LabCredits(input: {
@@ -125,8 +193,5 @@ export function estimateH3LabCredits(input: {
   resolution: HotelLobbyResolution;
   imageCount: number;
 }) {
-  return estimateHotelLobbyCredits({
-    ...input,
-    maxImages: H3_MAX_REFERENCE_IMAGES,
-  });
+  return calculateGenjutsuCredits(estimateH3LabProviderCost(input));
 }

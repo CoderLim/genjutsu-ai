@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
 
+import { classifyFalSubmitFailure } from '@/core/ai';
 import { getAuth } from '@/core/auth';
 import {
   assertHotelLobbyGenerationId,
@@ -14,9 +15,8 @@ import {
 import {
   estimateHotelLobbyCredits,
   estimateHotelLobbyProviderCost,
+  HOTEL_LOBBY_BILLING_RESOLUTION,
   HOTEL_LOBBY_MODEL,
-  HOTEL_LOBBY_RESOLUTIONS,
-  type HotelLobbyResolution,
 } from '@/modules/hotel-lobby/pricing';
 import {
   buildHotelLobbyPrompt,
@@ -26,7 +26,10 @@ import {
   resolveHotelLobbyInputUrls,
   sealHotelLobbyInputs,
 } from '@/modules/hotel-lobby/storage';
-import { probeHotelLobbyDurationSeconds } from '@/modules/hotel-lobby/video-metadata';
+import {
+  probeHotelLobbyDurationSeconds,
+  probeHotelLobbyVideoDimensions,
+} from '@/modules/hotel-lobby/video-metadata';
 import { enforceMinIntervalRateLimit } from '@/lib/rate-limit';
 import { respData, respErr, respJson } from '@/lib/resp';
 
@@ -68,10 +71,6 @@ async function POST({ request }: { request: Request }) {
     if (existing) return respData(taskResponse(existing));
 
     const useDefaultTemplate = body.useDefaultTemplate === true;
-    const resolution = body.resolution as HotelLobbyResolution;
-    if (!HOTEL_LOBBY_RESOLUTIONS.includes(resolution)) {
-      return respErr('Invalid resolution', { status: 400 });
-    }
 
     const videoKey =
       typeof body.videoKey === 'string' ? body.videoKey : undefined;
@@ -119,10 +118,8 @@ async function POST({ request }: { request: Request }) {
       ...sealed,
     });
 
-    // The output duration is intentionally not a user setting on this preset.
-    // It follows the reference video duration (probed from MP4/MOV/WebM, with
-    // a client-provided fallback for MediaRecorder WebM clips that omit
-    // Duration metadata), rounded to the integer range MiniMax H3 accepts.
+    // Output duration follows the reference video (probed from MP4/MOV/WebM),
+    // rounded to the integer range Kling O3 accepts (3–15s).
     const clientDurationHint =
       typeof body.durationSeconds === 'number'
         ? body.durationSeconds
@@ -137,16 +134,16 @@ async function POST({ request }: { request: Request }) {
           : undefined,
       }
     );
+    // Kling O3 rejects out-of-range pixels; fail before credit reservation.
+    await probeHotelLobbyVideoDimensions(providerInput.videoUrl);
 
     const prompt = buildHotelLobbyPrompt(imageKeys.length);
     const providerCostUsd = estimateHotelLobbyProviderCost({
       duration,
-      resolution,
       imageCount: imageKeys.length,
     });
     const credits = estimateHotelLobbyCredits({
       duration,
-      resolution,
       imageCount: imageKeys.length,
     });
 
@@ -157,7 +154,7 @@ async function POST({ request }: { request: Request }) {
       model: HOTEL_LOBBY_MODEL,
       prompt,
       duration,
-      resolution,
+      resolution: HOTEL_LOBBY_BILLING_RESOLUTION,
       aspectRatio: HOTEL_LOBBY_ASPECT_RATIO,
       promptExpansionMode: HOTEL_LOBBY_PROMPT_EXPANSION_MODE,
       ...sealed,
@@ -183,9 +180,6 @@ async function POST({ request }: { request: Request }) {
       const result = await submitHotelLobby({
         prompt,
         duration,
-        resolution,
-        aspectRatio: HOTEL_LOBBY_ASPECT_RATIO,
-        promptExpansionMode: HOTEL_LOBBY_PROMPT_EXPANSION_MODE,
         ...providerInput,
       });
 
@@ -207,9 +201,11 @@ async function POST({ request }: { request: Request }) {
       );
     } catch (error: any) {
       const message =
-        error instanceof Error ? error.message : 'MiniMax H3 submission failed';
+        error instanceof Error ? error.message : 'Kling O3 submission failed';
 
-      if (/request failed with status:/i.test(message)) {
+      // Only definite 4xx rejections are safe to refund. 5xx/429/network
+      // uncertainty keeps credits reserved for manual recovery.
+      if (classifyFalSubmitFailure(message) === 'refund') {
         await refundHotelLobbyGeneration({
           generationId,
           userId,
@@ -218,12 +214,18 @@ async function POST({ request }: { request: Request }) {
         });
         return respJson(
           -1,
-          'MiniMax H3 could not start this generation. Credits were refunded.',
+          'Kling O3 could not start this generation. Credits were refunded.',
           { code: 'PROVIDER_SUBMIT_FAILED', generationId },
           { status: 502 }
         );
       }
 
+      console.error('[ops] hotel-lobby submission_unknown credits_held', {
+        generationId,
+        userId,
+        error: message,
+        hasRequestId: false,
+      });
       await markHotelLobbySubmissionUnknown({
         generationId,
         userId,

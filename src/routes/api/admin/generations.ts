@@ -4,12 +4,6 @@ import { and, count, desc, eq, inArray, like, or, type SQL } from 'drizzle-orm';
 import { getAuth } from '@/core/auth';
 import { db } from '@/core/db';
 import { aiTask, order, subscription, user } from '@/config/db/schema';
-import { CHUTTAMALLE_SCENE } from '@/modules/chuttamalle/billing';
-import {
-  CHUTTAMALLE_RESOLUTIONS,
-  estimateChuttamalleCredits,
-  type ChuttamalleResolution,
-} from '@/modules/chuttamalle/pricing';
 import {
   generationMediaBasePath,
   isListableGenerationScene,
@@ -23,7 +17,9 @@ import {
 import { estimateSeedanceProviderCost } from '@/modules/genjutsu/seedance';
 import { HOTEL_LOBBY_SCENE } from '@/modules/hotel-lobby/billing';
 import {
+  estimateH3LabCredits,
   estimateHotelLobbyCredits,
+  H3_LAB_MODEL,
   HOTEL_LOBBY_RESOLUTIONS,
   type HotelLobbyResolution,
 } from '@/modules/hotel-lobby/pricing';
@@ -82,6 +78,15 @@ function isBillableResolution(
  * Best-effort credit estimate for admin display — mirrors GeneratorPanel /
  * generate.ts list-rate fallback when the task never reached reservation.
  */
+function isHotelLobbyH3Model(model: unknown): boolean {
+  return (
+    typeof model === 'string' &&
+    (model === H3_LAB_MODEL ||
+      model.includes('minimax/h3') ||
+      model.includes('minimax_h3'))
+  );
+}
+
 function isHotelLobbyResolution(value: unknown): value is HotelLobbyResolution {
   return (
     typeof value === 'string' &&
@@ -89,18 +94,10 @@ function isHotelLobbyResolution(value: unknown): value is HotelLobbyResolution {
   );
 }
 
-function isChuttamalleResolution(
-  value: unknown
-): value is ChuttamalleResolution {
-  return (
-    typeof value === 'string' &&
-    (CHUTTAMALLE_RESOLUTIONS as readonly string[]).includes(value)
-  );
-}
-
 function resolveEstimatedCredits(input: {
   scene: string;
   provider: string;
+  model?: string | null;
   providerCostUsd: number | null;
   sourceDurationSeconds: number | null;
   duration: number | null;
@@ -125,36 +122,20 @@ function resolveEstimatedCredits(input: {
   }
 
   if (input.scene === HOTEL_LOBBY_SCENE) {
-    if (
-      !isHotelLobbyResolution(input.resolution) ||
-      input.duration == null ||
-      !Number.isInteger(input.duration)
-    ) {
+    if (input.duration == null || !Number.isInteger(input.duration)) {
       return null;
     }
     try {
+      if (isHotelLobbyH3Model(input.model)) {
+        if (!isHotelLobbyResolution(input.resolution)) return null;
+        return estimateH3LabCredits({
+          duration: input.duration,
+          resolution: input.resolution,
+          imageCount: Math.max(1, input.imageCount),
+        });
+      }
       return estimateHotelLobbyCredits({
         duration: input.duration,
-        resolution: input.resolution,
-        imageCount: Math.max(1, input.imageCount),
-      });
-    } catch {
-      return null;
-    }
-  }
-
-  if (input.scene === CHUTTAMALLE_SCENE) {
-    if (
-      !isChuttamalleResolution(input.resolution) ||
-      input.duration == null ||
-      !Number.isInteger(input.duration)
-    ) {
-      return null;
-    }
-    try {
-      return estimateChuttamalleCredits({
-        duration: input.duration,
-        resolution: input.resolution,
         imageCount: Math.max(1, input.imageCount),
       });
     } catch {
@@ -342,9 +323,7 @@ async function GET({ request }: { request: Request }) {
             ? options.mode
             : row.scene === HOTEL_LOBBY_SCENE
               ? 'Hotel Lobby'
-              : row.scene === CHUTTAMALLE_SCENE
-                ? 'Chuttamalle'
-                : null,
+              : null,
         resolution:
           typeof options?.resolution === 'string' ? options.resolution : null,
         aspectRatio:
@@ -489,6 +468,7 @@ async function GET({ request }: { request: Request }) {
         estimatedCredits: resolveEstimatedCredits({
           scene: row.scene,
           provider: row.provider,
+          model: row.model,
           providerCostUsd:
             typeof info?.providerCostUsd === 'number'
               ? info.providerCostUsd

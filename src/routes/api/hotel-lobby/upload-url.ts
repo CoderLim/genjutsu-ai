@@ -45,7 +45,7 @@ async function POST({ request }: { request: Request }) {
       return respErr(
         useDefaultTemplate
           ? 'Provide one or two reference images'
-          : 'Provide one 5–15s reference video plus one or two reference images',
+          : 'Provide one 3–15s reference video plus one or two reference images',
         { status: 400 }
       );
     }

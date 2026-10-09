@@ -4,7 +4,6 @@ import { and, count, desc, eq, inArray, isNull } from 'drizzle-orm';
 import { getAuth } from '@/core/auth';
 import { db } from '@/core/db';
 import { aiTask } from '@/config/db/schema';
-import { CHUTTAMALLE_SCENE } from '@/modules/chuttamalle/billing';
 import {
   generationMediaBasePath,
   LISTABLE_GENERATION_SCENES,
@@ -76,9 +75,7 @@ async function GET({ request }: { request: Request }) {
           ? options.mode
           : row.scene === HOTEL_LOBBY_SCENE
             ? 'Hotel Lobby'
-            : row.scene === CHUTTAMALLE_SCENE
-              ? 'Chuttamalle'
-              : null;
+            : null;
       return {
         id: row.id,
         scene: row.scene,

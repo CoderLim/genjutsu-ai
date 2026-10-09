@@ -4,7 +4,7 @@ import { ArrowLeft, Calendar } from 'lucide-react';
 
 import { Link } from '@/core/i18n/navigation';
 import { envConfigs } from '@/config';
-import { localeLinks, socialMeta } from '@/lib/seo';
+import { absoluteUrl, localeLinks, socialMeta } from '@/lib/seo';
 import { m } from '@/paraglide/messages.js';
 import { getLocale } from '@/paraglide/runtime.js';
 import { SiteFooter } from '@/components/landing/SiteFooter';
@@ -28,6 +28,7 @@ export const Route = createFileRoute('/blog/$slug')({
     const { locale, post } = loaderData;
     const title = `${post.title} | ${envConfigs.app_name}`;
     const { canonical, alternates } = localeLinks(`/blog/${post.slug}`, locale);
+    const image = post.image ? absoluteUrl(post.image) : undefined;
     return {
       meta: [
         { title },
@@ -36,6 +37,7 @@ export const Route = createFileRoute('/blog/$slug')({
           title,
           description: post.description,
           url: canonical,
+          image,
         }),
       ],
       links: [{ rel: 'canonical', href: canonical }, ...alternates],
@@ -51,6 +53,7 @@ export const Route = createFileRoute('/blog/$slug')({
             dateModified: post.createdAt,
             inLanguage: locale,
             mainEntityOfPage: canonical,
+            ...(image ? { image: [image] } : {}),
             author: {
               '@type': 'Organization',
               name: post.authorName || envConfigs.app_name,

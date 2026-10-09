@@ -2,11 +2,14 @@ import { createFileRoute } from '@tanstack/react-router';
 
 import { getAuth } from '@/core/auth';
 import {
+  applyHotelLobbyProviderQueryError,
   assertHotelLobbyGenerationId,
+  claimHotelLobbyCompletion,
+  clearHotelLobbyProviderQueryErrors,
+  finalizeHotelLobbyGeneration,
   getHotelLobbyTaskById,
   parseHotelLobbyTask,
   refundHotelLobbyGeneration,
-  settleHotelLobbyGeneration,
 } from '@/modules/hotel-lobby/billing';
 import { getHotelLobbyProviderStatus } from '@/modules/hotel-lobby/service';
 import { persistHotelLobbyResultToR2 } from '@/modules/hotel-lobby/storage';
@@ -82,7 +85,6 @@ async function GET({ request }: { request: Request }) {
     if (
       task.status === 'reserved' ||
       task.status === 'submitting' ||
-      task.status === 'completing' ||
       task.status === 'refunding'
     ) {
       return respData({
@@ -93,7 +95,12 @@ async function GET({ request }: { request: Request }) {
       });
     }
 
-    if (task.status !== 'submitted' || !task.taskId) {
+    // `completing` may resume R2 persistence after a prior claim; do not
+    // early-return before the provider completed branch below.
+    if (
+      (task.status !== 'submitted' && task.status !== 'completing') ||
+      !task.taskId
+    ) {
       return respData({
         status: 'processing',
         providerStatus: task.status,
@@ -101,14 +108,70 @@ async function GET({ request }: { request: Request }) {
       });
     }
 
-    const provider = await getHotelLobbyProviderStatus(task.taskId);
+    const provider = await getHotelLobbyProviderStatus(
+      task.taskId,
+      typeof task.model === 'string' && task.model ? task.model : undefined
+    );
 
-    if (provider.status === 'failed') {
+    // Query-error parking only applies while still `submitted`.
+    if (task.status === 'submitted' && provider.status === 'unresolved') {
+      const outcome = await applyHotelLobbyProviderQueryError({
+        generationId,
+        userId: session.user.id,
+        providerStatus: provider.providerStatus,
+        error:
+          provider.error ||
+          'Provider status lookup failed permanently. Credits remain reserved.',
+      });
+
+      if (!outcome.unresolved) {
+        console.warn('hotel-lobby provider query error (retrying):', {
+          generationId,
+          errorCount: outcome.count,
+          providerStatus: provider.providerStatus,
+          error: provider.error,
+        });
+        return respData({
+          status: 'processing',
+          providerStatus: provider.providerStatus,
+          videoUrl: null,
+          reservedCredits: task.costCredits || 0,
+        });
+      }
+
+      console.error(
+        '[ops] hotel-lobby provider query unresolved credits_held',
+        {
+          generationId,
+          userId: session.user.id,
+          errorCount: outcome.count,
+          providerStatus: provider.providerStatus,
+          error: provider.error,
+          reservedCredits: task.costCredits || 0,
+        }
+      );
+      return respData({
+        status: 'failed',
+        providerStatus: 'submission_unknown',
+        videoUrl: null,
+        error:
+          'Provider status lookup failed permanently. Credits remain reserved; contact support before retrying.',
+      });
+    }
+
+    if (task.status === 'submitted' && provider.status === 'processing') {
+      await clearHotelLobbyProviderQueryErrors({
+        generationId,
+        userId: session.user.id,
+      });
+    }
+
+    if (task.status === 'submitted' && provider.status === 'failed') {
       const refunded = await refundHotelLobbyGeneration({
         generationId,
         userId: session.user.id,
         providerStatus: provider.providerStatus,
-        error: provider.error || 'MiniMax H3 generation failed',
+        error: provider.error || 'Video generation failed',
       });
       const refundedParsed = refunded
         ? parseHotelLobbyTask(refunded)
@@ -121,20 +184,57 @@ async function GET({ request }: { request: Request }) {
         error:
           refundedParsed.result?.error ||
           provider.error ||
-          'MiniMax H3 generation failed',
+          'Video generation failed',
         refundedCredits: task.costCredits || 0,
       });
     }
 
     if (provider.status === 'completed' && provider.videoUrl) {
       try {
+        // Claim before R2 so concurrent polls cannot park as submission_unknown.
+        if (task.status === 'submitted') {
+          const ownership = await claimHotelLobbyCompletion({
+            generationId,
+            userId: session.user.id,
+          });
+          if (ownership === 'unavailable') {
+            const current = await getHotelLobbyTaskById({
+              generationId,
+              userId: session.user.id,
+            });
+            if (current?.status === 'completed') {
+              return respData({
+                status: 'completed',
+                providerStatus: provider.providerStatus,
+                videoUrl: stableResultUrl(generationId),
+                reservedCredits: task.costCredits || 0,
+              });
+            }
+            if (current?.status === 'submission_unknown') {
+              return respData({
+                status: 'failed',
+                providerStatus: 'submission_unknown',
+                videoUrl: null,
+                error:
+                  'Submission result is uncertain. Please contact support before retrying.',
+              });
+            }
+            return respData({
+              status: 'processing',
+              providerStatus: current?.status || 'processing',
+              videoUrl: null,
+              reservedCredits: task.costCredits || 0,
+            });
+          }
+        }
+
         const persisted = await persistHotelLobbyResultToR2({
           userId: session.user.id,
           generationId,
           sourceUrl: provider.videoUrl,
         });
 
-        await settleHotelLobbyGeneration({
+        await finalizeHotelLobbyGeneration({
           generationId,
           userId: session.user.id,
           providerStatus: provider.providerStatus,

@@ -1,4 +1,9 @@
-import type { AnchorHTMLAttributes, HTMLAttributes } from 'react';
+import type {
+  AnchorHTMLAttributes,
+  HTMLAttributes,
+  ImgHTMLAttributes,
+  VideoHTMLAttributes,
+} from 'react';
 import type { MDXComponents } from 'mdx/types';
 
 import { cn } from '@/lib/utils';
@@ -93,5 +98,36 @@ export const mdxComponents: MDXComponents = {
   ),
   hr: ({ className, ...props }: HTMLAttributes<HTMLHRElement>) => (
     <hr className={cn('border-border my-8', className)} {...props} />
+  ),
+  img: ({ className, alt, ...props }: ImgHTMLAttributes<HTMLImageElement>) => (
+    <img
+      alt={alt ?? ''}
+      className={cn(
+        'border-border my-6 w-full rounded-xl border object-cover',
+        className
+      )}
+      {...props}
+    />
+  ),
+  video: ({ className, ...props }: VideoHTMLAttributes<HTMLVideoElement>) => (
+    <video
+      className={cn(
+        'border-border my-6 w-full rounded-xl border bg-black object-cover',
+        className
+      )}
+      {...props}
+    />
+  ),
+  figure: ({ className, ...props }: HTMLAttributes<HTMLElement>) => (
+    <figure className={cn('my-6', className)} {...props} />
+  ),
+  figcaption: ({ className, ...props }: HTMLAttributes<HTMLElement>) => (
+    <figcaption
+      className={cn(
+        'text-muted-foreground mt-2 text-center text-sm leading-6',
+        className
+      )}
+      {...props}
+    />
   ),
 };

@@ -1,9 +1,16 @@
 import { parseIsoBmffDurationSeconds } from '@/modules/genjutsu/video-metadata';
 
+import {
+  H3_MAX_DURATION_SECONDS,
+  H3_MIN_DURATION_SECONDS,
+  HOTEL_LOBBY_MAX_VIDEO_EDGE_PX,
+  HOTEL_LOBBY_MIN_VIDEO_EDGE_PX,
+} from './pricing';
+
 const HEAD_BYTES = 2 * 1024 * 1024;
 const TAIL_BYTES = 4 * 1024 * 1024;
 
-export const HOTEL_LOBBY_MIN_SOURCE_SECONDS = 5;
+export const HOTEL_LOBBY_MIN_SOURCE_SECONDS = 3;
 export const HOTEL_LOBBY_MAX_SOURCE_SECONDS = 15;
 
 function parseTotalBytes(contentRange: string | null) {
@@ -153,11 +160,154 @@ function parseReferenceDurationSeconds(bytes: Uint8Array) {
   return parseIsoBmffDurationSeconds(bytes) ?? parseWebmDurationSeconds(bytes);
 }
 
+export {
+  HOTEL_LOBBY_MAX_VIDEO_EDGE_PX,
+  HOTEL_LOBBY_MIN_VIDEO_EDGE_PX,
+} from './pricing';
+
+/** Tiny float tolerance only — not a product slack window. */
+const DURATION_EPSILON_SECONDS = 0.001;
+
+function readUint16(bytes: Uint8Array, offset: number) {
+  if (offset < 0 || offset + 2 > bytes.byteLength) return null;
+  return bytes[offset] * 0x100 + bytes[offset + 1];
+}
+
+function readUint32(bytes: Uint8Array, offset: number) {
+  if (offset < 0 || offset + 4 > bytes.byteLength) return null;
+  return (
+    bytes[offset] * 0x1000000 +
+    bytes[offset + 1] * 0x10000 +
+    bytes[offset + 2] * 0x100 +
+    bytes[offset + 3]
+  );
+}
+
+function isFourCc(bytes: Uint8Array, offset: number, tag: string) {
+  return (
+    offset + 4 <= bytes.byteLength &&
+    bytes[offset] === tag.charCodeAt(0) &&
+    bytes[offset + 1] === tag.charCodeAt(1) &&
+    bytes[offset + 2] === tag.charCodeAt(2) &&
+    bytes[offset + 3] === tag.charCodeAt(3)
+  );
+}
+
+/**
+ * ISO BMFF boxes start with size(4)+type(4). Scanning for fourcc alone false-
+ * positives on ftyp compatible brands (e.g. `iso2avc1mp41` embeds `avc1`).
+ * Real tkhd / VisualSampleEntry boxes are small; brand strings yield huge
+ * "sizes" when the preceding 4 bytes are misread as a length.
+ */
+function isPlausibleIsoBmffBox(
+  bytes: Uint8Array,
+  typeOffset: number,
+  minSize: number
+) {
+  const declaredSize = readUint32(bytes, typeOffset - 4);
+  if (declaredSize == null || declaredSize < minSize) return false;
+  // size==0 means "extends to EOF"; otherwise keep an upper bound so brand
+  // strings like "iso2" (0x69736f32) never look like box headers.
+  if (declaredSize === 0) return true;
+  return declaredSize <= 4 * 1024 * 1024;
+}
+
+/**
+ * Best-effort MP4/MOV display size from tkhd (16.16) or visual sample entries.
+ * Returns null when metadata is missing (e.g. WebM).
+ */
+export function parseIsoBmffVideoDimensions(bytes: Uint8Array): {
+  width: number;
+  height: number;
+} | null {
+  let bestTkhd: { width: number; height: number } | null = null;
+  let bestSample: { width: number; height: number } | null = null;
+
+  const consider = (
+    target: 'tkhd' | 'sample',
+    width: number,
+    height: number
+  ) => {
+    if (
+      !Number.isFinite(width) ||
+      !Number.isFinite(height) ||
+      width < 16 ||
+      height < 16
+    ) {
+      return;
+    }
+    const w = Math.round(width);
+    const h = Math.round(height);
+    const prev = target === 'tkhd' ? bestTkhd : bestSample;
+    if (!prev || w * h > prev.width * prev.height) {
+      if (target === 'tkhd') bestTkhd = { width: w, height: h };
+      else bestSample = { width: w, height: h };
+    }
+  };
+
+  for (let typeOffset = 4; typeOffset + 8 < bytes.byteLength; typeOffset += 1) {
+    if (isFourCc(bytes, typeOffset, 'tkhd')) {
+      // tkhd v0 = 92 bytes, v1 = 104 bytes (including size+type).
+      if (!isPlausibleIsoBmffBox(bytes, typeOffset, 92)) continue;
+      const version = bytes[typeOffset + 4];
+      const whOffset =
+        version === 0 ? typeOffset + 80 : version === 1 ? typeOffset + 92 : -1;
+      if (whOffset < 0 || whOffset + 8 > bytes.byteLength) continue;
+      const widthFixed = readUint32(bytes, whOffset);
+      const heightFixed = readUint32(bytes, whOffset + 4);
+      if (widthFixed == null || heightFixed == null) continue;
+      consider('tkhd', widthFixed / 65536, heightFixed / 65536);
+      continue;
+    }
+
+    if (
+      isFourCc(bytes, typeOffset, 'avc1') ||
+      isFourCc(bytes, typeOffset, 'avc3') ||
+      isFourCc(bytes, typeOffset, 'hvc1') ||
+      isFourCc(bytes, typeOffset, 'hev1') ||
+      isFourCc(bytes, typeOffset, 'vp09') ||
+      isFourCc(bytes, typeOffset, 'av01') ||
+      isFourCc(bytes, typeOffset, 'mp4v')
+    ) {
+      // VisualSampleEntry: size+type(8) + SampleEntry(8) + visual fields to
+      // width/height (~32 from type) — real boxes are typically <1KB.
+      if (!isPlausibleIsoBmffBox(bytes, typeOffset, 86)) continue;
+      // VisualSampleEntry width/height are uint16 after SampleEntry(8) +
+      // pre_defined/reserved/pre_defined[3](16), measured from the type fourcc.
+      const width = readUint16(bytes, typeOffset + 28);
+      const height = readUint16(bytes, typeOffset + 30);
+      if (width != null && height != null) consider('sample', width, height);
+    }
+  }
+
+  // Prefer tkhd display size; sample-entry dims are a fallback for partial reads.
+  return bestTkhd ?? bestSample;
+}
+
+export function assertHotelLobbyVideoDimensions(input: {
+  width: number;
+  height: number;
+}) {
+  const { width, height } = input;
+  if (
+    !Number.isFinite(width) ||
+    !Number.isFinite(height) ||
+    width < HOTEL_LOBBY_MIN_VIDEO_EDGE_PX ||
+    height < HOTEL_LOBBY_MIN_VIDEO_EDGE_PX ||
+    width > HOTEL_LOBBY_MAX_VIDEO_EDGE_PX ||
+    height > HOTEL_LOBBY_MAX_VIDEO_EDGE_PX
+  ) {
+    throw new Error(
+      `Reference video must be between ${HOTEL_LOBBY_MIN_VIDEO_EDGE_PX}×${HOTEL_LOBBY_MIN_VIDEO_EDGE_PX} and ${HOTEL_LOBBY_MAX_VIDEO_EDGE_PX}×${HOTEL_LOBBY_MAX_VIDEO_EDGE_PX} pixels (got ${Math.round(width)}×${Math.round(height)})`
+    );
+  }
+}
+
 export function normalizeHotelLobbyDuration(seconds: number) {
   if (
     !Number.isFinite(seconds) ||
-    seconds < HOTEL_LOBBY_MIN_SOURCE_SECONDS - 0.1 ||
-    seconds > HOTEL_LOBBY_MAX_SOURCE_SECONDS + 0.2
+    seconds < HOTEL_LOBBY_MIN_SOURCE_SECONDS - DURATION_EPSILON_SECONDS ||
+    seconds > HOTEL_LOBBY_MAX_SOURCE_SECONDS + DURATION_EPSILON_SECONDS
   ) {
     throw new Error(
       `Reference video must be between ${HOTEL_LOBBY_MIN_SOURCE_SECONDS} and ${HOTEL_LOBBY_MAX_SOURCE_SECONDS} seconds`
@@ -206,4 +356,51 @@ export async function probeHotelLobbyDurationSeconds(
   return normalizeHotelLobbyDuration(
     await probeHotelLobbyDurationSecondsRaw(videoUrl, options)
   );
+}
+
+/** H3 Lab: validate raw clip against MiniMax 5–15s before rounding for billing. */
+export function normalizeH3LabDuration(seconds: number) {
+  if (
+    !Number.isFinite(seconds) ||
+    seconds < H3_MIN_DURATION_SECONDS - DURATION_EPSILON_SECONDS ||
+    seconds > H3_MAX_DURATION_SECONDS + DURATION_EPSILON_SECONDS
+  ) {
+    throw new Error(
+      `Reference video must be between ${H3_MIN_DURATION_SECONDS} and ${H3_MAX_DURATION_SECONDS} seconds`
+    );
+  }
+
+  return Math.min(
+    H3_MAX_DURATION_SECONDS,
+    Math.max(H3_MIN_DURATION_SECONDS, Math.round(seconds))
+  );
+}
+
+export async function probeH3LabDurationSeconds(
+  videoUrl: string,
+  options?: { fallbackSeconds?: number }
+) {
+  return normalizeH3LabDuration(
+    await probeHotelLobbyDurationSecondsRaw(videoUrl, options)
+  );
+}
+
+export async function probeHotelLobbyVideoDimensions(videoUrl: string) {
+  const first = await fetchRange(videoUrl, `bytes=0-${HEAD_BYTES - 1}`);
+  let dims = parseIsoBmffVideoDimensions(first.bytes);
+
+  if (!dims && first.totalBytes && first.totalBytes > HEAD_BYTES) {
+    const start = Math.max(0, first.totalBytes - TAIL_BYTES);
+    const tail = await fetchRange(videoUrl, `bytes=${start}-`);
+    dims = parseIsoBmffVideoDimensions(tail.bytes);
+  }
+
+  if (!dims) {
+    throw new Error(
+      'Could not read the reference video resolution. Use an MP4 or MOV with readable metadata.'
+    );
+  }
+
+  assertHotelLobbyVideoDimensions(dims);
+  return dims;
 }

@@ -14,6 +14,74 @@ import {
 
 const defaultUuid: UuidFunction = () => crypto.randomUUID();
 
+/** Retryable Fal queue transport failures (not terminal model outcomes). */
+export function isTransientFalHttpStatus(status: number) {
+  return status === 408 || status === 429 || status >= 500;
+}
+
+/**
+ * Parse `request failed with status: NNN` from FalProvider.generate errors.
+ * Returns null when the message is not an HTTP status failure.
+ */
+export function parseFalHttpStatusFromError(message: string): number | null {
+  const match = /request failed with status:\s*(\d+)/i.exec(message);
+  if (!match) return null;
+  const status = Number(match[1]);
+  return Number.isInteger(status) ? status : null;
+}
+
+/**
+ * Submit-time HTTP codes that clearly mean Fal rejected the request
+ * (safe to refund). Excludes 408/429 (retryable) and all 5xx (uncertain).
+ */
+export function isDefiniteFalSubmitRejection(status: number) {
+  return (
+    Number.isInteger(status) &&
+    status >= 400 &&
+    status < 500 &&
+    !isTransientFalHttpStatus(status)
+  );
+}
+
+export function classifyFalSubmitFailure(
+  message: string
+): 'refund' | 'uncertain' {
+  const status = parseFalHttpStatusFromError(message);
+  if (status == null) return 'uncertain';
+  return isDefiniteFalSubmitRejection(status) ? 'refund' : 'uncertain';
+}
+
+export function isFalPermanentQueryFailure(
+  taskInfo?: {
+    status?: string;
+  } | null
+) {
+  const status = taskInfo?.status;
+  return (
+    status === 'QUERY_PERMANENT_ERROR' ||
+    status === 'RESULT_FETCH_PERMANENT_ERROR'
+  );
+}
+
+/** Consecutive permanent status-lookup failures before parking the task. */
+export const FAL_QUERY_PERMANENT_ERROR_THRESHOLD = 3;
+
+/**
+ * Fal queue status/result URLs use the app id (`owner/name`) only.
+ * Nested submit paths (e.g. `.../video-to-video/edit`, `minimax/h3/...`)
+ * return HTTP 405 on GET when the full path is used — verified against
+ * `fal-ai/kling-video/o3/standard/video-to-video/edit`.
+ */
+export function falQueueQueryModel(model?: string): string {
+  if (!model) return '';
+  const normalized = model.replace(/^\/+/, '');
+  const parts = normalized.split('/').filter(Boolean);
+  if (parts.length <= 2) {
+    return parts.join('/');
+  }
+  return `${parts[0]}/${parts[1]}`;
+}
+
 /**
  * Fal configs
  * @docs https://fal.ai/
@@ -135,18 +203,20 @@ export class FalProvider implements AIProvider {
 
     if (!statusResp.ok) {
       const detail = await statusResp.text().catch(() => '');
+      const message =
+        detail || `request failed with status: ${statusResp.status}`;
+      // 429/5xx (and 408): retryable. 4xx like 401/403/404: permanent lookup
+      // failure — callers must not keep polling forever or auto-refund.
+      const transient = isTransientFalHttpStatus(statusResp.status);
       return {
         taskId,
-        taskStatus: AITaskStatus.FAILED,
+        taskStatus: transient ? AITaskStatus.PROCESSING : AITaskStatus.FAILED,
         taskInfo: {
-          status: String(statusResp.status),
+          status: transient ? 'QUERY_ERROR' : 'QUERY_PERMANENT_ERROR',
           errorCode: String(statusResp.status),
-          errorMessage:
-            detail || `request failed with status: ${statusResp.status}`,
+          errorMessage: message,
         },
-        taskResult: {
-          error: detail || `request failed with status: ${statusResp.status}`,
-        },
+        taskResult: { error: message },
       };
     }
 
@@ -176,18 +246,20 @@ export class FalProvider implements AIProvider {
 
     if (!resultResp.ok) {
       const detail = await resultResp.text().catch(() => '');
+      const message =
+        detail || `request failed with status: ${resultResp.status}`;
+      const transient = isTransientFalHttpStatus(resultResp.status);
       return {
         taskId,
-        taskStatus: AITaskStatus.FAILED,
+        taskStatus: transient ? AITaskStatus.PROCESSING : AITaskStatus.FAILED,
         taskInfo: {
-          status: String(resultResp.status),
+          status: transient
+            ? 'RESULT_FETCH_ERROR'
+            : 'RESULT_FETCH_PERMANENT_ERROR',
           errorCode: String(resultResp.status),
-          errorMessage:
-            detail || `request failed with status: ${resultResp.status}`,
+          errorMessage: message,
         },
-        taskResult: {
-          error: detail || `request failed with status: ${resultResp.status}`,
-        },
+        taskResult: { error: message },
       };
     }
 
@@ -313,16 +385,7 @@ export class FalProvider implements AIProvider {
   }
 
   private getQueryModel(model?: string): string {
-    if (!model) {
-      return '';
-    }
-    // Fal queue status/result GETs use the app id (owner/name). Nested
-    // submit paths like minimax/h3/reference-to-video return 405 on GET.
-    const parts = model.replace(/^\/+/, '').split('/').filter(Boolean);
-    if (parts.length <= 2) {
-      return parts.join('/');
-    }
-    return `${parts[0]}/${parts[1]}`;
+    return falQueueQueryModel(model);
   }
 
   private formatInput({

@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
 
+import { classifyFalSubmitFailure } from '@/core/ai';
 import { getAuth } from '@/core/auth';
 import {
   assertHotelLobbyGenerationId,
@@ -12,26 +13,26 @@ import {
   reserveHotelLobbyGeneration,
 } from '@/modules/hotel-lobby/billing';
 import {
-  assertHotelLobbyDuration,
+  assertH3LabDuration,
   estimateH3LabCredits,
   estimateH3LabProviderCost,
+  H3_LAB_MODEL,
   H3_MAX_PROMPT_LENGTH,
   H3_MAX_REFERENCE_IMAGES,
   HOTEL_LOBBY_ASPECT_RATIOS,
-  HOTEL_LOBBY_MODEL,
   HOTEL_LOBBY_RESOLUTIONS,
   type HotelLobbyAspectRatio,
   type HotelLobbyResolution,
 } from '@/modules/hotel-lobby/pricing';
 import {
-  submitHotelLobby,
+  submitH3Lab,
   type HotelLobbyPromptExpansionMode,
 } from '@/modules/hotel-lobby/service';
 import {
   resolveHotelLobbyInputUrls,
   sealHotelLobbyInputs,
 } from '@/modules/hotel-lobby/storage';
-import { probeHotelLobbyDurationSeconds } from '@/modules/hotel-lobby/video-metadata';
+import { probeH3LabDurationSeconds } from '@/modules/hotel-lobby/video-metadata';
 import { enforceMinIntervalRateLimit } from '@/lib/rate-limit';
 import { respData, respErr, respJson } from '@/lib/resp';
 
@@ -184,10 +185,10 @@ async function POST({ request }: { request: Request }) {
         });
       }
       const rounded = Math.round(durationOverride);
-      assertHotelLobbyDuration(rounded);
+      assertH3LabDuration(rounded);
       duration = rounded;
     } else {
-      duration = await probeHotelLobbyDurationSeconds(providerInput.videoUrl, {
+      duration = await probeH3LabDurationSeconds(providerInput.videoUrl, {
         fallbackSeconds:
           durationOverride != null && Number.isFinite(durationOverride)
             ? durationOverride
@@ -210,7 +211,7 @@ async function POST({ request }: { request: Request }) {
       generationId,
       userId,
       userEmail: session.user.email,
-      model: HOTEL_LOBBY_MODEL,
+      model: H3_LAB_MODEL,
       prompt,
       duration,
       resolution,
@@ -236,7 +237,7 @@ async function POST({ request }: { request: Request }) {
     }
 
     try {
-      const result = await submitHotelLobby({
+      const result = await submitH3Lab({
         prompt,
         duration,
         resolution,
@@ -267,7 +268,7 @@ async function POST({ request }: { request: Request }) {
       const message =
         error instanceof Error ? error.message : 'MiniMax H3 submission failed';
 
-      if (/request failed with status:/i.test(message)) {
+      if (classifyFalSubmitFailure(message) === 'refund') {
         await refundHotelLobbyGeneration({
           generationId,
           userId,
@@ -282,6 +283,12 @@ async function POST({ request }: { request: Request }) {
         );
       }
 
+      console.error('[ops] h3-lab submission_unknown credits_held', {
+        generationId,
+        userId,
+        error: message,
+        hasRequestId: false,
+      });
       await markHotelLobbySubmissionUnknown({
         generationId,
         userId,

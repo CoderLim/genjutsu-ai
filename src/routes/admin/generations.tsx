@@ -494,9 +494,7 @@ const GenerationsTable = memo(function GenerationsTable({
             <div className="text-muted-foreground mt-1 text-[11px]">
               {g.scene === 'hotel-lobby'
                 ? m['admin.generations.scene.hotel_lobby']()
-                : g.scene === 'chuttamalle'
-                  ? m['admin.generations.scene.chuttamalle']()
-                  : m['admin.generations.scene.genjutsu']()}
+                : m['admin.generations.scene.genjutsu']()}
             </div>
           </div>
         ),
@@ -659,9 +657,6 @@ const GenerationsTable = memo(function GenerationsTable({
                   <SelectItem value="hotel-lobby">
                     {m['admin.generations.scene.hotel_lobby']()}
                   </SelectItem>
-                  <SelectItem value="chuttamalle">
-                    {m['admin.generations.scene.chuttamalle']()}
-                  </SelectItem>
                 </SelectContent>
               </Select>
               <Select
@@ -799,9 +794,7 @@ function GenerationsPage() {
                   <div className="text-muted-foreground mt-1 text-xs">
                     {detail.scene === 'hotel-lobby'
                       ? m['admin.generations.scene.hotel_lobby']()
-                      : detail.scene === 'chuttamalle'
-                        ? m['admin.generations.scene.chuttamalle']()
-                        : m['admin.generations.scene.genjutsu']()}
+                      : m['admin.generations.scene.genjutsu']()}
                   </div>
                 </div>
                 <div>
@@ -825,6 +818,11 @@ function GenerationsPage() {
                       {detail.status}
                     </Badge>
                   </div>
+                  {detail.status === 'submission_unknown' ? (
+                    <div className="text-destructive mt-1 text-xs">
+                      {m['admin.generations.submission_unknown_hint']()}
+                    </div>
+                  ) : null}
                   <div className="text-muted-foreground mt-1 text-xs">
                     stage: {detail.attemptStage || '—'}
                   </div>
