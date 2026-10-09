@@ -43,6 +43,7 @@ async function POST({ request }: { request: Request }) {
 
   let generationId: string | null = null;
   let userId: string | null = null;
+  let sealClaimForFailure: string | null = null;
 
   try {
     const auth = getAuth();
@@ -107,17 +108,17 @@ async function POST({ request }: { request: Request }) {
       throw new Error('Generation upload inputs are not bound');
     }
 
-    let ownSeal = false;
+    let sealClaim: string | null = null;
     if (task.status === 'initiated') {
-      ownSeal = await claimGenjutsuSeal({ generationId: gid, userId: uid });
+      sealClaim = await claimGenjutsuSeal({ generationId: gid, userId: uid });
     }
-    if (!ownSeal) {
+    if (!sealClaim) {
       const reclaim = await reclaimStaleGenjutsuSeal({
         generationId: gid,
         userId: uid,
       });
-      if (reclaim === 'reclaimed') {
-        ownSeal = true;
+      if (reclaim.status === 'reclaimed') {
+        sealClaim = reclaim.sealClaim;
       } else {
         task = await getGenjutsuTaskById({ generationId: gid, userId: uid });
         const options = parseOptions(task?.options);
@@ -138,7 +139,7 @@ async function POST({ request }: { request: Request }) {
       }
     }
 
-    if (!ownSeal) {
+    if (!sealClaim) {
       return respJson(
         -1,
         'Generation inputs are already being sealed',
@@ -146,6 +147,7 @@ async function POST({ request }: { request: Request }) {
         { status: 409 }
       );
     }
+    sealClaimForFailure = sealClaim;
 
     let sealed: { videoKey: string; imageKeys: string[] } | null = null;
     if (useDefaultTemplate) {
@@ -271,6 +273,7 @@ async function POST({ request }: { request: Request }) {
     task = await markGenjutsuAttemptReady({
       generationId: gid,
       userId: uid,
+      sealClaim,
       ...sealed,
     });
     if (!task || task.status !== 'ready') {
@@ -283,10 +286,11 @@ async function POST({ request }: { request: Request }) {
       ...sealed,
     });
   } catch (error: any) {
-    if (generationId && userId) {
+    if (generationId && userId && sealClaimForFailure) {
       await markGenjutsuAttemptFailedPreflight({
         generationId,
         userId,
+        sealClaim: sealClaimForFailure,
         stage: 'seal_inputs',
         errorCode: 'INPUT_SEAL_FAILED',
         error: error?.message || 'Failed to seal generation inputs',

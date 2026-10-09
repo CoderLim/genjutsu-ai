@@ -248,21 +248,21 @@ async function POST({ request }: { request: Request }) {
         );
       }
 
-      let ownSeal = false;
+      let sealClaim: string | null = null;
       if (task.status === 'initiated') {
-        ownSeal = await claimGenjutsuSeal({
+        sealClaim = await claimGenjutsuSeal({
           generationId,
           userId: session.user.id,
         });
       }
 
-      if (!ownSeal) {
+      if (!sealClaim) {
         const reclaim = await reclaimStaleGenjutsuSeal({
           generationId,
           userId: session.user.id,
         });
-        if (reclaim === 'reclaimed') {
-          ownSeal = true;
+        if (reclaim.status === 'reclaimed') {
+          sealClaim = reclaim.sealClaim;
         } else {
           task = await getGenjutsuTaskById({
             generationId,
@@ -271,7 +271,10 @@ async function POST({ request }: { request: Request }) {
           if (!task) throw new Error('Generation attempt disappeared');
           if (task.status === 'ready' || task.status === 'reserved') {
             // Another worker finished seal — continue to reserve/submit.
-          } else if (reclaim === 'not_stale' || task.status === 'sealing') {
+          } else if (
+            reclaim.status === 'not_stale' ||
+            task.status === 'sealing'
+          ) {
             return respJson(
               -1,
               'Generation inputs are already being sealed',
@@ -284,7 +287,7 @@ async function POST({ request }: { request: Request }) {
         }
       }
 
-      if (ownSeal) {
+      if (sealClaim) {
         try {
           const existing = await findExistingSealedZombieHugInputs({
             userId: session.user.id,
@@ -303,17 +306,18 @@ async function POST({ request }: { request: Request }) {
           task = await markGenjutsuAttemptReady({
             generationId,
             userId: session.user.id,
+            sealClaim,
             ...sealed,
           });
           if (!task || task.status !== 'ready') {
             throw new Error('Failed to finalize sealed generation inputs');
           }
         } catch (error: any) {
-          // We own the sealing lease — always exit that state so retries are
-          // not stuck forever after a failed reclaim/reseal.
+          // Only the current lease holder can exit sealing → failed_preflight.
           await markGenjutsuAttemptFailedPreflight({
             generationId,
             userId: session.user.id,
+            sealClaim,
             stage: 'seal_inputs',
             errorCode: 'INPUT_SEAL_FAILED',
             error: error?.message || 'Failed to seal generation inputs',

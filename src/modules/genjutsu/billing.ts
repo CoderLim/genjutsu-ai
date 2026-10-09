@@ -386,16 +386,24 @@ export async function getGenjutsuTaskByGenerationId(generationId: string) {
   return task ?? null;
 }
 
+/** Canonical seal lease payload — exact string match is used for CAS. */
+function sealClaimTaskResult(sealClaim: string) {
+  return JSON.stringify({ sealClaim });
+}
+
+/**
+ * Claim the seal lease. Returns the sealClaim token on success, otherwise null.
+ */
 export async function claimGenjutsuSeal(params: {
   generationId: string;
   userId: string;
-}) {
+}): Promise<string | null> {
   const sealClaim = getUuid();
   await db()
     .update(aiTask)
     .set({
       status: 'sealing',
-      taskResult: JSON.stringify({ sealClaim }),
+      taskResult: sealClaimTaskResult(sealClaim),
     })
     .where(
       and(
@@ -408,18 +416,25 @@ export async function claimGenjutsuSeal(params: {
 
   const current = await getGenjutsuTaskById(params);
   if (!current || current.status !== 'sealing' || !current.taskResult) {
-    return false;
+    return null;
   }
 
   try {
-    return JSON.parse(current.taskResult)?.sealClaim === sealClaim;
+    return JSON.parse(current.taskResult)?.sealClaim === sealClaim
+      ? sealClaim
+      : null;
   } catch {
-    return false;
+    return null;
   }
 }
 
 /** How long a seal claim may sit before another request can reclaim it. */
 export const GENJUTSU_SEAL_STALE_MS = 90_000;
+
+export type ReclaimGenjutsuSealResult =
+  | { status: 'reclaimed'; sealClaim: string }
+  | { status: 'not_stale' }
+  | { status: 'unavailable' };
 
 /**
  * Reclaim a stuck `sealing` row after the lease expires (worker crash between
@@ -429,12 +444,12 @@ export async function reclaimStaleGenjutsuSeal(params: {
   generationId: string;
   userId: string;
   staleAfterMs?: number;
-}): Promise<'reclaimed' | 'not_stale' | 'unavailable'> {
+}): Promise<ReclaimGenjutsuSealResult> {
   const staleAfterMs = params.staleAfterMs ?? GENJUTSU_SEAL_STALE_MS;
   const existing = await getGenjutsuTaskById(params);
-  if (!existing) return 'unavailable';
-  if (existing.status === 'ready') return 'unavailable';
-  if (existing.status !== 'sealing') return 'unavailable';
+  if (!existing) return { status: 'unavailable' };
+  if (existing.status === 'ready') return { status: 'unavailable' };
+  if (existing.status !== 'sealing') return { status: 'unavailable' };
 
   const updatedAtMs =
     existing.updatedAt instanceof Date
@@ -444,7 +459,7 @@ export async function reclaimStaleGenjutsuSeal(params: {
     !Number.isFinite(updatedAtMs) ||
     Date.now() - updatedAtMs < staleAfterMs
   ) {
-    return 'not_stale';
+    return { status: 'not_stale' };
   }
 
   const sealClaim = getUuid();
@@ -453,10 +468,7 @@ export async function reclaimStaleGenjutsuSeal(params: {
     .update(aiTask)
     .set({
       status: 'sealing',
-      taskResult: JSON.stringify({
-        sealClaim,
-        reclaimedAt: Date.now(),
-      }),
+      taskResult: sealClaimTaskResult(sealClaim),
     })
     .where(
       and(
@@ -469,16 +481,18 @@ export async function reclaimStaleGenjutsuSeal(params: {
     );
 
   const current = await getGenjutsuTaskById(params);
-  if (!current) return 'unavailable';
-  if (current.status === 'ready') return 'unavailable';
-  if (current.status !== 'sealing' || !current.taskResult) return 'unavailable';
+  if (!current) return { status: 'unavailable' };
+  if (current.status === 'ready') return { status: 'unavailable' };
+  if (current.status !== 'sealing' || !current.taskResult) {
+    return { status: 'unavailable' };
+  }
 
   try {
     return JSON.parse(current.taskResult)?.sealClaim === sealClaim
-      ? 'reclaimed'
-      : 'not_stale';
+      ? { status: 'reclaimed', sealClaim }
+      : { status: 'not_stale' };
   } catch {
-    return 'unavailable';
+    return { status: 'unavailable' };
   }
 }
 
@@ -487,6 +501,8 @@ export async function markGenjutsuAttemptReady(params: {
   userId: string;
   videoKey: string;
   imageKeys: string[];
+  /** Required: only the current seal lease holder may sealing → ready. */
+  sealClaim: string;
 }) {
   const task = await getGenjutsuTaskById(params);
   if (!task) throw new Error('Generation attempt not found');
@@ -517,19 +533,27 @@ export async function markGenjutsuAttemptReady(params: {
         eq(aiTask.id, params.generationId),
         eq(aiTask.userId, params.userId),
         eq(aiTask.scene, GENJUTSU_SCENE),
-        eq(aiTask.status, 'sealing')
+        eq(aiTask.status, 'sealing'),
+        eq(aiTask.taskResult, sealClaimTaskResult(params.sealClaim))
       )
     );
 
   return getGenjutsuTaskById(params);
 }
 
+/**
+ * Mark a preflight failure.
+ * - With `sealClaim`: only the lease holder may move sealing → failed_preflight
+ *   (never overwrites ready/another worker's lease).
+ * - Without: only `initiated` rows (upload/setup failures before a seal starts).
+ */
 export async function markGenjutsuAttemptFailedPreflight(params: {
   generationId: string;
   userId: string;
   stage: string;
   error: string;
   errorCode?: string;
+  sealClaim?: string;
 }) {
   await db()
     .update(aiTask)
@@ -546,7 +570,12 @@ export async function markGenjutsuAttemptFailedPreflight(params: {
         eq(aiTask.id, params.generationId),
         eq(aiTask.userId, params.userId),
         eq(aiTask.scene, GENJUTSU_SCENE),
-        inArray(aiTask.status, ['initiated', 'sealing', 'ready'])
+        params.sealClaim
+          ? and(
+              eq(aiTask.status, 'sealing'),
+              eq(aiTask.taskResult, sealClaimTaskResult(params.sealClaim))
+            )
+          : eq(aiTask.status, 'initiated')
       )
     );
 }
