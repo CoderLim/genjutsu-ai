@@ -6,6 +6,7 @@ import {
   getPricingProduct,
 } from '@/config/pricing';
 import { getAllConfigs } from '@/modules/config/service';
+import { resolveGenjutsuCheckoutAmount } from '@/modules/payment/checkout-amount';
 import { createCheckout } from '@/modules/payment/service';
 import { enforceMinIntervalRateLimit } from '@/lib/rate-limit';
 import { respData, respErr } from '@/lib/resp';
@@ -61,16 +62,19 @@ async function POST({ request }: { request: Request }) {
       return respErr(error.message || 'Product not available');
     }
 
-    // Optional per-provider "test amount" override (admin-configured).
-    // Only the charged amount is overridden — credits granted and order
-    // amount stored both come from the authoritative catalog.
+    // A stale *_test_amount value must never lower a V2 public pack's
+    // order amount (and thus Waffo's authoritative priceSnapshot).
     const configs = await getAllConfigs();
     const providerKey = payment_provider || configs.default_payment_provider;
-    const testAmountRaw = providerKey
-      ? configs[`${providerKey}_test_amount`]
-      : undefined;
-    const testAmount = testAmountRaw ? parseInt(testAmountRaw) : 0;
-    const chargeAmount = testAmount > 0 ? testAmount : product.priceInCents;
+    if (!providerKey) return respErr('No payment provider configured');
+    const chargeAmount = resolveGenjutsuCheckoutAmount({
+      catalogAmountCents: product.priceInCents,
+      productId: product.productId,
+      provider: providerKey,
+      providerEnvironment:
+        providerKey === 'waffo' ? configs.waffo_environment : undefined,
+      testAmountRaw: configs[`${providerKey}_test_amount`],
+    });
 
     // Build success/cancel URLs — only accept same-origin redirects.
     const baseUrl = configs.app_url || 'http://localhost:3000';
