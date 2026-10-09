@@ -13,7 +13,7 @@ import {
   listVisibleCreditPacks,
 } from './pricing';
 
-test('launch credit packs match the approved catalog', () => {
+test('V2 public credit packs match the approved catalog', () => {
   assert.deepEqual(
     GENJUTSU_CREDIT_PACKS.map((pack) => [
       pack.id,
@@ -21,12 +21,22 @@ test('launch credit packs match the approved catalog', () => {
       pack.credits,
     ]),
     [
-      ['starter', 499, 500],
-      ['creator', 999, 1100],
-      ['pro', 1999, 2400],
-      ['studio', 3999, 5000],
+      ['starter', 1499, 1100],
+      ['creator', 4999, 3900],
+      ['studio', 9999, 8400],
     ]
   );
+});
+
+test('V2 gross margin targets and monotonically decreasing unit prices', () => {
+  const [starter, creator, studio] = GENJUTSU_CREDIT_PACKS;
+  const modelCostUsd = (credits: number) => credits / 170;
+  for (const pack of GENJUTSU_CREDIT_PACKS) {
+    const margin = 1 - modelCostUsd(pack.credits) / (pack.priceCents / 100);
+    assert.ok(margin >= 0.5 && margin < 0.6, `unexpected ${pack.id} model-cost margin`);
+  }
+  assert.ok(starter.priceCents / starter.credits > creator.priceCents / creator.credits);
+  assert.ok(creator.priceCents / creator.credits > studio.priceCents / studio.credits);
 });
 
 test('smoke pack is only visible to gengliming emails', () => {
@@ -38,11 +48,11 @@ test('smoke pack is only visible to gengliming emails', () => {
   assert.equal(canSeeSmokeCreditPack('dev+GENGLIMING@x.com'), true);
   assert.deepEqual(
     listVisibleCreditPacks('alice@example.com').map((p) => p.id),
-    ['starter', 'creator', 'pro', 'studio']
+    ['starter', 'creator', 'studio']
   );
   assert.deepEqual(
     listVisibleCreditPacks('gengliming110@gmail.com').map((p) => p.id),
-    ['starter', 'creator', 'pro', 'studio', 'smoke']
+    ['starter', 'creator', 'studio', 'smoke']
   );
 });
 
@@ -95,7 +105,7 @@ test('credit gate chooses the smallest pack that covers the deficit', () => {
   assert.equal(
     getSmallestSufficientCreditPack({
       balance: 310,
-      requiredCredits: 820,
+      requiredCredits: 1900,
       email: 'alice@example.com',
     })?.id,
     'creator'
