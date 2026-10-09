@@ -19,10 +19,7 @@ import {
   isGenjutsuE2EMockEnabled,
   resolveGenjutsuE2EInputUrls,
 } from '@/modules/genjutsu/e2e-mock';
-import {
-  calculateGenjutsuCredits,
-  estimateGenjutsuCredits,
-} from '@/modules/genjutsu/pricing';
+import { calculateGenjutsuCredits } from '@/modules/genjutsu/pricing';
 import {
   logGenjutsuProviderFailure,
   providerFailureDebugFields,
@@ -272,24 +269,10 @@ async function POST({ request }: { request: Request }) {
       sourceDurationSeconds?: number;
     } | null = null;
 
-    if (needsReservation && target.provider === 'higgsfield') {
-      // Cheap preflight: if the user cannot afford even the minimum 4-second
-      // clip at this resolution, fail before live /estimate or submit.
-      const minimumCredits = estimateGenjutsuCredits({
-        durationSeconds: 4,
-        resolution: input.resolution,
-      });
-      const balance = await getBalance(session.user.id);
-      if (balance < minimumCredits) {
-        await markGenjutsuAttemptInsufficient({
-          generationId,
-          userId: session.user.id,
-          requiredCredits: minimumCredits,
-          balance,
-        });
-        throw new InsufficientCreditsError(minimumCredits, balance);
-      }
-    } else if (
+    // Higgsfield's public list rate can be much higher than its live
+    // discounted quote. Do not reject before /estimate; reservation below
+    // enforces the actual server-side credit requirement.
+    if (
       needsReservation &&
       (target.provider === 'seedance' ||
         target.provider === 'seedance-volcengine')
