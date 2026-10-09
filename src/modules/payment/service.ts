@@ -356,9 +356,9 @@ async function handleCheckoutSuccess(session: any, provider: string) {
   const subscriptionInfo = session.subscriptionInfo;
 
   if (session.paymentStatus === PaymentStatus.SUCCESS) {
-    // Waffo prices live on the mapped provider product. Fail closed if a
-    // stale/misconfigured mapping charges a different amount than our
-    // authoritative catalog order; never grant credits for the wrong SKU.
+    // Waffo one-time checkout uses the stored order priceSnapshot; product
+    // mapping is still required. Check the actual paid amount and currency
+    // against that immutable order snapshot before granting credits.
     if (provider === 'waffo') {
       const configs = await getAllConfigs();
       const waffoMode =
