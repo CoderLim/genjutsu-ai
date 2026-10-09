@@ -18,7 +18,7 @@ export function PricingSection() {
           </p>
         </div>
 
-        <div className="mx-auto grid max-w-[1180px] gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mx-auto grid max-w-[1180px] gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {GENJUTSU_CREDIT_PACKS.map((pack) => (
             <div
               key={pack.id}
@@ -80,10 +80,9 @@ export function PricingSection() {
         </div>
 
         <p className="text-muted-foreground mx-auto mt-6 max-w-2xl text-center text-sm leading-relaxed">
-          Each generation consumes API time equal to your input clip duration
-          (rounded up to the next second). Credits are calculated from that
-          estimate on the server before the job starts — longer clips and higher
-          resolution cost more.
+          Credits are calculated by the server for each generation. Longer
+          videos and higher resolutions may require more credits, and a single
+          pack may not cover every generation.
         </p>
       </div>
     </section>
