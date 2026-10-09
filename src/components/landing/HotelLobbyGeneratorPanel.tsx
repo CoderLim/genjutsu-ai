@@ -11,11 +11,7 @@ import { toast } from 'sonner';
 
 import { useSession } from '@/core/auth/client';
 import { Link } from '@/core/i18n/navigation';
-import {
-  estimateHotelLobbyCredits,
-  HOTEL_LOBBY_RESOLUTIONS,
-  type HotelLobbyResolution,
-} from '@/modules/hotel-lobby/pricing';
+import { estimateHotelLobbyCredits } from '@/modules/hotel-lobby/pricing';
 import { ApiError, apiGet, apiPost, uploadToSignedUrl } from '@/lib/api-client';
 import { trimVideoToFile } from '@/lib/trim-video';
 import { useUserCredits } from '@/hooks/use-user-credits';
@@ -72,7 +68,7 @@ const TEMPLATE_URL = '/api/hotel-lobby/template';
 const TEMPLATE_FILE_URL = '/api/hotel-lobby/template-file';
 const MAX_VIDEO_BYTES = 80 * 1024 * 1024;
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
-const MIN_REFERENCE_VIDEO_SECONDS = 5;
+const MIN_REFERENCE_VIDEO_SECONDS = 3;
 const MAX_REFERENCE_VIDEO_SECONDS = 15;
 
 function isFullSourceClip(
@@ -216,7 +212,6 @@ export function HotelLobbyGeneratorPanel() {
   const [templateAvailable, setTemplateAvailable] = useState(true);
   const [firstImage, setFirstImage] = useState<MediaItem | null>(null);
   const [secondImage, setSecondImage] = useState<MediaItem | null>(null);
-  const [resolution, setResolution] = useState<HotelLobbyResolution>('480P');
   const [trimStart, setTrimStart] = useState(0);
   const [trimEnd, setTrimEnd] = useState(0);
   const [trimming, setTrimming] = useState(false);
@@ -256,13 +251,12 @@ export function HotelLobbyGeneratorPanel() {
     try {
       return estimateHotelLobbyCredits({
         duration: billedDuration,
-        resolution,
         imageCount,
       });
     } catch {
       return null;
     }
-  }, [billedDuration, firstImage, secondImage, resolution]);
+  }, [billedDuration, firstImage, secondImage]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -315,7 +309,7 @@ export function HotelLobbyGeneratorPanel() {
       clipDurationSeconds < MIN_REFERENCE_VIDEO_SECONDS - 0.1 ||
       clipDurationSeconds > MAX_REFERENCE_VIDEO_SECONDS + 0.2
     ) {
-      toast.error('Trim the clip to between 5 and 15 seconds');
+      toast.error('Trim the clip to between 3 and 15 seconds');
       return;
     }
 
@@ -417,7 +411,7 @@ export function HotelLobbyGeneratorPanel() {
         durationSeconds < MIN_REFERENCE_VIDEO_SECONDS - 0.1 ||
         durationSeconds > MAX_REFERENCE_VIDEO_SECONDS + 0.2
       ) {
-        toast.error('Reference video must be between 5 and 15 seconds');
+        toast.error('Reference video must be between 3 and 15 seconds');
         return;
       }
 
@@ -522,7 +516,7 @@ export function HotelLobbyGeneratorPanel() {
       clipDurationSeconds < MIN_REFERENCE_VIDEO_SECONDS - 0.1 ||
       clipDurationSeconds > MAX_REFERENCE_VIDEO_SECONDS + 0.2
     ) {
-      toast.error('Trim the clip to between 5 and 15 seconds');
+      toast.error('Trim the clip to between 3 and 15 seconds');
       return;
     }
     if (!estimatedCredits) {
@@ -611,7 +605,6 @@ export function HotelLobbyGeneratorPanel() {
         {
           generationId: id,
           useDefaultTemplate,
-          resolution,
           videoKey: videoUpload?.storageKey,
           imageKeys: imageUploads.map((item) => item.storageKey),
           contentTypes,
@@ -662,7 +655,7 @@ export function HotelLobbyGeneratorPanel() {
     phase === 'uploading'
       ? 'Preparing clip…'
       : phase === 'starting'
-        ? 'Starting MiniMax H3…'
+        ? 'Starting Kling O3…'
         : phase === 'generating'
           ? providerStatus
             ? `Generating · ${providerStatus}`
@@ -683,7 +676,7 @@ export function HotelLobbyGeneratorPanel() {
                 </p>
                 <p className="mt-0.5 text-xs leading-5 text-white/40">
                   The Hotel Lobby preset is loaded by default. Trim below, or
-                  remove it to use your own 5–15s motion reference.
+                  remove it to use your own 3–15s motion reference.
                 </p>
               </div>
               {video?.kind === 'template' ? (
@@ -793,7 +786,7 @@ export function HotelLobbyGeneratorPanel() {
                       Upload reference video
                     </span>
                     <span className="mt-1 block text-xs text-white/38">
-                      MP4 or MOV · 5–15s · up to 80 MB
+                      MP4 or MOV · 3–15s · up to 80 MB
                     </span>
                   </span>
                 </button>
@@ -858,22 +851,6 @@ export function HotelLobbyGeneratorPanel() {
           ) : null}
 
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end sm:gap-3">
-            <select
-              value={resolution}
-              disabled={busy}
-              aria-label="Resolution"
-              onChange={(event) =>
-                setResolution(event.target.value as HotelLobbyResolution)
-              }
-              className="h-11 w-full rounded-xl border border-white/10 bg-black/20 px-3 text-sm text-white/85 transition outline-none focus:border-[rgb(204,144,92)] disabled:opacity-60 sm:w-[140px]"
-            >
-              {HOTEL_LOBBY_RESOLUTIONS.map((item) => (
-                <option key={item} value={item} className="bg-[rgb(32,25,21)]">
-                  {item}
-                </option>
-              ))}
-            </select>
-
             <button
               type="button"
               disabled={busy || sessionPending}
@@ -906,9 +883,7 @@ export function HotelLobbyGeneratorPanel() {
           <div className="mb-3 flex items-center justify-between gap-3 px-1">
             <div>
               <p className="text-sm font-semibold text-white/90">Your video</p>
-              <p className="mt-0.5 text-xs text-white/38">
-                MiniMax H3 · {resolution} · 16:9
-              </p>
+              <p className="mt-0.5 text-xs text-white/38">Kling O3 · 16:9</p>
             </div>
             <a
               href={

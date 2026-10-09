@@ -3,7 +3,7 @@ import { parseIsoBmffDurationSeconds } from '@/modules/genjutsu/video-metadata';
 const HEAD_BYTES = 2 * 1024 * 1024;
 const TAIL_BYTES = 4 * 1024 * 1024;
 
-export const HOTEL_LOBBY_MIN_SOURCE_SECONDS = 5;
+export const HOTEL_LOBBY_MIN_SOURCE_SECONDS = 3;
 export const HOTEL_LOBBY_MAX_SOURCE_SECONDS = 15;
 
 function parseTotalBytes(contentRange: string | null) {

@@ -316,9 +316,18 @@ export class FalProvider implements AIProvider {
     if (!model) {
       return '';
     }
-    // Fal queue status/result GETs use the app id (owner/name). Nested
-    // submit paths like minimax/h3/reference-to-video return 405 on GET.
-    const parts = model.replace(/^\/+/, '').split('/').filter(Boolean);
+    const normalized = model.replace(/^\/+/, '');
+    // Kling nested video-to-video/edit endpoints expose status/result on the
+    // full path (see OpenAPI for fal-ai/kling-video/o3/.../video-to-video/edit).
+    if (
+      normalized.startsWith('fal-ai/kling-video/') &&
+      normalized.includes('/video-to-video/')
+    ) {
+      return normalized;
+    }
+    // Other nested submit paths (e.g. minimax/h3/reference-to-video) return
+    // 405 on GET — Fal queue status uses the app id (owner/name) only.
+    const parts = normalized.split('/').filter(Boolean);
     if (parts.length <= 2) {
       return parts.join('/');
     }

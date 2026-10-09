@@ -28,7 +28,7 @@ const FAQ_ITEMS = [
   {
     question: 'How do you do the Hotel Lobby AI video?',
     answer:
-      'Use the preset performance already loaded on this page, upload one photo with both subjects or one photo per performer, choose a resolution, and press generate. The output is landscape 16:9 and its length follows the reference performance.',
+      'Use the preset performance already loaded on this page, upload one photo with both subjects or one photo per performer, and press generate. The output is landscape 16:9 and its length follows the reference performance.',
   },
   {
     question: 'Is Hotel Lobby AI free?',
@@ -43,7 +43,7 @@ const FAQ_ITEMS = [
   {
     question: 'Do I need Higgsfield for the Hotel Lobby trend?',
     answer:
-      'No. This page uses MiniMax H3 with a preset reference performance. Higgsfield Genjutsu is another option when you want a more general motion-transfer workflow with your own source clip.',
+      'No. This page uses Kling O3 video edit with a preset reference performance. Higgsfield Genjutsu is another option when you want a more general motion-transfer workflow with your own source clip.',
   },
   {
     question: 'Can I do Hotel Lobby AI with my pets?',
@@ -63,12 +63,12 @@ const FAQ_ITEMS = [
   {
     question: 'Can I make it longer or in HD?',
     answer:
-      'Yes. The output length follows the reference video, which must be 5–15 seconds. You can choose 480P, 768P, 2K, or 4K output; 2K and 4K are upscaled modes in the MiniMax H3 endpoint.',
+      'Yes. The output length follows the reference video, which must be 3–15 seconds. Kling O3 returns a single native output resolution for this edit endpoint.',
   },
   {
     question: 'Can I replace the preset Hotel Lobby template?',
     answer:
-      'Yes. The preset reference performance is loaded by default, but you can remove it and upload your own 5–15 second MP4 or MOV. The generator will use that clip’s duration automatically.',
+      'Yes. The preset reference performance is loaded by default, but you can remove it and upload your own 3–15 second MP4 or MOV. The generator will use that clip’s duration automatically.',
   },
 ] as const;
 
@@ -128,7 +128,7 @@ function howToJsonLd() {
       {
         '@type': 'HowToStep',
         name: 'Press generate',
-        text: 'The Hotel Lobby reference performance is already loaded. Choose a resolution and generate; the output duration follows the reference video.',
+        text: 'The Hotel Lobby reference performance is already loaded. Press generate; the output duration follows the reference video.',
       },
       {
         '@type': 'HowToStep',
@@ -203,7 +203,7 @@ function HotelLobbyAiPage() {
           <section className="mx-auto max-w-7xl px-4 pt-14 pb-12 text-center sm:pt-20 md:px-5 md:pb-16">
             <div className="mx-auto mb-4 flex w-fit items-center gap-2 rounded-full border border-[rgba(204,144,92,0.2)] bg-[rgba(204,144,92,0.07)] px-3 py-1.5 text-xs font-medium text-[rgb(220,155,99)]">
               <WandSparkles className="size-3.5" />
-              Hotel Lobby preset · MiniMax H3
+              Hotel Lobby preset · Kling O3
             </div>
 
             <h1 className="mx-auto max-w-4xl text-[34px] leading-[1.08] font-bold tracking-[-1.4px] sm:text-[44px] md:text-[56px]">
@@ -317,7 +317,7 @@ function HotelLobbyAiPage() {
                 {
                   icon: Sparkles,
                   title: '2. Press generate',
-                  text: 'The Hotel Lobby performance is already loaded. Pick a resolution; the duration is taken from the reference video automatically.',
+                  text: 'The Hotel Lobby performance is already loaded. The duration is taken from the reference video automatically.',
                 },
                 {
                   icon: Film,
@@ -403,7 +403,7 @@ function HotelLobbyAiPage() {
                       ],
                       [
                         'Default output',
-                        '480P · 16:9 · reference length',
+                        '16:9 · reference length',
                         'Up to 1080p · source-driven',
                       ],
                       [

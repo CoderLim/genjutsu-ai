@@ -32,7 +32,7 @@ async function getFfmpeg() {
 }
 
 /**
- * Trim a remote/local video to an MP4 clip for Fal MiniMax H3.
+ * Trim a remote/local video to an MP4 clip for Fal video models.
  * Prefers stream-copy; falls back to re-encode if copy fails.
  */
 export async function trimVideoToFile(params: {

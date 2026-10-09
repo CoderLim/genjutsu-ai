@@ -22,11 +22,7 @@ import {
 } from '@/modules/genjutsu/pricing';
 import { estimateSeedanceProviderCost } from '@/modules/genjutsu/seedance';
 import { HOTEL_LOBBY_SCENE } from '@/modules/hotel-lobby/billing';
-import {
-  estimateHotelLobbyCredits,
-  HOTEL_LOBBY_RESOLUTIONS,
-  type HotelLobbyResolution,
-} from '@/modules/hotel-lobby/pricing';
+import { estimateHotelLobbyCredits } from '@/modules/hotel-lobby/pricing';
 import { hasPermission } from '@/modules/rbac/service';
 import { respErr, respPage } from '@/lib/resp';
 
@@ -82,13 +78,6 @@ function isBillableResolution(
  * Best-effort credit estimate for admin display — mirrors GeneratorPanel /
  * generate.ts list-rate fallback when the task never reached reservation.
  */
-function isHotelLobbyResolution(value: unknown): value is HotelLobbyResolution {
-  return (
-    typeof value === 'string' &&
-    (HOTEL_LOBBY_RESOLUTIONS as readonly string[]).includes(value)
-  );
-}
-
 function isChuttamalleResolution(
   value: unknown
 ): value is ChuttamalleResolution {
@@ -125,17 +114,12 @@ function resolveEstimatedCredits(input: {
   }
 
   if (input.scene === HOTEL_LOBBY_SCENE) {
-    if (
-      !isHotelLobbyResolution(input.resolution) ||
-      input.duration == null ||
-      !Number.isInteger(input.duration)
-    ) {
+    if (input.duration == null || !Number.isInteger(input.duration)) {
       return null;
     }
     try {
       return estimateHotelLobbyCredits({
         duration: input.duration,
-        resolution: input.resolution,
         imageCount: Math.max(1, input.imageCount),
       });
     } catch {

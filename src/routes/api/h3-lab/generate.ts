@@ -12,19 +12,19 @@ import {
   reserveHotelLobbyGeneration,
 } from '@/modules/hotel-lobby/billing';
 import {
-  assertHotelLobbyDuration,
+  assertH3LabDuration,
   estimateH3LabCredits,
   estimateH3LabProviderCost,
+  H3_LAB_MODEL,
   H3_MAX_PROMPT_LENGTH,
   H3_MAX_REFERENCE_IMAGES,
   HOTEL_LOBBY_ASPECT_RATIOS,
-  HOTEL_LOBBY_MODEL,
   HOTEL_LOBBY_RESOLUTIONS,
   type HotelLobbyAspectRatio,
   type HotelLobbyResolution,
 } from '@/modules/hotel-lobby/pricing';
 import {
-  submitHotelLobby,
+  submitH3Lab,
   type HotelLobbyPromptExpansionMode,
 } from '@/modules/hotel-lobby/service';
 import {
@@ -184,7 +184,7 @@ async function POST({ request }: { request: Request }) {
         });
       }
       const rounded = Math.round(durationOverride);
-      assertHotelLobbyDuration(rounded);
+      assertH3LabDuration(rounded);
       duration = rounded;
     } else {
       duration = await probeHotelLobbyDurationSeconds(providerInput.videoUrl, {
@@ -193,6 +193,7 @@ async function POST({ request }: { request: Request }) {
             ? durationOverride
             : undefined,
       });
+      assertH3LabDuration(duration);
     }
 
     const providerCostUsd = estimateH3LabProviderCost({
@@ -210,7 +211,7 @@ async function POST({ request }: { request: Request }) {
       generationId,
       userId,
       userEmail: session.user.email,
-      model: HOTEL_LOBBY_MODEL,
+      model: H3_LAB_MODEL,
       prompt,
       duration,
       resolution,
@@ -236,7 +237,7 @@ async function POST({ request }: { request: Request }) {
     }
 
     try {
-      const result = await submitHotelLobby({
+      const result = await submitH3Lab({
         prompt,
         duration,
         resolution,

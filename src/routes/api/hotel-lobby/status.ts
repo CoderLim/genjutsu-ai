@@ -101,14 +101,17 @@ async function GET({ request }: { request: Request }) {
       });
     }
 
-    const provider = await getHotelLobbyProviderStatus(task.taskId);
+    const provider = await getHotelLobbyProviderStatus(
+      task.taskId,
+      typeof task.model === 'string' && task.model ? task.model : undefined
+    );
 
     if (provider.status === 'failed') {
       const refunded = await refundHotelLobbyGeneration({
         generationId,
         userId: session.user.id,
         providerStatus: provider.providerStatus,
-        error: provider.error || 'MiniMax H3 generation failed',
+        error: provider.error || 'Video generation failed',
       });
       const refundedParsed = refunded
         ? parseHotelLobbyTask(refunded)
@@ -121,7 +124,7 @@ async function GET({ request }: { request: Request }) {
         error:
           refundedParsed.result?.error ||
           provider.error ||
-          'MiniMax H3 generation failed',
+          'Video generation failed',
         refundedCredits: task.costCredits || 0,
       });
     }
