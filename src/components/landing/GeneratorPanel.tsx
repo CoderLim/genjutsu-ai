@@ -1231,7 +1231,8 @@ export function GeneratorPanel({
       let delayMs = 1_500;
       let notFoundCount = 0;
 
-      for (let attempt = 0; attempt < 90; attempt += 1) {
+      // 364 attempts × backoff 1.5s → 5s ≈ 30 min.
+      for (let attempt = 0; attempt < 364; attempt += 1) {
         await sleep(delayMs);
         if (generationRunRef.current !== runId) return;
 
@@ -1793,9 +1794,7 @@ export function GeneratorPanel({
 
           <div className="ml-auto flex w-full items-center justify-end gap-2 sm:w-auto">
             {estimatedCredits != null ? (
-              <div
-                className="flex shrink-0 items-center gap-1 text-[12px] tabular-nums text-white/50"
-              >
+              <div className="flex shrink-0 items-center gap-1 text-[12px] text-white/50 tabular-nums">
                 <span>
                   {m['genjutsu.estimate.credits']({
                     count: estimatedCredits.toLocaleString(),
