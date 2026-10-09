@@ -5,6 +5,7 @@ import {
   calculateGenjutsuCredits,
   canSeeSmokeCreditPack,
   estimateGenjutsuCredits,
+  estimateGenjutsuCreditsForProvider,
   estimateGenjutsuListCost,
   estimateSeedanceCredits,
   GENJUTSU_CREDIT_PACKS,
@@ -137,6 +138,26 @@ test('credit gate supports the internal smoke pack and does not under-sell large
     }),
     null
   );
+});
+
+test('display estimator tracks selected server provider', () => {
+  const input = { durationSeconds: 4.1, resolution: '720p' as const };
+  assert.equal(
+    estimateGenjutsuCreditsForProvider({ ...input, provider: 'higgsfield' }),
+    estimateGenjutsuCredits(input)
+  );
+  assert.equal(
+    estimateGenjutsuCreditsForProvider({ ...input, provider: 'seedance' }),
+    estimateSeedanceCredits(input)
+  );
+  assert.equal(
+    estimateGenjutsuCreditsForProvider({
+      ...input,
+      provider: 'seedance-volcengine',
+    }),
+    estimateSeedanceCredits(input)
+  );
+  assert.notEqual(estimateGenjutsuCredits(input), estimateSeedanceCredits(input));
 });
 
 test('Seedance early-gate estimate matches the server customer quote without whole-second rounding', () => {
