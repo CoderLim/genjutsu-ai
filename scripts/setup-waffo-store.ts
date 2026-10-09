@@ -170,6 +170,30 @@ async function main() {
       : Environment.Test;
   const environmentName =
     waffoEnvironment === Environment.Prod ? 'prod' : 'test';
+  // V2 changed the USD prices for existing internal starter/creator/studio
+  // IDs. A successful checkout-session probe does NOT verify remote pricing.
+  // Never silently reuse V1 Waffo products under V2 catalog IDs.
+  const isV2Pricing =
+    pricingCatalog.starter?.priceInCents === 1499 &&
+    pricingCatalog.creator?.priceInCents === 4999 &&
+    pricingCatalog.studio?.priceInCents === 9999;
+  const v2PublicIds = new Set(['starter', 'creator', 'studio']);
+  const recreateV2 = process.env.WAFFO_RECREATE_V2_PRODUCTS === 'true';
+  const v2ProductsVerified =
+    process.env.WAFFO_V2_PRODUCTS_VERIFIED === 'true';
+
+  // Product mappings in DB settings affect LIVE checkout even before a code
+  // deployment. Require an explicit cutover acknowledgement in production.
+  if (
+    isV2Pricing &&
+    environmentName === 'prod' &&
+    process.env.WAFFO_CONFIRM_V2_PROD_CUTOVER !== 'true'
+  ) {
+    throw new Error(
+      'V2 production mapping is protected. Deploy/test the V2 snapshot-based checkout first, then set WAFFO_CONFIRM_V2_PROD_CUTOVER=true for the intentional cutover.'
+    );
+  }
+
   const client = new WaffoPancake({
     merchantId,
     privateKey,
@@ -197,30 +221,6 @@ async function main() {
     previousMapping = JSON.parse(process.env.WAFFO_PRODUCT_IDS_MAPPING || '{}');
   } catch {
     previousMapping = {};
-  }
-
-  // V2 changed the USD prices for existing internal starter/creator/studio
-  // IDs. A successful checkout-session probe does NOT verify remote pricing.
-  // Never silently reuse V1 Waffo products under V2 catalog IDs.
-  const isV2Pricing =
-    pricingCatalog.starter?.priceInCents === 1499 &&
-    pricingCatalog.creator?.priceInCents === 4999 &&
-    pricingCatalog.studio?.priceInCents === 9999;
-  const v2PublicIds = new Set(['starter', 'creator', 'studio']);
-  const recreateV2 = process.env.WAFFO_RECREATE_V2_PRODUCTS === 'true';
-  const v2ProductsVerified =
-    process.env.WAFFO_V2_PRODUCTS_VERIFIED === 'true';
-
-  // Product mappings in DB settings affect LIVE checkout even before a code
-  // deployment. Require an explicit cutover acknowledgement in production.
-  if (
-    isV2Pricing &&
-    environmentName === 'prod' &&
-    process.env.WAFFO_CONFIRM_V2_PROD_CUTOVER !== 'true'
-  ) {
-    throw new Error(
-      'V2 production mapping is protected. Deploy/test the V2 snapshot-based checkout first, then set WAFFO_CONFIRM_V2_PROD_CUTOVER=true for the intentional cutover.'
-    );
   }
 
   // Rebuild from the current catalog and retire the old Pro checkout mapping.
