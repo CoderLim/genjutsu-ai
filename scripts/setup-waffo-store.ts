@@ -6,7 +6,7 @@
  *   - One Store per product app (do NOT reuse another app's STO_*)
  *   - Merchant + private key can be shared across apps
  *   - Test vs prod product IDs differ — WAFFO_ENVIRONMENT selects the target
- *   - Prices live on the Waffo product (currency from catalog product.currency)
+ *   - New V2 products use catalog prices; per-session checkout priceSnapshot also enforces the local order amount
  *   - checkout maps via WAFFO_PRODUCT_IDS_MAPPING
  *   - Verify/create use the catalog currency (USD/CNY/…) — do not hardcode USD
  *   - Webhook: {APP_URL}/api/payment/notify/waffo (HTTPS public URL required)
@@ -15,7 +15,8 @@
  *   pnpm exec tsx scripts/with-env.ts "pnpm exec tsx scripts/setup-waffo-store.ts"
  *
  * Env required: WAFFO_MERCHANT_ID, WAFFO_PRIVATE_KEY
- * Optional: WAFFO_STORE_ID (reuse), WAFFO_PRODUCT_IDS_MAPPING (skip existing)
+ * Optional: WAFFO_STORE_ID (reuse), WAFFO_PRODUCT_IDS_MAPPING (non-V2 products)
+ * V2 public products require WAFFO_RECREATE_V2_PRODUCTS=true when provisioning.
  *
  * The generated mapping is written to .env.development and, when the app
  * database is configured, synchronized to DB-backed Admin settings because DB
@@ -81,7 +82,7 @@ function mapBillingPeriod(
   }
 }
 
-async function verifyCheckout(
+async function verifyCheckoutAvailable(
   client: WaffoPancake,
   productId: string,
   currency: string
@@ -179,8 +180,6 @@ async function main() {
     pricingCatalog.studio?.priceInCents === 9999;
   const v2PublicIds = new Set(['starter', 'creator', 'studio']);
   const recreateV2 = process.env.WAFFO_RECREATE_V2_PRODUCTS === 'true';
-  const v2ProductsVerified =
-    process.env.WAFFO_V2_PRODUCTS_VERIFIED === 'true';
 
   // Product mappings in DB settings affect LIVE checkout even before a code
   // deployment. Require an explicit cutover acknowledgement in production.
@@ -223,6 +222,14 @@ async function main() {
     previousMapping = {};
   }
 
+  // V2 always uses new public product IDs; a session availability check cannot
+  // validate an existing remote product price. Require explicit provisioning.
+  if (isV2Pricing && !recreateV2) {
+    throw new Error(
+      'V2 requires WAFFO_RECREATE_V2_PRODUCTS=true to provision new priced public SKUs. Existing product IDs cannot bypass price verification.'
+    );
+  }
+
   // Rebuild from the current catalog and retire the old Pro checkout mapping.
   const mapping: Record<string, string> = {};
 
@@ -232,15 +239,10 @@ async function main() {
     const currency = (product.currency || 'usd').toUpperCase();
 
     const v2Pack = isV2Pricing && v2PublicIds.has(catalogId);
-    if (v2Pack && existingId && !recreateV2 && !v2ProductsVerified) {
-      throw new Error(
-        `Cannot reuse potentially V1-priced Waffo product for ${catalogId}. Run the V2 migration with WAFFO_RECREATE_V2_PRODUCTS=true to create new products, or explicitly verify each new price before setting WAFFO_V2_PRODUCTS_VERIFIED=true.`
-      );
-    }
     if (
       existingId &&
-      !(v2Pack && recreateV2) &&
-      (await verifyCheckout(client, existingId, currency))
+      !v2Pack &&
+      (await verifyCheckoutAvailable(client, existingId, currency))
     ) {
       console.log(`✓ ${catalogId} existing checkout works -> ${existingId}`);
       mapping[catalogId] = existingId;
@@ -260,6 +262,7 @@ async function main() {
     console.log(`Creating ${catalogId} (${product.type}, ${currency})...`);
 
     let productId: string;
+    let createdPublicPrices: Prices | undefined;
     if (product.type === PaymentType.SUBSCRIPTION) {
       const { product: created } = await client.subscriptionProducts.create({
         storeId,
@@ -279,13 +282,27 @@ async function main() {
         metadata: { catalogId, app: STORE_NAME },
       });
       productId = created.id;
+      createdPublicPrices = created.prices;
     }
 
-    const ok = await verifyCheckout(client, productId, currency);
-    console.log(`  -> ${productId} (test checkout: ${ok ? 'ok' : 'FAILED'})`);
+    // Product creation returns its persisted prices. Reject a missing,
+    // differently-currencied or differently-priced V2 response before mapping.
+    if (v2Pack) {
+      const actual = createdPublicPrices?.[currency]?.amount;
+      const expected = centsToAmount(product.priceInCents);
+      if (actual !== expected) {
+        throw new Error(
+          `Waffo V2 price mismatch for ${catalogId}: expected ${currency} ${expected}, returned ${String(actual)}. Mapping was not published.`
+        );
+      }
+      console.log(`✓ ${catalogId} created with verified response price ${currency} ${expected}`);
+    }
+
+    const ok = await verifyCheckoutAvailable(client, productId, currency);
+    console.log(`  -> ${productId} (checkout availability: ${ok ? 'ok' : 'FAILED'})`);
     if (!ok) {
       throw new Error(
-        `Created ${productId} but test checkout failed — check Waffo Dashboard Test mode`
+        `Created ${productId} but checkout availability failed — inspect Waffo environment and product status`
       );
     }
     mapping[catalogId] = productId;
@@ -293,7 +310,6 @@ async function main() {
 
   const mappingJson = JSON.stringify(mapping);
   upsertEnv('WAFFO_PRODUCT_IDS_MAPPING', mappingJson);
-  if (isV2Pricing) upsertEnv('WAFFO_V2_PRODUCTS_VERIFIED', 'true');
   upsertEnv('WAFFO_ENABLED', 'true');
   upsertEnv('DEFAULT_PAYMENT_PROVIDER', 'waffo');
   upsertEnv('WAFFO_ENVIRONMENT', environmentName);
