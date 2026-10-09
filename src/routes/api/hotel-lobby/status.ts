@@ -1,14 +1,12 @@
 import { createFileRoute } from '@tanstack/react-router';
 
-import { FAL_QUERY_PERMANENT_ERROR_THRESHOLD } from '@/core/ai';
 import { getAuth } from '@/core/auth';
 import {
+  applyHotelLobbyProviderQueryError,
   assertHotelLobbyGenerationId,
   clearHotelLobbyProviderQueryErrors,
   getHotelLobbyTaskById,
-  markHotelLobbyProviderQueryUnresolved,
   parseHotelLobbyTask,
-  recordHotelLobbyProviderQueryError,
   refundHotelLobbyGeneration,
   settleHotelLobbyGeneration,
 } from '@/modules/hotel-lobby/billing';
@@ -111,7 +109,7 @@ async function GET({ request }: { request: Request }) {
     );
 
     if (provider.status === 'unresolved') {
-      const errorCount = await recordHotelLobbyProviderQueryError({
+      const outcome = await applyHotelLobbyProviderQueryError({
         generationId,
         userId: session.user.id,
         providerStatus: provider.providerStatus,
@@ -120,10 +118,10 @@ async function GET({ request }: { request: Request }) {
           'Provider status lookup failed permanently. Credits remain reserved.',
       });
 
-      if (errorCount < FAL_QUERY_PERMANENT_ERROR_THRESHOLD) {
+      if (!outcome.unresolved) {
         console.warn('hotel-lobby provider query error (retrying):', {
           generationId,
-          errorCount,
+          errorCount: outcome.count,
           providerStatus: provider.providerStatus,
           error: provider.error,
         });
@@ -135,20 +133,17 @@ async function GET({ request }: { request: Request }) {
         });
       }
 
-      console.error('hotel-lobby provider query unresolved:', {
-        generationId,
-        errorCount,
-        providerStatus: provider.providerStatus,
-        error: provider.error,
-      });
-      await markHotelLobbyProviderQueryUnresolved({
-        generationId,
-        userId: session.user.id,
-        providerStatus: provider.providerStatus,
-        error:
-          provider.error ||
-          'Provider status lookup failed permanently. Credits remain reserved.',
-      });
+      console.error(
+        '[ops] hotel-lobby provider query unresolved credits_held',
+        {
+          generationId,
+          userId: session.user.id,
+          errorCount: outcome.count,
+          providerStatus: provider.providerStatus,
+          error: provider.error,
+          reservedCredits: task.costCredits || 0,
+        }
+      );
       return respData({
         status: 'failed',
         providerStatus: 'submission_unknown',

@@ -894,6 +894,7 @@
   "admin.generations.mode": "Mode / Resolution",
   "admin.generations.provider": "Provider / Model",
   "admin.generations.status": "Status",
+  "admin.generations.submission_unknown_hint": "Credits stay reserved with no Fal request to poll. Check logs / Fal dashboard, then refund or settle manually.",
   "admin.generations.cost": "Credits / Cost",
   "admin.generations.duration": "Source Duration",
   "admin.generations.created_at": "Created At",

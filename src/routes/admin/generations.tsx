@@ -825,6 +825,11 @@ function GenerationsPage() {
                       {detail.status}
                     </Badge>
                   </div>
+                  {detail.status === 'submission_unknown' ? (
+                    <div className="text-destructive mt-1 text-xs">
+                      {m['admin.generations.submission_unknown_hint']()}
+                    </div>
+                  ) : null}
                   <div className="text-muted-foreground mt-1 text-xs">
                     stage: {detail.attemptStage || '—'}
                   </div>

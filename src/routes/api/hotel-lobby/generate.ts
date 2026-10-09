@@ -220,6 +220,12 @@ async function POST({ request }: { request: Request }) {
         );
       }
 
+      console.error('[ops] hotel-lobby submission_unknown credits_held', {
+        generationId,
+        userId,
+        error: message,
+        hasRequestId: false,
+      });
       await markHotelLobbySubmissionUnknown({
         generationId,
         userId,

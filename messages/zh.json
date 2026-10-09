@@ -894,6 +894,7 @@
   "admin.generations.mode": "模式 / 分辨率",
   "admin.generations.provider": "Provider / 模型",
   "admin.generations.status": "状态",
+  "admin.generations.submission_unknown_hint": "积分仍被预扣且没有可轮询的 Fal requestId。请查看日志 / Fal 控制台后人工退款或结清。",
   "admin.generations.cost": "积分 / 成本",
   "admin.generations.duration": "源视频时长",
   "admin.generations.created_at": "创建时间",

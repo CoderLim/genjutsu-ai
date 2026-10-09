@@ -225,6 +225,12 @@ async function POST({ request }: { request: Request }) {
         );
       }
 
+      console.error('[ops] chuttamalle submission_unknown credits_held', {
+        generationId,
+        userId,
+        error: message,
+        hasRequestId: false,
+      });
       await markChuttamalleSubmissionUnknown({
         generationId,
         userId,

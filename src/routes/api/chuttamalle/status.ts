@@ -1,14 +1,12 @@
 import { createFileRoute } from '@tanstack/react-router';
 
-import { FAL_QUERY_PERMANENT_ERROR_THRESHOLD } from '@/core/ai';
 import { getAuth } from '@/core/auth';
 import {
+  applyChuttamalleProviderQueryError,
   assertChuttamalleGenerationId,
   clearChuttamalleProviderQueryErrors,
   getChuttamalleTaskById,
-  markChuttamalleProviderQueryUnresolved,
   parseChuttamalleTask,
-  recordChuttamalleProviderQueryError,
   refundChuttamalleGeneration,
   settleChuttamalleGeneration,
 } from '@/modules/chuttamalle/billing';
@@ -108,7 +106,7 @@ async function GET({ request }: { request: Request }) {
     const provider = await getChuttamalleProviderStatus(task.taskId);
 
     if (provider.status === 'unresolved') {
-      const errorCount = await recordChuttamalleProviderQueryError({
+      const outcome = await applyChuttamalleProviderQueryError({
         generationId,
         userId: session.user.id,
         providerStatus: provider.providerStatus,
@@ -117,10 +115,10 @@ async function GET({ request }: { request: Request }) {
           'Provider status lookup failed permanently. Credits remain reserved.',
       });
 
-      if (errorCount < FAL_QUERY_PERMANENT_ERROR_THRESHOLD) {
+      if (!outcome.unresolved) {
         console.warn('chuttamalle provider query error (retrying):', {
           generationId,
-          errorCount,
+          errorCount: outcome.count,
           providerStatus: provider.providerStatus,
           error: provider.error,
         });
@@ -132,20 +130,17 @@ async function GET({ request }: { request: Request }) {
         });
       }
 
-      console.error('chuttamalle provider query unresolved:', {
-        generationId,
-        errorCount,
-        providerStatus: provider.providerStatus,
-        error: provider.error,
-      });
-      await markChuttamalleProviderQueryUnresolved({
-        generationId,
-        userId: session.user.id,
-        providerStatus: provider.providerStatus,
-        error:
-          provider.error ||
-          'Provider status lookup failed permanently. Credits remain reserved.',
-      });
+      console.error(
+        '[ops] chuttamalle provider query unresolved credits_held',
+        {
+          generationId,
+          userId: session.user.id,
+          errorCount: outcome.count,
+          providerStatus: provider.providerStatus,
+          error: provider.error,
+          reservedCredits: task.costCredits || 0,
+        }
+      );
       return respData({
         status: 'failed',
         providerStatus: 'submission_unknown',

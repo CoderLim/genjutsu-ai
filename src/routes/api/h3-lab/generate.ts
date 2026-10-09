@@ -283,6 +283,12 @@ async function POST({ request }: { request: Request }) {
         );
       }
 
+      console.error('[ops] h3-lab submission_unknown credits_held', {
+        generationId,
+        userId,
+        error: message,
+        hasRequestId: false,
+      });
       await markHotelLobbySubmissionUnknown({
         generationId,
         userId,
