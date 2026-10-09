@@ -21,6 +21,7 @@ import {
 } from '@/modules/genjutsu/e2e-mock';
 import { calculateGenjutsuCredits } from '@/modules/genjutsu/pricing';
 import {
+  isUncertainProviderHttpStatus,
   logGenjutsuProviderFailure,
   providerFailureDebugFields,
   splitProviderFailureError,
@@ -428,6 +429,29 @@ async function POST({ request }: { request: Request }) {
           providerCode: failure.providerCode,
           providerError: failure.providerError,
         });
+
+        // 5xx/408/429: provider may have accepted the job. Keep credits held.
+        if (isUncertainProviderHttpStatus(error.status)) {
+          await markGenjutsuSubmissionUnknown({
+            generationId,
+            userId: session.user.id,
+            error: failure.error,
+          });
+          return respJson(
+            -1,
+            'Generation submission result is uncertain. Credits remain reserved; do not retry this generation.',
+            {
+              code: 'SUBMISSION_UNKNOWN',
+              generationId,
+              ...providerFailureDebugFields({
+                providerError: failure.providerError,
+                providerCode: failure.providerCode,
+              }),
+            },
+            { status: 502 }
+          );
+        }
+
         await refundGenjutsuGeneration({
           generationId,
           userId: session.user.id,
@@ -449,7 +473,7 @@ async function POST({ request }: { request: Request }) {
               providerCode: failure.providerCode,
             }),
           },
-          { status: error.status >= 400 && error.status < 500 ? 400 : 502 }
+          { status: 400 }
         );
       }
 

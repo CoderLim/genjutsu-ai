@@ -11,6 +11,7 @@ import {
 } from '@/modules/genjutsu/billing';
 import {
   createGenjutsuE2EUploadDescriptor,
+  ensureGenjutsuE2ETemplateObject,
   isGenjutsuE2EMockEnabled,
 } from '@/modules/genjutsu/e2e-mock';
 import { getGenjutsuModel } from '@/modules/genjutsu/service';
@@ -21,6 +22,7 @@ import {
   ensureZombieHugTemplateInR2,
   GENJUTSU_PROXY_UPLOAD_MAX_BYTES,
   getGenjutsuInputKey,
+  getZombieHugTemplateVideoKey,
 } from '@/modules/genjutsu/storage';
 import {
   ZOMBIE_HUG_IMAGE_COUNT,
@@ -79,9 +81,13 @@ async function POST({ request }: { request: Request }) {
     }
 
     // Fail before the user uploads photos when the shared motion template is
-    // missing from R2 (Workers cannot seed it from the public/ folder).
+    // missing. E2E mock seeds an in-memory object; real deploys need R2.
     try {
-      await ensureZombieHugTemplateInR2();
+      if (isGenjutsuE2EMockEnabled()) {
+        ensureGenjutsuE2ETemplateObject(getZombieHugTemplateVideoKey());
+      } else {
+        await ensureZombieHugTemplateInR2();
+      }
     } catch (error: any) {
       return respJson(
         -1,

@@ -936,6 +936,9 @@ export async function reserveGenjutsuCredits(params: {
       return { task: null, insufficient: true };
     }
 
+    // Preserve preset metadata (e.g. zombie-hug useDefaultTemplate) so retries
+    // after reservation still pass scene-specific generate guards.
+    const previousOptions = parseTaskOptions(insideExisting || {}) || {};
     const task = {
       id: params.generationId,
       userId: params.userId,
@@ -944,6 +947,7 @@ export async function reserveGenjutsuCredits(params: {
       model: params.model,
       prompt: params.prompt,
       options: JSON.stringify({
+        ...previousOptions,
         mode: params.mode,
         resolution: params.resolution,
         prompt: params.prompt,

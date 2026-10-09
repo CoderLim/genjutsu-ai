@@ -148,6 +148,36 @@ export function resolveGenjutsuE2EInputUrls(params: {
   };
 }
 
+/**
+ * Seed a shared template object in the in-memory E2E store so preset flows
+ * (e.g. zombie-hug) can seal without talking to R2.
+ */
+export function ensureGenjutsuE2ETemplateObject(templateKey: string) {
+  if (!isGenjutsuE2EMockEnabled()) {
+    throw new Error('Genjutsu E2E mock is disabled');
+  }
+  if (!templateKey.startsWith('genjutsu/')) {
+    throw new Error('E2E template key must be under genjutsu/');
+  }
+
+  cleanupExpiredUploads();
+  const existingToken = storageKeys().get(templateKey);
+  if (existingToken && store().has(existingToken)) return templateKey;
+
+  const token = getUuid();
+  const bytes = new Uint8Array([
+    0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70, 0x69, 0x73, 0x6f, 0x6d,
+    0x00, 0x00, 0x00, 0x00, 0x69, 0x73, 0x6f, 0x6d, 0x6d, 0x70, 0x34, 0x31,
+  ]);
+  store().set(token, {
+    bytes,
+    contentType: 'video/mp4',
+    createdAt: Date.now(),
+  });
+  storageKeys().set(templateKey, token);
+  return templateKey;
+}
+
 export function sealGenjutsuE2EStorageObject(
   sourceKey: string,
   destinationKey: string

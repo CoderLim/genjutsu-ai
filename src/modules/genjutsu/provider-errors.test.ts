@@ -5,6 +5,7 @@ import {
   GENJUTSU_PROVIDER_FAILED_CODE,
   GENJUTSU_PROVIDER_FAILURE_USER_MESSAGE,
   isArkRealPersonPrivacyCode,
+  isUncertainProviderHttpStatus,
   looksLikeRawProviderError,
   splitProviderFailureError,
   toUserFacingProviderError,
@@ -74,4 +75,20 @@ test('always preserves raw text for admin on provider failures', () => {
   assert.equal(split.error, GENJUTSU_PROVIDER_FAILURE_USER_MESSAGE);
   assert.equal(split.providerError, raw);
   assert.equal(split.errorCode, GENJUTSU_PROVIDER_FAILED_CODE);
+});
+
+test('treats 408 / 429 / 5xx as uncertain provider submit statuses', () => {
+  assert.equal(isUncertainProviderHttpStatus(408), true);
+  assert.equal(isUncertainProviderHttpStatus(429), true);
+  assert.equal(isUncertainProviderHttpStatus(500), true);
+  assert.equal(isUncertainProviderHttpStatus(502), true);
+  assert.equal(isUncertainProviderHttpStatus(503), true);
+});
+
+test('treats definite 4xx as refundable provider submit statuses', () => {
+  assert.equal(isUncertainProviderHttpStatus(400), false);
+  assert.equal(isUncertainProviderHttpStatus(401), false);
+  assert.equal(isUncertainProviderHttpStatus(403), false);
+  assert.equal(isUncertainProviderHttpStatus(404), false);
+  assert.equal(isUncertainProviderHttpStatus(422), false);
 });

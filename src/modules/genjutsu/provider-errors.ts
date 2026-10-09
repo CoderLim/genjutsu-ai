@@ -9,6 +9,14 @@ import {
 export const GENJUTSU_PROVIDER_FAILURE_USER_MESSAGE =
   'Generation failed. Please try again later.';
 
+/**
+ * HTTP statuses where the provider may have accepted the job even though the
+ * client saw an error. Do not auto-refund — park as submission_unknown.
+ */
+export function isUncertainProviderHttpStatus(status: number) {
+  return status === 408 || status === 429 || (status >= 500 && status <= 599);
+}
+
 export const GENJUTSU_PROVIDER_FAILED_CODE = 'PROVIDER_FAILED';
 
 /**

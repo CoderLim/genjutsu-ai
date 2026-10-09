@@ -19,6 +19,10 @@ const childEnv = {
   AUTH_URL: baseUrl,
   AUTH_SECRET: process.env.AUTH_SECRET || `${randomUUID()}${randomUUID()}`,
   GENJUTSU_E2E_MOCK: 'true',
+  // Isolate from local Seedance/Volcengine prefs in .env.development —
+  // this smoke path exercises the Higgsfield mock + sealed R2/E2E store.
+  GENJUTSU_MOTION_PROVIDER: 'higgsfield',
+  GENJUTSU_OBJECT_SWAP_PROVIDER: 'higgsfield',
 };
 
 function cleanDb() {
@@ -174,14 +178,14 @@ async function appGet(path, cookie) {
 async function main() {
   cleanDb();
 
-  console.log('\n[1/6] Preparing isolated SQLite database...');
+  console.log('\n[1/7] Preparing isolated SQLite database...');
   run('pnpm', ['db:setup']);
   run('pnpm', ['db:push']);
 
-  console.log('\n[2/6] Compiling locale assets...');
+  console.log('\n[2/7] Compiling locale assets...');
   run('pnpm', ['predev']);
 
-  console.log(`\n[3/6] Starting E2E server on ${baseUrl}...`);
+  console.log(`\n[3/7] Starting E2E server on ${baseUrl}...`);
   const server = spawn(
     'pnpm',
     ['exec', 'vite', 'dev', '--host', '127.0.0.1', '--port', String(port)],
@@ -199,11 +203,11 @@ async function main() {
   try {
     await waitForServer();
 
-    console.log('\n[4/6] Creating an authenticated E2E user...');
+    console.log('\n[4/7] Creating an authenticated E2E user...');
     const { cookie, email } = await ensureSession();
     await seedSmokeTestCredits(cookie, email);
 
-    console.log('\n[5/6] Uploading source media through the app upload API...');
+    console.log('\n[5/7] Uploading source media through the app upload API...');
     const generationId = `e2e-${randomUUID()}`;
     const videoBytes = Buffer.from('genjutsu-e2e-source-video');
     const imageBytes = Buffer.from(
@@ -371,7 +375,7 @@ async function main() {
     );
 
     console.log(
-      '\n[6/6] Running Generate → Status → sealed source-video result...'
+      '\n[6/7] Running Generate → Status → sealed source-video result...'
     );
     const started = await appPost('/api/genjutsu/generate', cookie, {
       generationId,
@@ -423,12 +427,67 @@ async function main() {
     const returned = Buffer.from(await resultResponse.arrayBuffer());
     assert.deepEqual(returned, videoBytes.subarray(0, 10));
 
+    console.log(
+      '\n[7/7] Zombie-hug preset: two photos + mock template → generate...'
+    );
+    await sleep(1_100);
+    const zombieGenerationId = `e2e-zombie-${randomUUID()}`;
+    const zombieUpload = await appPost('/api/zombie-hug/upload-url', cookie, {
+      generationId: zombieGenerationId,
+      contentTypes: ['image/png', 'image/png'],
+      contentLengths: [imageBytes.byteLength, imageBytes.byteLength],
+    });
+    assert.equal(zombieUpload.uploads.length, 2);
+    assert.ok(
+      zombieUpload.uploads.every((item) =>
+        /\/reference-0[12]\.png$/.test(item.storageKey)
+      ),
+      'zombie-hug should stage two image keys (template is index 0)'
+    );
+
+    for (const upload of [...zombieUpload.uploads].sort(
+      (a, b) => a.index - b.index
+    )) {
+      const response = await fetch(upload.uploadUrl, {
+        method: 'PUT',
+        headers: {
+          ...(upload.uploadHeaders || {}),
+          'Content-Type': 'image/png',
+        },
+        body: imageBytes,
+      });
+      assert.ok(
+        response.ok,
+        `zombie-hug mock upload failed: HTTP ${response.status}`
+      );
+    }
+
+    const zombieStarted = await appPost('/api/zombie-hug/generate', cookie, {
+      generationId: zombieGenerationId,
+    });
+    assert.equal(zombieStarted.generationId, zombieGenerationId);
+    assert.ok(zombieStarted.reservedCredits > 0);
+
+    await sleep(1_100);
+    const zombieCompleted = await appGet(
+      `/api/genjutsu/status?generationId=${encodeURIComponent(zombieGenerationId)}`,
+      cookie
+    );
+    assert.equal(zombieCompleted.status, 'completed');
+    assert.equal(
+      zombieCompleted.videoUrl,
+      `/api/genjutsu/result/${encodeURIComponent(zombieGenerationId)}`
+    );
+
     console.log('\n✅ Genjutsu E2E passed');
     console.log(
       '   auth → persisted attempt → staging upload → immutable seal →'
     );
     console.log(
       '   credit reserve → mock provider submit → durable result URL'
+    );
+    console.log(
+      '   zombie-hug: mock template seed → two-image upload → generate'
     );
   } finally {
     stop();

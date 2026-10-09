@@ -16,12 +16,14 @@ import {
   reserveGenjutsuCredits,
 } from '@/modules/genjutsu/billing';
 import {
+  ensureGenjutsuE2ETemplateObject,
   isGenjutsuE2EMockEnabled,
   resolveGenjutsuE2EInputUrls,
   sealGenjutsuE2EStorageObject,
 } from '@/modules/genjutsu/e2e-mock';
 import { calculateGenjutsuCredits } from '@/modules/genjutsu/pricing';
 import {
+  isUncertainProviderHttpStatus,
   logGenjutsuProviderFailure,
   providerFailureDebugFields,
   splitProviderFailureError,
@@ -186,7 +188,11 @@ async function POST({ request }: { request: Request }) {
 
     if (task.status === 'initiated') {
       try {
-        await ensureZombieHugTemplateInR2();
+        if (isGenjutsuE2EMockEnabled()) {
+          ensureGenjutsuE2ETemplateObject(getZombieHugTemplateVideoKey());
+        } else {
+          await ensureZombieHugTemplateInR2();
+        }
       } catch (error: any) {
         await markGenjutsuAttemptFailedPreflight({
           generationId,
@@ -410,6 +416,29 @@ async function POST({ request }: { request: Request }) {
           providerCode: failure.providerCode,
           providerError: failure.providerError,
         });
+
+        // 5xx/408/429: provider may have accepted the job. Keep credits.
+        if (isUncertainProviderHttpStatus(error.status)) {
+          await markGenjutsuSubmissionUnknown({
+            generationId,
+            userId: session.user.id,
+            error: failure.error,
+          });
+          return respJson(
+            -1,
+            'Generation submission result is uncertain. Credits remain reserved; do not retry this generation.',
+            {
+              code: 'SUBMISSION_UNKNOWN',
+              generationId,
+              ...providerFailureDebugFields({
+                providerError: failure.providerError,
+                providerCode: failure.providerCode,
+              }),
+            },
+            { status: 502 }
+          );
+        }
+
         await refundGenjutsuGeneration({
           generationId,
           userId: session.user.id,
@@ -431,7 +460,7 @@ async function POST({ request }: { request: Request }) {
               providerCode: failure.providerCode,
             }),
           },
-          { status: error.status >= 400 && error.status < 500 ? 400 : 502 }
+          { status: 400 }
         );
       }
 

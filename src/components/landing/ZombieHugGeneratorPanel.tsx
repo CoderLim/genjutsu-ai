@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -52,10 +53,24 @@ type GenerationPoll = {
   error?: string;
   reservedCredits?: number;
   refundedCredits?: number;
+  requiredCredits?: number;
+  balance?: number;
+  errorCode?: string;
+};
+
+type PersistedGeneration = {
+  userId: string;
+  generationId: string;
+  reservedCredits: number;
 };
 
 const TEMPLATE_URL = '/api/zombie-hug/template';
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
+const activeGenerationKey = (userId: string) =>
+  `zombie_hug_active_generation:${userId}`;
+
+const sleep = (ms: number) =>
+  new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 function createMediaItem(file: File): MediaItem {
   return {
@@ -144,11 +159,12 @@ export function ZombieHugGeneratorPanel() {
   const [lovedOneImage, setLovedOneImage] = useState<MediaItem | null>(null);
   const [templateUrl, setTemplateUrl] = useState(TEMPLATE_URL);
   const [phase, setPhase] = useState<
-    'idle' | 'uploading' | 'starting' | 'generating' | 'saving'
+    'idle' | 'uploading' | 'starting' | 'generating' | 'saving' | 'locked'
   >('idle');
   const [providerStatus, setProviderStatus] = useState('');
   const [generationId, setGenerationId] = useState<string | null>(null);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
+  const [jobError, setJobError] = useState('');
   const [creditError, setCreditError] = useState<{
     required: number;
     balance: number;
@@ -158,6 +174,7 @@ export function ZombieHugGeneratorPanel() {
   const lovedOneInputRef = useRef<HTMLInputElement>(null);
   const survivorUrlRef = useRef<string | null>(null);
   const lovedOneUrlRef = useRef<string | null>(null);
+  const generationRunRef = useRef(0);
 
   const estimatedCredits = useMemo(
     () =>
@@ -168,7 +185,12 @@ export function ZombieHugGeneratorPanel() {
     []
   );
 
-  const busy = phase !== 'idle';
+  const busy =
+    phase === 'uploading' ||
+    phase === 'starting' ||
+    phase === 'generating' ||
+    phase === 'saving' ||
+    phase === 'locked';
 
   useEffect(() => {
     survivorUrlRef.current = survivorImage?.url ?? null;
@@ -227,68 +249,187 @@ export function ZombieHugGeneratorPanel() {
     }
   };
 
-  const pollUntilComplete = async (id: string) => {
-    let consecutivePollErrors = 0;
+  const pollGeneration = useCallback(
+    async (active: PersistedGeneration, runId: number) => {
+      let delayMs = 1_500;
+      let notFoundCount = 0;
 
-    for (let attempt = 0; attempt < 240; attempt += 1) {
-      await new Promise((resolve) => setTimeout(resolve, 2_500));
+      for (let attempt = 0; attempt < 240; attempt += 1) {
+        await sleep(delayMs);
+        if (generationRunRef.current !== runId) return;
 
-      let poll: GenerationPoll;
-      try {
-        poll = await apiGet<GenerationPoll>(
-          `/api/genjutsu/status?generationId=${encodeURIComponent(id)}`
-        );
-        consecutivePollErrors = 0;
-      } catch (error) {
-        consecutivePollErrors += 1;
-        if (consecutivePollErrors < 5) continue;
-        throw error;
+        let poll: GenerationPoll;
+        try {
+          poll = await apiGet<GenerationPoll>(
+            `/api/genjutsu/status?generationId=${encodeURIComponent(active.generationId)}`
+          );
+        } catch (cause) {
+          const data =
+            cause instanceof ApiError &&
+            cause.data &&
+            typeof cause.data === 'object'
+              ? (cause.data as Record<string, unknown>)
+              : null;
+
+          if (data?.code === 'GENERATION_NOT_FOUND') {
+            notFoundCount += 1;
+            if (notFoundCount >= 15) {
+              localStorage.removeItem(activeGenerationKey(active.userId));
+              setPhase('idle');
+              setJobError(
+                'Generation was not accepted by the server. No active paid job was found.'
+              );
+              return;
+            }
+          }
+
+          // Transient status failures must not unlock Generate while a paid
+          // provider job may still be running.
+          delayMs = Math.min(5_000, Math.ceil(delayMs * 1.2));
+          continue;
+        }
+
+        notFoundCount = 0;
+        setProviderStatus(poll.providerStatus || '');
+
+        if (
+          poll.providerStatus === 'initiated' ||
+          poll.providerStatus === 'sealing' ||
+          poll.providerStatus === 'ready'
+        ) {
+          localStorage.removeItem(activeGenerationKey(active.userId));
+          setPhase('idle');
+          setJobError(
+            poll.providerStatus === 'ready'
+              ? 'Upload completed, but generation was not started. Click Generate to try again.'
+              : 'The previous upload did not finish starting a generation. Click Generate to try again.'
+          );
+          return;
+        }
+
+        if (
+          typeof poll.reservedCredits === 'number' &&
+          poll.reservedCredits > 0 &&
+          poll.reservedCredits !== active.reservedCredits
+        ) {
+          active.reservedCredits = poll.reservedCredits;
+          localStorage.setItem(
+            activeGenerationKey(active.userId),
+            JSON.stringify(active)
+          );
+        }
+
+        if (poll.providerStatus === 'submission_unknown') {
+          setPhase('locked');
+          setJobError(
+            poll.error ||
+              'The provider submission result is uncertain. This generation remains locked to avoid a duplicate charge.'
+          );
+          return;
+        }
+
+        if (poll.providerStatus === 'persisting') setPhase('saving');
+
+        if (poll.status === 'completed' && poll.videoUrl) {
+          if (generationRunRef.current !== runId) return;
+          localStorage.removeItem(activeGenerationKey(active.userId));
+          setResultUrl(poll.videoUrl);
+          setJobError('');
+          setPhase('idle');
+          await creditsQuery.refetch();
+          toast.success('Your AI zombie hug video is ready');
+          return;
+        }
+
+        if (poll.status === 'failed') {
+          localStorage.removeItem(activeGenerationKey(active.userId));
+          setPhase('idle');
+          await creditsQuery.refetch();
+
+          if (poll.providerStatus === 'insufficient_credits') {
+            const required = Number(poll.requiredCredits);
+            const balance = Number(poll.balance);
+            if (
+              Number.isFinite(required) &&
+              required > 0 &&
+              Number.isFinite(balance) &&
+              balance >= 0
+            ) {
+              setCreditError({ required, balance });
+              setJobError('');
+              return;
+            }
+          }
+
+          setJobError(poll.error || 'Generation failed');
+          toast.error(poll.error || 'Generation failed');
+          return;
+        }
+
+        delayMs = Math.min(5_000, Math.ceil(delayMs * 1.2));
       }
 
-      setProviderStatus(poll.providerStatus || '');
-      if (poll.providerStatus === 'persisting') setPhase('saving');
+      // Do not return to idle: the provider job may still be running.
+      setPhase('locked');
+      setJobError(
+        'Generation is still processing. This job remains reserved; refresh the page to resume checking it.'
+      );
+    },
+    [creditsQuery]
+  );
 
-      if (poll.status === 'completed' && poll.videoUrl) {
-        setResultUrl(poll.videoUrl);
-        setPhase('idle');
-        await creditsQuery.refetch();
-        toast.success('Your AI zombie hug video is ready');
+  useEffect(() => {
+    const userId = session?.user?.id;
+    if (!userId || phase !== 'idle') return;
+
+    try {
+      const raw = localStorage.getItem(activeGenerationKey(userId));
+      if (!raw) return;
+
+      const active = JSON.parse(raw) as PersistedGeneration;
+      if (
+        active.userId !== userId ||
+        !active.generationId ||
+        !Number.isFinite(active.reservedCredits)
+      ) {
+        localStorage.removeItem(activeGenerationKey(userId));
         return;
       }
 
-      if (poll.status === 'failed') {
-        setPhase('idle');
-        await creditsQuery.refetch();
-        throw new Error(poll.error || 'Generation failed');
-      }
+      const runId = ++generationRunRef.current;
+      setJobError('');
+      setCreditError(null);
+      setGenerationId(active.generationId);
+      setPhase('generating');
+      void pollGeneration(active, runId);
+    } catch {
+      localStorage.removeItem(activeGenerationKey(userId));
     }
-
-    throw new Error('Generation timed out. Check Creations in a few minutes.');
-  };
+  }, [pollGeneration, session?.user?.id, phase]);
 
   const generate = async () => {
     if (!session?.user) {
       window.location.href = `/sign-in?callbackUrl=${encodeURIComponent('/ai-zombie-hug#generator')}`;
       return;
     }
+    if (busy) return;
     if (!survivorImage || !lovedOneImage) {
       toast.error('Upload both photos: survivor and loved one');
       return;
     }
 
-    const balance = creditsQuery.data?.balance ?? 0;
-    if (!creditsQuery.isPending && balance < estimatedCredits) {
-      setCreditError({ required: estimatedCredits, balance });
-      return;
-    }
+    // As on the homepage, the displayed estimate is informational only.
+    // Higgsfield's server-side quote and credit reservation are authoritative.
 
     setResultUrl(null);
     setProviderStatus('');
     setCreditError(null);
+    setJobError('');
     setPhase('uploading');
 
     const id = crypto.randomUUID();
     setGenerationId(id);
+    const runId = ++generationRunRef.current;
 
     try {
       const files = [survivorImage.file, lovedOneImage.file];
@@ -319,50 +460,116 @@ export function ZombieHugGeneratorPanel() {
         });
       }
 
+      if (generationRunRef.current !== runId) return;
+
+      // Persist before the paid POST so a refresh can reconcile an already-paid
+      // job and never auto-starts a still-unpaid attempt from another click.
+      const active: PersistedGeneration = {
+        userId: session.user.id,
+        generationId: id,
+        reservedCredits: 0,
+      };
+      localStorage.setItem(
+        activeGenerationKey(session.user.id),
+        JSON.stringify(active)
+      );
+
       setPhase('starting');
       const start = await apiPost<GenerationStart>('/api/zombie-hug/generate', {
         generationId: id,
       });
 
+      active.generationId = start.generationId;
+      active.reservedCredits = start.reservedCredits || 0;
+      localStorage.setItem(
+        activeGenerationKey(session.user.id),
+        JSON.stringify(active)
+      );
+
       await creditsQuery.refetch();
 
-      if (
-        start.status === 'refunded' ||
-        start.status === 'submission_unknown'
-      ) {
-        throw new Error(
-          start.status === 'submission_unknown'
-            ? 'Submission result is uncertain. Please contact support before retrying.'
-            : 'Generation could not be started'
+      if (start.status === 'submission_unknown') {
+        setPhase('locked');
+        setJobError(
+          'Submission result is uncertain. Credits remain reserved; do not retry this generation.'
         );
+        return;
+      }
+
+      if (start.status === 'refunded') {
+        localStorage.removeItem(activeGenerationKey(session.user.id));
+        setPhase('idle');
+        throw new Error('Generation could not be started');
       }
 
       setPhase('generating');
-      await pollUntilComplete(id);
+      await pollGeneration(active, runId);
     } catch (error) {
+      if (generationRunRef.current !== runId) return;
+
       if (error instanceof ApiError) {
         const data =
           error.data && typeof error.data === 'object'
             ? (error.data as Record<string, unknown>)
             : null;
-        if (data?.code === 'INSUFFICIENT_CREDITS') {
-          setCreditError({
-            required: Number(data.requiredCredits) || estimatedCredits,
-            balance: Number(data.balance) || 0,
-          });
-          setPhase('idle');
+
+        if (data?.code === 'SUBMISSION_UNKNOWN') {
+          setPhase('locked');
+          setJobError(
+            error.message ||
+              'Submission result is uncertain. Credits remain reserved; do not retry this generation.'
+          );
           return;
         }
+
+        localStorage.removeItem(activeGenerationKey(session.user.id));
+        setPhase('idle');
+
+        if (data?.code === 'INSUFFICIENT_CREDITS') {
+          const required = Number(data.requiredCredits);
+          const balance = Number(data.balance);
+          if (
+            Number.isFinite(required) &&
+            required > 0 &&
+            Number.isFinite(balance) &&
+            balance >= 0
+          ) {
+            setCreditError({ required, balance });
+            return;
+          }
+        }
         if (data?.code === 'TEMPLATE_NOT_CONFIGURED') {
-          setPhase('idle');
           toast.error(
             error.message ||
               'Zombie hug template is not configured in storage. Contact support.'
           );
           return;
         }
+
+        toast.error(error.message || 'Generation failed to start');
+        setJobError(error.message || 'Generation failed to start');
+        return;
       }
 
+      // Network failure after the paid POST may still have reserved credits.
+      const raw = localStorage.getItem(activeGenerationKey(session.user.id));
+      if (raw) {
+        try {
+          const active = JSON.parse(raw) as PersistedGeneration;
+          if (active.generationId === id) {
+            setPhase('generating');
+            setJobError(
+              'Connection interrupted while starting. Resuming status checks for the reserved job…'
+            );
+            await pollGeneration(active, runId);
+            return;
+          }
+        } catch {
+          // fall through
+        }
+      }
+
+      localStorage.removeItem(activeGenerationKey(session.user.id));
       setPhase('idle');
       toast.error(
         error instanceof Error ? error.message : 'Generation failed to start'
@@ -381,7 +588,9 @@ export function ZombieHugGeneratorPanel() {
             : 'Generating…'
           : phase === 'saving'
             ? 'Saving your video…'
-            : 'Generate';
+            : phase === 'locked'
+              ? 'Job locked'
+              : 'Generate';
 
   return (
     <div className="mx-auto w-full max-w-[1120px]">
@@ -466,6 +675,12 @@ export function ZombieHugGeneratorPanel() {
               >
                 Buy credits
               </Link>
+            </div>
+          ) : null}
+
+          {jobError ? (
+            <div className="mb-4 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white/60">
+              {jobError}
             </div>
           ) : null}
 
