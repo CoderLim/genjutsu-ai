@@ -12,11 +12,15 @@ import {
   PaymentEventType,
   PaymentInterval,
   PaymentStatus,
+  PaymentType,
   SubscriptionCycleType,
   WebhookIgnoredError,
   type PaymentSession,
 } from './types';
-import { createWaffoProvider } from './waffo';
+import {
+  createWaffoProvider,
+  getWaffoOneTimePriceSnapshot,
+} from './waffo';
 
 const WAFFO_SUBSCRIPTION_RENEWED = 'subscription.renewed';
 const WAFFO_SUBSCRIPTION_RECOVERED = 'subscription.recovered';
@@ -70,6 +74,36 @@ function baseEvent(
     ...overrides,
   };
 }
+
+test('V2 Waffo checkout uses the local one-time order price snapshot', () => {
+  const forPrice = (amount: number, currency = 'usd') =>
+    getWaffoOneTimePriceSnapshot({
+      type: PaymentType.ONE_TIME,
+      price: { amount, currency },
+    });
+
+  assert.deepEqual(forPrice(1499), {
+    amount: '14.99',
+    taxCategory: 'saas',
+  });
+  assert.deepEqual(forPrice(4999), {
+    amount: '49.99',
+    taxCategory: 'saas',
+  });
+  assert.deepEqual(forPrice(9999), {
+    amount: '99.99',
+    taxCategory: 'saas',
+  });
+  assert.equal(forPrice(0), undefined);
+  assert.equal(forPrice(14.2), undefined);
+  assert.equal(
+    getWaffoOneTimePriceSnapshot({
+      type: PaymentType.SUBSCRIPTION,
+      price: { amount: 1499, currency: 'usd' },
+    }),
+    undefined
+  );
+});
 
 test('subscription.payment_succeeded is ignored (ACK path)', () => {
   const internals = providerInternals();
