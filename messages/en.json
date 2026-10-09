@@ -863,6 +863,7 @@
   "genjutsu.credits.checkout_failed": "Could not open checkout",
   "genjutsu.estimate.credits": "~{count} cr",
   "genjutsu.estimate.tooltip": "Approximate credits at Higgsfield's public list rate. Your actual required credits may be lower with provider discounts; the server calculates the final charge when you generate.",
+  "genjutsu.estimate.seedance_tooltip": "Estimated credits using Seedance video-reference pricing for the selected duration and resolution. The final amount is calculated on the server.",
   "genjutsu.estimate.help_aria": "About estimated credits",
   "admin.nav.generations": "Generations",
   "admin.generations.title": "Generation Records",
