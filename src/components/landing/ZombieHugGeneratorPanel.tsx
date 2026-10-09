@@ -15,10 +15,10 @@ import { useSession } from '@/core/auth/client';
 import { Link } from '@/core/i18n/navigation';
 import { estimateGenjutsuCredits } from '@/modules/genjutsu/pricing';
 import {
-  getZombieHugPublicTemplatePath,
   ZOMBIE_HUG_ASPECT_RATIOS,
   ZOMBIE_HUG_DEFAULT_ASPECT_RATIO,
   ZOMBIE_HUG_DEFAULT_RESOLUTION,
+  ZOMBIE_HUG_PUBLIC_TEMPLATE_PATH,
   ZOMBIE_HUG_RESOLUTIONS,
   ZOMBIE_HUG_TEMPLATE_DURATION_SECONDS,
   type ZombieHugAspectRatio,
@@ -78,8 +78,7 @@ type PersistedGeneration = {
   reservedCredits: number;
 };
 
-const templateApiUrl = (aspectRatio: ZombieHugAspectRatio) =>
-  `/api/zombie-hug/template?aspect=${encodeURIComponent(aspectRatio)}`;
+const TEMPLATE_URL = '/api/zombie-hug/template';
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
 
 const chipClass =
@@ -237,9 +236,7 @@ export function ZombieHugGeneratorPanel() {
     ZOMBIE_HUG_DEFAULT_ASPECT_RATIO
   );
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [templateUrl, setTemplateUrl] = useState(() =>
-    templateApiUrl(ZOMBIE_HUG_DEFAULT_ASPECT_RATIO)
-  );
+  const [templateUrl, setTemplateUrl] = useState(TEMPLATE_URL);
   const [phase, setPhase] = useState<
     'idle' | 'uploading' | 'starting' | 'generating' | 'saving' | 'locked'
   >('idle');
@@ -268,10 +265,6 @@ export function ZombieHugGeneratorPanel() {
       }),
     [resolution]
   );
-
-  useEffect(() => {
-    setTemplateUrl(templateApiUrl(aspectRatio));
-  }, [aspectRatio]);
 
   useEffect(() => {
     if (!settingsOpen) return;
@@ -853,9 +846,8 @@ export function ZombieHugGeneratorPanel() {
                 preload="metadata"
                 className="size-full object-contain"
                 onError={() => {
-                  const fallback = getZombieHugPublicTemplatePath(aspectRatio);
-                  if (templateUrl !== fallback) {
-                    setTemplateUrl(fallback);
+                  if (templateUrl !== ZOMBIE_HUG_PUBLIC_TEMPLATE_PATH) {
+                    setTemplateUrl(ZOMBIE_HUG_PUBLIC_TEMPLATE_PATH);
                   }
                 }}
               />

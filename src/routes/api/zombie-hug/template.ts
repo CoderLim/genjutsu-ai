@@ -1,30 +1,18 @@
 import { createFileRoute } from '@tanstack/react-router';
 
 import { getZombieHugTemplatePreviewUrl } from '@/modules/genjutsu/storage';
-import {
-  getZombieHugPublicTemplatePath,
-  isZombieHugAspectRatio,
-  ZOMBIE_HUG_DEFAULT_ASPECT_RATIO,
-  type ZombieHugAspectRatio,
-} from '@/modules/zombie-hug/prompt';
+import { ZOMBIE_HUG_PUBLIC_TEMPLATE_PATH } from '@/modules/zombie-hug/prompt';
 
-async function GET({ request }: { request: Request }) {
-  const url = new URL(request.url);
-  const rawAspect = url.searchParams.get('aspect');
-  const aspectRatio: ZombieHugAspectRatio = isZombieHugAspectRatio(rawAspect)
-    ? rawAspect
-    : ZOMBIE_HUG_DEFAULT_ASPECT_RATIO;
-
+async function GET() {
   try {
-    const previewUrl = await getZombieHugTemplatePreviewUrl(aspectRatio);
+    const url = await getZombieHugTemplatePreviewUrl();
     return new Response(null, {
       status: 302,
       headers: {
-        Location: previewUrl,
+        Location: url,
         'Cache-Control': 'public, max-age=300',
         // Same object generation will seal from R2.
         'X-Zombie-Hug-Template-Source': 'r2',
-        'X-Zombie-Hug-Aspect-Ratio': aspectRatio,
       },
     });
   } catch (error) {
@@ -37,10 +25,9 @@ async function GET({ request }: { request: Request }) {
     return new Response(null, {
       status: 302,
       headers: {
-        Location: getZombieHugPublicTemplatePath(aspectRatio),
+        Location: ZOMBIE_HUG_PUBLIC_TEMPLATE_PATH,
         'Cache-Control': 'public, max-age=60',
         'X-Zombie-Hug-Template-Source': 'public-fallback',
-        'X-Zombie-Hug-Aspect-Ratio': aspectRatio,
       },
     });
   }

@@ -22,10 +22,6 @@ import {
   sealGenjutsuR2Inputs,
   sealGenjutsuTemplateR2Inputs,
 } from '@/modules/genjutsu/storage';
-import {
-  isZombieHugAspectRatio,
-  ZOMBIE_HUG_DEFAULT_ASPECT_RATIO,
-} from '@/modules/zombie-hug/prompt';
 import { enforceMinIntervalRateLimit } from '@/lib/rate-limit';
 import { respData, respErr, respJson } from '@/lib/resp';
 
@@ -90,12 +86,7 @@ async function POST({ request }: { request: Request }) {
     }
 
     const useDefaultTemplate = currentOptions?.useDefaultTemplate === true;
-    const templateAspectRatio = isZombieHugAspectRatio(
-      currentOptions?.aspectRatio
-    )
-      ? currentOptions.aspectRatio
-      : ZOMBIE_HUG_DEFAULT_ASPECT_RATIO;
-    const zombieTemplateKey = getZombieHugTemplateVideoKey(templateAspectRatio);
+    const zombieTemplateKey = getZombieHugTemplateVideoKey();
     const videoKey =
       typeof currentOptions?.videoKey === 'string'
         ? currentOptions.videoKey

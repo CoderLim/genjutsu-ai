@@ -13,7 +13,7 @@ export const ZOMBIE_HUG_DEFAULT_RESOLUTION: ZombieHugResolution = '720p';
 
 export const ZOMBIE_HUG_ASPECT_RATIOS = ['16:9', '9:16'] as const;
 export type ZombieHugAspectRatio = (typeof ZOMBIE_HUG_ASPECT_RATIOS)[number];
-/** Matches the primary motion template (854×480 landscape). */
+/** Preview framing default. Generation always seals the shared motion template. */
 export const ZOMBIE_HUG_DEFAULT_ASPECT_RATIO: ZombieHugAspectRatio = '16:9';
 
 export function isZombieHugResolution(
@@ -47,13 +47,3 @@ Character mapping:
 - @image2 = infected loved one in the early shots, then restored human in the later shots`;
 
 export const ZOMBIE_HUG_PUBLIC_TEMPLATE_PATH = '/videos/zombie-hug-tpl.mp4';
-export const ZOMBIE_HUG_PUBLIC_TEMPLATE_PATH_9X16 =
-  '/videos/zombie-hug-tpl-9x16.mp4';
-
-export function getZombieHugPublicTemplatePath(
-  aspectRatio: ZombieHugAspectRatio = ZOMBIE_HUG_DEFAULT_ASPECT_RATIO
-) {
-  return aspectRatio === '9:16'
-    ? ZOMBIE_HUG_PUBLIC_TEMPLATE_PATH_9X16
-    : ZOMBIE_HUG_PUBLIC_TEMPLATE_PATH;
-}
