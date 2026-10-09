@@ -177,6 +177,17 @@ export function estimateSeedanceCredits(input: {
   return calculateGenjutsuCredits(estimateSeedanceListCost(input));
 }
 
+/** Approximate browser price only; reservation always quotes the server provider. */
+export function estimateGenjutsuCreditsForProvider(input: {
+  provider: 'higgsfield' | 'seedance' | 'seedance-volcengine';
+  durationSeconds: number;
+  resolution: GenjutsuBillableResolution;
+}) {
+  return input.provider === 'higgsfield'
+    ? estimateGenjutsuCredits(input)
+    : estimateSeedanceCredits(input);
+}
+
 export function getCreditPack(id: GenjutsuCreditPackId) {
   if (id === GENJUTSU_SMOKE_CREDIT_PACK.id) return GENJUTSU_SMOKE_CREDIT_PACK;
   return GENJUTSU_CREDIT_PACKS.find((pack) => pack.id === id) ?? null;
