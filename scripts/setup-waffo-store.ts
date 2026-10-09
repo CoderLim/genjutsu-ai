@@ -199,8 +199,31 @@ async function main() {
     previousMapping = {};
   }
 
-  // Rebuild the mapping from the current catalog only. This deliberately
-  // drops stale ShipAny demo SKU keys after the catalog migration.
+  // V2 changed the USD prices for existing internal starter/creator/studio
+  // IDs. A successful checkout-session probe does NOT verify remote pricing.
+  // Never silently reuse V1 Waffo products under V2 catalog IDs.
+  const isV2Pricing =
+    pricingCatalog.starter?.priceInCents === 1499 &&
+    pricingCatalog.creator?.priceInCents === 4999 &&
+    pricingCatalog.studio?.priceInCents === 9999;
+  const v2PublicIds = new Set(['starter', 'creator', 'studio']);
+  const recreateV2 = process.env.WAFFO_RECREATE_V2_PRODUCTS === 'true';
+  const v2ProductsVerified =
+    process.env.WAFFO_V2_PRODUCTS_VERIFIED === 'true';
+
+  // Product mappings in DB settings affect LIVE checkout even before a code
+  // deployment. Require an explicit cutover acknowledgement in production.
+  if (
+    isV2Pricing &&
+    environmentName === 'prod' &&
+    process.env.WAFFO_CONFIRM_V2_PROD_CUTOVER !== 'true'
+  ) {
+    throw new Error(
+      'V2 production mapping is protected. Deploy/test the V2 snapshot-based checkout first, then set WAFFO_CONFIRM_V2_PROD_CUTOVER=true for the intentional cutover.'
+    );
+  }
+
+  // Rebuild from the current catalog and retire the old Pro checkout mapping.
   const mapping: Record<string, string> = {};
 
   for (const product of Object.values(pricingCatalog)) {
@@ -208,8 +231,18 @@ async function main() {
     const existingId = previousMapping[catalogId];
     const currency = (product.currency || 'usd').toUpperCase();
 
-    if (existingId && (await verifyCheckout(client, existingId, currency))) {
-      console.log(`✓ ${catalogId} already works -> ${existingId}`);
+    const v2Pack = isV2Pricing && v2PublicIds.has(catalogId);
+    if (v2Pack && existingId && !recreateV2 && !v2ProductsVerified) {
+      throw new Error(
+        `Cannot reuse potentially V1-priced Waffo product for ${catalogId}. Run the V2 migration with WAFFO_RECREATE_V2_PRODUCTS=true to create new products, or explicitly verify each new price before setting WAFFO_V2_PRODUCTS_VERIFIED=true.`
+      );
+    }
+    if (
+      existingId &&
+      !(v2Pack && recreateV2) &&
+      (await verifyCheckout(client, existingId, currency))
+    ) {
+      console.log(`✓ ${catalogId} existing checkout works -> ${existingId}`);
       mapping[catalogId] = existingId;
       continue;
     }
@@ -260,6 +293,7 @@ async function main() {
 
   const mappingJson = JSON.stringify(mapping);
   upsertEnv('WAFFO_PRODUCT_IDS_MAPPING', mappingJson);
+  if (isV2Pricing) upsertEnv('WAFFO_V2_PRODUCTS_VERIFIED', 'true');
   upsertEnv('WAFFO_ENABLED', 'true');
   upsertEnv('DEFAULT_PAYMENT_PROVIDER', 'waffo');
   upsertEnv('WAFFO_ENVIRONMENT', environmentName);
