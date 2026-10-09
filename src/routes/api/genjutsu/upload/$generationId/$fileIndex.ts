@@ -63,24 +63,43 @@ async function PUT({
     const binding = getGenjutsuUploadBinding(task);
     if (!binding) return errorResponse('Upload not prepared', 400);
 
-    const storageKey =
-      fileIndex === 0 ? binding.videoKey : binding.imageKeys[fileIndex - 1];
-    const expectedType = binding.contentTypes[fileIndex]
-      ?.split(';', 1)[0]
-      ?.trim()
-      .toLowerCase();
-    const expectedLength = binding.contentLengths[fileIndex];
+    let storageKey: string | undefined;
+    let expectedType: string | undefined;
+    let expectedLength: number | undefined;
+
+    if (binding.useDefaultTemplate) {
+      // Template video is server-owned; clients only upload reference images at
+      // Genjutsu indices 1..N. contentTypes/lengths are image-only (0-based).
+      if (fileIndex < 1) {
+        return errorResponse('Invalid file index for template preset', 400);
+      }
+      const imageIndex = fileIndex - 1;
+      storageKey = binding.imageKeys[imageIndex];
+      expectedType = binding.contentTypes[imageIndex]
+        ?.split(';', 1)[0]
+        ?.trim()
+        .toLowerCase();
+      expectedLength = binding.contentLengths[imageIndex];
+    } else {
+      storageKey =
+        fileIndex === 0 ? binding.videoKey : binding.imageKeys[fileIndex - 1];
+      expectedType = binding.contentTypes[fileIndex]
+        ?.split(';', 1)[0]
+        ?.trim()
+        .toLowerCase();
+      expectedLength = binding.contentLengths[fileIndex];
+    }
 
     if (
       !storageKey ||
       !expectedType ||
       !Number.isSafeInteger(expectedLength) ||
-      expectedLength <= 0
+      expectedLength! <= 0
     ) {
       return errorResponse('Upload binding incomplete', 400);
     }
 
-    if (expectedLength > GENJUTSU_PROXY_UPLOAD_MAX_BYTES) {
+    if (expectedLength! > GENJUTSU_PROXY_UPLOAD_MAX_BYTES) {
       return errorResponse('File too large for proxy upload', 413);
     }
 
@@ -123,7 +142,7 @@ async function PUT({
         key: storageKey,
         body: request.body,
         contentType: expectedType,
-        contentLength,
+        contentLength: expectedLength!,
       });
     } catch (putError: any) {
       console.error('genjutsu proxy upload put failed:', putError);

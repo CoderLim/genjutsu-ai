@@ -126,10 +126,12 @@ function assertReusableUploadBinding(
     model: string;
     resolution: GenjutsuResolution;
     prompt: string;
-    videoKey: string;
+    videoKey?: string;
     imageKeys: string[];
     contentTypes: string[];
     contentLengths: number[];
+    useDefaultTemplate?: boolean;
+    preset?: string;
   }
 ) {
   if (task.status !== 'initiated') {
@@ -150,10 +152,17 @@ function assertReusableUploadBinding(
     ? options.contentLengths
     : null;
 
-  if (!options?.videoKey) return task;
+  const useDefaultTemplate = Boolean(params.useDefaultTemplate);
+  const boundWithTemplate =
+    options?.useDefaultTemplate === true && Array.isArray(options?.imageKeys);
+  const boundWithVideo = typeof options?.videoKey === 'string';
+
+  if (!boundWithTemplate && !boundWithVideo) return task;
 
   const matches =
-    options.videoKey === params.videoKey &&
+    Boolean(options?.useDefaultTemplate) === useDefaultTemplate &&
+    (options?.preset || undefined) === (params.preset || undefined) &&
+    (useDefaultTemplate || options.videoKey === params.videoKey) &&
     imageKeys !== null &&
     imageKeys.length === params.imageKeys.length &&
     imageKeys.every(
@@ -267,10 +276,12 @@ export async function bindGenjutsuUploadInputs(params: {
   model: string;
   resolution: GenjutsuResolution;
   prompt: string;
-  videoKey: string;
+  videoKey?: string;
   imageKeys: string[];
   contentTypes: string[];
   contentLengths: number[];
+  useDefaultTemplate?: boolean;
+  preset?: string;
 }) {
   return db().transaction(async (tx: any) => {
     const [task] = await tx
@@ -289,11 +300,22 @@ export async function bindGenjutsuUploadInputs(params: {
     assertReusableUploadBinding(task, params);
 
     const currentOptions = parseTaskOptions(task) || {};
-    if (currentOptions.videoKey) return task;
+    if (params.useDefaultTemplate) {
+      if (
+        currentOptions.useDefaultTemplate === true &&
+        Array.isArray(currentOptions.imageKeys)
+      ) {
+        return task;
+      }
+    } else if (currentOptions.videoKey) {
+      return task;
+    }
 
     const nextOptions = JSON.stringify({
       ...currentOptions,
-      videoKey: params.videoKey,
+      useDefaultTemplate: Boolean(params.useDefaultTemplate),
+      ...(params.preset ? { preset: params.preset } : {}),
+      ...(params.videoKey ? { videoKey: params.videoKey } : {}),
       imageKeys: params.imageKeys,
       contentTypes: params.contentTypes,
       contentLengths: params.contentLengths,
@@ -654,13 +676,20 @@ export async function recordGenjutsuUploadObservation(params: {
 
 export function getGenjutsuUploadBinding(task: { options?: string | null }) {
   const options = parseTaskOptions(task);
-  if (!options || typeof options.videoKey !== 'string') return null;
+  if (!options) return null;
+
+  const useDefaultTemplate = options.useDefaultTemplate === true;
+  if (!useDefaultTemplate && typeof options.videoKey !== 'string') {
+    return null;
+  }
 
   const imageKeys = Array.isArray(options.imageKeys)
     ? options.imageKeys.filter(
         (value: unknown): value is string => typeof value === 'string'
       )
     : [];
+  if (useDefaultTemplate && imageKeys.length < 1) return null;
+
   const contentTypes = Array.isArray(options.contentTypes)
     ? options.contentTypes.filter(
         (value: unknown): value is string => typeof value === 'string'
@@ -671,7 +700,9 @@ export function getGenjutsuUploadBinding(task: { options?: string | null }) {
     : [];
 
   return {
-    videoKey: options.videoKey as string,
+    useDefaultTemplate,
+    videoKey:
+      typeof options.videoKey === 'string' ? options.videoKey : undefined,
     imageKeys,
     contentTypes,
     contentLengths,

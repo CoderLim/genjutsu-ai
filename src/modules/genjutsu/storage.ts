@@ -1,5 +1,6 @@
 import { AwsClient } from 'aws4fetch';
 
+import { envConfigs } from '@/config';
 import { getAllConfigs } from '@/modules/config/service';
 import { getStorage } from '@/modules/storage/service';
 
@@ -813,6 +814,251 @@ export async function createGenjutsuR2ReadUrl(key: string) {
     expiresSeconds: READ_EXPIRES_SECONDS,
   });
   return signed.url;
+}
+
+export function getZombieHugTemplateVideoKey() {
+  return (
+    envConfigs.zombie_hug_template_video_key?.trim() ||
+    'genjutsu/templates/zombie-hug.mp4'
+  );
+}
+
+async function putGenjutsuObjectBytes(params: {
+  key: string;
+  bytes: Uint8Array;
+  contentType: string;
+}) {
+  assertSafeObjectKey(params.key);
+  if (!params.key.startsWith('genjutsu/')) {
+    throw new Error('Invalid Genjutsu object key');
+  }
+
+  const binding = getR2BucketBinding();
+  if (binding) {
+    const config = await getR2SigningConfig();
+    const objectKey = buildGenjutsuR2ObjectKey(config.uploadPath, params.key);
+    await binding.put(objectKey, params.bytes, {
+      httpMetadata: { contentType: params.contentType },
+    });
+    return;
+  }
+
+  if (isCloudflareWorkersRuntime()) {
+    throw new GenjutsuR2BindingMissingError();
+  }
+
+  const config = await getR2SigningConfig();
+  const headers = new Headers({
+    'Content-Type': params.contentType,
+    'Content-Length': String(params.bytes.byteLength),
+    'x-amz-content-sha256': 'UNSIGNED-PAYLOAD',
+  });
+  const response = await createR2Client(config).fetch(
+    new Request(buildR2ObjectUrl(config, params.key), {
+      method: 'PUT',
+      headers,
+      body: params.bytes.buffer.slice(
+        params.bytes.byteOffset,
+        params.bytes.byteOffset + params.bytes.byteLength
+      ) as ArrayBuffer,
+    })
+  );
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '');
+    throw new Error(
+      `Failed to upload Genjutsu object: HTTP ${response.status}${
+        detail ? ` - ${detail.slice(0, 300)}` : ''
+      }`
+    );
+  }
+}
+
+/**
+ * Ensure the shared zombie-hug motion template exists in R2. On local Node,
+ * seed it from public/videos/zombie-hug-tpl.mp4 when missing.
+ */
+export async function ensureZombieHugTemplateInR2() {
+  const key = getZombieHugTemplateVideoKey();
+  assertSafeObjectKey(key);
+  if (!key.startsWith('genjutsu/')) {
+    throw new Error('Zombie hug template key must be under genjutsu/');
+  }
+
+  try {
+    await headR2Object(key);
+    return key;
+  } catch {
+    // continue to seed
+  }
+
+  if (isCloudflareWorkersRuntime()) {
+    throw new Error(
+      `Zombie hug template missing from R2 (${key}). Upload public/videos/zombie-hug-tpl.mp4 to that key.`
+    );
+  }
+
+  const { readFile } = await import('node:fs/promises');
+  const { existsSync } = await import('node:fs');
+  const path = await import('node:path');
+  const localPath = path.join(
+    process.cwd(),
+    'public/videos/zombie-hug-tpl.mp4'
+  );
+  if (!existsSync(localPath)) {
+    throw new Error(
+      `Zombie hug template missing from R2 (${key}) and local file ${localPath} was not found`
+    );
+  }
+
+  const bytes = new Uint8Array(await readFile(localPath));
+  await putGenjutsuObjectBytes({
+    key,
+    bytes,
+    contentType: 'video/mp4',
+  });
+  return key;
+}
+
+export async function getZombieHugTemplatePreviewUrl() {
+  const key = await ensureZombieHugTemplateInR2();
+  return createGenjutsuR2ReadUrl(key);
+}
+
+/**
+ * Seal motion-transfer inputs when the source video is a shared R2 template
+ * (user only uploaded reference images).
+ */
+export async function sealGenjutsuTemplateR2Inputs(params: {
+  userId: string;
+  generationId: string;
+  templateVideoKey: string;
+  imageKeys: string[];
+  expectedContentTypes: string[];
+  expectedContentLengths: number[];
+}) {
+  if (
+    params.imageKeys.length < 1 ||
+    params.imageKeys.length > 8 ||
+    params.expectedContentTypes.length !== params.imageKeys.length ||
+    params.expectedContentLengths.length !== params.imageKeys.length
+  ) {
+    throw new Error('Invalid Genjutsu template input set');
+  }
+
+  const templateVideoKey =
+    params.templateVideoKey === getZombieHugTemplateVideoKey()
+      ? await ensureZombieHugTemplateInR2()
+      : params.templateVideoKey;
+
+  assertSafeObjectKey(templateVideoKey);
+  if (!templateVideoKey.startsWith('genjutsu/')) {
+    throw new Error('Invalid Genjutsu template video key');
+  }
+
+  const stagingPrefix = getGenjutsuInputPrefix(params);
+  const sealedPrefix = getGenjutsuSealedInputPrefix(params);
+  const referencePattern = new RegExp(
+    `^${escapeRegExp(stagingPrefix)}reference-0[1-8]\\.(?:jpg|png|webp|gif|avif|heic|heif)$`
+  );
+
+  for (const key of params.imageKeys) {
+    assertSafeObjectKey(key);
+    if (!referencePattern.test(key)) {
+      throw new Error('Invalid Genjutsu reference-image storage keys');
+    }
+  }
+
+  const templateMetadata = await headR2Object(templateVideoKey);
+  assertGenjutsuUploadSize(0, templateMetadata.contentLength);
+  if (!templateMetadata.contentType.startsWith('video/')) {
+    throw new Error('Genjutsu template must be a video');
+  }
+  const videoExt = VIDEO_CONTENT_TYPES[templateMetadata.contentType];
+  if (!videoExt) {
+    throw new Error('Genjutsu template must be MP4, MOV, or WebM');
+  }
+
+  const imageMetadata = await Promise.all(
+    params.imageKeys.map((key) => headR2Object(key))
+  );
+  imageMetadata.forEach((item, index) => {
+    assertGenjutsuObjectMetadata({
+      key: params.imageKeys[index],
+      index: index + 1,
+      metadata: item,
+    });
+    const expectedType =
+      params.expectedContentTypes[index]
+        ?.split(';', 1)[0]
+        ?.trim()
+        .toLowerCase() || '';
+    if (!expectedType || item.contentType !== expectedType) {
+      throw new Error('Uploaded media content type changed before sealing');
+    }
+    if (item.contentLength !== params.expectedContentLengths[index]) {
+      throw new Error('Uploaded media size changed before sealing');
+    }
+  });
+
+  const sealedVideoKey = `${sealedPrefix}source.${videoExt}`;
+  const sealedImageKeys = params.imageKeys.map((key) => {
+    const filename = key.slice(stagingPrefix.length);
+    if (!filename || filename.includes('/')) {
+      throw new Error('Invalid Genjutsu staging image key');
+    }
+    return `${sealedPrefix}${filename}`;
+  });
+
+  await copyR2Object({
+    sourceKey: templateVideoKey,
+    destinationKey: sealedVideoKey,
+    sourceEtag: templateMetadata.etag,
+  });
+
+  await Promise.all(
+    params.imageKeys.map((sourceKey, index) =>
+      copyR2Object({
+        sourceKey,
+        destinationKey: sealedImageKeys[index],
+        sourceEtag: imageMetadata[index].etag,
+      })
+    )
+  );
+
+  const sealedVideoMetadata = await headR2Object(sealedVideoKey);
+  assertGenjutsuObjectMetadata({
+    key: sealedVideoKey,
+    index: 0,
+    metadata: sealedVideoMetadata,
+  });
+  if (
+    sealedVideoMetadata.contentLength !== templateMetadata.contentLength ||
+    sealedVideoMetadata.contentType !== templateMetadata.contentType
+  ) {
+    throw new Error('Sealed Genjutsu template does not match source media');
+  }
+
+  const sealedImageMetadata = await Promise.all(
+    sealedImageKeys.map((key) => headR2Object(key))
+  );
+  sealedImageMetadata.forEach((item, index) => {
+    assertGenjutsuObjectMetadata({
+      key: sealedImageKeys[index],
+      index: index + 1,
+      metadata: item,
+    });
+    if (
+      item.contentLength !== imageMetadata[index].contentLength ||
+      item.contentType !== imageMetadata[index].contentType
+    ) {
+      throw new Error('Sealed Genjutsu input does not match uploaded media');
+    }
+  });
+
+  return {
+    videoKey: sealedVideoKey,
+    imageKeys: sealedImageKeys,
+  };
 }
 
 export async function sealGenjutsuR2Inputs(params: {

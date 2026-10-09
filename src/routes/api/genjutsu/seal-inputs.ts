@@ -14,7 +14,9 @@ import {
 } from '@/modules/genjutsu/e2e-mock';
 import {
   getGenjutsuSealedInputKey,
+  getZombieHugTemplateVideoKey,
   sealGenjutsuR2Inputs,
+  sealGenjutsuTemplateR2Inputs,
 } from '@/modules/genjutsu/storage';
 import { enforceMinIntervalRateLimit } from '@/lib/rate-limit';
 import { respData, respErr, respJson } from '@/lib/resp';
@@ -76,6 +78,7 @@ async function POST({ request }: { request: Request }) {
       );
     }
 
+    const useDefaultTemplate = currentOptions?.useDefaultTemplate === true;
     const videoKey =
       typeof currentOptions?.videoKey === 'string'
         ? currentOptions.videoKey
@@ -94,7 +97,7 @@ async function POST({ request }: { request: Request }) {
       ? currentOptions.contentLengths.map((value: unknown) => Number(value))
       : [];
 
-    if (!videoKey || imageKeys.length < 1) {
+    if (imageKeys.length < 1 || (!useDefaultTemplate && !videoKey)) {
       throw new Error('Generation upload inputs are not bound');
     }
 
@@ -120,26 +123,59 @@ async function POST({ request }: { request: Request }) {
 
     let sealed: { videoKey: string; imageKeys: string[] };
     if (isGenjutsuE2EMockEnabled()) {
-      const sourceKeys = [videoKey, ...imageKeys];
-      const sealedKeys = sourceKeys.map((sourceKey) =>
-        getGenjutsuSealedInputKey({
-          userId,
-          generationId,
-          stagingKey: sourceKey,
-        })
-      );
-      sourceKeys.forEach((sourceKey, index) =>
-        sealGenjutsuE2EStorageObject(sourceKey, sealedKeys[index])
-      );
-      sealed = {
-        videoKey: sealedKeys[0],
-        imageKeys: sealedKeys.slice(1),
-      };
+      if (useDefaultTemplate) {
+        const sealedImageKeys = imageKeys.map((sourceKey) =>
+          getGenjutsuSealedInputKey({
+            userId,
+            generationId,
+            stagingKey: sourceKey,
+          })
+        );
+        const sealedVideoKey = sealedImageKeys[0]
+          .replace(/reference-\d+\./, 'source.')
+          .replace(/\.(jpg|png|webp|gif|avif|heic|heif)$/i, '.mp4');
+        sealGenjutsuE2EStorageObject(
+          getZombieHugTemplateVideoKey(),
+          sealedVideoKey
+        );
+        imageKeys.forEach((sourceKey, index) =>
+          sealGenjutsuE2EStorageObject(sourceKey, sealedImageKeys[index])
+        );
+        sealed = {
+          videoKey: sealedVideoKey,
+          imageKeys: sealedImageKeys,
+        };
+      } else {
+        const sourceKeys = [videoKey as string, ...imageKeys];
+        const sealedKeys = sourceKeys.map((sourceKey) =>
+          getGenjutsuSealedInputKey({
+            userId,
+            generationId,
+            stagingKey: sourceKey,
+          })
+        );
+        sourceKeys.forEach((sourceKey, index) =>
+          sealGenjutsuE2EStorageObject(sourceKey, sealedKeys[index])
+        );
+        sealed = {
+          videoKey: sealedKeys[0],
+          imageKeys: sealedKeys.slice(1),
+        };
+      }
+    } else if (useDefaultTemplate) {
+      sealed = await sealGenjutsuTemplateR2Inputs({
+        userId,
+        generationId,
+        templateVideoKey: getZombieHugTemplateVideoKey(),
+        imageKeys,
+        expectedContentTypes: contentTypes,
+        expectedContentLengths: contentLengths,
+      });
     } else {
       sealed = await sealGenjutsuR2Inputs({
         userId,
         generationId,
-        videoKey,
+        videoKey: videoKey as string,
         imageKeys,
         expectedContentTypes: contentTypes,
         expectedContentLengths: contentLengths,
