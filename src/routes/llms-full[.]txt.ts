@@ -13,12 +13,6 @@ const STATIC_PAGES: { path: string; title: string; description: string }[] = [
     description:
       'Preset two-photo Hotel Lobby AI video generator powered by MiniMax H3',
   },
-  {
-    path: '/chuttamalle-ai',
-    title: 'Chuttamalle AI Video Generator',
-    description:
-      'Preset two-photo Chuttamalle AI dance video generator powered by MiniMax H3',
-  },
   { path: '/blog', title: 'Blog', description: 'Blog posts and articles' },
 ];
 

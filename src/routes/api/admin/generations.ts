@@ -4,12 +4,6 @@ import { and, count, desc, eq, inArray, like, or, type SQL } from 'drizzle-orm';
 import { getAuth } from '@/core/auth';
 import { db } from '@/core/db';
 import { aiTask, order, subscription, user } from '@/config/db/schema';
-import { CHUTTAMALLE_SCENE } from '@/modules/chuttamalle/billing';
-import {
-  CHUTTAMALLE_RESOLUTIONS,
-  estimateChuttamalleCredits,
-  type ChuttamalleResolution,
-} from '@/modules/chuttamalle/pricing';
 import {
   generationMediaBasePath,
   isListableGenerationScene,
@@ -84,15 +78,6 @@ function isBillableResolution(
  * Best-effort credit estimate for admin display — mirrors GeneratorPanel /
  * generate.ts list-rate fallback when the task never reached reservation.
  */
-function isChuttamalleResolution(
-  value: unknown
-): value is ChuttamalleResolution {
-  return (
-    typeof value === 'string' &&
-    (CHUTTAMALLE_RESOLUTIONS as readonly string[]).includes(value)
-  );
-}
-
 function isHotelLobbyH3Model(model: unknown): boolean {
   return (
     typeof model === 'string' &&
@@ -151,25 +136,6 @@ function resolveEstimatedCredits(input: {
       }
       return estimateHotelLobbyCredits({
         duration: input.duration,
-        imageCount: Math.max(1, input.imageCount),
-      });
-    } catch {
-      return null;
-    }
-  }
-
-  if (input.scene === CHUTTAMALLE_SCENE) {
-    if (
-      !isChuttamalleResolution(input.resolution) ||
-      input.duration == null ||
-      !Number.isInteger(input.duration)
-    ) {
-      return null;
-    }
-    try {
-      return estimateChuttamalleCredits({
-        duration: input.duration,
-        resolution: input.resolution,
         imageCount: Math.max(1, input.imageCount),
       });
     } catch {
@@ -357,9 +323,7 @@ async function GET({ request }: { request: Request }) {
             ? options.mode
             : row.scene === HOTEL_LOBBY_SCENE
               ? 'Hotel Lobby'
-              : row.scene === CHUTTAMALLE_SCENE
-                ? 'Chuttamalle'
-                : null,
+              : null,
         resolution:
           typeof options?.resolution === 'string' ? options.resolution : null,
         aspectRatio:

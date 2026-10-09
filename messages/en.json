@@ -903,7 +903,6 @@
   "admin.generations.all_scenes": "All scenes",
   "admin.generations.scene.genjutsu": "Genjutsu",
   "admin.generations.scene.hotel_lobby": "Hotel Lobby",
-  "admin.generations.scene.chuttamalle": "Chuttamalle",
   "creations.nav": "My Creations",
   "creations.title": "My Creations",
   "creations.description": "View your generated videos and check jobs that are still processing.",
@@ -930,6 +929,5 @@
   "creations.page": "Page {page} of {pages}",
   "creations.load_error": "Couldn't load your creations. Please try again.",
   "creations.scene.genjutsu": "Genjutsu",
-  "creations.scene.hotel_lobby": "Hotel Lobby",
-  "creations.scene.chuttamalle": "Chuttamalle"
+  "creations.scene.hotel_lobby": "Hotel Lobby"
 }

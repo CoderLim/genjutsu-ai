@@ -194,6 +194,25 @@ function isFourCc(bytes: Uint8Array, offset: number, tag: string) {
 }
 
 /**
+ * ISO BMFF boxes start with size(4)+type(4). Scanning for fourcc alone false-
+ * positives on ftyp compatible brands (e.g. `iso2avc1mp41` embeds `avc1`).
+ * Real tkhd / VisualSampleEntry boxes are small; brand strings yield huge
+ * "sizes" when the preceding 4 bytes are misread as a length.
+ */
+function isPlausibleIsoBmffBox(
+  bytes: Uint8Array,
+  typeOffset: number,
+  minSize: number
+) {
+  const declaredSize = readUint32(bytes, typeOffset - 4);
+  if (declaredSize == null || declaredSize < minSize) return false;
+  // size==0 means "extends to EOF"; otherwise keep an upper bound so brand
+  // strings like "iso2" (0x69736f32) never look like box headers.
+  if (declaredSize === 0) return true;
+  return declaredSize <= 4 * 1024 * 1024;
+}
+
+/**
  * Best-effort MP4/MOV display size from tkhd (16.16) or visual sample entries.
  * Returns null when metadata is missing (e.g. WebM).
  */
@@ -201,9 +220,14 @@ export function parseIsoBmffVideoDimensions(bytes: Uint8Array): {
   width: number;
   height: number;
 } | null {
-  let best: { width: number; height: number } | null = null;
+  let bestTkhd: { width: number; height: number } | null = null;
+  let bestSample: { width: number; height: number } | null = null;
 
-  const consider = (width: number, height: number) => {
+  const consider = (
+    target: 'tkhd' | 'sample',
+    width: number,
+    height: number
+  ) => {
     if (
       !Number.isFinite(width) ||
       !Number.isFinite(height) ||
@@ -214,13 +238,17 @@ export function parseIsoBmffVideoDimensions(bytes: Uint8Array): {
     }
     const w = Math.round(width);
     const h = Math.round(height);
-    if (!best || w * h > best.width * best.height) {
-      best = { width: w, height: h };
+    const prev = target === 'tkhd' ? bestTkhd : bestSample;
+    if (!prev || w * h > prev.width * prev.height) {
+      if (target === 'tkhd') bestTkhd = { width: w, height: h };
+      else bestSample = { width: w, height: h };
     }
   };
 
   for (let typeOffset = 4; typeOffset + 8 < bytes.byteLength; typeOffset += 1) {
     if (isFourCc(bytes, typeOffset, 'tkhd')) {
+      // tkhd v0 = 92 bytes, v1 = 104 bytes (including size+type).
+      if (!isPlausibleIsoBmffBox(bytes, typeOffset, 92)) continue;
       const version = bytes[typeOffset + 4];
       const whOffset =
         version === 0 ? typeOffset + 80 : version === 1 ? typeOffset + 92 : -1;
@@ -228,7 +256,7 @@ export function parseIsoBmffVideoDimensions(bytes: Uint8Array): {
       const widthFixed = readUint32(bytes, whOffset);
       const heightFixed = readUint32(bytes, whOffset + 4);
       if (widthFixed == null || heightFixed == null) continue;
-      consider(widthFixed / 65536, heightFixed / 65536);
+      consider('tkhd', widthFixed / 65536, heightFixed / 65536);
       continue;
     }
 
@@ -241,15 +269,19 @@ export function parseIsoBmffVideoDimensions(bytes: Uint8Array): {
       isFourCc(bytes, typeOffset, 'av01') ||
       isFourCc(bytes, typeOffset, 'mp4v')
     ) {
+      // VisualSampleEntry: size+type(8) + SampleEntry(8) + visual fields to
+      // width/height (~32 from type) — real boxes are typically <1KB.
+      if (!isPlausibleIsoBmffBox(bytes, typeOffset, 86)) continue;
       // VisualSampleEntry width/height are uint16 after SampleEntry(8) +
       // pre_defined/reserved/pre_defined[3](16), measured from the type fourcc.
       const width = readUint16(bytes, typeOffset + 28);
       const height = readUint16(bytes, typeOffset + 30);
-      if (width != null && height != null) consider(width, height);
+      if (width != null && height != null) consider('sample', width, height);
     }
   }
 
-  return best;
+  // Prefer tkhd display size; sample-entry dims are a fallback for partial reads.
+  return bestTkhd ?? bestSample;
 }
 
 export function assertHotelLobbyVideoDimensions(input: {
