@@ -248,7 +248,7 @@ async function POST({ request }: { request: Request }) {
     }
 
     if (task.status === 'initiated' || task.status === 'sealing') {
-      try {
+      const ensureTemplatePresent = async () => {
         if (isGenjutsuE2EMockEnabled()) {
           ensureGenjutsuE2ETemplateObject(
             getZombieHugTemplateVideoKey(aspectRatio)
@@ -256,22 +256,34 @@ async function POST({ request }: { request: Request }) {
         } else {
           await ensureZombieHugTemplateInR2(aspectRatio);
         }
-      } catch (error: any) {
-        await markGenjutsuAttemptFailedPreflight({
-          generationId,
-          userId: session.user.id,
-          stage: 'template_missing',
-          errorCode: 'TEMPLATE_NOT_CONFIGURED',
-          error:
-            error?.message || 'Zombie hug template is not configured in R2',
-        }).catch(() => undefined);
-        return respJson(
+      };
+
+      const templateMissingResponse = (error: any) =>
+        respJson(
           -1,
           error?.message ||
             'Zombie hug template is not configured in R2. Upload the matching public/videos/zombie-hug-tpl*.mp4 to R2.',
           { code: 'TEMPLATE_NOT_CONFIGURED' },
           { status: 503 }
         );
+
+      // Fast-fail only while still `initiated`. `markFailedPreflight` without a
+      // sealClaim only matches initiated — never kill an active sealing lease
+      // with TEMPLATE_NOT_CONFIGURED (clients treat that as safe to unlock).
+      if (task.status === 'initiated') {
+        try {
+          await ensureTemplatePresent();
+        } catch (error: any) {
+          await markGenjutsuAttemptFailedPreflight({
+            generationId,
+            userId: session.user.id,
+            stage: 'template_missing',
+            errorCode: 'TEMPLATE_NOT_CONFIGURED',
+            error:
+              error?.message || 'Zombie hug template is not configured in R2',
+          }).catch(() => undefined);
+          return templateMissingResponse(error);
+        }
       }
 
       let sealClaim: string | null = null;
@@ -314,6 +326,24 @@ async function POST({ request }: { request: Request }) {
       }
 
       if (sealClaim) {
+        // Lease holder re-checks template (covers reclaim after Worker A died
+        // and transient R2 blips that previously returned unlockable 503 while
+        // sealing). CAS with sealClaim can exit sealing → failed_preflight.
+        try {
+          await ensureTemplatePresent();
+        } catch (error: any) {
+          await markGenjutsuAttemptFailedPreflight({
+            generationId,
+            userId: session.user.id,
+            sealClaim,
+            stage: 'template_missing',
+            errorCode: 'TEMPLATE_NOT_CONFIGURED',
+            error:
+              error?.message || 'Zombie hug template is not configured in R2',
+          }).catch(() => undefined);
+          return templateMissingResponse(error);
+        }
+
         try {
           const existing = await findExistingSealedZombieHugInputs({
             userId: session.user.id,

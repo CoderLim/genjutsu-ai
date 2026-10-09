@@ -512,10 +512,44 @@ export function ZombieHugGeneratorPanel() {
               continue;
             }
 
+            // TEMPLATE_NOT_CONFIGURED during resume is not by itself proof the
+            // sealing job died — verify status before unlocking Generate.
+            if (code === 'TEMPLATE_NOT_CONFIGURED') {
+              resumeAttempts = Math.max(0, resumeAttempts - 1);
+              try {
+                const verify = await apiGet<GenerationPoll>(
+                  `/api/genjutsu/status?generationId=${encodeURIComponent(active.generationId)}`
+                );
+                if (generationRunRef.current !== runId) return;
+                if (verify.providerStatus === 'failed_preflight') {
+                  localStorage.removeItem(activeGenerationKey(active.userId));
+                  setPhase('idle');
+                  setJobError(
+                    cause instanceof Error
+                      ? cause.message
+                      : 'Generation failed to start'
+                  );
+                  toast.error(
+                    cause instanceof Error
+                      ? cause.message
+                      : 'Generation failed to start'
+                  );
+                  return;
+                }
+              } catch {
+                // fall through to keep waiting
+              }
+              setPhase('starting');
+              setJobError(
+                'Template check failed while a previous seal may still be running. Keeping this job locked…'
+              );
+              delayMs = Math.min(5_000, Math.ceil(delayMs * 1.2));
+              continue;
+            }
+
             // Only unlock when the server proves no credits were held.
             if (
               code === 'INSUFFICIENT_CREDITS' ||
-              code === 'TEMPLATE_NOT_CONFIGURED' ||
               code === 'GENERATION_NOT_FOUND'
             ) {
               localStorage.removeItem(activeGenerationKey(active.userId));
@@ -757,12 +791,10 @@ export function ZombieHugGeneratorPanel() {
       const code = typeof data?.code === 'string' ? data.code : undefined;
 
       // Only these codes prove credits were not held (or the attempt never
-      // existed). Everything else — including unexpected 5xx / DB errors —
-      // must keep the job and reconcile via status before unlocking.
+      // existed). TEMPLATE_NOT_CONFIGURED is handled below after a status
+      // check — sealing jobs must not unlock Generate on a bare template 503.
       const safeToClear =
-        code === 'INSUFFICIENT_CREDITS' ||
-        code === 'TEMPLATE_NOT_CONFIGURED' ||
-        code === 'GENERATION_NOT_FOUND';
+        code === 'INSUFFICIENT_CREDITS' || code === 'GENERATION_NOT_FOUND';
 
       if (code === 'SUBMISSION_UNKNOWN') {
         setPhase('locked');
@@ -772,6 +804,47 @@ export function ZombieHugGeneratorPanel() {
             : 'Submission result is uncertain. Credits remain reserved; do not retry this generation.'
         );
         return;
+      }
+
+      if (code === 'TEMPLATE_NOT_CONFIGURED') {
+        try {
+          const verify = await apiGet<GenerationPoll>(
+            `/api/genjutsu/status?generationId=${encodeURIComponent(id)}`
+          );
+          if (generationRunRef.current !== runId) return;
+          if (verify.providerStatus === 'failed_preflight') {
+            localStorage.removeItem(activeGenerationKey(session.user.id));
+            setPhase('idle');
+            toast.error(
+              error instanceof Error
+                ? error.message
+                : 'Zombie hug template is not configured in storage. Contact support.'
+            );
+            return;
+          }
+          if (
+            verify.providerStatus === 'initiated' ||
+            verify.providerStatus === 'sealing' ||
+            verify.providerStatus === 'ready'
+          ) {
+            setPhase('generating');
+            setJobError(
+              'Template check failed while sealing may still be in progress. Checking the existing job…'
+            );
+            const raw = localStorage.getItem(
+              activeGenerationKey(session.user.id)
+            );
+            if (raw) {
+              const active = JSON.parse(raw) as PersistedGeneration;
+              if (active.generationId === id) {
+                await pollGeneration(active, runId);
+                return;
+              }
+            }
+          }
+        } catch {
+          // fall through to keep/reconcile via persisted job
+        }
       }
 
       if (error instanceof ApiError && safeToClear) {
@@ -790,13 +863,6 @@ export function ZombieHugGeneratorPanel() {
             setCreditError({ required, balance });
             return;
           }
-        }
-        if (code === 'TEMPLATE_NOT_CONFIGURED') {
-          toast.error(
-            error.message ||
-              'Zombie hug template is not configured in storage. Contact support.'
-          );
-          return;
         }
 
         toast.error(error.message || 'Generation failed to start');
