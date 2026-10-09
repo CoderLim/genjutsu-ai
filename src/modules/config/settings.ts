@@ -561,7 +561,7 @@ export function getSettings(): Setting[] {
       title: 'Product IDs Mapping',
       type: 'textarea',
       placeholder:
-        '{"starter":"PROD_xxx","creator":"PROD_xxx","pro":"PROD_xxx","studio":"PROD_xxx"}',
+        '{"starter":"PROD_xxx","creator":"PROD_xxx","studio":"PROD_xxx"}',
       tip: 'Map pricing catalog product_id to Waffo Product ID. Must be valid JSON.',
       group: 'waffo',
       tab: 'payment',
