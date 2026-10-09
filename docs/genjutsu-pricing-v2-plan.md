@@ -1,7 +1,7 @@
 # Genjutsu AI Pricing V2 — Implementation Plan
 
 **Decision date:** 2026-10-08  
-**Status:** Approved pricing proposal; **documentation only, not implemented or deployed**  
+**Status:** Phase A implemented on `feat/genjutsu-pricing-v2`; **not merged, not deployed, Waffo live products not migrated**  
 **Scope:** Genjutsu AI public credit packs, insufficient-balance checkout, provider quote consistency, payment catalog migration.  
 **Source of truth today:** `src/modules/genjutsu/pricing.ts` and `src/config/pricing.ts`.
 
@@ -144,4 +144,19 @@ Report daily for the first few days, then review after **at least 20–30 real p
 2. Ops/checklist: provision and verify V2 Waffo products and **atomic** catalog/mapping rollout.
 3. PR B (optional): hidden $4.99 / 400 offer behind feature flag and secured offer-specific checkout.
 
-**No application code, product mapping, provider dashboard settings or deployment was changed in creating this plan.**
+**Branch progress (2026-10-09):** Phase A code and follow-up Cursor review fixes (I1–I6) are implemented on `feat/genjutsu-pricing-v2`. Waffo live settings and deployment remain untouched. Hidden small-refill stays deferred. Unit/E2E, Waffo test-price verification and live cutover checks remain release gates.
+
+## 9. V2 deployment runbook (important)
+
+> The branch is code only. **Do not run the Waffo setup script against production before the V2 price-snapshot checkout code is deployed and its test-environment payment behavior has been verified.**
+
+1. Review PR and run `pnpm test` and `pnpm e2e:genjutsu` in CI or a local checkout. Check `pnpm build`/`pnpm cf:build` before merge. No tests are implied to have run simply because this branch was pushed.
+2. In the Waffo **test** environment, provision the new public products using `WAFFO_RECREATE_V2_PRODUCTS=true` with `scripts/setup-waffo-store.ts`. This creates new remote public products rather than silently reusing mapped V1-priced products. Internal `smoke` can reuse its existing product. Verify exact displayed checkout amounts $14.99/$49.99/$99.99 and corresponding grants 1,100/3,900/8,400.
+3. The setup script **requires new V2 public SKUs** (`WAFFO_RECREATE_V2_PRODUCTS=true`) and compares the prices in Waffo's product-create response to the server catalog before publishing mapping. It does **not** accept or write any `WAFFO_V2_PRODUCTS_VERIFIED` bypass flag. It writes `WAFFO_PRODUCT_IDS_MAPPING` to the local env and optionally DB config; **DB configuration takes precedence**. Keep Test and Production mappings separate. Review the remote product price in Waffo Dashboard and run a real test-environment checkout before cutover. Never commit credentials.
+4. Confirm the authenticated Waffo checkout actually honors the `priceSnapshot` (server-side local order amount) with the installed SDK and merchant account. If it fails, **stop the cutover**; don't ship UI prices that disagree with Waffo charges.
+5. Deploy V2 code via controlled release only after payment smoke checks. Confirm no old V1 new checkouts remain in flight where possible; pending orders use immutable stored order amounts and credits. Verify legacy Pro order settlement independently.
+6. During a controlled production migration, use `WAFFO_CONFIRM_V2_PROD_CUTOVER=true` together with `WAFFO_RECREATE_V2_PRODUCTS=true` to create new production product IDs and explicitly update live mappings. The setup script refuses production V2 provisioning/mapping changes without the cutover acknowledgement. Avoid accidentally running the script on existing live V1 deployment.
+7. Check Waffo product names/credit descriptions, real successful payment, webhook/callback idempotence, old pending orders, refunds, generation paid flow and estimated vs actual provider cost. The branch **does not** perform these live changes.
+8. Rollback **code and Waffo product mapping together**, keeping all paid order snapshots intact. Use V1 remote IDs retained for historical reconciliation. Do not delete credits.
+
+**Important limitation:** The script verifies the **newly created SKU response** against expected currency and price; it cannot guarantee that no subsequent dashboard edits will change it. Always inspect products and complete a Waffo test checkout. Authenticated one-time checkout passes the server-side `priceSnapshot` to the SDK, and settlement rejects mismatched amounts/currencies. Public pack checkout fails closed if any stale `*_test_amount` override is present; only internal smoke checkout may use a Waffo test-environment override.

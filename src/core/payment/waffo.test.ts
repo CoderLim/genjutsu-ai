@@ -12,11 +12,15 @@ import {
   PaymentEventType,
   PaymentInterval,
   PaymentStatus,
+  PaymentType,
   SubscriptionCycleType,
   WebhookIgnoredError,
   type PaymentSession,
 } from './types';
-import { createWaffoProvider } from './waffo';
+import {
+  createWaffoProvider,
+  getWaffoOneTimePriceSnapshot,
+} from './waffo';
 
 const WAFFO_SUBSCRIPTION_RENEWED = 'subscription.renewed';
 const WAFFO_SUBSCRIPTION_RECOVERED = 'subscription.recovered';
@@ -70,6 +74,36 @@ function baseEvent(
     ...overrides,
   };
 }
+
+test('V2 Waffo checkout uses the local one-time order price snapshot', () => {
+  const forPrice = (amount: number, currency = 'usd') =>
+    getWaffoOneTimePriceSnapshot({
+      type: PaymentType.ONE_TIME,
+      price: { amount, currency },
+    });
+
+  assert.deepEqual(forPrice(1499), {
+    amount: '14.99',
+    taxCategory: 'saas',
+  });
+  assert.deepEqual(forPrice(4999), {
+    amount: '49.99',
+    taxCategory: 'saas',
+  });
+  assert.deepEqual(forPrice(9999), {
+    amount: '99.99',
+    taxCategory: 'saas',
+  });
+  assert.equal(forPrice(0), undefined);
+  assert.equal(forPrice(14.2), undefined);
+  assert.equal(
+    getWaffoOneTimePriceSnapshot({
+      type: PaymentType.SUBSCRIPTION,
+      price: { amount: 1499, currency: 'usd' },
+    }),
+    undefined
+  );
+});
 
 test('subscription.payment_succeeded is ignored (ACK path)', () => {
   const internals = providerInternals();
@@ -378,7 +412,8 @@ test('createPayment uses authenticated checkout and preserves merchant order ref
     order: {
       orderNo: 'ORD_local_1',
       productId: 'PROD_1',
-      price: { amount: 499, currency: 'USD' },
+      type: PaymentType.ONE_TIME,
+      price: { amount: 1499, currency: 'USD' },
       customer: {
         id: 'user-123',
         email: 'buyer@example.com',
@@ -386,6 +421,12 @@ test('createPayment uses authenticated checkout and preserves merchant order ref
     },
   });
 
+  // Assert the **actual authenticated SDK call**, not just the pure helper.
+  assert.deepEqual(received?.priceSnapshot, {
+    amount: '14.99',
+    taxCategory: 'saas',
+  });
+  assert.equal(received?.currency, 'USD');
   assert.equal(received?.buyerIdentity, 'user-123');
   assert.equal(received?.orderMerchantExternalId, 'ORD_local_1');
   assert.deepEqual(received?.metadata, { orderNo: 'ORD_local_1' });
@@ -393,6 +434,42 @@ test('createPayment uses authenticated checkout and preserves merchant order ref
   assert.equal(session.metadata.checkoutSessionId, 'SES_provider_1');
   assert.equal(session.metadata.waffoEnvironment, 'prod');
   assert.equal(session.checkoutResult.waffoEnvironment, 'prod');
+});
+
+test('createPayment does not override subscription product price', async () => {
+  const provider = createWaffoProvider({
+    merchantId: 'MER_abcdefghijklmnopqrstuv',
+    privateKey: TEST_PRIVATE_KEY,
+    storeId: 'STO_1',
+    environment: 'test',
+  }) as any;
+
+  let sdkParams: Record<string, unknown> | undefined;
+  provider.ensureWebhook = async () => {};
+  provider.client = {
+    checkout: {
+      authenticated: {
+        create: async (params: Record<string, unknown>) => {
+          sdkParams = params;
+          return {
+            sessionId: 'SES_subscription',
+            checkoutUrl: 'https://checkout.example/subscription',
+          };
+        },
+      },
+    },
+  };
+
+  await provider.createPayment({
+    order: {
+      type: PaymentType.SUBSCRIPTION,
+      orderNo: 'ORD_subscription',
+      productId: 'PROD_subscription',
+      price: { amount: 4999, currency: 'USD' },
+      customer: { id: 'user-sub' },
+    },
+  });
+  assert.equal(sdkParams?.priceSnapshot, undefined);
 });
 
 test('prod provider rejects test_mode webhook settlement', () => {

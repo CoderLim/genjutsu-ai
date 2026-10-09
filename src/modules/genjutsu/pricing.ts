@@ -1,10 +1,6 @@
 export type GenjutsuBillableResolution = '480p' | '720p' | '1080p';
 
-export type GenjutsuPublicCreditPackId =
-  | 'starter'
-  | 'creator'
-  | 'pro'
-  | 'studio';
+export type GenjutsuPublicCreditPackId = 'starter' | 'creator' | 'studio';
 
 export type GenjutsuCreditPackId = GenjutsuPublicCreditPackId | 'smoke';
 
@@ -99,31 +95,26 @@ export const SEEDANCE_VIDEO_REFERENCE_RATE_USD_PER_BILLED_SECOND: Record<
   '1080p': 0.8377668,
 };
 
+/** V2 public one-time credit packs. Keep previous paid orders as immutable snapshots. */
 export const GENJUTSU_CREDIT_PACKS: readonly GenjutsuCreditPack[] = [
   {
     id: 'starter',
     name: 'Starter',
-    priceCents: 499,
-    credits: 500,
+    priceCents: 1499,
+    credits: 1100,
   },
   {
     id: 'creator',
     name: 'Creator',
-    priceCents: 999,
-    credits: 1100,
+    priceCents: 4999,
+    credits: 3900,
     highlighted: true,
-  },
-  {
-    id: 'pro',
-    name: 'Pro',
-    priceCents: 1999,
-    credits: 2400,
   },
   {
     id: 'studio',
     name: 'Studio',
-    priceCents: 3999,
-    credits: 5000,
+    priceCents: 9999,
+    credits: 8400,
   },
 ] as const;
 
@@ -184,6 +175,17 @@ export function estimateSeedanceCredits(input: {
   resolution: GenjutsuBillableResolution;
 }) {
   return calculateGenjutsuCredits(estimateSeedanceListCost(input));
+}
+
+/** Approximate browser price only; reservation always quotes the server provider. */
+export function estimateGenjutsuCreditsForProvider(input: {
+  provider: 'higgsfield' | 'seedance' | 'seedance-volcengine';
+  durationSeconds: number;
+  resolution: GenjutsuBillableResolution;
+}) {
+  return input.provider === 'higgsfield'
+    ? estimateGenjutsuCredits(input)
+    : estimateSeedanceCredits(input);
 }
 
 export function getCreditPack(id: GenjutsuCreditPackId) {

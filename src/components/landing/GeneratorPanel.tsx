@@ -14,7 +14,7 @@ import { toast } from 'sonner';
 
 import { useSession } from '@/core/auth/client';
 import {
-  estimateSeedanceCredits,
+  estimateGenjutsuCreditsForProvider,
   getSmallestSufficientCreditPack,
   type GenjutsuCreditPack,
 } from '@/modules/genjutsu/pricing';
@@ -31,6 +31,7 @@ import {
   type UploadClientDiagnostics,
 } from '@/lib/upload-diagnostics';
 import { m } from '@/paraglide/messages.js';
+import { usePublicConfig } from '@/hooks/use-public-config';
 import { useUserCredits } from '@/hooks/use-user-credits';
 import {
   ChevronDownIcon,
@@ -1138,6 +1139,7 @@ export function GeneratorPanel({
 }: GeneratorPanelProps) {
   const { data: session } = useSession();
   const creditsQuery = useUserCredits(Boolean(session?.user));
+  const { data: publicConfig } = usePublicConfig();
   const [internalMode, setInternalMode] =
     useState<GeneratorMode>('motion-transfer');
   const mode = modeProp ?? internalMode;
@@ -1404,9 +1406,23 @@ export function GeneratorPanel({
   const canGenerate =
     Boolean(video && images.length > 0) && status !== 'generating';
 
+  // Provider selection comes from the same server resolver that starts jobs.
+  // Until loaded, omit a potentially misleading estimate.
+  const rawProvider =
+    mode === 'motion-transfer'
+      ? publicConfig?.genjutsu_motion_provider
+      : publicConfig?.genjutsu_object_swap_provider;
+  const pricingProvider =
+    rawProvider === 'higgsfield' ||
+    rawProvider === 'seedance' ||
+    rawProvider === 'seedance-volcengine'
+      ? rawProvider
+      : null;
+
   const estimatedCredits = useMemo(() => {
     const durationSeconds = video?.durationSeconds;
     if (
+      !pricingProvider ||
       typeof durationSeconds !== 'number' ||
       !Number.isFinite(durationSeconds) ||
       durationSeconds <= 0
@@ -1414,19 +1430,15 @@ export function GeneratorPanel({
       return null;
     }
     try {
-      return estimateSeedanceCredits({
+      return estimateGenjutsuCreditsForProvider({
+        provider: pricingProvider,
         durationSeconds,
         resolution,
       });
     } catch {
       return null;
     }
-  }, [resolution, video?.durationSeconds]);
-
-  const estimateExceedsBalance =
-    estimatedCredits != null &&
-    typeof creditsQuery.data?.balance === 'number' &&
-    creditsQuery.data.balance < estimatedCredits;
+  }, [pricingProvider, resolution, video?.durationSeconds]);
 
   const handleGenerate = async () => {
     if (!video || images.length === 0 || status === 'generating') return;
@@ -1436,19 +1448,9 @@ export function GeneratorPanel({
       return;
     }
 
-    const knownBalance = creditsQuery.data?.balance;
-    if (
-      estimatedCredits != null &&
-      typeof knownBalance === 'number' &&
-      knownBalance < estimatedCredits
-    ) {
-      setError('');
-      setCreditGate({
-        balance: knownBalance,
-        requiredCredits: estimatedCredits,
-      });
-      return;
-    }
+    // Display estimates are not authoritative (Higgsfield can discount them).
+    // Never block here: server provider pricing and reservation return the
+    // actual deficit, if any.
 
     const runId = ++generationRunRef.current;
     const generationId =
@@ -1792,12 +1794,7 @@ export function GeneratorPanel({
           <div className="ml-auto flex w-full items-center justify-end gap-2 sm:w-auto">
             {estimatedCredits != null ? (
               <div
-                className={cn(
-                  'flex shrink-0 items-center gap-1 text-[12px] tabular-nums',
-                  estimateExceedsBalance
-                    ? 'text-[rgb(220,120,90)]'
-                    : 'text-white/50'
-                )}
+                className="flex shrink-0 items-center gap-1 text-[12px] tabular-nums text-white/50"
               >
                 <span>
                   {m['genjutsu.estimate.credits']({
@@ -1818,7 +1815,9 @@ export function GeneratorPanel({
                       align="end"
                       className="max-w-[240px] text-left leading-snug"
                     >
-                      {m['genjutsu.estimate.tooltip']()}
+                      {pricingProvider === 'higgsfield'
+                        ? m['genjutsu.estimate.tooltip']()
+                        : m['genjutsu.estimate.seedance_tooltip']()}
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
