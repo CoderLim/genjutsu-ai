@@ -18,6 +18,7 @@ import {
   assertGenjutsuUploadSize,
   createGenjutsuProxyUploadDescriptor,
   createGenjutsuR2UploadDescriptor,
+  ensureZombieHugTemplateInR2,
   GENJUTSU_PROXY_UPLOAD_MAX_BYTES,
   getGenjutsuInputKey,
 } from '@/modules/genjutsu/storage';
@@ -66,6 +67,29 @@ async function POST({ request }: { request: Request }) {
       contentLengths.length !== ZOMBIE_HUG_IMAGE_COUNT
     ) {
       return respErr('Upload exactly two reference images', { status: 400 });
+    }
+
+    for (const contentType of contentTypes) {
+      const mime = contentType.split(';', 1)[0]?.trim().toLowerCase() || '';
+      if (!mime.startsWith('image/')) {
+        return respErr('Both uploads must be images (JPG, PNG, WebP, or GIF)', {
+          status: 400,
+        });
+      }
+    }
+
+    // Fail before the user uploads photos when the shared motion template is
+    // missing from R2 (Workers cannot seed it from the public/ folder).
+    try {
+      await ensureZombieHugTemplateInR2();
+    } catch (error: any) {
+      return respJson(
+        -1,
+        error?.message ||
+          'Zombie hug template is not configured in R2. Upload public/videos/zombie-hug-tpl.mp4 to genjutsu/templates/zombie-hug.mp4.',
+        { code: 'TEMPLATE_NOT_CONFIGURED' },
+        { status: 503 }
+      );
     }
 
     // Image staging keys use Genjutsu indices 1 and 2 (0 is the template video).

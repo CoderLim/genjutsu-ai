@@ -33,6 +33,7 @@ import {
   submitGenjutsu,
 } from '@/modules/genjutsu/service';
 import {
+  ensureZombieHugTemplateInR2,
   getGenjutsuSealedInputKey,
   getZombieHugTemplateVideoKey,
   resolveGenjutsuInputUrls,
@@ -184,6 +185,26 @@ async function POST({ request }: { request: Request }) {
     }
 
     if (task.status === 'initiated') {
+      try {
+        await ensureZombieHugTemplateInR2();
+      } catch (error: any) {
+        await markGenjutsuAttemptFailedPreflight({
+          generationId,
+          userId: session.user.id,
+          stage: 'template_missing',
+          errorCode: 'TEMPLATE_NOT_CONFIGURED',
+          error:
+            error?.message || 'Zombie hug template is not configured in R2',
+        }).catch(() => undefined);
+        return respJson(
+          -1,
+          error?.message ||
+            'Zombie hug template is not configured in R2. Upload public/videos/zombie-hug-tpl.mp4 to genjutsu/templates/zombie-hug.mp4.',
+          { code: 'TEMPLATE_NOT_CONFIGURED' },
+          { status: 503 }
+        );
+      }
+
       const claimed = await claimGenjutsuSeal({
         generationId,
         userId: session.user.id,
@@ -203,20 +224,33 @@ async function POST({ request }: { request: Request }) {
           );
         }
       } else {
-        const sealed = await sealZombieHugInputs({
-          userId: session.user.id,
-          generationId,
-          imageKeys,
-          contentTypes,
-          contentLengths,
-        });
-        task = await markGenjutsuAttemptReady({
-          generationId,
-          userId: session.user.id,
-          ...sealed,
-        });
-        if (!task || task.status !== 'ready') {
-          throw new Error('Failed to finalize sealed generation inputs');
+        try {
+          const sealed = await sealZombieHugInputs({
+            userId: session.user.id,
+            generationId,
+            imageKeys,
+            contentTypes,
+            contentLengths,
+          });
+          task = await markGenjutsuAttemptReady({
+            generationId,
+            userId: session.user.id,
+            ...sealed,
+          });
+          if (!task || task.status !== 'ready') {
+            throw new Error('Failed to finalize sealed generation inputs');
+          }
+        } catch (error: any) {
+          // claimGenjutsuSeal moved the row to sealing — always exit that
+          // state so retries are not stuck forever.
+          await markGenjutsuAttemptFailedPreflight({
+            generationId,
+            userId: session.user.id,
+            stage: 'seal_inputs',
+            errorCode: 'INPUT_SEAL_FAILED',
+            error: error?.message || 'Failed to seal generation inputs',
+          }).catch(() => undefined);
+          throw error;
         }
       }
     }

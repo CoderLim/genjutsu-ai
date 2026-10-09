@@ -156,6 +156,8 @@ export function ZombieHugGeneratorPanel() {
 
   const survivorInputRef = useRef<HTMLInputElement>(null);
   const lovedOneInputRef = useRef<HTMLInputElement>(null);
+  const survivorUrlRef = useRef<string | null>(null);
+  const lovedOneUrlRef = useRef<string | null>(null);
 
   const estimatedCredits = useMemo(
     () =>
@@ -169,16 +171,26 @@ export function ZombieHugGeneratorPanel() {
   const busy = phase !== 'idle';
 
   useEffect(() => {
+    survivorUrlRef.current = survivorImage?.url ?? null;
+  }, [survivorImage]);
+
+  useEffect(() => {
+    lovedOneUrlRef.current = lovedOneImage?.url ?? null;
+  }, [lovedOneImage]);
+
+  // Unmount-only revoke. Slot setters already revoke the previous URL on replace.
+  useEffect(() => {
     return () => {
-      if (survivorImage) URL.revokeObjectURL(survivorImage.url);
-      if (lovedOneImage) URL.revokeObjectURL(lovedOneImage.url);
+      if (survivorUrlRef.current) URL.revokeObjectURL(survivorUrlRef.current);
+      if (lovedOneUrlRef.current) URL.revokeObjectURL(lovedOneUrlRef.current);
     };
-  }, [survivorImage, lovedOneImage]);
+  }, []);
 
   const setImageAt = (slot: 'survivor' | 'lovedOne', file: File | null) => {
     if (!file) return;
-    if (!file.type.startsWith('image/')) {
-      toast.error('Please upload an image file');
+    const mime = file.type.split(';', 1)[0]?.trim().toLowerCase() || '';
+    if (!mime.startsWith('image/')) {
+      toast.error('Please upload a JPG, PNG, WebP, or GIF image');
       return;
     }
     if (file.size > MAX_IMAGE_BYTES) {
@@ -341,6 +353,14 @@ export function ZombieHugGeneratorPanel() {
           setPhase('idle');
           return;
         }
+        if (data?.code === 'TEMPLATE_NOT_CONFIGURED') {
+          setPhase('idle');
+          toast.error(
+            error.message ||
+              'Zombie hug template is not configured in storage. Contact support.'
+          );
+          return;
+        }
       }
 
       setPhase('idle');
@@ -468,7 +488,7 @@ export function ZombieHugGeneratorPanel() {
                   ? 'Sign in to generate'
                   : busy
                     ? phaseLabel
-                    : `Make my zombie hug video (~${estimatedCredits} credits)`}
+                    : `Make my zombie hug video (~${estimatedCredits} credits est.)`}
               </span>
             </button>
           </div>
