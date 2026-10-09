@@ -14,7 +14,7 @@ import { toast } from 'sonner';
 
 import { useSession } from '@/core/auth/client';
 import {
-  estimateSeedanceCredits,
+  estimateGenjutsuCredits,
   getSmallestSufficientCreditPack,
   type GenjutsuCreditPack,
 } from '@/modules/genjutsu/pricing';
@@ -1414,7 +1414,7 @@ export function GeneratorPanel({
       return null;
     }
     try {
-      return estimateSeedanceCredits({
+      return estimateGenjutsuCredits({
         durationSeconds,
         resolution,
       });
@@ -1422,11 +1422,6 @@ export function GeneratorPanel({
       return null;
     }
   }, [resolution, video?.durationSeconds]);
-
-  const estimateExceedsBalance =
-    estimatedCredits != null &&
-    typeof creditsQuery.data?.balance === 'number' &&
-    creditsQuery.data.balance < estimatedCredits;
 
   const handleGenerate = async () => {
     if (!video || images.length === 0 || status === 'generating') return;
@@ -1436,19 +1431,9 @@ export function GeneratorPanel({
       return;
     }
 
-    const knownBalance = creditsQuery.data?.balance;
-    if (
-      estimatedCredits != null &&
-      typeof knownBalance === 'number' &&
-      knownBalance < estimatedCredits
-    ) {
-      setError('');
-      setCreditGate({
-        balance: knownBalance,
-        requiredCredits: estimatedCredits,
-      });
-      return;
-    }
+    // The browser only has a public list-rate estimate, not Higgsfield's
+    // live quote. Never block here: the server will use provider pricing,
+    // reserve atomically, then return the authoritative deficit if needed.
 
     const runId = ++generationRunRef.current;
     const generationId =
@@ -1792,12 +1777,7 @@ export function GeneratorPanel({
           <div className="ml-auto flex w-full items-center justify-end gap-2 sm:w-auto">
             {estimatedCredits != null ? (
               <div
-                className={cn(
-                  'flex shrink-0 items-center gap-1 text-[12px] tabular-nums',
-                  estimateExceedsBalance
-                    ? 'text-[rgb(220,120,90)]'
-                    : 'text-white/50'
-                )}
+                className="flex shrink-0 items-center gap-1 text-[12px] tabular-nums text-white/50"
               >
                 <span>
                   {m['genjutsu.estimate.credits']({
