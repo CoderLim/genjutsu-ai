@@ -181,6 +181,14 @@ async function main() {
   const v2PublicIds = new Set(['starter', 'creator', 'studio']);
   const recreateV2 = process.env.WAFFO_RECREATE_V2_PRODUCTS === 'true';
 
+  // V2 always uses new public product IDs; a session availability check cannot
+  // validate an existing remote product price. Require explicit provisioning.
+  if (isV2Pricing && !recreateV2) {
+    throw new Error(
+      'V2 requires WAFFO_RECREATE_V2_PRODUCTS=true to provision new priced public SKUs. Existing product IDs cannot bypass price verification.'
+    );
+  }
+
   // Product mappings in DB settings affect LIVE checkout even before a code
   // deployment. Require an explicit cutover acknowledgement in production.
   if (
@@ -220,14 +228,6 @@ async function main() {
     previousMapping = JSON.parse(process.env.WAFFO_PRODUCT_IDS_MAPPING || '{}');
   } catch {
     previousMapping = {};
-  }
-
-  // V2 always uses new public product IDs; a session availability check cannot
-  // validate an existing remote product price. Require explicit provisioning.
-  if (isV2Pricing && !recreateV2) {
-    throw new Error(
-      'V2 requires WAFFO_RECREATE_V2_PRODUCTS=true to provision new priced public SKUs. Existing product IDs cannot bypass price verification.'
-    );
   }
 
   // Rebuild from the current catalog and retire the old Pro checkout mapping.
