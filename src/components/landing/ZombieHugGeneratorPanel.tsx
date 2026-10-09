@@ -903,10 +903,10 @@ export function ZombieHugGeneratorPanel() {
     <div className="mx-auto w-full max-w-[1120px]">
       <div className="overflow-hidden rounded-[26px] border border-white/10 bg-[rgba(22,24,28,0.94)] shadow-[0_30px_90px_-30px_rgba(0,0,0,0.85)] backdrop-blur-2xl">
         <div className="grid gap-0 lg:grid-cols-[0.9fr_1.1fr]">
-          <div className="border-b border-white/8 p-4 sm:p-5 lg:border-r lg:border-b-0">
+          <div className="flex items-center justify-center border-b border-white/8 p-4 sm:p-5 lg:border-r lg:border-b-0">
             <div
               className={cn(
-                'relative mx-auto max-h-[420px] overflow-hidden rounded-2xl border border-white/10 bg-black',
+                'relative mx-auto max-h-[420px] w-full overflow-hidden rounded-2xl border border-white/10 bg-black',
                 aspectRatio === '9:16' ? 'aspect-[9/16]' : 'aspect-video'
               )}
             >

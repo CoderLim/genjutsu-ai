@@ -647,6 +647,10 @@ export const FOOTER_COLUMNS: FooterColumn[] = [
         href: '/hotel-lobby-ai',
       },
       {
+        label: 'AI Zombie Hug',
+        href: '/ai-zombie-hug',
+      },
+      {
         label: 'Person Remover',
         href: 'https://personremover.org',
       },
