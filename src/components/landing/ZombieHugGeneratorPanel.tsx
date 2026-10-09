@@ -264,11 +264,8 @@ export function ZombieHugGeneratorPanel() {
       return;
     }
 
-    const balance = creditsQuery.data?.balance ?? 0;
-    if (!creditsQuery.isPending && balance < estimatedCredits) {
-      setCreditError({ required: estimatedCredits, balance });
-      return;
-    }
+    // As on the homepage, the displayed estimate is informational only.
+    // Higgsfield's server-side quote and credit reservation are authoritative.
 
     setResultUrl(null);
     setProviderStatus('');
@@ -334,12 +331,18 @@ export function ZombieHugGeneratorPanel() {
             ? (error.data as Record<string, unknown>)
             : null;
         if (data?.code === 'INSUFFICIENT_CREDITS') {
-          setCreditError({
-            required: Number(data.requiredCredits) || estimatedCredits,
-            balance: Number(data.balance) || 0,
-          });
-          setPhase('idle');
-          return;
+          const required = Number(data.requiredCredits);
+          const balance = Number(data.balance);
+          if (
+            Number.isFinite(required) &&
+            required > 0 &&
+            Number.isFinite(balance) &&
+            balance >= 0
+          ) {
+            setCreditError({ required, balance });
+            setPhase('idle');
+            return;
+          }
         }
       }
 
