@@ -863,6 +863,7 @@
   "genjutsu.credits.checkout_failed": "无法打开支付页面",
   "genjutsu.estimate.credits": "~{count} cr",
   "genjutsu.estimate.tooltip": "按 Higgsfield 公开标价估算，实际消耗可能因供应商优惠而更低。点击生成后由服务端按实际报价确定积分。",
+  "genjutsu.estimate.seedance_tooltip": "基于 Seedance 视频参考计价规则、所选时长和分辨率的估算值；最终消耗由服务端计算。",
   "genjutsu.estimate.help_aria": "关于预估积分",
   "admin.nav.generations": "生成记录",
   "admin.generations.title": "生成记录",
