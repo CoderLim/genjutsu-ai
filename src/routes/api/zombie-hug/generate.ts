@@ -45,6 +45,7 @@ import {
   sealGenjutsuTemplateR2Inputs,
 } from '@/modules/genjutsu/storage';
 import {
+  getZombieHugTemplateDurationSeconds,
   isZombieHugAspectRatio,
   isZombieHugResolution,
   ZOMBIE_HUG_DEFAULT_ASPECT_RATIO,
@@ -52,7 +53,6 @@ import {
   ZOMBIE_HUG_MODE,
   ZOMBIE_HUG_PRESET,
   ZOMBIE_HUG_PROMPT,
-  ZOMBIE_HUG_TEMPLATE_DURATION_SECONDS,
   type ZombieHugAspectRatio,
   type ZombieHugResolution,
 } from '@/modules/zombie-hug/prompt';
@@ -102,8 +102,9 @@ async function sealZombieHugInputs(params: {
   imageKeys: string[];
   contentTypes: string[];
   contentLengths: number[];
+  aspectRatio: ZombieHugAspectRatio;
 }) {
-  const templateVideoKey = getZombieHugTemplateVideoKey();
+  const templateVideoKey = getZombieHugTemplateVideoKey(params.aspectRatio);
   if (isGenjutsuE2EMockEnabled()) {
     const sealedImageKeys = params.imageKeys.map((sourceKey) =>
       getGenjutsuSealedInputKey({
@@ -222,6 +223,8 @@ async function POST({ request }: { request: Request }) {
     }
 
     const { resolution, aspectRatio } = resolveZombieHugOutputSettings(options);
+    const templateDurationSeconds =
+      getZombieHugTemplateDurationSeconds(aspectRatio);
 
     // During initiated/sealing these are staging keys under genjutsu/inputs/.
     const imageKeys = Array.isArray(options?.imageKeys)
@@ -247,9 +250,11 @@ async function POST({ request }: { request: Request }) {
     if (task.status === 'initiated' || task.status === 'sealing') {
       try {
         if (isGenjutsuE2EMockEnabled()) {
-          ensureGenjutsuE2ETemplateObject(getZombieHugTemplateVideoKey());
+          ensureGenjutsuE2ETemplateObject(
+            getZombieHugTemplateVideoKey(aspectRatio)
+          );
         } else {
-          await ensureZombieHugTemplateInR2();
+          await ensureZombieHugTemplateInR2(aspectRatio);
         }
       } catch (error: any) {
         await markGenjutsuAttemptFailedPreflight({
@@ -263,7 +268,7 @@ async function POST({ request }: { request: Request }) {
         return respJson(
           -1,
           error?.message ||
-            'Zombie hug template is not configured in R2. Upload public/videos/zombie-hug-tpl.mp4 to genjutsu/templates/zombie-hug.mp4.',
+            'Zombie hug template is not configured in R2. Upload the matching public/videos/zombie-hug-tpl*.mp4 to R2.',
           { code: 'TEMPLATE_NOT_CONFIGURED' },
           { status: 503 }
         );
@@ -323,6 +328,7 @@ async function POST({ request }: { request: Request }) {
               imageKeys,
               contentTypes,
               contentLengths,
+              aspectRatio,
             }));
           task = await markGenjutsuAttemptReady({
             generationId,
@@ -399,7 +405,7 @@ async function POST({ request }: { request: Request }) {
       const estimate = await resolveGenjutsuProviderCost({
         ...providerInput,
         ...target,
-        durationSeconds: ZOMBIE_HUG_TEMPLATE_DURATION_SECONDS,
+        durationSeconds: templateDurationSeconds,
       });
       const credits = calculateGenjutsuCredits(
         estimate.customerPriceBasisUsd ?? estimate.providerCostUsd
@@ -419,8 +425,7 @@ async function POST({ request }: { request: Request }) {
         credits,
         providerEstimate: estimate.payload,
         sourceDurationSeconds:
-          estimate.sourceDurationSeconds ??
-          ZOMBIE_HUG_TEMPLATE_DURATION_SECONDS,
+          estimate.sourceDurationSeconds ?? templateDurationSeconds,
       });
 
       if (task.status !== 'reserved') {

@@ -100,15 +100,17 @@ async function POST({ request }: { request: Request }) {
     // missing. E2E mock seeds an in-memory object; real deploys need R2.
     try {
       if (isGenjutsuE2EMockEnabled()) {
-        ensureGenjutsuE2ETemplateObject(getZombieHugTemplateVideoKey());
+        ensureGenjutsuE2ETemplateObject(
+          getZombieHugTemplateVideoKey(aspectRatio)
+        );
       } else {
-        await ensureZombieHugTemplateInR2();
+        await ensureZombieHugTemplateInR2(aspectRatio);
       }
     } catch (error: any) {
       return respJson(
         -1,
         error?.message ||
-          'Zombie hug template is not configured in R2. Upload public/videos/zombie-hug-tpl.mp4 to genjutsu/templates/zombie-hug.mp4.',
+          'Zombie hug template is not configured in R2. Upload the matching public/videos/zombie-hug-tpl*.mp4 to R2.',
         { code: 'TEMPLATE_NOT_CONFIGURED' },
         { status: 503 }
       );

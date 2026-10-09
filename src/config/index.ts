@@ -147,10 +147,13 @@ export const envConfigs: Record<string, string> = {
     procEnv.HOTEL_LOBBY_TEMPLATE_VIDEO_KEY ??
     'hotel-lobby/templates/default.mp4',
 
-  // AI Zombie Hug preset (server-only). Shared motion-transfer source clip in R2.
+  // AI Zombie Hug preset (server-only). Motion-transfer source clips in R2.
   zombie_hug_template_video_key:
     procEnv.ZOMBIE_HUG_TEMPLATE_VIDEO_KEY ??
     'genjutsu/templates/zombie-hug.mp4',
+  zombie_hug_template_video_key_9x16:
+    procEnv.ZOMBIE_HUG_TEMPLATE_VIDEO_KEY_9X16 ??
+    'genjutsu/templates/zombie-hug-9x16.mp4',
 
   // Locale (public)
   locale: publicEnv('VITE_DEFAULT_LOCALE') ?? 'en',

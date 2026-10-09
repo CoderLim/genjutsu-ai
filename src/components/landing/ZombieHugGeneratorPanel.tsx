@@ -15,12 +15,12 @@ import { useSession } from '@/core/auth/client';
 import { Link } from '@/core/i18n/navigation';
 import { estimateGenjutsuCredits } from '@/modules/genjutsu/pricing';
 import {
+  getZombieHugPublicTemplatePath,
+  getZombieHugTemplateDurationSeconds,
   ZOMBIE_HUG_ASPECT_RATIOS,
   ZOMBIE_HUG_DEFAULT_ASPECT_RATIO,
   ZOMBIE_HUG_DEFAULT_RESOLUTION,
-  ZOMBIE_HUG_PUBLIC_TEMPLATE_PATH,
   ZOMBIE_HUG_RESOLUTIONS,
-  ZOMBIE_HUG_TEMPLATE_DURATION_SECONDS,
   type ZombieHugAspectRatio,
   type ZombieHugResolution,
 } from '@/modules/zombie-hug/prompt';
@@ -78,7 +78,8 @@ type PersistedGeneration = {
   reservedCredits: number;
 };
 
-const TEMPLATE_URL = '/api/zombie-hug/template';
+const templateApiUrl = (aspectRatio: ZombieHugAspectRatio) =>
+  `/api/zombie-hug/template?aspect=${encodeURIComponent(aspectRatio)}`;
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
 
 const chipClass =
@@ -236,7 +237,9 @@ export function ZombieHugGeneratorPanel() {
     ZOMBIE_HUG_DEFAULT_ASPECT_RATIO
   );
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [templateUrl, setTemplateUrl] = useState(TEMPLATE_URL);
+  const [templateUrl, setTemplateUrl] = useState(() =>
+    templateApiUrl(ZOMBIE_HUG_DEFAULT_ASPECT_RATIO)
+  );
   const [phase, setPhase] = useState<
     'idle' | 'uploading' | 'starting' | 'generating' | 'saving' | 'locked'
   >('idle');
@@ -260,11 +263,15 @@ export function ZombieHugGeneratorPanel() {
   const estimatedCredits = useMemo(
     () =>
       estimateGenjutsuCredits({
-        durationSeconds: ZOMBIE_HUG_TEMPLATE_DURATION_SECONDS,
+        durationSeconds: getZombieHugTemplateDurationSeconds(aspectRatio),
         resolution,
       }),
-    [resolution]
+    [aspectRatio, resolution]
   );
+
+  useEffect(() => {
+    setTemplateUrl(templateApiUrl(aspectRatio));
+  }, [aspectRatio]);
 
   useEffect(() => {
     if (!settingsOpen) return;
@@ -846,8 +853,9 @@ export function ZombieHugGeneratorPanel() {
                 preload="metadata"
                 className="size-full object-contain"
                 onError={() => {
-                  if (templateUrl !== ZOMBIE_HUG_PUBLIC_TEMPLATE_PATH) {
-                    setTemplateUrl(ZOMBIE_HUG_PUBLIC_TEMPLATE_PATH);
+                  const fallback = getZombieHugPublicTemplatePath(aspectRatio);
+                  if (templateUrl !== fallback) {
+                    setTemplateUrl(fallback);
                   }
                 }}
               />
