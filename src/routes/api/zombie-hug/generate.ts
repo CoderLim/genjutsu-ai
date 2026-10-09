@@ -45,11 +45,16 @@ import {
   sealGenjutsuTemplateR2Inputs,
 } from '@/modules/genjutsu/storage';
 import {
+  isZombieHugAspectRatio,
+  isZombieHugResolution,
+  ZOMBIE_HUG_DEFAULT_ASPECT_RATIO,
+  ZOMBIE_HUG_DEFAULT_RESOLUTION,
   ZOMBIE_HUG_MODE,
   ZOMBIE_HUG_PRESET,
   ZOMBIE_HUG_PROMPT,
-  ZOMBIE_HUG_RESOLUTION,
   ZOMBIE_HUG_TEMPLATE_DURATION_SECONDS,
+  type ZombieHugAspectRatio,
+  type ZombieHugResolution,
 } from '@/modules/zombie-hug/prompt';
 import { enforceMinIntervalRateLimit } from '@/lib/rate-limit';
 import { respData, respErr, respJson } from '@/lib/resp';
@@ -61,6 +66,22 @@ function parseOptions(value: string | null | undefined) {
   } catch {
     return null;
   }
+}
+
+function resolveZombieHugOutputSettings(
+  options: Record<string, unknown> | null
+) {
+  const resolution: ZombieHugResolution = isZombieHugResolution(
+    options?.resolution
+  )
+    ? options.resolution
+    : ZOMBIE_HUG_DEFAULT_RESOLUTION;
+  const aspectRatio: ZombieHugAspectRatio = isZombieHugAspectRatio(
+    options?.aspectRatio
+  )
+    ? options.aspectRatio
+    : ZOMBIE_HUG_DEFAULT_ASPECT_RATIO;
+  return { resolution, aspectRatio };
 }
 
 function taskResponse(task: any) {
@@ -81,7 +102,9 @@ async function sealZombieHugInputs(params: {
   imageKeys: string[];
   contentTypes: string[];
   contentLengths: number[];
+  aspectRatio: ZombieHugAspectRatio;
 }) {
+  const templateVideoKey = getZombieHugTemplateVideoKey(params.aspectRatio);
   if (isGenjutsuE2EMockEnabled()) {
     const sealedImageKeys = params.imageKeys.map((sourceKey) =>
       getGenjutsuSealedInputKey({
@@ -93,10 +116,7 @@ async function sealZombieHugInputs(params: {
     const sealedVideoKey = sealedImageKeys[0]
       .replace(/reference-\d+\./, 'source.')
       .replace(/\.(jpg|png|webp|gif|avif|heic|heif)$/i, '.mp4');
-    sealGenjutsuE2EStorageObject(
-      getZombieHugTemplateVideoKey(),
-      sealedVideoKey
-    );
+    sealGenjutsuE2EStorageObject(templateVideoKey, sealedVideoKey);
     params.imageKeys.forEach((sourceKey, index) =>
       sealGenjutsuE2EStorageObject(sourceKey, sealedImageKeys[index])
     );
@@ -109,7 +129,7 @@ async function sealZombieHugInputs(params: {
   return sealGenjutsuTemplateR2Inputs({
     userId: params.userId,
     generationId: params.generationId,
-    templateVideoKey: getZombieHugTemplateVideoKey(),
+    templateVideoKey,
     imageKeys: params.imageKeys,
     expectedContentTypes: params.contentTypes,
     expectedContentLengths: params.contentLengths,
@@ -202,6 +222,8 @@ async function POST({ request }: { request: Request }) {
       });
     }
 
+    const { resolution, aspectRatio } = resolveZombieHugOutputSettings(options);
+
     // During initiated/sealing these are staging keys under genjutsu/inputs/.
     const imageKeys = Array.isArray(options?.imageKeys)
       ? options.imageKeys.filter(
@@ -226,9 +248,11 @@ async function POST({ request }: { request: Request }) {
     if (task.status === 'initiated' || task.status === 'sealing') {
       try {
         if (isGenjutsuE2EMockEnabled()) {
-          ensureGenjutsuE2ETemplateObject(getZombieHugTemplateVideoKey());
+          ensureGenjutsuE2ETemplateObject(
+            getZombieHugTemplateVideoKey(aspectRatio)
+          );
         } else {
-          await ensureZombieHugTemplateInR2();
+          await ensureZombieHugTemplateInR2(aspectRatio);
         }
       } catch (error: any) {
         await markGenjutsuAttemptFailedPreflight({
@@ -242,7 +266,7 @@ async function POST({ request }: { request: Request }) {
         return respJson(
           -1,
           error?.message ||
-            'Zombie hug template is not configured in R2. Upload public/videos/zombie-hug-tpl.mp4 to genjutsu/templates/zombie-hug.mp4.',
+            'Zombie hug template is not configured in R2. Upload the matching public/videos/zombie-hug-tpl*.mp4 to R2.',
           { code: 'TEMPLATE_NOT_CONFIGURED' },
           { status: 503 }
         );
@@ -302,6 +326,7 @@ async function POST({ request }: { request: Request }) {
               imageKeys,
               contentTypes,
               contentLengths,
+              aspectRatio,
             }));
           task = await markGenjutsuAttemptReady({
             generationId,
@@ -362,7 +387,7 @@ async function POST({ request }: { request: Request }) {
 
     const providerInput = {
       mode: ZOMBIE_HUG_MODE,
-      resolution: ZOMBIE_HUG_RESOLUTION,
+      resolution,
       prompt: ZOMBIE_HUG_PROMPT,
       ...mediaUrls,
     };
@@ -389,7 +414,7 @@ async function POST({ request }: { request: Request }) {
         userId: session.user.id,
         userEmail: session.user.email,
         mode: ZOMBIE_HUG_MODE,
-        resolution: ZOMBIE_HUG_RESOLUTION,
+        resolution,
         prompt: ZOMBIE_HUG_PROMPT,
         videoKey: sealedVideoKey,
         imageKeys: sealedImageKeys,

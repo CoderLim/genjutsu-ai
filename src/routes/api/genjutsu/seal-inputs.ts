@@ -22,6 +22,10 @@ import {
   sealGenjutsuR2Inputs,
   sealGenjutsuTemplateR2Inputs,
 } from '@/modules/genjutsu/storage';
+import {
+  isZombieHugAspectRatio,
+  ZOMBIE_HUG_DEFAULT_ASPECT_RATIO,
+} from '@/modules/zombie-hug/prompt';
 import { enforceMinIntervalRateLimit } from '@/lib/rate-limit';
 import { respData, respErr, respJson } from '@/lib/resp';
 
@@ -86,6 +90,12 @@ async function POST({ request }: { request: Request }) {
     }
 
     const useDefaultTemplate = currentOptions?.useDefaultTemplate === true;
+    const templateAspectRatio = isZombieHugAspectRatio(
+      currentOptions?.aspectRatio
+    )
+      ? currentOptions.aspectRatio
+      : ZOMBIE_HUG_DEFAULT_ASPECT_RATIO;
+    const zombieTemplateKey = getZombieHugTemplateVideoKey(templateAspectRatio);
     const videoKey =
       typeof currentOptions?.videoKey === 'string'
         ? currentOptions.videoKey
@@ -221,10 +231,7 @@ async function POST({ request }: { request: Request }) {
           const sealedVideoKey = sealedImageKeys[0]
             .replace(/reference-\d+\./, 'source.')
             .replace(/\.(jpg|png|webp|gif|avif|heic|heif)$/i, '.mp4');
-          sealGenjutsuE2EStorageObject(
-            getZombieHugTemplateVideoKey(),
-            sealedVideoKey
-          );
+          sealGenjutsuE2EStorageObject(zombieTemplateKey, sealedVideoKey);
           imageKeys.forEach((sourceKey: string, index: number) =>
             sealGenjutsuE2EStorageObject(sourceKey, sealedImageKeys[index])
           );
@@ -253,7 +260,7 @@ async function POST({ request }: { request: Request }) {
         sealed = await sealGenjutsuTemplateR2Inputs({
           userId: uid,
           generationId: gid,
-          templateVideoKey: getZombieHugTemplateVideoKey(),
+          templateVideoKey: zombieTemplateKey,
           imageKeys,
           expectedContentTypes: contentTypes,
           expectedContentLengths: contentLengths,

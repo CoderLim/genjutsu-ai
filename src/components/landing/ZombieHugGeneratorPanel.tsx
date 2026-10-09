@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
   type ChangeEvent,
+  type ReactNode,
   type RefObject,
 } from 'react';
 import { CircleHelp, Download } from 'lucide-react';
@@ -14,15 +15,20 @@ import { useSession } from '@/core/auth/client';
 import { Link } from '@/core/i18n/navigation';
 import { estimateGenjutsuCredits } from '@/modules/genjutsu/pricing';
 import {
-  ZOMBIE_HUG_PUBLIC_TEMPLATE_PATH,
-  ZOMBIE_HUG_RESOLUTION,
+  getZombieHugPublicTemplatePath,
+  ZOMBIE_HUG_ASPECT_RATIOS,
+  ZOMBIE_HUG_DEFAULT_ASPECT_RATIO,
+  ZOMBIE_HUG_DEFAULT_RESOLUTION,
+  ZOMBIE_HUG_RESOLUTIONS,
   ZOMBIE_HUG_TEMPLATE_DURATION_SECONDS,
+  type ZombieHugAspectRatio,
+  type ZombieHugResolution,
 } from '@/modules/zombie-hug/prompt';
 import { ApiError, apiGet, apiPost, uploadToSignedUrl } from '@/lib/api-client';
 import { cn } from '@/lib/cn';
 import { m } from '@/paraglide/messages.js';
 import { useUserCredits } from '@/hooks/use-user-credits';
-import { CloseIcon, ImageModeIcon } from '@/components/icons';
+import { ChevronDownIcon, CloseIcon, ImageModeIcon } from '@/components/icons';
 import {
   Tooltip,
   TooltipContent,
@@ -72,8 +78,67 @@ type PersistedGeneration = {
   reservedCredits: number;
 };
 
-const TEMPLATE_URL = '/api/zombie-hug/template';
+const templateApiUrl = (aspectRatio: ZombieHugAspectRatio) =>
+  `/api/zombie-hug/template?aspect=${encodeURIComponent(aspectRatio)}`;
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
+
+const chipClass =
+  'inline-flex h-7 max-w-full min-w-0 shrink-0 items-center gap-1 rounded-lg border border-transparent bg-[rgba(94,96,104,0.3)] px-2 text-[12px] font-medium text-secondary-foreground/88 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-2xl transition-all duration-200 hover:bg-[rgba(109,112,121,0.36)] disabled:cursor-not-allowed disabled:opacity-50';
+
+const selectedOptionClass =
+  'border-transparent bg-[rgba(120,87,60,0.9)] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.045)]';
+
+const idleOptionClass =
+  'border-transparent bg-transparent text-foreground/68 hover:bg-[rgba(98,71,51,0.28)] hover:text-foreground/88';
+
+function SectionLabel({ children }: { children: ReactNode }) {
+  return (
+    <div className="text-foreground/55 mb-1.5 px-1 text-[10px] font-medium">
+      {children}
+    </div>
+  );
+}
+
+function OptionRow({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex gap-1 rounded-[11px] bg-[rgba(72,52,38,0.2)] p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.015)]">
+      {children}
+    </div>
+  );
+}
+
+function SegmentButton({
+  selected,
+  onClick,
+  children,
+}: {
+  selected: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'relative flex h-7 min-w-0 flex-1 items-center justify-center overflow-visible rounded-[9px] px-2 text-[13px] font-medium transition-all duration-200',
+        selected ? selectedOptionClass : idleOptionClass
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+function FloatingPanel({ children }: { children: ReactNode }) {
+  return (
+    <div className="animate-in fade-in slide-in-from-bottom-1 absolute bottom-full left-0 z-[1000] mb-2 w-[min(calc(100vw-2rem),280px)] max-w-[calc(100vw-1rem)] duration-200">
+      <div className="overflow-y-hidden rounded-[20px] bg-[rgba(41,30,23,0.992)] p-2.5 shadow-[0_40px_80px_-12px_rgba(0,0,0,0.66)] backdrop-blur-2xl">
+        {children}
+      </div>
+    </div>
+  );
+}
 const activeGenerationKey = (userId: string) =>
   `zombie_hug_active_generation:${userId}`;
 
@@ -165,12 +230,23 @@ export function ZombieHugGeneratorPanel() {
 
   const [survivorImage, setSurvivorImage] = useState<MediaItem | null>(null);
   const [lovedOneImage, setLovedOneImage] = useState<MediaItem | null>(null);
-  const [templateUrl, setTemplateUrl] = useState(TEMPLATE_URL);
+  const [resolution, setResolution] = useState<ZombieHugResolution>(
+    ZOMBIE_HUG_DEFAULT_RESOLUTION
+  );
+  const [aspectRatio, setAspectRatio] = useState<ZombieHugAspectRatio>(
+    ZOMBIE_HUG_DEFAULT_ASPECT_RATIO
+  );
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [templateUrl, setTemplateUrl] = useState(() =>
+    templateApiUrl(ZOMBIE_HUG_DEFAULT_ASPECT_RATIO)
+  );
   const [phase, setPhase] = useState<
     'idle' | 'uploading' | 'starting' | 'generating' | 'saving' | 'locked'
   >('idle');
   const [generationId, setGenerationId] = useState<string | null>(null);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
+  const [resultAspectRatio, setResultAspectRatio] =
+    useState<ZombieHugAspectRatio>(ZOMBIE_HUG_DEFAULT_ASPECT_RATIO);
   const [jobError, setJobError] = useState('');
   const [creditError, setCreditError] = useState<{
     required: number;
@@ -182,15 +258,41 @@ export function ZombieHugGeneratorPanel() {
   const survivorUrlRef = useRef<string | null>(null);
   const lovedOneUrlRef = useRef<string | null>(null);
   const generationRunRef = useRef(0);
+  const settingsRef = useRef<HTMLDivElement>(null);
 
   const estimatedCredits = useMemo(
     () =>
       estimateGenjutsuCredits({
         durationSeconds: ZOMBIE_HUG_TEMPLATE_DURATION_SECONDS,
-        resolution: ZOMBIE_HUG_RESOLUTION,
+        resolution,
       }),
-    []
+    [resolution]
   );
+
+  useEffect(() => {
+    setTemplateUrl(templateApiUrl(aspectRatio));
+  }, [aspectRatio]);
+
+  useEffect(() => {
+    if (!settingsOpen) return;
+    const onPointerDown = (event: MouseEvent) => {
+      if (
+        settingsRef.current &&
+        !settingsRef.current.contains(event.target as Node)
+      ) {
+        setSettingsOpen(false);
+      }
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setSettingsOpen(false);
+    };
+    document.addEventListener('mousedown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [settingsOpen]);
 
   const busy =
     phase === 'uploading' ||
@@ -578,6 +680,8 @@ export function ZombieHugGeneratorPanel() {
         generationId: id,
         contentTypes,
         contentLengths,
+        resolution,
+        aspectRatio,
       });
 
       if (setup.uploads.length !== files.length) {
@@ -611,6 +715,7 @@ export function ZombieHugGeneratorPanel() {
       );
 
       setPhase('starting');
+      setResultAspectRatio(aspectRatio);
       const start = await apiPost<GenerationStart>('/api/zombie-hug/generate', {
         generationId: id,
       });
@@ -739,8 +844,8 @@ export function ZombieHugGeneratorPanel() {
                   Motion template
                 </p>
                 <p className="mt-0.5 text-xs leading-5 text-white/40">
-                  Fixed zombie hug performance · 9:16 · ~24 sec. You only upload
-                  two photos.
+                  Fixed zombie hug performance · {aspectRatio} · ~24 sec. You
+                  only upload two photos.
                 </p>
               </div>
               <span className="border-primary/20 bg-primary/10 text-primary shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-semibold">
@@ -748,7 +853,12 @@ export function ZombieHugGeneratorPanel() {
               </span>
             </div>
 
-            <div className="relative mx-auto aspect-[9/16] max-h-[420px] overflow-hidden rounded-2xl border border-white/10 bg-black">
+            <div
+              className={cn(
+                'relative mx-auto max-h-[420px] overflow-hidden rounded-2xl border border-white/10 bg-black',
+                aspectRatio === '9:16' ? 'aspect-[9/16]' : 'aspect-video'
+              )}
+            >
               <video
                 key={templateUrl}
                 src={templateUrl}
@@ -758,14 +868,16 @@ export function ZombieHugGeneratorPanel() {
                 preload="metadata"
                 className="size-full object-contain"
                 onError={() => {
-                  if (templateUrl !== ZOMBIE_HUG_PUBLIC_TEMPLATE_PATH) {
-                    setTemplateUrl(ZOMBIE_HUG_PUBLIC_TEMPLATE_PATH);
+                  const fallback = getZombieHugPublicTemplatePath(aspectRatio);
+                  if (templateUrl !== fallback) {
+                    setTemplateUrl(fallback);
                   }
                 }}
               />
             </div>
             <p className="mt-3 text-center text-[11px] text-white/34">
-              Trending · October 2026 ｜ 24 sec · 9:16 ｜ Ready in ~10 minutes
+              Trending · October 2026 ｜ 24 sec · {aspectRatio} ｜ Ready in ~10
+              minutes
             </p>
           </div>
 
@@ -820,47 +932,113 @@ export function ZombieHugGeneratorPanel() {
             </div>
           ) : null}
 
-          <div className="ml-auto flex w-full items-center justify-end gap-2 sm:w-auto">
-            {estimatedCredits != null ? (
-              <div className="flex shrink-0 items-center gap-1 text-[12px] text-white/50 tabular-nums">
-                <span>
-                  {m['genjutsu.estimate.credits']({
-                    count: estimatedCredits.toLocaleString(),
-                  })}
+          <div className="relative flex flex-wrap items-center gap-1.5 sm:gap-2">
+            <div className="relative" ref={settingsRef}>
+              <button
+                type="button"
+                aria-expanded={settingsOpen}
+                aria-haspopup="dialog"
+                disabled={busy}
+                onClick={() => setSettingsOpen((v) => !v)}
+                className={cn(
+                  chipClass,
+                  'gap-1',
+                  settingsOpen && 'bg-[rgba(109,112,121,0.42)]'
+                )}
+              >
+                <span className="text-foreground/90 font-medium">
+                  {resolution}
                 </span>
-                <TooltipProvider delay={200}>
-                  <Tooltip>
-                    <TooltipTrigger
-                      type="button"
-                      className="inline-flex size-4 items-center justify-center rounded-full text-current/70 transition-colors hover:text-current"
-                      aria-label={m['genjutsu.estimate.help_aria']()}
-                    >
-                      <CircleHelp className="size-3.5" aria-hidden />
-                    </TooltipTrigger>
-                    <TooltipContent
-                      side="top"
-                      align="end"
-                      className="max-w-[240px] text-left leading-snug"
-                    >
-                      {m['genjutsu.estimate.tooltip']()}
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </div>
-            ) : null}
-            <button
-              type="button"
-              disabled={!canGenerate}
-              onClick={() => void generate()}
-              className={cn(
-                'relative inline-flex h-8 flex-1 items-center justify-center rounded-lg px-3.5 text-sm font-semibold tracking-wide shadow-none transition-all duration-200 active:scale-95 sm:w-auto sm:flex-none',
-                canGenerate
-                  ? 'bg-[rgb(204,144,92)] text-[rgb(247,246,243)] hover:brightness-105'
-                  : 'bg-[rgba(126,128,132,0.28)] text-[rgb(237,234,222)]/38'
-              )}
-            >
-              {busy ? 'Generating…' : 'Generate'}
-            </button>
+                <span className="text-white/35">·</span>
+                <span className="text-foreground/90 font-medium">
+                  {aspectRatio}
+                </span>
+                <ChevronDownIcon
+                  className={cn(
+                    'ml-0.5 size-3.5 opacity-60 transition-transform duration-200',
+                    settingsOpen && 'rotate-180'
+                  )}
+                />
+              </button>
+
+              {settingsOpen ? (
+                <FloatingPanel>
+                  <div className="space-y-2">
+                    <section className="p-1">
+                      <SectionLabel>Resolution</SectionLabel>
+                      <OptionRow>
+                        {ZOMBIE_HUG_RESOLUTIONS.map((n) => (
+                          <SegmentButton
+                            key={n}
+                            selected={resolution === n}
+                            onClick={() => setResolution(n)}
+                          >
+                            {n}
+                          </SegmentButton>
+                        ))}
+                      </OptionRow>
+                    </section>
+                    <section className="p-1">
+                      <SectionLabel>Aspect ratio</SectionLabel>
+                      <OptionRow>
+                        {ZOMBIE_HUG_ASPECT_RATIOS.map((n) => (
+                          <SegmentButton
+                            key={n}
+                            selected={aspectRatio === n}
+                            onClick={() => setAspectRatio(n)}
+                          >
+                            {n}
+                          </SegmentButton>
+                        ))}
+                      </OptionRow>
+                    </section>
+                  </div>
+                </FloatingPanel>
+              ) : null}
+            </div>
+
+            <div className="ml-auto flex w-full items-center justify-end gap-2 sm:w-auto">
+              {estimatedCredits != null ? (
+                <div className="flex shrink-0 items-center gap-1 text-[12px] text-white/50 tabular-nums">
+                  <span>
+                    {m['genjutsu.estimate.credits']({
+                      count: estimatedCredits.toLocaleString(),
+                    })}
+                  </span>
+                  <TooltipProvider delay={200}>
+                    <Tooltip>
+                      <TooltipTrigger
+                        type="button"
+                        className="inline-flex size-4 items-center justify-center rounded-full text-current/70 transition-colors hover:text-current"
+                        aria-label={m['genjutsu.estimate.help_aria']()}
+                      >
+                        <CircleHelp className="size-3.5" aria-hidden />
+                      </TooltipTrigger>
+                      <TooltipContent
+                        side="top"
+                        align="end"
+                        className="max-w-[240px] text-left leading-snug"
+                      >
+                        {m['genjutsu.estimate.tooltip']()}
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+              ) : null}
+              <button
+                type="button"
+                disabled={!canGenerate}
+                onClick={() => void generate()}
+                className={cn(
+                  'relative inline-flex h-8 flex-1 items-center justify-center rounded-lg px-3.5 text-sm font-semibold tracking-wide shadow-none transition-all duration-200 active:scale-95 sm:w-auto sm:flex-none',
+                  canGenerate
+                    ? 'bg-[rgb(204,144,92)] text-[rgb(247,246,243)] hover:brightness-105'
+                    : 'bg-[rgba(126,128,132,0.28)] text-[rgb(237,234,222)]/38'
+                )}
+              >
+                {busy ? 'Generating…' : 'Generate'}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -896,7 +1074,10 @@ export function ZombieHugGeneratorPanel() {
             controls
             autoPlay
             playsInline
-            className="mx-auto aspect-[9/16] max-h-[720px] w-full max-w-full rounded-2xl bg-black object-contain"
+            className={cn(
+              'mx-auto max-h-[720px] w-full max-w-full rounded-2xl bg-black object-contain',
+              resultAspectRatio === '9:16' ? 'aspect-[9/16]' : 'aspect-video'
+            )}
           />
         </div>
       ) : null}

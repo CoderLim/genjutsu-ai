@@ -25,11 +25,16 @@ import {
   getZombieHugTemplateVideoKey,
 } from '@/modules/genjutsu/storage';
 import {
+  isZombieHugAspectRatio,
+  isZombieHugResolution,
+  ZOMBIE_HUG_DEFAULT_ASPECT_RATIO,
+  ZOMBIE_HUG_DEFAULT_RESOLUTION,
   ZOMBIE_HUG_IMAGE_COUNT,
   ZOMBIE_HUG_MODE,
   ZOMBIE_HUG_PRESET,
   ZOMBIE_HUG_PROMPT,
-  ZOMBIE_HUG_RESOLUTION,
+  type ZombieHugAspectRatio,
+  type ZombieHugResolution,
 } from '@/modules/zombie-hug/prompt';
 import { enforceMinIntervalRateLimit } from '@/lib/rate-limit';
 import { respData, respErr, respJson } from '@/lib/resp';
@@ -54,6 +59,17 @@ async function POST({ request }: { request: Request }) {
     const body = await request.json().catch(() => ({}));
     const generationId = assertGenerationId(body.generationId);
     generationIdForFailure = generationId;
+
+    const resolution: ZombieHugResolution = isZombieHugResolution(
+      body.resolution
+    )
+      ? body.resolution
+      : ZOMBIE_HUG_DEFAULT_RESOLUTION;
+    const aspectRatio: ZombieHugAspectRatio = isZombieHugAspectRatio(
+      body.aspectRatio
+    )
+      ? body.aspectRatio
+      : ZOMBIE_HUG_DEFAULT_ASPECT_RATIO;
 
     const contentTypes = Array.isArray(body.contentTypes)
       ? body.contentTypes.filter(
@@ -84,15 +100,17 @@ async function POST({ request }: { request: Request }) {
     // missing. E2E mock seeds an in-memory object; real deploys need R2.
     try {
       if (isGenjutsuE2EMockEnabled()) {
-        ensureGenjutsuE2ETemplateObject(getZombieHugTemplateVideoKey());
+        ensureGenjutsuE2ETemplateObject(
+          getZombieHugTemplateVideoKey(aspectRatio)
+        );
       } else {
-        await ensureZombieHugTemplateInR2();
+        await ensureZombieHugTemplateInR2(aspectRatio);
       }
     } catch (error: any) {
       return respJson(
         -1,
         error?.message ||
-          'Zombie hug template is not configured in R2. Upload public/videos/zombie-hug-tpl.mp4 to genjutsu/templates/zombie-hug.mp4.',
+          'Zombie hug template is not configured in R2. Upload the matching public/videos/zombie-hug-tpl*.mp4 to R2.',
         { code: 'TEMPLATE_NOT_CONFIGURED' },
         { status: 503 }
       );
@@ -126,7 +144,7 @@ async function POST({ request }: { request: Request }) {
       generationId,
       userId: session.user.id,
       mode: ZOMBIE_HUG_MODE,
-      resolution: ZOMBIE_HUG_RESOLUTION,
+      resolution,
       prompt: ZOMBIE_HUG_PROMPT,
       provider,
       model,
@@ -136,12 +154,13 @@ async function POST({ request }: { request: Request }) {
       generationId,
       userId: session.user.id,
       mode: ZOMBIE_HUG_MODE,
-      resolution: ZOMBIE_HUG_RESOLUTION,
+      resolution,
       prompt: ZOMBIE_HUG_PROMPT,
       provider,
       model,
       useDefaultTemplate: true,
       preset: ZOMBIE_HUG_PRESET,
+      aspectRatio,
       imageKeys: normalizedInputs.map((item: { key: string }) => item.key),
       contentTypes: normalizedInputs.map(
         (item: { contentType: string }) => item.contentType

@@ -816,7 +816,15 @@ export async function createGenjutsuR2ReadUrl(key: string) {
   return signed.url;
 }
 
-export function getZombieHugTemplateVideoKey() {
+export function getZombieHugTemplateVideoKey(
+  aspectRatio: '16:9' | '9:16' = '16:9'
+) {
+  if (aspectRatio === '9:16') {
+    return (
+      envConfigs.zombie_hug_template_video_key_9x16?.trim() ||
+      'genjutsu/templates/zombie-hug-9x16.mp4'
+    );
+  }
   return (
     envConfigs.zombie_hug_template_video_key?.trim() ||
     'genjutsu/templates/zombie-hug.mp4'
@@ -875,10 +883,12 @@ async function putGenjutsuObjectBytes(params: {
 
 /**
  * Ensure the shared zombie-hug motion template exists in R2. On local Node,
- * seed it from public/videos/zombie-hug-tpl.mp4 when missing.
+ * seed it from the matching public/videos/zombie-hug-tpl*.mp4 when missing.
  */
-export async function ensureZombieHugTemplateInR2() {
-  const key = getZombieHugTemplateVideoKey();
+export async function ensureZombieHugTemplateInR2(
+  aspectRatio: '16:9' | '9:16' = '16:9'
+) {
+  const key = getZombieHugTemplateVideoKey(aspectRatio);
   assertSafeObjectKey(key);
   if (!key.startsWith('genjutsu/')) {
     throw new Error('Zombie hug template key must be under genjutsu/');
@@ -891,19 +901,21 @@ export async function ensureZombieHugTemplateInR2() {
     // continue to seed
   }
 
+  const localRelative =
+    aspectRatio === '9:16'
+      ? 'public/videos/zombie-hug-tpl-9x16.mp4'
+      : 'public/videos/zombie-hug-tpl.mp4';
+
   if (isCloudflareWorkersRuntime()) {
     throw new Error(
-      `Zombie hug template missing from R2 (${key}). Upload public/videos/zombie-hug-tpl.mp4 to that key.`
+      `Zombie hug template missing from R2 (${key}). Upload ${localRelative} to that key.`
     );
   }
 
   const { readFile } = await import('node:fs/promises');
   const { existsSync } = await import('node:fs');
   const path = await import('node:path');
-  const localPath = path.join(
-    process.cwd(),
-    'public/videos/zombie-hug-tpl.mp4'
-  );
+  const localPath = path.join(process.cwd(), localRelative);
   if (!existsSync(localPath)) {
     throw new Error(
       `Zombie hug template missing from R2 (${key}) and local file ${localPath} was not found`
@@ -919,8 +931,10 @@ export async function ensureZombieHugTemplateInR2() {
   return key;
 }
 
-export async function getZombieHugTemplatePreviewUrl() {
-  const key = await ensureZombieHugTemplateInR2();
+export async function getZombieHugTemplatePreviewUrl(
+  aspectRatio: '16:9' | '9:16' = '16:9'
+) {
+  const key = await ensureZombieHugTemplateInR2(aspectRatio);
   return createGenjutsuR2ReadUrl(key);
 }
 
@@ -986,10 +1000,14 @@ export async function sealGenjutsuTemplateR2Inputs(params: {
     throw new Error('Invalid Genjutsu template input set');
   }
 
+  const landscapeKey = getZombieHugTemplateVideoKey('16:9');
+  const portraitKey = getZombieHugTemplateVideoKey('9:16');
   const templateVideoKey =
-    params.templateVideoKey === getZombieHugTemplateVideoKey()
-      ? await ensureZombieHugTemplateInR2()
-      : params.templateVideoKey;
+    params.templateVideoKey === landscapeKey
+      ? await ensureZombieHugTemplateInR2('16:9')
+      : params.templateVideoKey === portraitKey
+        ? await ensureZombieHugTemplateInR2('9:16')
+        : params.templateVideoKey;
 
   assertSafeObjectKey(templateVideoKey);
   if (!templateVideoKey.startsWith('genjutsu/')) {

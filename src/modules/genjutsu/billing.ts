@@ -132,6 +132,7 @@ function assertReusableUploadBinding(
     contentLengths: number[];
     useDefaultTemplate?: boolean;
     preset?: string;
+    aspectRatio?: string;
   }
 ) {
   if (task.status !== 'initiated') {
@@ -162,6 +163,7 @@ function assertReusableUploadBinding(
   const matches =
     Boolean(options?.useDefaultTemplate) === useDefaultTemplate &&
     (options?.preset || undefined) === (params.preset || undefined) &&
+    (options?.aspectRatio || undefined) === (params.aspectRatio || undefined) &&
     (useDefaultTemplate || options.videoKey === params.videoKey) &&
     imageKeys !== null &&
     imageKeys.length === params.imageKeys.length &&
@@ -282,6 +284,7 @@ export async function bindGenjutsuUploadInputs(params: {
   contentLengths: number[];
   useDefaultTemplate?: boolean;
   preset?: string;
+  aspectRatio?: string;
 }) {
   return db().transaction(async (tx: any) => {
     const [task] = await tx
@@ -315,6 +318,7 @@ export async function bindGenjutsuUploadInputs(params: {
       ...currentOptions,
       useDefaultTemplate: Boolean(params.useDefaultTemplate),
       ...(params.preset ? { preset: params.preset } : {}),
+      ...(params.aspectRatio ? { aspectRatio: params.aspectRatio } : {}),
       ...(params.videoKey ? { videoKey: params.videoKey } : {}),
       imageKeys: params.imageKeys,
       contentTypes: params.contentTypes,
