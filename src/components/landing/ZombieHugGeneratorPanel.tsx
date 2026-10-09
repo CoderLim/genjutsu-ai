@@ -319,17 +319,12 @@ export function ZombieHugGeneratorPanel() {
         ) {
           preReservePolls += 1;
 
-          if (poll.providerStatus === 'sealing') {
-            setPhase('starting');
-            setJobError('Finishing upload seal for the previous generation…');
-            delayMs = Math.min(5_000, Math.ceil(delayMs * 1.2));
-            continue;
-          }
-
           if (preReservePolls < RESUME_GRACE_POLLS) {
             setPhase('starting');
             setJobError(
-              'Waiting to confirm whether the previous generation already started…'
+              poll.providerStatus === 'sealing'
+                ? 'Finishing upload seal for the previous generation…'
+                : 'Waiting to confirm whether the previous generation already started…'
             );
             delayMs = Math.min(5_000, Math.ceil(delayMs * 1.2));
             continue;
@@ -396,6 +391,17 @@ export function ZombieHugGeneratorPanel() {
                   : 'Submission result is uncertain. Credits remain reserved; do not retry this generation.'
               );
               return;
+            }
+
+            // Active seal lease — keep waiting until stale reclaim is allowed.
+            if (code === 'GENERATION_SEAL_IN_PROGRESS') {
+              resumeAttempts = Math.max(0, resumeAttempts - 1);
+              setPhase('starting');
+              setJobError(
+                'Upload seal is still in progress. Waiting to reclaim the same job if it stalls…'
+              );
+              delayMs = Math.min(5_000, Math.ceil(delayMs * 1.2));
+              continue;
             }
 
             // Only unlock when the server proves no credits were held.

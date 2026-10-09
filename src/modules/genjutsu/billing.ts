@@ -1,4 +1,4 @@
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, lt } from 'drizzle-orm';
 
 import { db } from '@/core/db';
 import { aiTask } from '@/config/db/schema';
@@ -415,6 +415,70 @@ export async function claimGenjutsuSeal(params: {
     return JSON.parse(current.taskResult)?.sealClaim === sealClaim;
   } catch {
     return false;
+  }
+}
+
+/** How long a seal claim may sit before another request can reclaim it. */
+export const GENJUTSU_SEAL_STALE_MS = 90_000;
+
+/**
+ * Reclaim a stuck `sealing` row after the lease expires (worker crash between
+ * claimGenjutsuSeal and markGenjutsuAttemptReady). Same generationId; new sealClaim.
+ */
+export async function reclaimStaleGenjutsuSeal(params: {
+  generationId: string;
+  userId: string;
+  staleAfterMs?: number;
+}): Promise<'reclaimed' | 'not_stale' | 'unavailable'> {
+  const staleAfterMs = params.staleAfterMs ?? GENJUTSU_SEAL_STALE_MS;
+  const existing = await getGenjutsuTaskById(params);
+  if (!existing) return 'unavailable';
+  if (existing.status === 'ready') return 'unavailable';
+  if (existing.status !== 'sealing') return 'unavailable';
+
+  const updatedAtMs =
+    existing.updatedAt instanceof Date
+      ? existing.updatedAt.getTime()
+      : Number(existing.updatedAt);
+  if (
+    !Number.isFinite(updatedAtMs) ||
+    Date.now() - updatedAtMs < staleAfterMs
+  ) {
+    return 'not_stale';
+  }
+
+  const sealClaim = getUuid();
+  const cutoff = new Date(Date.now() - staleAfterMs);
+  await db()
+    .update(aiTask)
+    .set({
+      status: 'sealing',
+      taskResult: JSON.stringify({
+        sealClaim,
+        reclaimedAt: Date.now(),
+      }),
+    })
+    .where(
+      and(
+        eq(aiTask.id, params.generationId),
+        eq(aiTask.userId, params.userId),
+        eq(aiTask.scene, GENJUTSU_SCENE),
+        eq(aiTask.status, 'sealing'),
+        lt(aiTask.updatedAt, cutoff)
+      )
+    );
+
+  const current = await getGenjutsuTaskById(params);
+  if (!current) return 'unavailable';
+  if (current.status === 'ready') return 'unavailable';
+  if (current.status !== 'sealing' || !current.taskResult) return 'unavailable';
+
+  try {
+    return JSON.parse(current.taskResult)?.sealClaim === sealClaim
+      ? 'reclaimed'
+      : 'not_stale';
+  } catch {
+    return 'unavailable';
   }
 }
 

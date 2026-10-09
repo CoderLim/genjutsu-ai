@@ -924,6 +924,47 @@ export async function getZombieHugTemplatePreviewUrl() {
   return createGenjutsuR2ReadUrl(key);
 }
 
+/** HEAD helper that returns false on missing objects (does not throw). */
+export async function genjutsuR2ObjectExists(key: string): Promise<boolean> {
+  assertSafeObjectKey(key);
+  const result = await headR2ObjectResult(key);
+  return result.status === 'ok';
+}
+
+/**
+ * If a prior seal crash left sealed R2 objects for this generationId, return
+ * those keys so the caller can mark ready without re-copying.
+ */
+export async function findExistingSealedGenjutsuTemplateInputs(params: {
+  userId: string;
+  generationId: string;
+  imageKeys: string[];
+}): Promise<{ videoKey: string; imageKeys: string[] } | null> {
+  if (params.imageKeys.length < 1) return null;
+
+  const sealedImageKeys = params.imageKeys.map((stagingKey) =>
+    getGenjutsuSealedInputKey({
+      userId: params.userId,
+      generationId: params.generationId,
+      stagingKey,
+    })
+  );
+
+  for (const key of sealedImageKeys) {
+    if (!(await genjutsuR2ObjectExists(key))) return null;
+  }
+
+  const sealedPrefix = getGenjutsuSealedInputPrefix(params);
+  for (const ext of ['mp4', 'mov', 'webm'] as const) {
+    const videoKey = `${sealedPrefix}source.${ext}`;
+    if (await genjutsuR2ObjectExists(videoKey)) {
+      return { videoKey, imageKeys: sealedImageKeys };
+    }
+  }
+
+  return null;
+}
+
 /**
  * Seal motion-transfer inputs when the source video is a shared R2 template
  * (user only uploaded reference images).

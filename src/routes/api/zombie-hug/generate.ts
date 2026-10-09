@@ -12,11 +12,13 @@ import {
   markGenjutsuSubmissionUnknown,
   markGenjutsuSubmitted,
   parseGenjutsuTaskInfo,
+  reclaimStaleGenjutsuSeal,
   refundGenjutsuGeneration,
   reserveGenjutsuCredits,
 } from '@/modules/genjutsu/billing';
 import {
   ensureGenjutsuE2ETemplateObject,
+  getGenjutsuE2EUrlForStorageKey,
   isGenjutsuE2EMockEnabled,
   resolveGenjutsuE2EInputUrls,
   sealGenjutsuE2EStorageObject,
@@ -36,6 +38,7 @@ import {
 } from '@/modules/genjutsu/service';
 import {
   ensureZombieHugTemplateInR2,
+  findExistingSealedGenjutsuTemplateInputs,
   getGenjutsuSealedInputKey,
   getZombieHugTemplateVideoKey,
   resolveGenjutsuInputUrls,
@@ -46,6 +49,7 @@ import {
   ZOMBIE_HUG_PRESET,
   ZOMBIE_HUG_PROMPT,
   ZOMBIE_HUG_RESOLUTION,
+  ZOMBIE_HUG_TEMPLATE_DURATION_SECONDS,
 } from '@/modules/zombie-hug/prompt';
 import { enforceMinIntervalRateLimit } from '@/lib/rate-limit';
 import { respData, respErr, respJson } from '@/lib/resp';
@@ -112,6 +116,34 @@ async function sealZombieHugInputs(params: {
   });
 }
 
+async function findExistingSealedZombieHugInputs(params: {
+  userId: string;
+  generationId: string;
+  imageKeys: string[];
+}) {
+  if (isGenjutsuE2EMockEnabled()) {
+    const sealedImageKeys = params.imageKeys.map((stagingKey) =>
+      getGenjutsuSealedInputKey({
+        userId: params.userId,
+        generationId: params.generationId,
+        stagingKey,
+      })
+    );
+    const sealedVideoKey = sealedImageKeys[0]
+      .replace(/reference-\d+\./, 'source.')
+      .replace(/\.(jpg|png|webp|gif|avif|heic|heif)$/i, '.mp4');
+    if (
+      !getGenjutsuE2EUrlForStorageKey(sealedVideoKey) ||
+      sealedImageKeys.some((key) => !getGenjutsuE2EUrlForStorageKey(key))
+    ) {
+      return null;
+    }
+    return { videoKey: sealedVideoKey, imageKeys: sealedImageKeys };
+  }
+
+  return findExistingSealedGenjutsuTemplateInputs(params);
+}
+
 async function POST({ request }: { request: Request }) {
   const limited = enforceMinIntervalRateLimit(request, {
     intervalMs: 1_500,
@@ -147,7 +179,11 @@ async function POST({ request }: { request: Request }) {
       );
     }
 
-    if (task.status !== 'initiated' && task.status !== 'ready') {
+    if (
+      task.status !== 'initiated' &&
+      task.status !== 'sealing' &&
+      task.status !== 'ready'
+    ) {
       if (task.status === 'reserved' || task.status === 'submitting') {
         // Fall through to claim/submit if somehow mid-flight.
       } else {
@@ -166,6 +202,7 @@ async function POST({ request }: { request: Request }) {
       });
     }
 
+    // During initiated/sealing these are staging keys under genjutsu/inputs/.
     const imageKeys = Array.isArray(options?.imageKeys)
       ? options.imageKeys.filter(
           (value: unknown): value is string => typeof value === 'string'
@@ -186,7 +223,7 @@ async function POST({ request }: { request: Request }) {
       });
     }
 
-    if (task.status === 'initiated') {
+    if (task.status === 'initiated' || task.status === 'sealing') {
       try {
         if (isGenjutsuE2EMockEnabled()) {
           ensureGenjutsuE2ETemplateObject(getZombieHugTemplateVideoKey());
@@ -211,33 +248,58 @@ async function POST({ request }: { request: Request }) {
         );
       }
 
-      const claimed = await claimGenjutsuSeal({
-        generationId,
-        userId: session.user.id,
-      });
-      if (!claimed) {
-        task = await getGenjutsuTaskById({
+      let ownSeal = false;
+      if (task.status === 'initiated') {
+        ownSeal = await claimGenjutsuSeal({
           generationId,
           userId: session.user.id,
         });
-        if (!task) throw new Error('Generation attempt disappeared');
-        if (task.status !== 'ready' && task.status !== 'reserved') {
-          return respJson(
-            -1,
-            'Generation inputs are already being sealed',
-            { code: 'GENERATION_SEAL_IN_PROGRESS' },
-            { status: 409 }
-          );
+      }
+
+      if (!ownSeal) {
+        const reclaim = await reclaimStaleGenjutsuSeal({
+          generationId,
+          userId: session.user.id,
+        });
+        if (reclaim === 'reclaimed') {
+          ownSeal = true;
+        } else {
+          task = await getGenjutsuTaskById({
+            generationId,
+            userId: session.user.id,
+          });
+          if (!task) throw new Error('Generation attempt disappeared');
+          if (task.status === 'ready' || task.status === 'reserved') {
+            // Another worker finished seal — continue to reserve/submit.
+          } else if (reclaim === 'not_stale' || task.status === 'sealing') {
+            return respJson(
+              -1,
+              'Generation inputs are already being sealed',
+              { code: 'GENERATION_SEAL_IN_PROGRESS' },
+              { status: 409 }
+            );
+          } else {
+            return respData(taskResponse(task));
+          }
         }
-      } else {
+      }
+
+      if (ownSeal) {
         try {
-          const sealed = await sealZombieHugInputs({
+          const existing = await findExistingSealedZombieHugInputs({
             userId: session.user.id,
             generationId,
             imageKeys,
-            contentTypes,
-            contentLengths,
           });
+          const sealed =
+            existing ??
+            (await sealZombieHugInputs({
+              userId: session.user.id,
+              generationId,
+              imageKeys,
+              contentTypes,
+              contentLengths,
+            }));
           task = await markGenjutsuAttemptReady({
             generationId,
             userId: session.user.id,
@@ -247,8 +309,8 @@ async function POST({ request }: { request: Request }) {
             throw new Error('Failed to finalize sealed generation inputs');
           }
         } catch (error: any) {
-          // claimGenjutsuSeal moved the row to sealing — always exit that
-          // state so retries are not stuck forever.
+          // We own the sealing lease — always exit that state so retries are
+          // not stuck forever after a failed reclaim/reseal.
           await markGenjutsuAttemptFailedPreflight({
             generationId,
             userId: session.user.id,
@@ -307,9 +369,12 @@ async function POST({ request }: { request: Request }) {
     };
 
     if (task.status === 'ready') {
+      // Pass fixed template duration so list-rate fallback matches the UI
+      // estimate when Higgsfield /estimate (and probe) are unavailable.
       const estimate = await resolveGenjutsuProviderCost({
         ...providerInput,
         ...target,
+        durationSeconds: ZOMBIE_HUG_TEMPLATE_DURATION_SECONDS,
       });
       const credits = calculateGenjutsuCredits(
         estimate.customerPriceBasisUsd ?? estimate.providerCostUsd
@@ -328,7 +393,9 @@ async function POST({ request }: { request: Request }) {
         providerCostUsd: estimate.providerCostUsd,
         credits,
         providerEstimate: estimate.payload,
-        sourceDurationSeconds: estimate.sourceDurationSeconds,
+        sourceDurationSeconds:
+          estimate.sourceDurationSeconds ??
+          ZOMBIE_HUG_TEMPLATE_DURATION_SECONDS,
       });
 
       if (task.status !== 'reserved') {
