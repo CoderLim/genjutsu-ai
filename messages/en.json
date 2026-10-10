@@ -1278,5 +1278,20 @@
   "site.hotel.faq9_q": "Can I make it longer or in HD?",
   "site.hotel.faq9_a": "Yes. The output length follows the reference video, which must be 3–15 seconds and between 720×720 and 3840×3840 pixels. Custom clips keep their own framing; the preset booth template is landscape.",
   "site.hotel.faq10_q": "Can I replace the preset Hotel Lobby template?",
-  "site.hotel.faq10_a": "Yes. The preset reference performance is loaded by default, but you can remove it and upload your own 3–15 second MP4 or MOV. The generator will use that clip’s duration automatically."
+  "site.hotel.faq10_a": "Yes. The preset reference performance is loaded by default, but you can remove it and upload your own 3–15 second MP4 or MOV. The generator will use that clip’s duration automatically.",
+  "site.hotel.compare1": "What you upload",
+  "site.hotel.compare2": "1–2 photos; preset video included",
+  "site.hotel.compare3": "4–30s source clip + references",
+  "site.hotel.compare4": "Copies source motion",
+  "site.hotel.compare5": "Yes, from the preset or your replacement clip",
+  "site.hotel.compare6": "Yes, in Motion Transfer",
+  "site.hotel.compare7": "Need to find the Hotel Lobby clip",
+  "site.hotel.compare8": "No",
+  "site.hotel.compare9": "Yes, if that is the motion you want",
+  "site.hotel.compare10": "Default output",
+  "site.hotel.compare11": "Matches the reference clip",
+  "site.hotel.compare12": "Up to 1080p · source-driven",
+  "site.hotel.compare13": "Prompt writing",
+  "site.hotel.compare14": "No fixed prompt exposed",
+  "site.hotel.compare15": "Optional / workflow-dependent"
 }
