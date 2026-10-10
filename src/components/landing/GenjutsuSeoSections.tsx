@@ -24,6 +24,27 @@ const HOW_COPY = [
   { title: m['site.seo.step2_title'], description: m['site.seo.step2_desc'] },
   { title: m['site.seo.step3_title'], description: m['site.seo.step3_desc'] },
 ];
+const EXAMPLE_COPY = [
+  m['site.seo.example1'],
+  m['site.seo.example2'],
+  m['site.seo.example3'],
+  m['site.seo.example4'],
+  m['site.seo.example5'],
+  m['site.seo.example6'],
+];
+const HOWTO_COPY = [
+  { title: m['site.seo.howto1_title'], description: m['site.seo.howto1_desc'] },
+  { title: m['site.seo.howto2_title'], description: m['site.seo.howto2_desc'] },
+  { title: m['site.seo.howto3_title'], description: m['site.seo.howto3_desc'] },
+  { title: m['site.seo.howto4_title'], description: m['site.seo.howto4_desc'] },
+  { title: m['site.seo.howto5_title'], description: m['site.seo.howto5_desc'] },
+];
+const VS_COPY = [
+  { label: m['site.seo.vs1_label'], ours: m['site.seo.vs1_ours'], official: m['site.seo.vs1_official'] },
+  { label: m['site.seo.vs2_label'], ours: m['site.seo.vs2_ours'], official: m['site.seo.vs2_official'] },
+  { label: m['site.seo.vs3_label'], ours: m['site.seo.vs3_ours'], official: m['site.seo.vs3_official'] },
+  { label: m['site.seo.vs4_label'], ours: m['site.seo.vs4_ours'], official: m['site.seo.vs4_official'] },
+];
 const CHANGE_COPY = [
   { title: m['site.seo.change_products'], description: m['site.seo.change_products_desc'] },
   { title: m['site.seo.change_styles'], description: m['site.seo.change_styles_desc'] },
@@ -128,13 +149,13 @@ export function WhatYouCanChange({ className }: { className?: string }) {
           })}
         </div>
         <div className="mx-auto mt-12 grid max-w-[1180px] gap-4 sm:grid-cols-2">
-          {GENJUTSU_CHANGE_EXAMPLES.map((example) => (
+          {GENJUTSU_CHANGE_EXAMPLES.map((example, index) => (
             <div
               key={example}
               className="rounded-2xl border border-white/8 bg-white/[0.03] p-5"
             >
               <p className="text-foreground/70 text-sm leading-relaxed">
-                {example}
+                {EXAMPLE_COPY[index]?.() ?? example}
               </p>
             </div>
           ))}
@@ -153,7 +174,7 @@ export function HowToUseGenerator({ className }: { className?: string }) {
           description={m['site.seo.howto_desc']()}
         />
         <ol className="mx-auto mt-12 max-w-3xl space-y-8">
-          {GENJUTSU_HOWTO_STEPS.map((item) => (
+          {GENJUTSU_HOWTO_STEPS.map((item, index) => (
             <li key={item.step} className="flex gap-4">
               <span
                 className={cn(
@@ -165,10 +186,10 @@ export function HowToUseGenerator({ className }: { className?: string }) {
               </span>
               <div className="min-w-0 flex-1">
                 <h3 className="text-foreground text-xl font-bold">
-                  {item.title}
+                  {HOWTO_COPY[index]?.title() ?? item.title}
                 </h3>
                 <p className="text-foreground/70 mt-2 text-base leading-relaxed">
-                  {item.description}
+                  {HOWTO_COPY[index]?.description() ?? item.description}
                 </p>
               </div>
             </li>
@@ -252,19 +273,19 @@ export function VsOfficial({ className }: { className?: string }) {
               </tr>
             </thead>
             <tbody>
-              {GENJUTSU_VS_ROWS.map((row) => (
+              {GENJUTSU_VS_ROWS.map((row, index) => (
                 <tr
                   key={row.label}
                   className="border-border/50 border-b last:border-b-0"
                 >
                   <th className="text-foreground px-5 py-4 align-top font-medium">
-                    {row.label}
+                    {VS_COPY[index]?.label() ?? row.label}
                   </th>
                   <td className="text-foreground/70 px-5 py-4 align-top leading-relaxed">
-                    {row.ours}
+                    {VS_COPY[index]?.ours() ?? row.ours}
                   </td>
                   <td className="text-foreground/70 px-5 py-4 align-top leading-relaxed">
-                    {row.official}
+                    {VS_COPY[index]?.official() ?? row.official}
                   </td>
                 </tr>
               ))}
