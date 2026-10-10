@@ -643,6 +643,10 @@ export const FOOTER_COLUMNS: FooterColumn[] = [
     title: 'Tools',
     links: [
       {
+        label: 'Bulin 47 AI',
+        href: '/bulin-47-ai',
+      },
+      {
         label: 'Hotel Lobby AI',
         href: '/hotel-lobby-ai',
       },
