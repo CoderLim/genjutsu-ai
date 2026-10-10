@@ -59,11 +59,41 @@ const FAQ_ITEMS = [
   },
 ] as const;
 
+
+const ZOMBIE_FAQ_COPY = [
+  { question: m['site.zombie.faq1_q'], answer: m['site.zombie.faq1_a'] },
+  { question: m['site.zombie.faq2_q'], answer: m['site.zombie.faq2_a'] },
+  { question: m['site.zombie.faq3_q'], answer: m['site.zombie.faq3_a'] },
+  { question: m['site.zombie.faq4_q'], answer: m['site.zombie.faq4_a'] },
+  { question: m['site.zombie.faq5_q'], answer: m['site.zombie.faq5_a'] },
+  { question: m['site.zombie.faq6_q'], answer: m['site.zombie.faq6_a'] },
+  { question: m['site.zombie.faq7_q'], answer: m['site.zombie.faq7_a'] },
+  { question: m['site.zombie.faq8_q'], answer: m['site.zombie.faq8_a'] },
+];
+function getZombieFaqItems() {
+  return FAQ_ITEMS.map((item, index) => ({
+    ...item,
+    question: ZOMBIE_FAQ_COPY[index]?.question() ?? item.question,
+    answer: ZOMBIE_FAQ_COPY[index]?.answer() ?? item.answer,
+  }));
+}
+const ZOMBIE_PHOTO_COPY = [
+  { need: m['site.zombie.photo1_need'], why: m['site.zombie.photo1_why'] },
+  { need: m['site.zombie.photo2_need'], why: m['site.zombie.photo2_why'] },
+  { need: m['site.zombie.photo3_need'], why: m['site.zombie.photo3_why'] },
+  { need: m['site.zombie.photo4_need'], why: m['site.zombie.photo4_why'] },
+];
+const ZOMBIE_VERSION_COPY = [
+  { title: m['site.zombie.version1_title'], description: m['site.zombie.version1_desc'] },
+  { title: m['site.zombie.version2_title'], description: m['site.zombie.version2_desc'] },
+  { title: m['site.zombie.version3_title'], description: m['site.zombie.version3_desc'] },
+];
+
 function faqJsonLd() {
   return {
     '@context': 'https://schema.org',
     '@type': 'FAQPage',
-    mainEntity: FAQ_ITEMS.map((item) => ({
+    mainEntity: getZombieFaqItems().map((item) => ({
       '@type': 'Question',
       name: item.question,
       acceptedAnswer: {
@@ -250,13 +280,7 @@ function AiZombieHugPage() {
               <div>
                 <p className="text-foreground/85 font-medium">{m['site.zombie.cold']()}</p>
                 <blockquote className="border-border/60 bg-background/50 mt-2 rounded-xl border p-4">
-                  Cinematic 9:16 shot, rainy empty city street at dusk. A young
-                  woman with pale gray skin, clouded eyes and a thin streak of
-                  dried blood on her cheek stands six meters away, breathing
-                  hard. In the foreground, a man&apos;s hands shake as he raises
-                  a pistol, then slowly lowers it. She screams and charges
-                  toward him. Desaturated blue-gray grade, shallow depth of
-                  field, film grain, 24 fps.
+                  {m['site.zombie.cold_prompt']()}
                 </blockquote>
               </div>
               <div>
@@ -264,10 +288,7 @@ function AiZombieHugPage() {
                   {m['site.zombie.warm']()}
                 </p>
                 <blockquote className="border-border/60 bg-background/50 mt-2 rounded-xl border p-4">
-                  Cinematic 9:16 shot, golden sunset beach. The same young
-                  woman, alive and healthy, laughing as she runs into the
-                  man&apos;s open arms. He lifts her off the ground. Warm golden
-                  grade, soft lens flare, film grain, 24 fps.
+                  {m['site.zombie.warm_prompt']()}
                 </blockquote>
               </div>
             </div>
@@ -304,12 +325,12 @@ function AiZombieHugPage() {
                     'No kids, no public figures',
                     'Only people who agreed to it; label the video as AI where the platform asks',
                   ],
-                ].map(([need, why]) => (
+                ].map(([need, why], index) => (
                   <tr key={need}>
                     <td className="text-foreground/80 px-4 py-3 font-medium">
-                      {need}
+                      {ZOMBIE_PHOTO_COPY[index]?.need() ?? need}
                     </td>
-                    <td className="px-4 py-3">{why}</td>
+                    <td className="px-4 py-3">{ZOMBIE_PHOTO_COPY[index]?.why() ?? why}</td>
                   </tr>
                 ))}
               </tbody>
@@ -335,14 +356,14 @@ function AiZombieHugPage() {
                 'The family version',
                 "A parent you'd never shoot. This one lands hardest with people doing it as a memory, so keep the zombie makeup light around the eyes and mouth.",
               ],
-            ].map(([title, text]) => (
+            ].map(([title, text], index) => (
               <div
                 key={title}
                 className="border-border/70 bg-card/95 rounded-2xl border p-5"
               >
-                <h3 className="text-foreground font-semibold">{title}</h3>
+                <h3 className="text-foreground font-semibold">{ZOMBIE_VERSION_COPY[index]?.title() ?? title}</h3>
                 <p className="text-muted-foreground mt-2 text-sm leading-6">
-                  {text}
+                  {ZOMBIE_VERSION_COPY[index]?.description() ?? text}
                 </p>
               </div>
             ))}
@@ -372,7 +393,7 @@ function AiZombieHugPage() {
             FAQ
           </h2>
           <div className="border-border/70 bg-card/60 divide-border/60 mt-7 divide-y rounded-2xl border px-5 sm:px-7">
-            {FAQ_ITEMS.map((item) => (
+            {getZombieFaqItems().map((item) => (
               <details key={item.question} className="group py-5">
                 <summary className="text-foreground/85 cursor-pointer list-none pr-6 text-sm font-semibold sm:text-base">
                   {item.question}
