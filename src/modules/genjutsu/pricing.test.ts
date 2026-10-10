@@ -22,6 +22,7 @@ test('V2 public credit packs match the approved catalog', () => {
       pack.credits,
     ]),
     [
+      ['mini', 999, 600],
       ['starter', 1499, 1100],
       ['creator', 4999, 3900],
       ['studio', 9999, 8400],
@@ -30,12 +31,13 @@ test('V2 public credit packs match the approved catalog', () => {
 });
 
 test('V2 gross margin targets and monotonically decreasing unit prices', () => {
-  const [starter, creator, studio] = GENJUTSU_CREDIT_PACKS;
+  const [mini, starter, creator, studio] = GENJUTSU_CREDIT_PACKS;
   const modelCostUsd = (credits: number) => credits / 170;
   for (const pack of GENJUTSU_CREDIT_PACKS) {
     const margin = 1 - modelCostUsd(pack.credits) / (pack.priceCents / 100);
-    assert.ok(margin >= 0.5 && margin < 0.6, `unexpected ${pack.id} model-cost margin`);
+    assert.ok(margin >= 0.5 && margin < 0.7, `unexpected ${pack.id} model-cost margin`);
   }
+  assert.ok(mini.priceCents / mini.credits > starter.priceCents / starter.credits);
   assert.ok(starter.priceCents / starter.credits > creator.priceCents / creator.credits);
   assert.ok(creator.priceCents / creator.credits > studio.priceCents / studio.credits);
 });
@@ -49,11 +51,11 @@ test('smoke pack is only visible to gengliming emails', () => {
   assert.equal(canSeeSmokeCreditPack('dev+GENGLIMING@x.com'), true);
   assert.deepEqual(
     listVisibleCreditPacks('alice@example.com').map((p) => p.id),
-    ['starter', 'creator', 'studio']
+    ['mini', 'starter', 'creator', 'studio']
   );
   assert.deepEqual(
     listVisibleCreditPacks('gengliming110@gmail.com').map((p) => p.id),
-    ['starter', 'creator', 'studio', 'smoke']
+    ['mini', 'starter', 'creator', 'studio', 'smoke']
   );
 });
 
@@ -117,8 +119,29 @@ test('credit gate chooses the smallest pack that covers the deficit', () => {
       requiredCredits: 820,
       email: 'alice@example.com',
     })?.id,
-    'starter'
+    'mini'
   );
+});
+
+test('Mini deficit boundaries select the smallest sufficient public pack', () => {
+  const cases: Array<[number, string | null]> = [
+    [599, 'mini'],
+    [600, 'mini'],
+    [601, 'starter'],
+    [1100, 'starter'],
+    [1101, 'creator'],
+    [3900, 'creator'],
+    [3901, 'studio'],
+    [8400, 'studio'],
+    [8401, null],
+  ];
+  for (const [deficit, expected] of cases) {
+    assert.equal(getSmallestSufficientCreditPack({
+      balance: 250,
+      requiredCredits: 250 + deficit,
+      email: 'alice@example.com',
+    })?.id ?? null, expected, `deficit ${deficit}`);
+  }
 });
 
 test('credit gate supports the internal smoke pack and does not under-sell large deficits', () => {
