@@ -1364,5 +1364,10 @@
   "site.zombie.version3_title": "가족 버전",
   "site.zombie.version3_desc": "소중한 가족과의 추억을 담는 버전입니다. 눈과 입 주변의 좀비 분장을 가볍게 하면 감정이 더 잘 전달됩니다.",
   "site.zombie.cold_prompt": "시네마틱 9:16 세로 영상. 비 내리는 해 질 녘 텅 빈 도시 거리. 창백한 회색 피부와 흐릿한 눈, 볼의 옅은 피 자국이 있는 여성이 6미터 앞에서 거칠게 숨을 쉰다. 앞쪽 남자가 떨리는 손으로 권총을 들었다가 천천히 내린다. 여자가 소리치며 달려온다. 채도를 낮춘 청회색 톤, 얕은 심도, 필름 그레인, 24fps.",
-  "site.zombie.warm_prompt": "시네마틱 9:16 세로 영상. 황금빛 노을이 지는 해변. 앞 장면의 여성이 건강하고 밝은 모습으로 웃으며 남자의 품으로 달려가고 남자는 그녀를 들어 올린다. 따뜻한 황금빛 색보정, 부드러운 렌즈 플레어, 필름 그레인, 24fps."
+  "site.zombie.warm_prompt": "시네마틱 9:16 세로 영상. 황금빛 노을이 지는 해변. 앞 장면의 여성이 건강하고 밝은 모습으로 웃으며 남자의 품으로 달려가고 남자는 그녀를 들어 올린다. 따뜻한 황금빛 색보정, 부드러운 렌즈 플레어, 필름 그레인, 24fps.",
+  "site.zombie.survivor_note": "감염되지 않은 생존자/총을 든 인물. 본인의 선명한 정면 사진.",
+  "site.zombie.loved_note": "초반에는 좀비, 후반에는 원래 모습으로 돌아오는 같은 인물의 사진.",
+  "site.zombie.upload_photo": "사진 업로드",
+  "site.zombie.photo_hint": "JPG, PNG, WebP · 최대 12MB",
+  "site.zombie.provider_label": "Higgsfield Genjutsu · 모션 전송"
 }
