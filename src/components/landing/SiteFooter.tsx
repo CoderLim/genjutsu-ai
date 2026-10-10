@@ -7,6 +7,20 @@ import { m } from '@/paraglide/messages.js';
 import { RaphaelLogo } from '@/components/icons';
 import { FOOTER_COLUMNS } from '@/components/landing/content';
 
+function translatedFooterText(value: string) {
+  switch (value) {
+    case 'About': return m['site.footer.about']();
+    case 'Tools': return m['site.footer.tools']();
+    case 'Features': return m['site.footer.features']();
+    case 'Pricing': return m['site.header.pricing']();
+    case 'Blog': return m['site.header.blog']();
+    case 'Partners': return m['site.footer.partners']();
+    case 'Person Remover': return m['site.footer.personremover']();
+    case 'Video Text Remover': return m['site.footer.videotextremover']();
+    default: return value; // Brand/product labels are intentionally retained.
+  }
+}
+
 const GITHUB_REPO_URL = 'https://github.com/limbuilder/genjutsu-ai';
 
 const isExternalHref = (href: string) => /^https?:\/\//.test(href);
@@ -86,16 +100,16 @@ export function SiteFooter() {
 
             <div className="grid w-full max-w-md grid-cols-2 gap-8">
               {FOOTER_COLUMNS.map((column) => (
-                <div key={column.title}>
+                <div key={translatedFooterText(column.title)}>
                   <p className="text-foreground mb-6 font-bold">
-                    {column.title}
+                    {translatedFooterText(column.title)}
                   </p>
                   <ul className="space-y-3">
                     {column.links.map((link) => (
                       <li key={link.label}>
                         <FooterLink
                           href={link.href}
-                          label={link.label}
+                          label={translatedFooterText(link.label)}
                           badge={link.badge}
                         />
                       </li>
