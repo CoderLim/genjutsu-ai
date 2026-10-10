@@ -7,7 +7,7 @@ import {
   listPricingProducts,
 } from './pricing';
 
-test('V2 server checkout resolves exactly three public USD packs', () => {
+test('V2 server checkout resolves exactly four public USD packs', () => {
   const publicProducts = listPricingProducts('buyer@example.com');
   assert.deepEqual(
     publicProducts.map(({ productId, priceInCents, credits }) => [
@@ -16,6 +16,7 @@ test('V2 server checkout resolves exactly three public USD packs', () => {
       credits,
     ]),
     [
+      ['mini', 999, 600],
       ['starter', 1499, 1100],
       ['creator', 4999, 3900],
       ['studio', 9999, 8400],
