@@ -8,16 +8,49 @@ import {
 
 import { Link } from '@/core/i18n/navigation';
 import { cn } from '@/lib/cn';
+import { m } from '@/paraglide/messages.js';
+import { getLocalizedGenjutsuPromptIdeas } from '@/components/landing/genjutsu-prompts-i18n';
 import {
   GENJUTSU_CHANGE_EXAMPLES,
   GENJUTSU_CHANGE_ITEMS,
   GENJUTSU_HOW_IT_WORKS,
   GENJUTSU_HOWTO_STEPS,
-  GENJUTSU_PROMPT_IDEAS,
   GENJUTSU_VS_ROWS,
 } from '@/components/landing/content';
 
 const CHANGE_ICONS: LucideIcon[] = [Package, Palette, MapPin, Clapperboard];
+const HOW_COPY = [
+  { title: m['site.seo.step1_title'], description: m['site.seo.step1_desc'] },
+  { title: m['site.seo.step2_title'], description: m['site.seo.step2_desc'] },
+  { title: m['site.seo.step3_title'], description: m['site.seo.step3_desc'] },
+];
+const EXAMPLE_COPY = [
+  m['site.seo.example1'],
+  m['site.seo.example2'],
+  m['site.seo.example3'],
+  m['site.seo.example4'],
+  m['site.seo.example5'],
+  m['site.seo.example6'],
+];
+const HOWTO_COPY = [
+  { title: m['site.seo.howto1_title'], description: m['site.seo.howto1_desc'] },
+  { title: m['site.seo.howto2_title'], description: m['site.seo.howto2_desc'] },
+  { title: m['site.seo.howto3_title'], description: m['site.seo.howto3_desc'] },
+  { title: m['site.seo.howto4_title'], description: m['site.seo.howto4_desc'] },
+  { title: m['site.seo.howto5_title'], description: m['site.seo.howto5_desc'] },
+];
+const VS_COPY = [
+  { label: m['site.seo.vs1_label'], ours: m['site.seo.vs1_ours'], official: m['site.seo.vs1_official'] },
+  { label: m['site.seo.vs2_label'], ours: m['site.seo.vs2_ours'], official: m['site.seo.vs2_official'] },
+  { label: m['site.seo.vs3_label'], ours: m['site.seo.vs3_ours'], official: m['site.seo.vs3_official'] },
+  { label: m['site.seo.vs4_label'], ours: m['site.seo.vs4_ours'], official: m['site.seo.vs4_official'] },
+];
+const CHANGE_COPY = [
+  { title: m['site.seo.change_products'], description: m['site.seo.change_products_desc'] },
+  { title: m['site.seo.change_styles'], description: m['site.seo.change_styles_desc'] },
+  { title: m['site.seo.change_scenes'], description: m['site.seo.change_scenes_desc'] },
+  { title: m['site.seo.change_props'], description: m['site.seo.change_props_desc'] },
+];
 
 function SectionHeading({
   title,
@@ -44,15 +77,9 @@ export function WhatIsGenjutsu({ className }: { className?: string }) {
   return (
     <section id="introduction" className={cn('scroll-mt-24 py-16', className)}>
       <div className="container mx-auto px-4">
-        <SectionHeading title="What Is Genjutsu AI?" />
+        <SectionHeading title={m['site.seo.what_title']()} />
         <p className="text-foreground/70 mx-auto mt-8 max-w-3xl text-center text-base leading-relaxed sm:text-lg">
-          Genjutsu is a video-to-video model by Higgsfield. You upload an
-          existing clip; this site uses the model to restyle scenes, styles,
-          products, and props around the same subject while preserving the
-          original motion, camera movement, and timing. It is not a from-scratch
-          text-to-video generator — and it is not a face-swap or identity-swap
-          tool. The source take provides the motion; Genjutsu changes the world
-          around it.
+          {m['site.seo.what_description']()}
         </p>
       </div>
     </section>
@@ -64,11 +91,11 @@ export function HowGenjutsuWorks({ className }: { className?: string }) {
     <section id="how-it-works" className={cn('scroll-mt-24 py-16', className)}>
       <div className="container mx-auto px-4">
         <SectionHeading
-          title="How Genjutsu Works"
-          description="Three steps: keep the subject, rewrite the world around them."
+          title={m['site.seo.how_title']()}
+          description={m['site.seo.how_desc']()}
         />
         <ol className="mx-auto mt-12 grid max-w-[1180px] gap-8 sm:grid-cols-3">
-          {GENJUTSU_HOW_IT_WORKS.map((item) => (
+          {GENJUTSU_HOW_IT_WORKS.map((item, index) => (
             <li
               key={item.step}
               className="rounded-2xl border border-white/8 bg-white/[0.03] p-6"
@@ -82,10 +109,10 @@ export function HowGenjutsuWorks({ className }: { className?: string }) {
                 {item.step}
               </span>
               <h3 className="text-foreground mt-4 text-lg font-semibold">
-                {item.title}
+                {HOW_COPY[index]?.title() ?? item.title}
               </h3>
               <p className="text-foreground/65 mt-3 text-sm leading-relaxed">
-                {item.description}
+                {HOW_COPY[index]?.description() ?? item.description}
               </p>
             </li>
           ))}
@@ -100,8 +127,8 @@ export function WhatYouCanChange({ className }: { className?: string }) {
     <section id="feature" className={cn('scroll-mt-24 py-16', className)}>
       <div className="container mx-auto px-4">
         <SectionHeading
-          title="What You Can Change"
-          description="Same subject — new scene, style, product, or a single object."
+          title={m['site.seo.change_title']()}
+          description={m['site.seo.change_desc']()}
         />
         <div className="mx-auto mt-12 grid max-w-[1180px] gap-10 sm:grid-cols-2 lg:grid-cols-4">
           {GENJUTSU_CHANGE_ITEMS.map((item, index) => {
@@ -112,23 +139,23 @@ export function WhatYouCanChange({ className }: { className?: string }) {
                   <Icon className="text-primary size-8" aria-hidden="true" />
                 </div>
                 <h3 className="text-foreground mb-2 text-xl font-bold">
-                  {item.title}
+                  {CHANGE_COPY[index]?.title() ?? item.title}
                 </h3>
                 <p className="text-foreground/80 leading-relaxed">
-                  {item.description}
+                  {CHANGE_COPY[index]?.description() ?? item.description}
                 </p>
               </div>
             );
           })}
         </div>
         <div className="mx-auto mt-12 grid max-w-[1180px] gap-4 sm:grid-cols-2">
-          {GENJUTSU_CHANGE_EXAMPLES.map((example) => (
+          {GENJUTSU_CHANGE_EXAMPLES.map((example, index) => (
             <div
               key={example}
               className="rounded-2xl border border-white/8 bg-white/[0.03] p-5"
             >
               <p className="text-foreground/70 text-sm leading-relaxed">
-                {example}
+                {EXAMPLE_COPY[index]?.() ?? example}
               </p>
             </div>
           ))}
@@ -143,11 +170,11 @@ export function HowToUseGenerator({ className }: { className?: string }) {
     <section className={cn('py-16', className)}>
       <div className="container mx-auto px-4">
         <SectionHeading
-          title="How to Use the Generator"
-          description="Five steps from upload to download."
+          title={m['site.seo.howto_title']()}
+          description={m['site.seo.howto_desc']()}
         />
         <ol className="mx-auto mt-12 max-w-3xl space-y-8">
-          {GENJUTSU_HOWTO_STEPS.map((item) => (
+          {GENJUTSU_HOWTO_STEPS.map((item, index) => (
             <li key={item.step} className="flex gap-4">
               <span
                 className={cn(
@@ -159,10 +186,10 @@ export function HowToUseGenerator({ className }: { className?: string }) {
               </span>
               <div className="min-w-0 flex-1">
                 <h3 className="text-foreground text-xl font-bold">
-                  {item.title}
+                  {HOWTO_COPY[index]?.title() ?? item.title}
                 </h3>
                 <p className="text-foreground/70 mt-2 text-base leading-relaxed">
-                  {item.description}
+                  {HOWTO_COPY[index]?.description() ?? item.description}
                 </p>
               </div>
             </li>
@@ -184,11 +211,11 @@ export function PromptIdeas({
     <section className={cn('py-16', className)}>
       <div className="container mx-auto px-4">
         <SectionHeading
-          title="Genjutsu Prompt Ideas"
-          description="Scene, style, and object rewrites — keep the original subject and motion."
+          title={m['site.seo.ideas_title']()}
+          description={m['site.seo.ideas_desc']()}
         />
         <div className="mx-auto mt-12 grid max-w-[1180px] gap-8 sm:grid-cols-2">
-          {GENJUTSU_PROMPT_IDEAS.slice(0, 8).map((item) => (
+          {getLocalizedGenjutsuPromptIdeas().slice(0, 8).map((item) => (
             <article
               key={item.title}
               className="rounded-2xl border border-white/8 bg-white/[0.03] p-6"
@@ -208,7 +235,7 @@ export function PromptIdeas({
               href="/genjutsu-prompts"
               className="text-primary text-sm font-medium underline-offset-4 hover:underline"
             >
-              Browse all Genjutsu prompt ideas
+              {m['site.seo.browse_prompts']()}
             </Link>
           </p>
         ) : null}
@@ -222,8 +249,8 @@ export function VsOfficial({ className }: { className?: string }) {
     <section className={cn('py-16', className)}>
       <div className="container mx-auto px-4">
         <SectionHeading
-          title="Our Tool vs the Official Higgsfield Genjutsu"
-          description="Same underlying model. Different way to pay. Use the official app if you want the full Higgsfield suite on a subscription; use this site if you prefer prepaid credits for Genjutsu jobs only."
+          title={m['site.seo.vs_title']()}
+          description={m['site.seo.vs_description']()}
         />
         <div className="border-border/70 mx-auto mt-12 max-w-[1180px] overflow-x-auto rounded-xl border">
           <table className="w-full min-w-[640px] table-fixed border-collapse text-left text-sm">
@@ -238,27 +265,27 @@ export function VsOfficial({ className }: { className?: string }) {
                   &nbsp;
                 </th>
                 <th className="text-foreground px-5 py-4 font-semibold">
-                  This site
+                  {m['site.seo.this_site']()}
                 </th>
                 <th className="text-foreground px-5 py-4 font-semibold">
-                  Official Higgsfield
+                  {m['site.seo.official']()}
                 </th>
               </tr>
             </thead>
             <tbody>
-              {GENJUTSU_VS_ROWS.map((row) => (
+              {GENJUTSU_VS_ROWS.map((row, index) => (
                 <tr
                   key={row.label}
                   className="border-border/50 border-b last:border-b-0"
                 >
                   <th className="text-foreground px-5 py-4 align-top font-medium">
-                    {row.label}
+                    {VS_COPY[index]?.label() ?? row.label}
                   </th>
                   <td className="text-foreground/70 px-5 py-4 align-top leading-relaxed">
-                    {row.ours}
+                    {VS_COPY[index]?.ours() ?? row.ours}
                   </td>
                   <td className="text-foreground/70 px-5 py-4 align-top leading-relaxed">
-                    {row.official}
+                    {VS_COPY[index]?.official() ?? row.official}
                   </td>
                 </tr>
               ))}
@@ -276,18 +303,17 @@ export function BackToToolCta({ className }: { className?: string }) {
       <div className="container mx-auto px-4">
         <div className="mx-auto max-w-3xl rounded-3xl border border-dashed px-6 py-12 text-center sm:px-10 sm:py-16">
           <h2 className="text-foreground text-3xl font-bold tracking-tight sm:text-4xl">
-            Ready to rewrite a clip?
+            {m['site.seo.cta_title']()}
           </h2>
           <p className="text-foreground/70 mx-auto mt-6 max-w-xl text-base leading-relaxed sm:text-lg">
-            Upload a video, write the result you want, and generate. The tool is
-            at the top of this page.
+            {m['site.seo.cta_description']()}
           </p>
           <div className="mt-8 flex justify-center">
             <a
               href="#hero-generator"
               className="inline-flex h-11 items-center justify-center rounded-xl bg-[rgb(204,144,92)] px-6 text-sm font-semibold text-[rgb(247,246,243)] transition hover:brightness-105"
             >
-              Back to the generator
+              {m['site.seo.cta_button']()}
             </a>
           </div>
         </div>

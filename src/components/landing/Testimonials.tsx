@@ -1,7 +1,20 @@
 import type { Testimonial } from '@/types/landing';
 
 import { cn } from '@/lib/cn';
+import { m } from '@/paraglide/messages.js';
 import { TESTIMONIALS } from '@/components/landing/content';
+
+const TESTIMONIAL_COPY = [
+  { quote: m['site.testimonials.quote1'], role: m['site.testimonials.role1'] },
+  { quote: m['site.testimonials.quote2'], role: m['site.testimonials.role2'] },
+  { quote: m['site.testimonials.quote3'], role: m['site.testimonials.role3'] },
+  { quote: m['site.testimonials.quote4'], role: m['site.testimonials.role4'] },
+  { quote: m['site.testimonials.quote5'], role: m['site.testimonials.role5'] },
+  { quote: m['site.testimonials.quote6'], role: m['site.testimonials.role6'] },
+  { quote: m['site.testimonials.quote7'], role: m['site.testimonials.role7'] },
+  { quote: m['site.testimonials.quote8'], role: m['site.testimonials.role8'] },
+  { quote: m['site.testimonials.quote9'], role: m['site.testimonials.role9'] },
+];
 
 function QuoteCard({ item }: { item: Testimonial }) {
   return (
@@ -12,7 +25,7 @@ function QuoteCard({ item }: { item: Testimonial }) {
       )}
     >
       <div className="text-foreground/90 text-sm leading-relaxed">
-        {item.quote}
+        {TESTIMONIAL_COPY[TESTIMONIALS.findIndex((p) => p.name === item.name)]?.quote() ?? item.quote}
       </div>
       <div className="mt-5 flex items-center gap-2">
         <img
@@ -26,7 +39,7 @@ function QuoteCard({ item }: { item: Testimonial }) {
           <div className="text-foreground leading-5 font-medium tracking-tight">
             {item.name}
           </div>
-          <div className="leading-5 tracking-tight opacity-60">{item.role}</div>
+          <div className="leading-5 tracking-tight opacity-60">{TESTIMONIAL_COPY[TESTIMONIALS.findIndex((p) => p.name === item.name)]?.role() ?? item.role}</div>
         </div>
       </div>
     </article>
@@ -78,15 +91,14 @@ export function Testimonials() {
                 'text-foreground/80 text-xs font-semibold backdrop-blur-sm'
               )}
             >
-              Testimonials
+              {m['site.testimonials.tag']()}
             </div>
           </div>
           <h2 className="text-foreground mt-6 text-3xl font-bold tracking-tight sm:text-4xl">
-            What Creators Say About Genjutsu AI
+            {m['site.testimonials.title']()}
           </h2>
           <p className="text-foreground/80 mt-6 text-lg leading-relaxed">
-            Editors, producers, and short-form teams using video-to-video to
-            keep the original motion
+            {m['site.testimonials.subtitle']()}
           </p>
         </div>
 

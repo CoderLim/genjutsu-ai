@@ -1,8 +1,9 @@
 import { cn } from '@/lib/cn';
+import { m } from '@/paraglide/messages.js';
 import { DemoVideoGallery } from '@/components/landing/DemoVideoGallery';
 import { GeneratorPanel } from '@/components/landing/GeneratorPanel';
 
-const BADGES = ['Motion Transfer', 'Objects Swap', 'Up to 1080p'] as const;
+const BADGES = [m['site.hero.motion'], m['site.hero.objects'], m['site.hero.quality']] as const;
 
 const HERO_VIDEO_SRC = '/videos/hero-bg.mp4';
 const HERO_POSTER_SRC = '/videos/hero-bg-poster.jpg';
@@ -47,13 +48,11 @@ export function Hero({ className }: { className?: string }) {
             fetchPriority="high"
             className="size-9 rounded-full sm:size-10 md:size-12"
           />
-          <span>Genjutsu AI Video Generator</span>
+          <span>{m['site.hero.title']()}</span>
         </h1>
 
         <p className="mx-auto mt-3 max-w-3xl text-base leading-relaxed text-white/82 sm:mt-4 sm:text-lg">
-          Keep your subject, change the world around them. Genjutsu transfers
-          the original motion and timing into a new scene, style, or set of
-          objects — without swapping who or what is in the shot.
+          {m['site.hero.description']()}
         </p>
 
         <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
@@ -62,7 +61,7 @@ export function Hero({ className }: { className?: string }) {
               key={badge}
               className="inline-flex h-[27px] items-center rounded-full border border-[rgba(245,158,11,0.2)] bg-[rgba(245,158,11,0.1)] px-2.5 py-0.5 text-[11px] font-medium whitespace-nowrap text-[rgb(245,158,11)] backdrop-blur-sm"
             >
-              {badge}
+              {badge()}
             </span>
           ))}
         </div>

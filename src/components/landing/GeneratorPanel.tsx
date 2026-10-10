@@ -85,12 +85,12 @@ const MODE_OPTIONS: {
 }[] = [
   {
     id: 'motion-transfer',
-    label: 'Motion transfer',
+    label: m['site.generator.motion'],
     icon: MotionTransferIcon,
   },
   {
     id: 'objects-swap',
-    label: 'Objects swap',
+    label: m['site.generator.objects'],
     icon: ObjectsSwapIcon,
   },
 ];
@@ -168,7 +168,7 @@ function ModeToggle({
   return (
     <div
       role="tablist"
-      aria-label="Genjutsu mode"
+      aria-label={m['site.generator.mode_aria']()}
       className="inline-flex w-full max-w-full items-center gap-0.5 rounded-xl border border-white/8 bg-[rgba(28,22,18,0.92)] p-1 sm:w-auto"
     >
       {MODE_OPTIONS.map((opt) => {
@@ -189,7 +189,7 @@ function ModeToggle({
             )}
           >
             <Icon className="size-3.5 shrink-0" />
-            {opt.label}
+            {opt.label()}
           </button>
         );
       })}
@@ -241,18 +241,18 @@ function MediaLightbox({
       className="fixed inset-0 z-[400] flex items-center justify-center p-4 sm:p-8"
       role="dialog"
       aria-modal="true"
-      aria-label={kind === 'video' ? 'Video preview' : 'Image preview'}
+      aria-label={kind === 'video' ? m['site.generator.video_lightbox']() : m['site.generator.image_lightbox']()}
     >
       <button
         type="button"
-        aria-label="Close preview"
+        aria-label={m['site.generator.preview_close']()}
         className="absolute inset-0 bg-black/75 backdrop-blur-sm"
         onClick={onClose}
       />
       <div className="relative z-10 max-h-[88vh] max-w-[min(92vw,760px)]">
         <button
           type="button"
-          aria-label="Close"
+          aria-label={m['site.generator.close']()}
           onClick={onClose}
           className="absolute -top-3 -right-3 z-20 flex size-8 items-center justify-center rounded-full border border-white/15 bg-[rgba(41,30,23,0.95)] text-[rgb(237,234,222)] shadow-lg hover:bg-[rgba(60,44,34,0.98)]"
         >
@@ -338,7 +338,7 @@ function VideoUploadSlot({
       const file = Array.from(list).find((f) => f.type.startsWith('video/'));
       if (!file) return;
       if (file.size <= 0 || file.size > MAX_SOURCE_VIDEO_BYTES) {
-        toast.error('Source video must be 200 MB or smaller');
+        toast.error(m['site.generator.video_size_error']());
         return;
       }
 
@@ -351,7 +351,7 @@ function VideoUploadSlot({
             durationSeconds > MAX_SOURCE_VIDEO_SECONDS
           ) {
             toast.error(
-              `Source video must be ${MIN_SOURCE_VIDEO_SECONDS}–${MAX_SOURCE_VIDEO_SECONDS} seconds (got ${durationSeconds.toFixed(1)}s)`
+              m['site.generator.video_duration_error']({ min: String(MIN_SOURCE_VIDEO_SECONDS), max: String(MAX_SOURCE_VIDEO_SECONDS), actual: durationSeconds.toFixed(1) })
             );
             return;
           }
@@ -362,7 +362,7 @@ function VideoUploadSlot({
           });
         } catch {
           toast.error(
-            'Could not read video duration. Please use an MP4/MOV between 4 and 30 seconds.'
+            m['site.generator.video_read_error']()
           );
         }
       })();
@@ -395,7 +395,7 @@ function VideoUploadSlot({
           type="file"
           className="hidden"
           accept="video/*"
-          aria-label="Add a reference video to edit"
+          aria-label={m['site.generator.video_upload']()}
           onChange={(e: ChangeEvent<HTMLInputElement>) => {
             takeFile(e.target.files);
             e.target.value = '';
@@ -406,7 +406,7 @@ function VideoUploadSlot({
           <button
             type="button"
             onClick={() => setPreviewOpen(true)}
-            aria-label="Preview reference video"
+            aria-label={m['site.generator.video_preview']()}
             className="group relative block h-[96px] w-[68px] overflow-hidden rounded-[4px] border border-[rgba(204,144,92,0.35)] shadow-[0_10px_28px_-12px_rgba(0,0,0,0.75)] focus:outline-none"
           >
             <video
@@ -416,12 +416,12 @@ function VideoUploadSlot({
               className="h-full w-full object-cover"
             />
             <span className="absolute inset-x-0 bottom-0 bg-black/55 px-1 py-0.5 text-[9px] font-medium text-white/90">
-              Video
+              {m['site.generator.video_label']()}
             </span>
             <span
               role="button"
               tabIndex={0}
-              aria-label="Remove reference video"
+              aria-label={m['site.generator.video_remove']()}
               onClick={(e) => {
                 e.stopPropagation();
                 e.preventDefault();
@@ -441,12 +441,12 @@ function VideoUploadSlot({
           </button>
         ) : (
           <EmptyUploadButton
-            title="Add a reference video to edit"
+            title={m['site.generator.video_upload']()}
             hint="4–30s"
             icon={<FilmIcon className="text-primary/78 size-5 shrink-0" />}
             dragging={dragging}
             onClick={() => inputRef.current?.click()}
-            ariaLabel="Add a reference video to edit"
+            ariaLabel={m['site.generator.video_upload']()}
           />
         )}
       </div>
@@ -670,7 +670,7 @@ function ImageUploadSlot({
         .slice(0, room)
         .filter((file) => {
           if (file.size <= 0 || file.size > MAX_REFERENCE_IMAGE_BYTES) {
-            toast.error(`"${file.name}" must be 12 MB or smaller`);
+            toast.error(m['site.generator.image_size_error']({ name: file.name }));
             return false;
           }
           return true;
@@ -711,7 +711,7 @@ function ImageUploadSlot({
           className="hidden"
           accept="image/*"
           multiple
-          aria-label="Add products, clothes, objects, or scenes"
+          aria-label={m['site.generator.image_upload']()}
           onChange={(e: ChangeEvent<HTMLInputElement>) => {
             mergeFiles(e.target.files);
             e.target.value = '';
@@ -723,7 +723,7 @@ function ImageUploadSlot({
             key={item.id}
             type="button"
             onClick={() => setPreviewId(item.id)}
-            aria-label={`Preview Reference ${index + 1}: ${item.file.name}`}
+            aria-label={m['site.generator.image_preview']({ index: String(index + 1), name: item.file.name })}
             className="group relative block h-[96px] w-[68px] overflow-hidden rounded-[4px] border border-[rgba(204,144,92,0.35)] shadow-[0_10px_28px_-12px_rgba(0,0,0,0.75)] focus:outline-none"
           >
             <img
@@ -733,12 +733,12 @@ function ImageUploadSlot({
               draggable={false}
             />
             <span className="absolute inset-x-0 bottom-0 bg-black/60 px-1 py-0.5 text-center text-[8px] font-medium text-white/90">
-              Reference {index + 1}
+              {m['site.generator.image_label']({ index: String(index + 1) })}
             </span>
             <span
               role="button"
               tabIndex={0}
-              aria-label="Remove image"
+              aria-label={m['site.generator.image_remove']()}
               onClick={(e) => {
                 e.stopPropagation();
                 e.preventDefault();
@@ -760,18 +760,18 @@ function ImageUploadSlot({
 
         {items.length === 0 ? (
           <EmptyUploadButton
-            title="Add products, clothes, objects, or scenes"
+            title={m['site.generator.image_upload']()}
             hint={m['genjutsu.safety.upload_hint']()}
             icon={<ImageModeIcon className="text-primary/78 size-5 shrink-0" />}
             dragging={dragging}
             onClick={openPicker}
-            ariaLabel="Add products, clothes, objects, or scenes"
+            ariaLabel={m['site.generator.image_upload']()}
           />
         ) : canAdd ? (
           <button
             type="button"
             onClick={openPicker}
-            aria-label="Add more images"
+            aria-label={m['site.generator.image_more']()}
             className="relative block h-[96px] w-[68px] focus:ring-0 focus:outline-none"
           >
             <span
@@ -858,7 +858,7 @@ function ResolutionPanel({
   return (
     <div className="space-y-2">
       <section className="p-1">
-        <SectionLabel>Resolution</SectionLabel>
+        <SectionLabel>{m['site.generator.resolution']()}</SectionLabel>
         <OptionRow>
           {RESOLUTIONS.map((n) => (
             <SegmentButton
@@ -1054,7 +1054,7 @@ function ResultPanel({
   if (status === 'idle') return null;
 
   const modeLabel =
-    result?.mode === 'objects-swap' ? 'Objects swap' : 'Motion transfer';
+    result?.mode === 'objects-swap' ? m['site.generator.objects']() : m['site.generator.motion']();
 
   return (
     <div
@@ -1064,27 +1064,26 @@ function ResultPanel({
       <div className="flex items-center justify-between gap-3 border-b border-white/8 px-4 py-3">
         <div className="min-w-0">
           <p className="text-sm font-medium text-[rgb(237,234,222)]">
-            {status === 'generating' ? 'Generating…' : 'Result'}
+            {status === 'generating' ? m['site.generator.generating']() : m['site.generator.result']()}
           </p>
           {result ? (
             <p className="mt-0.5 truncate text-[11px] text-white/45">
-              {modeLabel} · {result.resolution} · {result.imageCount} reference
-              {result.imageCount === 1 ? '' : 's'}
+              {modeLabel} · {result.resolution} · {m['site.generator.references']({ count: String(result.imageCount) })}
               {result.reservedCredits
-                ? ` · ${result.reservedCredits} credits`
+                ? ` · ${m['site.generator.credits']({ count: String(result.reservedCredits) })}`
                 : ''}
               {result.prompt ? ` · ${result.prompt}` : ''}
             </p>
           ) : (
             <p className="mt-0.5 text-[11px] text-white/45">
-              Uploading references and starting generation…
+              {m['site.generator.starting']()}
             </p>
           )}
         </div>
         {status === 'done' ? (
           <button
             type="button"
-            aria-label="Dismiss result"
+            aria-label={m['site.generator.dismiss']()}
             onClick={onDismiss}
             className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg text-white/45 hover:bg-white/8 hover:text-white"
           >
@@ -1098,8 +1097,7 @@ function ResultPanel({
           <div className="flex flex-col items-center gap-3 py-10">
             <span className="border-primary size-9 animate-spin rounded-full border-2 border-t-transparent" />
             <p className="text-sm text-white/55">
-              Uploading references and running Genjutsu (
-              {result?.resolution ?? '…'})…
+              {m['site.generator.progress']({ resolution: result?.resolution ?? '…' })}
             </p>
           </div>
         ) : result ? (
@@ -1120,10 +1118,10 @@ function ResultPanel({
             download={`genjutsu-${result.mode}-${result.resolution}.mp4`}
             className="inline-flex h-8 items-center rounded-lg bg-[rgb(204,144,92)] px-3 text-sm font-semibold text-[rgb(247,246,243)] hover:brightness-105"
           >
-            Download
+            {m['site.generator.download']()}
           </a>
           <span className="text-[11px] text-white/40">
-            Generated with Genjutsu AI
+            {m['site.generator.generated_by']()}
           </span>
         </div>
       ) : null}
@@ -1220,11 +1218,11 @@ export function GeneratorPanel({
   const placeholder =
     mode === 'objects-swap'
       ? images.length > 1
-        ? 'e.g. Replace the man with @Image1 and the phone with @Image2 (optional)...'
-        : 'Describe what to swap. Use @Video1 / @Image1 to reference assets (optional)...'
+        ? m['site.generator.prompt_objects_multi']()
+        : m['site.generator.prompt_objects']()
       : images.length > 1
-        ? 'e.g. Use @Image1 for the main character and @Image2 for the outfit (optional)...'
-        : 'Describe the new scene, style, product, or object. Use @Video1 / @Image1 to reference assets (optional)...';
+        ? m['site.generator.prompt_motion_multi']()
+        : m['site.generator.prompt_motion']();
 
   const pollGeneration = useCallback(
     async (active: PersistedGeneration, runId: number) => {
@@ -1311,7 +1309,7 @@ export function GeneratorPanel({
         if (polled.providerStatus === 'submission_unknown') {
           setError(
             polled.error ||
-              'The provider submission result is uncertain. This generation remains locked to avoid a duplicate charge.'
+              m['site.generator.pending']()
           );
           return;
         }
@@ -1354,7 +1352,7 @@ export function GeneratorPanel({
           setCreditGate(null);
           const uiError =
             generationFailureUiMessage(polled.error, polled.errorCode) ||
-            `Generation failed (${polled.providerStatus})`;
+            m['site.generator.failed_status']({ status: polled.providerStatus });
           setError(uiError);
           return;
         }
@@ -1365,7 +1363,7 @@ export function GeneratorPanel({
       // Do not return to idle here: the provider job can still be running and
       // enabling Generate would make a second paid generation too easy.
       setError(
-        'Generation is still processing. This job remains reserved; refresh the page to resume checking it.'
+        m['site.generator.still_processing']()
       );
     },
     []
@@ -1506,12 +1504,12 @@ export function GeneratorPanel({
       );
 
       if (uploadBatch.uploads.length !== media.length) {
-        throw new Error('Storage returned an incomplete upload batch');
+        throw new Error(m['site.generator.upload_incomplete']());
       }
 
       for (let index = 0; index < media.length; index += 1) {
         const upload = uploadBatch.uploads[index];
-        if (!upload) throw new Error('Missing storage upload URL');
+        if (!upload) throw new Error(m['site.generator.upload_url_missing']());
         try {
           const uploaded = await uploadToSignedUrl({
             url: upload.uploadUrl,
@@ -1631,8 +1629,8 @@ export function GeneratorPanel({
             submissionUnknown
               ? cause instanceof Error
                 ? cause.message
-                : 'Generation submission result is uncertain.'
-              : 'Connection lost while starting generation. Checking the existing job before allowing another submission.'
+                : m['site.generator.submission_uncertain']()
+              : m['site.generator.connection_lost']()
           );
           void pollGeneration(active, runId);
           return;
@@ -1647,7 +1645,7 @@ export function GeneratorPanel({
       setError(
         cause instanceof Error
           ? cause.message
-          : 'Generation failed unexpectedly'
+          : m['site.generator.failed_unexpected']()
       );
     }
   };
@@ -1692,7 +1690,7 @@ export function GeneratorPanel({
       );
 
       if (!checkout.checkout_url) {
-        throw new Error('Checkout URL was not returned');
+        throw new Error(m['site.generator.checkout_url_missing']());
       }
 
       if (checkoutWindow && !checkoutWindow.closed) {
@@ -1746,7 +1744,7 @@ export function GeneratorPanel({
             <div className="mt-auto flex items-end justify-between gap-3 pb-1 text-[11px] text-white/45">
               {images.length > 1 ? (
                 <span className="max-w-[75%] leading-snug">
-                  Use @Image1, @Image2, etc. to map each image to a target.
+                  {m['site.generator.prompt_mapping']()}
                 </span>
               ) : (
                 <span />
@@ -1833,7 +1831,7 @@ export function GeneratorPanel({
                   : 'bg-[rgba(126,128,132,0.28)] text-[rgb(237,234,222)]/38'
               )}
             >
-              {status === 'generating' ? 'Generating…' : 'Generate'}
+              {status === 'generating' ? m['site.generator.generating']() : m['site.generator.generate']()}
             </button>
           </div>
         </div>
@@ -1853,7 +1851,7 @@ export function GeneratorPanel({
           role="alert"
           className="mt-3 rounded-xl border border-red-400/20 bg-red-950/25 px-4 py-3 text-sm text-red-100/90"
         >
-          <p className="font-medium">Generation failed</p>
+          <p className="font-medium">{m['site.generator.failed']()}</p>
           <p className="mt-1 text-xs text-red-100/65">{error}</p>
         </div>
       ) : null}

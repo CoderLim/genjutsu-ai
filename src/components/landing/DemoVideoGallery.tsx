@@ -1,4 +1,5 @@
 import { cn } from '@/lib/cn';
+import { m } from '@/paraglide/messages.js';
 
 type DemoVideo = {
   src: string;
@@ -11,31 +12,31 @@ const DEMO_VIDEOS: DemoVideo[] = [
   {
     src: '/videos/demos/two-cats-dance.mp4',
     poster: '/videos/demos/two-cats-dance-poster.jpg',
-    label: 'Two cats dance',
+    label: m['site.demo.cats'](),
     aspect: 'portrait',
   },
   {
     src: '/videos/demos/car-drop.mp4',
     poster: '/videos/demos/car-drop-poster.jpg',
-    label: 'Car drop',
+    label: m['site.demo.car'](),
     aspect: 'portrait',
   },
   {
     src: '/videos/demos/cat-to-dog.mp4',
     poster: '/videos/demos/cat-to-dog-poster.jpg',
-    label: 'Cat to dog',
+    label: m['site.demo.catdog'](),
     aspect: 'portrait',
   },
   {
     src: '/videos/demos/demodemo.mp4',
     poster: '/videos/demos/demodemo-poster.jpg',
-    label: 'Scene rewrite demo',
+    label: m['site.demo.scene'](),
     aspect: 'landscape',
   },
   {
     src: '/videos/demos/jackson-cat.mp4',
     poster: '/videos/demos/jackson-cat-poster.jpg',
-    label: 'Jackson cat',
+    label: m['site.demo.jackson'](),
     aspect: 'landscape',
   },
 ];

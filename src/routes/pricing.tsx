@@ -1,15 +1,12 @@
 import { createFileRoute } from '@tanstack/react-router';
 
-import { envConfigs } from '@/config';
 import { localeLinks, socialMeta } from '@/lib/seo';
 import { getLocale } from '@/paraglide/runtime.js';
+import { m } from '@/paraglide/messages.js';
 import { Pricing } from '@/blocks/pricing';
 import { SiteFooter } from '@/components/landing/SiteFooter';
 import { SiteHeader } from '@/components/landing/SiteHeader';
 
-const PAGE_TITLE = `Genjutsu AI Pricing | ${envConfigs.app_name}`;
-const PAGE_DESCRIPTION =
-  'One-time Genjutsu credit packs for Motion Transfer and Object Swap. No subscription — pay only for the video generations you run.';
 
 export const Route = createFileRoute('/pricing')({
   loader: () => {
@@ -21,11 +18,11 @@ export const Route = createFileRoute('/pricing')({
     const { canonical, alternates } = localeLinks('/pricing', locale);
     return {
       meta: [
-        { title: PAGE_TITLE },
-        { name: 'description', content: PAGE_DESCRIPTION },
+        { title: m['site.pricing.standalone_meta_title']() },
+        { name: 'description', content: m['site.pricing.standalone_meta_desc']() },
         ...socialMeta({
-          title: PAGE_TITLE,
-          description: PAGE_DESCRIPTION,
+          title: m['site.pricing.standalone_meta_title'](),
+          description: m['site.pricing.standalone_meta_desc'](),
           url: canonical,
         }),
       ],

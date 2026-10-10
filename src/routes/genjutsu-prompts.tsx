@@ -3,13 +3,11 @@ import { createFileRoute } from '@tanstack/react-router';
 import { Link } from '@/core/i18n/navigation';
 import { localeLinks, socialMeta } from '@/lib/seo';
 import { getLocale } from '@/paraglide/runtime.js';
-import { GENJUTSU_PROMPT_IDEAS } from '@/components/landing/content';
+import { getLocalizedGenjutsuPromptIdeas } from '@/components/landing/genjutsu-prompts-i18n';
+import { m } from '@/paraglide/messages.js';
 import { SiteFooter } from '@/components/landing/SiteFooter';
 import { SiteHeader } from '@/components/landing/SiteHeader';
 
-const PAGE_TITLE = 'Genjutsu Prompt Ideas — Scene, Style & Object Restyles';
-const PAGE_DESCRIPTION =
-  'Ready-to-use Genjutsu prompts for restyling scenes, styles, products, and props without changing who or what is in the shot.';
 
 function GenjutsuPromptsPage() {
   return (
@@ -25,25 +23,24 @@ function GenjutsuPromptsPage() {
               Genjutsu AI
             </Link>
             <span className="mx-2">/</span>
-            <span>Prompt ideas</span>
+            <span>{m['site.prompts.breadcrumb']()}</span>
           </p>
           <h1 className="text-foreground mx-auto mt-4 max-w-3xl text-center text-3xl font-bold tracking-tight sm:text-4xl">
-            Genjutsu Prompt Ideas
+            {m['site.seo.ideas_title']()}
           </h1>
           <p className="text-foreground/70 mx-auto mt-4 max-w-2xl text-center text-base leading-relaxed sm:text-lg">
-            Copy a prompt, upload your clip on the{' '}
+            {m['site.prompts.description_before']()}{' '}
             <Link
               href="/#hero-generator"
               className="text-primary underline-offset-4 hover:underline"
             >
-              homepage generator
+              {m['site.prompts.home_generator']()}
             </Link>
-            , and restyle scenes, styles, products, or props while keeping the
-            original subject and motion. Face swapping is not supported.
+            {m['site.prompts.description_after']()}
           </p>
 
           <div className="mx-auto mt-12 grid max-w-[1180px] gap-8 sm:grid-cols-2">
-            {GENJUTSU_PROMPT_IDEAS.map((item) => (
+            {getLocalizedGenjutsuPromptIdeas().map((item) => (
               <article
                 key={item.title}
                 className="rounded-2xl border border-white/8 bg-white/[0.03] p-6"
@@ -63,7 +60,7 @@ function GenjutsuPromptsPage() {
               href="/#hero-generator"
               className="inline-flex h-11 items-center justify-center rounded-xl bg-[rgb(204,144,92)] px-6 text-sm font-semibold text-[rgb(247,246,243)] transition hover:brightness-105"
             >
-              Open the generator
+              {m['site.prompts.open']()}
             </Link>
           </div>
         </div>
@@ -83,11 +80,11 @@ export const Route = createFileRoute('/genjutsu-prompts')({
     const { canonical, alternates } = localeLinks('/genjutsu-prompts', locale);
     return {
       meta: [
-        { title: PAGE_TITLE },
-        { name: 'description', content: PAGE_DESCRIPTION },
+        { title: m['site.prompts.meta_title']() },
+        { name: 'description', content: m['site.prompts.meta_description']() },
         ...socialMeta({
-          title: PAGE_TITLE,
-          description: PAGE_DESCRIPTION,
+          title: m['site.prompts.meta_title'](),
+          description: m['site.prompts.meta_description'](),
           url: canonical,
         }),
       ],

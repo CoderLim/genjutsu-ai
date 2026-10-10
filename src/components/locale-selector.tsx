@@ -37,12 +37,12 @@ export function LocaleSelector({
       >
         {variant === 'icon' ? (
           <>
-            <Languages className="size-4" />
+            <Globe className="size-4" />
             <span className="sr-only">Switch language</span>
           </>
         ) : (
           <>
-            <Globe className="size-4" />
+            <Languages className="size-4" />
             <span>{localeNames[locale] || locale}</span>
             <ChevronDown className="size-4 opacity-70" />
           </>

@@ -194,7 +194,7 @@ function PersonSlot({
             type="button"
             onClick={onRemove}
             disabled={disabled}
-            aria-label={`Remove ${title}`}
+            aria-label={m['site.common.remove_item']({ name: title })}
             className="absolute top-2 right-2 flex size-8 items-center justify-center rounded-full bg-black/70 text-white/80 backdrop-blur transition hover:bg-black/90 disabled:opacity-40"
           >
             <CloseIcon className="size-4" />
@@ -212,10 +212,10 @@ function PersonSlot({
           </span>
           <span>
             <span className="block text-sm font-medium text-white/78">
-              Upload photo
+              {m['site.zombie.upload_photo']()}
             </span>
             <span className="mt-1 block text-xs text-white/38">
-              JPG, PNG or WebP · up to 12 MB
+              {m['site.zombie.photo_hint']()}
             </span>
           </span>
         </button>
@@ -321,11 +321,11 @@ export function ZombieHugGeneratorPanel() {
     if (!file) return;
     const mime = file.type.split(';', 1)[0]?.trim().toLowerCase() || '';
     if (!mime.startsWith('image/')) {
-      toast.error('Please upload a JPG, PNG, WebP, or GIF image');
+      toast.error(m['site.zombie.image_type']());
       return;
     }
     if (file.size > MAX_IMAGE_BYTES) {
-      toast.error('Images must be 12 MB or smaller');
+      toast.error(m['site.zombie.image_size']());
       return;
     }
 
@@ -527,12 +527,12 @@ export function ZombieHugGeneratorPanel() {
                   setJobError(
                     cause instanceof Error
                       ? cause.message
-                      : 'Generation failed to start'
+                      : m['site.zombie.failed_start']()
                   );
                   toast.error(
                     cause instanceof Error
                       ? cause.message
-                      : 'Generation failed to start'
+                      : m['site.zombie.failed_start']()
                   );
                   return;
                 }
@@ -571,12 +571,12 @@ export function ZombieHugGeneratorPanel() {
               setJobError(
                 cause instanceof Error
                   ? cause.message
-                  : 'Generation failed to start'
+                  : m['site.zombie.failed_start']()
               );
               toast.error(
                 cause instanceof Error
                   ? cause.message
-                  : 'Generation failed to start'
+                  : m['site.zombie.failed_start']()
               );
               return;
             }
@@ -634,8 +634,8 @@ export function ZombieHugGeneratorPanel() {
             }
           }
 
-          setJobError(poll.error || 'Generation failed');
-          toast.error(poll.error || 'Generation failed');
+          setJobError(poll.error || m['site.zombie.failed']());
+          toast.error(poll.error || m['site.zombie.failed']());
           return;
         }
 
@@ -687,7 +687,7 @@ export function ZombieHugGeneratorPanel() {
     }
     if (busy) return;
     if (!survivorImage || !lovedOneImage) {
-      toast.error('Upload both photos: survivor and loved one');
+      toast.error(m['site.zombie.upload_both']());
       return;
     }
 
@@ -865,8 +865,8 @@ export function ZombieHugGeneratorPanel() {
           }
         }
 
-        toast.error(error.message || 'Generation failed to start');
-        setJobError(error.message || 'Generation failed to start');
+        toast.error(error.message || m['site.zombie.failed_start']());
+        setJobError(error.message || m['site.zombie.failed_start']());
         return;
       }
 
@@ -891,7 +891,7 @@ export function ZombieHugGeneratorPanel() {
       localStorage.removeItem(activeGenerationKey(session.user.id));
       setPhase('idle');
       toast.error(
-        error instanceof Error ? error.message : 'Generation failed to start'
+        error instanceof Error ? error.message : m['site.zombie.failed_start']()
       );
     }
   };
@@ -931,8 +931,8 @@ export function ZombieHugGeneratorPanel() {
           <div className="p-4 sm:p-5">
             <div className="grid grid-cols-2 gap-3">
               <PersonSlot
-                title="Survivor (@image1)"
-                note="Uninfected / gun holder. Clear front-facing photo of you."
+                title={m['site.zombie.survivor']()}
+                note={m['site.zombie.survivor_note']()}
                 item={survivorImage}
                 inputRef={survivorInputRef}
                 disabled={busy}
@@ -940,8 +940,8 @@ export function ZombieHugGeneratorPanel() {
                 onRemove={() => clearImageAt('survivor')}
               />
               <PersonSlot
-                title="Loved one (@image2)"
-                note="Infected then restored. Same person in early zombie / later human shots."
+                title={m['site.zombie.loved']()}
+                note={m['site.zombie.loved_note']()}
                 item={lovedOneImage}
                 inputRef={lovedOneInputRef}
                 disabled={busy}
@@ -957,18 +957,17 @@ export function ZombieHugGeneratorPanel() {
             <div className="mb-4 flex flex-col gap-3 rounded-xl border border-amber-400/20 bg-amber-400/[0.06] px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="font-medium text-amber-100/90">
-                  Not enough credits
+                  {m['genjutsu.credits.insufficient_title']()}
                 </p>
                 <p className="mt-0.5 text-xs text-amber-100/55">
-                  Need {creditError.required.toLocaleString()} · balance{' '}
-                  {creditError.balance.toLocaleString()}
+                  {m['site.common.required_balance']({ required: creditError.required.toLocaleString(), balance: creditError.balance.toLocaleString() })}
                 </p>
               </div>
               <Link
                 href="/pricing"
                 className="inline-flex h-8 shrink-0 items-center justify-center rounded-lg bg-[rgb(204,144,92)] px-3 text-xs font-semibold text-[rgb(247,246,243)] transition hover:brightness-105"
               >
-                Buy credits
+                {m['site.pricing.buy']()}
               </Link>
             </div>
           ) : null}
@@ -1012,7 +1011,7 @@ export function ZombieHugGeneratorPanel() {
                 <FloatingPanel>
                   <div className="space-y-2">
                     <section className="p-1">
-                      <SectionLabel>Resolution</SectionLabel>
+                      <SectionLabel>{m['site.generator.resolution']()}</SectionLabel>
                       <OptionRow>
                         {ZOMBIE_HUG_RESOLUTIONS.map((n) => (
                           <SegmentButton
@@ -1026,7 +1025,7 @@ export function ZombieHugGeneratorPanel() {
                       </OptionRow>
                     </section>
                     <section className="p-1">
-                      <SectionLabel>Aspect ratio</SectionLabel>
+                      <SectionLabel>{m['site.zombie.aspect']()}</SectionLabel>
                       <OptionRow>
                         {ZOMBIE_HUG_ASPECT_RATIOS.map((n) => (
                           <SegmentButton
@@ -1083,7 +1082,7 @@ export function ZombieHugGeneratorPanel() {
                     : 'bg-[rgba(126,128,132,0.28)] text-[rgb(237,234,222)]/38'
                 )}
               >
-                {busy ? 'Generating…' : 'Generate'}
+                {busy ? m['site.common.generating']() : m['site.generator.generate']()}
               </button>
             </div>
           </div>
@@ -1094,9 +1093,9 @@ export function ZombieHugGeneratorPanel() {
         <div className="mt-5 overflow-hidden rounded-[24px] border border-white/10 bg-[rgba(18,20,24,0.94)] p-3 shadow-2xl sm:p-4">
           <div className="mb-3 flex items-center justify-between gap-3 px-1">
             <div>
-              <p className="text-sm font-semibold text-white/90">Your video</p>
+              <p className="text-sm font-semibold text-white/90">{m['site.common.your_video']()}</p>
               <p className="mt-0.5 text-xs text-white/38">
-                Higgsfield Genjutsu · motion transfer
+                {m['site.zombie.provider_label']()}
               </p>
             </div>
             <a
@@ -1113,7 +1112,7 @@ export function ZombieHugGeneratorPanel() {
               className="inline-flex h-9 items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 text-xs font-medium text-white/70 transition hover:bg-white/10 hover:text-white"
             >
               <Download className="size-3.5" />
-              Download
+              {m['site.common.download']()}
             </a>
           </div>
           <video

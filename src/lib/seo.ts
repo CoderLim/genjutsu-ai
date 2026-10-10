@@ -32,21 +32,40 @@ export function socialMeta(opts: {
   ];
 }
 
-/** Canonical + hreflang alternate links for a locale-free path. */
-export function localeLinks(path: string, locale: string) {
+/**
+ * Canonical + hreflang alternate links for a locale-free path.
+ * Limit supportedLocales to real translated versions for content-backed pages.
+ * Missing translations may render an English fallback, but must not advertise
+ * that fallback as a separate language version in search results.
+ */
+export function localeLinks(
+  path: string,
+  locale: string,
+  supportedLocales: readonly string[] = locales
+) {
+  const available = locales.filter((loc) => supportedLocales.includes(loc));
+  const canonicalLocale = available.includes(locale as (typeof locales)[number])
+    ? locale
+    : available.includes('en') ? 'en' : (available[0] ?? 'en');
   const urlFor = (loc: string) =>
     localizeUrl(absoluteUrl(path || '/'), {
       locale: loc as (typeof locales)[number],
     }).href;
   return {
-    canonical: urlFor(locale),
-    alternates: [
-      ...locales.map((loc) => ({
-        rel: 'alternate' as const,
-        hrefLang: loc,
-        href: urlFor(loc),
-      })),
-      { rel: 'alternate' as const, hrefLang: 'x-default', href: urlFor('en') },
-    ],
+    canonical: urlFor(canonicalLocale),
+    alternates: available.length > 1
+      ? [
+          ...available.map((loc) => ({
+            rel: 'alternate' as const,
+            hrefLang: loc,
+            href: urlFor(loc),
+          })),
+          {
+            rel: 'alternate' as const,
+            hrefLang: 'x-default',
+            href: urlFor(available.includes('en') ? 'en' : available[0]!),
+          },
+        ]
+      : [],
   };
 }

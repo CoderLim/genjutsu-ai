@@ -1,5 +1,6 @@
 import { useId, type PointerEvent as ReactPointerEvent } from 'react';
 import { LoaderCircle, Scissors } from 'lucide-react';
+import { m } from '@/paraglide/messages.js';
 
 type HotelLobbyTrimBarProps = {
   durationSeconds: number;
@@ -97,7 +98,7 @@ export function HotelLobbyTrimBar({
   return (
     <div className="mt-3 space-y-2">
       <div className="flex items-center justify-between gap-3 text-[11px] text-white/45">
-        <span id={labelId}>Trim clip</span>
+        <span id={labelId}>{m['site.hotel.trim_clip']()}</span>
         <span className="text-white/55 tabular-nums">
           {formatClock(startSeconds)} – {formatClock(endSeconds)} ·{' '}
           {clipLength.toFixed(1)}s
@@ -122,7 +123,7 @@ export function HotelLobbyTrimBar({
           />
           <button
             type="button"
-            aria-label="Trim start"
+            aria-label={m['site.hotel.trim_start']()}
             disabled={disabled || applying}
             className="absolute top-1/2 z-10 size-4 -translate-x-1/2 -translate-y-1/2 touch-none rounded-full border border-[rgb(220,155,99)] bg-[rgb(204,144,92)] shadow"
             style={{ left: `calc(${startPct}% + 4px)` }}
@@ -130,7 +131,7 @@ export function HotelLobbyTrimBar({
           />
           <button
             type="button"
-            aria-label="Trim end"
+            aria-label={m['site.hotel.trim_end']()}
             disabled={disabled || applying}
             className="absolute top-1/2 z-10 size-4 -translate-x-1/2 -translate-y-1/2 touch-none rounded-full border border-[rgb(220,155,99)] bg-[rgb(204,144,92)] shadow"
             style={{ left: `calc(${endPct}% - 4px)` }}
@@ -149,12 +150,12 @@ export function HotelLobbyTrimBar({
           ) : (
             <Scissors className="size-3.5" />
           )}
-          {applying ? 'Trimming…' : 'Trim'}
+          {applying ? m['site.hotel.trimming']() : m['site.hotel.trim_action']()}
         </button>
       </div>
 
       <p className="text-[10px] leading-4 text-white/30">
-        Drag the handles, then click Trim. Credits follow the clipped length.
+        {m['site.hotel.trim_note']()}
       </p>
     </div>
   );

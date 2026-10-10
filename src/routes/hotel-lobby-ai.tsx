@@ -12,12 +12,10 @@ import { Link } from '@/core/i18n/navigation';
 import { envConfigs } from '@/config';
 import { absoluteUrl, localeLinks, socialMeta } from '@/lib/seo';
 import { getLocale } from '@/paraglide/runtime.js';
+import { m } from '@/paraglide/messages.js';
 import { HotelLobbyGeneratorPanel } from '@/components/landing/HotelLobbyGeneratorPanel';
 import { SiteHeader } from '@/components/landing/SiteHeader';
 
-const PAGE_TITLE = 'Hotel Lobby AI Video Generator: 2 Photos, One Orange Booth';
-const PAGE_DESCRIPTION =
-  'Turn two photos into the viral Hotel Lobby AI video: your faces in the orange booth, trading bars at one hanging mic. Landscape 16:9 and ready to post.';
 
 const FAQ_ITEMS = [
   {
@@ -98,11 +96,64 @@ const PHOTO_TIPS = [
   'Try a second run if identity or hand gestures drift. Video generation is stochastic.',
 ] as const;
 
+
+const HOTEL_FAQ_COPY = [
+  { question: m['site.hotel.faq1_q'], answer: m['site.hotel.faq1_a'] },
+  { question: m['site.hotel.faq2_q'], answer: m['site.hotel.faq2_a'] },
+  { question: m['site.hotel.faq3_q'], answer: m['site.hotel.faq3_a'] },
+  { question: m['site.hotel.faq4_q'], answer: m['site.hotel.faq4_a'] },
+  { question: m['site.hotel.faq5_q'], answer: m['site.hotel.faq5_a'] },
+  { question: m['site.hotel.faq6_q'], answer: m['site.hotel.faq6_a'] },
+  { question: m['site.hotel.faq7_q'], answer: m['site.hotel.faq7_a'] },
+  { question: m['site.hotel.faq8_q'], answer: m['site.hotel.faq8_a'] },
+  { question: m['site.hotel.faq9_q'], answer: m['site.hotel.faq9_a'] },
+  { question: m['site.hotel.faq10_q'], answer: m['site.hotel.faq10_a'] },
+];
+function getHotelFaqItems() {
+  return FAQ_ITEMS.map((item, index) => ({
+    ...item,
+    question: HOTEL_FAQ_COPY[index]?.question() ?? item.question,
+    answer: HOTEL_FAQ_COPY[index]?.answer() ?? item.answer,
+  }));
+}
+const HOTEL_CAST_COPY = [
+  [m['site.hotel.cast1_title'], m['site.hotel.cast1_desc']],
+  [m['site.hotel.cast2_title'], m['site.hotel.cast2_desc']],
+  [m['site.hotel.cast3_title'], m['site.hotel.cast3_desc']],
+  [m['site.hotel.cast4_title'], m['site.hotel.cast4_desc']],
+  [m['site.hotel.cast5_title'], m['site.hotel.cast5_desc']],
+  [m['site.hotel.cast6_title'], m['site.hotel.cast6_desc']],
+];
+const HOTEL_COMPARISON_COPY = [
+  m['site.hotel.compare1'],
+  m['site.hotel.compare2'],
+  m['site.hotel.compare3'],
+  m['site.hotel.compare4'],
+  m['site.hotel.compare5'],
+  m['site.hotel.compare6'],
+  m['site.hotel.compare7'],
+  m['site.hotel.compare8'],
+  m['site.hotel.compare9'],
+  m['site.hotel.compare10'],
+  m['site.hotel.compare11'],
+  m['site.hotel.compare12'],
+  m['site.hotel.compare13'],
+  m['site.hotel.compare14'],
+  m['site.hotel.compare15'],
+];
+const HOTEL_TIPS_COPY = [
+  m['site.hotel.tip1'],
+  m['site.hotel.tip2'],
+  m['site.hotel.tip3'],
+  m['site.hotel.tip4'],
+  m['site.hotel.tip5'],
+];
+
 function faqJsonLd() {
   return {
     '@context': 'https://schema.org',
     '@type': 'FAQPage',
-    mainEntity: FAQ_ITEMS.map((item) => ({
+    mainEntity: getHotelFaqItems().map((item) => ({
       '@type': 'Question',
       name: item.question,
       acceptedAnswer: {
@@ -203,16 +254,14 @@ function HotelLobbyAiPage() {
           <section className="mx-auto max-w-7xl px-4 pt-14 pb-12 text-center sm:pt-20 md:px-5 md:pb-16">
             <div className="mx-auto mb-4 flex w-fit items-center gap-2 rounded-full border border-[rgba(204,144,92,0.2)] bg-[rgba(204,144,92,0.07)] px-3 py-1.5 text-xs font-medium text-[rgb(220,155,99)]">
               <WandSparkles className="size-3.5" />
-              Hotel Lobby preset · Kling O3
+              {m['site.hotel.hero_badge']()}
             </div>
 
             <h1 className="mx-auto max-w-4xl text-[34px] leading-[1.08] font-bold tracking-[-1.4px] sm:text-[44px] md:text-[56px]">
-              Hotel Lobby AI Video Generator
+              {m['site.hotel.hero_title']()}
             </h1>
             <p className="mx-auto mt-5 max-w-3xl text-base leading-7 text-white/58 sm:text-lg">
-              One or two photos in, one orange-booth clip out. Put your duo at
-              the hanging mic in a landscape 16:9 video, ready for YouTube,
-              Reels, or Shorts.
+              {m['site.hotel.hero_description']()}
             </p>
 
             <div id="generator" className="mt-8 text-left sm:mt-10">
@@ -230,23 +279,16 @@ function HotelLobbyAiPage() {
             >
               <div>
                 <p className="text-xs font-semibold tracking-[0.18em] text-[rgb(204,144,92)] uppercase">
-                  The result
+                  {m['site.hotel.result_tag']()}
                 </p>
                 <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
-                  What the Hotel Lobby AI video gives you
+                  {m['site.hotel.result_title']()}
                 </h2>
                 <p className="mt-4 text-sm leading-7 text-white/48 sm:text-base">
-                  The preset keeps the recognizable orange performance setup:
-                  two performers, one hanging microphone, and the reference
-                  choreography. Your uploaded photos control the identities,
-                  hair, outfits, and overall appearance.
+                  {m['site.hotel.result_desc1']()}
                 </p>
                 <p className="mt-4 text-sm leading-7 text-white/48 sm:text-base">
-                  With the preset booth clip, output is landscape. Length
-                  follows the reference video automatically, from 5 to 15
-                  seconds. For the original song when you post, choose the
-                  licensed <em>Hotel Lobby</em> sound inside TikTok or Instagram
-                  rather than bundling the track into the generated file.
+                  {m['site.hotel.result_desc2']()}
                 </p>
               </div>
 
@@ -261,7 +303,7 @@ function HotelLobbyAiPage() {
                     className="mx-auto aspect-video max-h-[620px] w-full max-w-full rounded-2xl bg-black object-contain"
                   />
                   <p className="px-1 pt-3 text-center text-xs text-white/34">
-                    Real Hotel Lobby AI output
+                    {m['site.hotel.result_caption']()}
                   </p>
                 </div>
               ) : null}
@@ -271,27 +313,17 @@ function HotelLobbyAiPage() {
           <section className="border-y border-white/7 bg-white/[0.018]">
             <div className="mx-auto max-w-5xl px-4 py-14 md:px-5 md:py-20">
               <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-                What is the Hotel Lobby AI trend?
+                {m['site.hotel.trend_title']()}
               </h2>
               <div className="mt-5 space-y-4 text-sm leading-7 text-white/48 sm:text-base">
                 <p>
-                  The orange set, one microphone hanging from the ceiling, and
-                  two people trading verses comes from Quavo and Takeoff’s 2022
-                  A COLORS SHOW performance of{' '}
-                  <em>HOTEL LOBBY (Unc &amp; Phew)</em>.
+                  {m['site.hotel.trend_p1']()}
                 </p>
                 <p>
-                  In September 2026, AI remixes of that performance spread
-                  across TikTok and X. Creators started replacing the duo with
-                  friends, couples, pets, athletes, celebrities, and fictional
-                  characters while keeping the recognizable stage and
-                  performance structure.
+                  {m['site.hotel.trend_p2']()}
                 </p>
                 <p>
-                  It is not a traditional camera filter. The versions people
-                  share are generated or edited with AI from reference images
-                  and a motion or scene template. This page packages that
-                  generation step into one preset.
+                  {m['site.hotel.trend_p3']()}
                 </p>
               </div>
             </div>
@@ -300,10 +332,10 @@ function HotelLobbyAiPage() {
           <section className="mx-auto max-w-6xl px-4 py-14 md:px-5 md:py-20">
             <div className="mx-auto max-w-3xl text-center">
               <p className="text-xs font-semibold tracking-[0.18em] text-[rgb(204,144,92)] uppercase">
-                Three steps
+                {m['site.hotel.three_steps']()}
               </p>
               <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
-                How to make the Hotel Lobby AI video
+                {m['site.hotel.how_title']()}
               </h2>
             </div>
 
@@ -311,18 +343,18 @@ function HotelLobbyAiPage() {
               {[
                 {
                   icon: Images,
-                  title: '1. Upload one or two photos',
-                  text: 'Use one photo with both of you, or one clear photo per performer. Waist-up or full-body shots carry outfits better.',
+                  title: m['site.hotel.step1_title'](),
+                  text: m['site.hotel.step1_desc'](),
                 },
                 {
                   icon: Sparkles,
-                  title: '2. Press generate',
-                  text: 'The Hotel Lobby performance is already loaded. The duration is taken from the reference video automatically.',
+                  title: m['site.hotel.step2_title'](),
+                  text: m['site.hotel.step2_desc'](),
                 },
                 {
                   icon: Film,
-                  title: '3. Add the sound and post',
-                  text: 'Download the MP4, upload it to TikTok or Reels, then choose the licensed Hotel Lobby sound from the platform music library.',
+                  title: m['site.hotel.step3_title'](),
+                  text: m['site.hotel.step3_desc'](),
                 },
               ].map((step) => {
                 const Icon = step.icon;
@@ -346,16 +378,16 @@ function HotelLobbyAiPage() {
 
           <section className="mx-auto max-w-6xl px-4 pb-14 md:px-5 md:pb-20">
             <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-              Who people cast in the Hotel Lobby AI video
+              {m['site.hotel.cast_title']()}
             </h2>
             <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {CAST_IDEAS.map(([title, text]) => (
+              {CAST_IDEAS.map(([title, text], index) => (
                 <div
                   key={title}
                   className="rounded-2xl border border-white/8 bg-white/[0.025] p-5"
                 >
-                  <h3 className="font-semibold text-white/86">{title}</h3>
-                  <p className="mt-2 text-sm leading-6 text-white/42">{text}</p>
+                  <h3 className="font-semibold text-white/86">{HOTEL_CAST_COPY[index]?.[0]() ?? title}</h3>
+                  <p className="mt-2 text-sm leading-6 text-white/42">{HOTEL_CAST_COPY[index]?.[1]() ?? text}</p>
                 </div>
               ))}
             </div>
@@ -364,13 +396,10 @@ function HotelLobbyAiPage() {
           <section className="border-y border-white/7 bg-white/[0.018]">
             <div className="mx-auto max-w-6xl px-4 py-14 md:px-5 md:py-20">
               <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-                Hotel Lobby AI vs Higgsfield Genjutsu
+                {m['site.hotel.vs_title']()}
               </h2>
               <p className="mt-4 max-w-3xl text-sm leading-7 text-white/48 sm:text-base">
-                Both workflows can use a source performance to preserve motion.
-                The difference is product scope: this page preloads the Hotel
-                Lobby template and fixes the prompt, while Genjutsu is the
-                general-purpose motion-transfer and object-swap workflow.
+                {m['site.hotel.vs_desc']()}
               </p>
 
               <div className="mt-7 overflow-x-auto rounded-2xl border border-white/8">
@@ -378,7 +407,7 @@ function HotelLobbyAiPage() {
                   <thead className="bg-white/[0.035] text-white/72">
                     <tr>
                       <th className="px-4 py-3 font-semibold"> </th>
-                      <th className="px-4 py-3 font-semibold">This page</th>
+                      <th className="px-4 py-3 font-semibold">{m['site.hotel.this_page']()}</th>
                       <th className="px-4 py-3 font-semibold">
                         Higgsfield Genjutsu
                       </th>
@@ -411,7 +440,7 @@ function HotelLobbyAiPage() {
                         'No fixed prompt exposed',
                         'Optional / workflow-dependent',
                       ],
-                    ].map((row) => (
+                    ].map((row, rowIndex) => (
                       <tr key={row[0]}>
                         {row.map((cell, index) => (
                           <td
@@ -422,7 +451,7 @@ function HotelLobbyAiPage() {
                                 : 'px-4 py-3'
                             }
                           >
-                            {cell}
+                            {HOTEL_COMPARISON_COPY[rowIndex * 3 + index]?.() ?? cell}
                           </td>
                         ))}
                       </tr>
@@ -436,16 +465,16 @@ function HotelLobbyAiPage() {
           <section className="mx-auto grid max-w-6xl gap-8 px-4 py-14 md:px-5 md:py-20 lg:grid-cols-2">
             <div>
               <h2 className="text-3xl font-semibold tracking-tight">
-                Photo tips for a better swap
+                {m['site.hotel.photo_tips']()}
               </h2>
               <ul className="mt-6 space-y-4">
-                {PHOTO_TIPS.map((tip) => (
+                {PHOTO_TIPS.map((tip, index) => (
                   <li
                     key={tip}
                     className="flex gap-3 text-sm leading-6 text-white/46"
                   >
                     <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-[rgb(204,144,92)]" />
-                    <span>{tip}</span>
+                    <span>{HOTEL_TIPS_COPY[index]?.() ?? tip}</span>
                   </li>
                 ))}
               </ul>
@@ -456,30 +485,23 @@ function HotelLobbyAiPage() {
                 <ShieldCheck className="size-5" />
               </div>
               <h2 className="mt-5 text-3xl font-semibold tracking-tight">
-                Free to set up, private by default
+                {m['site.hotel.privacy_title']()}
               </h2>
               <p className="mt-4 text-sm leading-7 text-white/46">
-                You can load the preset, choose photos, and preview your setup
-                without spending credits. Choosing a file only creates a local
-                browser preview. Your photos and custom reference video are not
-                uploaded until you sign in and press generate. Generation inputs
-                are stored privately for the job rather than published to a
-                public gallery.
+                {m['site.hotel.privacy_p1']()}
               </p>
               <p className="mt-4 text-sm leading-7 text-white/46">
-                Provider failures automatically refund reserved credits. Use
-                images of yourself, pets you own, or people who agreed to
-                appear.
+                {m['site.hotel.privacy_p2']()}
               </p>
             </div>
           </section>
 
           <section className="mx-auto max-w-5xl px-4 pb-16 md:px-5 md:pb-24">
             <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-              Hotel Lobby AI FAQ
+              {m['site.hotel.faq_title']()}
             </h2>
             <div className="mt-7 divide-y divide-white/7 rounded-2xl border border-white/8 bg-white/[0.02] px-5 sm:px-7">
-              {FAQ_ITEMS.map((item) => (
+              {getHotelFaqItems().map((item) => (
                 <details key={item.question} className="group py-5">
                   <summary className="cursor-pointer list-none pr-6 text-sm font-semibold text-white/82 sm:text-base">
                     {item.question}
@@ -495,14 +517,14 @@ function HotelLobbyAiPage() {
           <section className="mx-auto max-w-6xl px-4 pb-20 md:px-5">
             <div className="rounded-[26px] border border-white/8 bg-white/[0.02] p-6 sm:p-8">
               <h2 className="text-2xl font-semibold tracking-tight">
-                Explore more
+                {m['site.hotel.explore']()}
               </h2>
               <div className="mt-5 flex flex-wrap gap-3">
                 {[
-                  ['Genjutsu motion transfer', '/'],
-                  ['Genjutsu prompt guide', '/genjutsu-prompts'],
-                  ['Your generated videos', '/creations'],
-                  ['Credit pricing', '/pricing'],
+                  [m['site.hotel.more1'](), '/'],
+                  [m['site.hotel.more2'](), '/genjutsu-prompts'],
+                  [m['site.hotel.more3'](), '/creations'],
+                  [m['site.hotel.more4'](), '/pricing'],
                 ].map(([label, href]) => (
                   <Link
                     key={href}
@@ -521,33 +543,32 @@ function HotelLobbyAiPage() {
       <footer className="border-t border-white/7 py-8">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 px-4 text-center text-xs text-white/32 sm:flex-row sm:text-left md:px-5">
           <p>
-            © 2026 {envConfigs.app_name}. Independent tool; not affiliated with
-            COLORS, Quavo, or Takeoff.
+            © 2026 {envConfigs.app_name}. {m['site.hotel.copyright']()}
           </p>
           <div className="flex flex-wrap items-center justify-center gap-4">
             <Link
               href="/privacy-policy"
               className="transition hover:text-white/65"
             >
-              Privacy
+              {m['site.hotel.footer_privacy']()}
             </Link>
             <Link
               href="/terms-of-service"
               className="transition hover:text-white/65"
             >
-              Terms
+              {m['site.hotel.footer_terms']()}
             </Link>
             <Link
               href="/refund-policy"
               className="transition hover:text-white/65"
             >
-              Refunds
+              {m['site.hotel.footer_refunds']()}
             </Link>
             <a
               href={`mailto:${envConfigs.app_support_email}`}
               className="transition hover:text-white/65"
             >
-              Support
+              {m['site.hotel.footer_support']()}
             </a>
           </div>
         </div>
@@ -566,11 +587,11 @@ export const Route = createFileRoute('/hotel-lobby-ai')({
     const { canonical, alternates } = localeLinks('/hotel-lobby-ai', locale);
     return {
       meta: [
-        { title: PAGE_TITLE },
-        { name: 'description', content: PAGE_DESCRIPTION },
+        { title: m['site.hotel.page_title']() },
+        { name: 'description', content: m['site.hotel.page_description']() },
         ...socialMeta({
-          title: PAGE_TITLE,
-          description: PAGE_DESCRIPTION,
+          title: m['site.hotel.page_title'](),
+          description: m['site.hotel.page_description'](),
           url: canonical,
         }),
       ],

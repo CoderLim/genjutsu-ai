@@ -3,7 +3,8 @@ import { createFileRoute } from '@tanstack/react-router';
 import { envConfigs } from '@/config';
 import { localeLinks, socialMeta } from '@/lib/seo';
 import { getLocale } from '@/paraglide/runtime.js';
-import { GENJUTSU_FAQS } from '@/components/landing/content';
+import { getLocalizedGenjutsuFaqs } from '@/components/landing/genjutsu-faqs-i18n';
+import { m } from '@/paraglide/messages.js';
 import { FaqSection } from '@/components/landing/FaqSection';
 import {
   BackToToolCta,
@@ -21,9 +22,7 @@ import { SiteHeader } from '@/components/landing/SiteHeader';
 import { StickyComposer } from '@/components/landing/StickyComposer';
 import { Testimonials } from '@/components/landing/Testimonials';
 
-const PAGE_TITLE = 'Genjutsu AI Video Generator — Video Restyling';
-const PAGE_DESCRIPTION =
-  'Genjutsu AI restyles any video without changing who or what is in it. Transfer motion into a new scene, style, or objects — upload a clip, write a prompt, get your new video in minutes.';
+
 
 function HomePage() {
   return (
@@ -44,19 +43,18 @@ function HomePage() {
         <VsOfficial />
         <Testimonials />
         <FaqSection
-          items={GENJUTSU_FAQS}
-          title="Genjutsu AI FAQ"
+          items={getLocalizedGenjutsuFaqs()}
+          title={m['site.home.faq_title']()}
           description={
             <>
-              Answers about video-to-video, credits, and how Genjutsu preserves
-              motion. Contact{' '}
+              {m['site.home.faq_intro']()}{' '}
               <a
                 href={`mailto:${envConfigs.app_support_email}`}
                 className="text-primary underline-offset-2 hover:underline"
               >
                 {envConfigs.app_support_email}
               </a>{' '}
-              if you need help.
+              {m['site.home.faq_help']()}
             </>
           }
         />
@@ -79,7 +77,7 @@ export const Route = createFileRoute('/')({
     const faqLd = {
       '@context': 'https://schema.org',
       '@type': 'FAQPage',
-      mainEntity: GENJUTSU_FAQS.map((item) => ({
+      mainEntity: getLocalizedGenjutsuFaqs().map((item) => ({
         '@type': 'Question',
         name: item.question,
         acceptedAnswer: {
@@ -90,11 +88,11 @@ export const Route = createFileRoute('/')({
     };
     return {
       meta: [
-        { title: PAGE_TITLE },
-        { name: 'description', content: PAGE_DESCRIPTION },
+        { title: m['site.home.meta_title']() },
+        { name: 'description', content: m['site.home.meta_description']() },
         ...socialMeta({
-          title: PAGE_TITLE,
-          description: PAGE_DESCRIPTION,
+          title: m['site.home.meta_title'](),
+          description: m['site.home.meta_description'](),
           url: canonical,
         }),
       ],
