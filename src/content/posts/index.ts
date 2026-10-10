@@ -122,10 +122,16 @@ export function mergePosts(
   return options.limit ? merged.slice(0, options.limit) : merged;
 }
 
+const DATE_LOCALES: Record<string, string> = {
+  en: 'en-US',
+  ja: 'ja-JP',
+  ko: 'ko-KR',
+};
+
 export function formatPostDate(dateIso: string, locale: string): string {
-  return new Intl.DateTimeFormat(locale === 'zh' ? 'zh-CN' : 'en-US', {
+  return new Intl.DateTimeFormat(DATE_LOCALES[locale] ?? 'en-US', {
     year: 'numeric',
-    month: locale === 'zh' ? 'long' : 'short',
+    month: locale === 'en' ? 'short' : 'long',
     day: 'numeric',
   }).format(new Date(dateIso));
 }

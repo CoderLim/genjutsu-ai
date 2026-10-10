@@ -59,7 +59,7 @@ export const Route = createRootRoute({
   loader: () => getAnalyticsConfigs(),
   // Do not emit homepage hreflang here — it leaks onto every route and fails
   // production-audit / Ahrefs (duplicate language URLs, missing return tags).
-  // Each public route owns its own canonical + en/zh + x-default.
+  // Each public route owns its own canonical + locale alternates + x-default.
   head: () => ({
     meta: [
       { charSet: 'utf-8' },
