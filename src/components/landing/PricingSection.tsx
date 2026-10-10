@@ -1,5 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useEffect, useRef } from 'react';
 import { Check } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -20,28 +19,25 @@ export function PricingSection() {
   const router = useRouter();
   const pathname = usePathname();
   const { data: session, isPending: sessionPending } = useSession();
-  const [loadingId, setLoadingId] = useState<string | null>(null);
   const autoBuyStarted = useRef(false);
 
-  const checkoutMutation = useMutation({
-    mutationFn: (productId: string) =>
-      apiPost<{ checkout_url?: string }>('/api/payment/checkout', {
-        product_id: productId,
-        redirect: `${pathname}#pricing`,
-      }),
-    onSuccess: (data) => {
+  async function startCheckout(productId: string) {
+    try {
+      const data = await apiPost<{ checkout_url?: string }>(
+        '/api/payment/checkout',
+        {
+          product_id: productId,
+          redirect: `${pathname}#pricing`,
+        }
+      );
       if (!data?.checkout_url) {
-        toast.error('Checkout failed');
-        setLoadingId(null);
-        return;
+        throw new Error('Checkout failed');
       }
       window.location.href = data.checkout_url;
-    },
-    onError: (err: Error) => {
-      toast.error(err.message || 'Checkout failed');
-      setLoadingId(null);
-    },
-  });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Checkout failed');
+    }
+  }
 
   function clearBuyQuery() {
     if (typeof window === 'undefined') return;
@@ -52,14 +48,8 @@ export function PricingSection() {
     window.history.replaceState({}, '', next);
   }
 
-  function startCheckout(productId: string) {
-    if (loadingId) return;
-    setLoadingId(productId);
-    checkoutMutation.mutate(productId);
-  }
-
   function handleBuy(productId: string) {
-    if (!isPublicPackId(productId) || loadingId) return;
+    if (!isPublicPackId(productId)) return;
 
     if (!session?.user) {
       const callbackUrl = encodeURIComponent(
@@ -69,7 +59,7 @@ export function PricingSection() {
       return;
     }
 
-    startCheckout(productId);
+    void startCheckout(productId);
   }
 
   // Resume checkout after sign-in: /?buy=mini#pricing
@@ -89,7 +79,7 @@ export function PricingSection() {
       return;
     }
 
-    startCheckout(buy);
+    void startCheckout(buy);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot resume after auth
   }, [sessionPending, session?.user, pathname]);
 
@@ -153,18 +143,16 @@ export function PricingSection() {
 
               <button
                 type="button"
-                disabled={loadingId !== null}
                 onClick={() => handleBuy(pack.id)}
                 className={cn(
                   'mt-auto flex h-10 w-full items-center justify-center rounded-lg',
                   pack.highlighted
                     ? 'bg-primary text-primary-foreground'
                     : 'border-border bg-background text-foreground border',
-                  'text-sm font-medium transition hover:brightness-105',
-                  'disabled:pointer-events-none disabled:opacity-60'
+                  'text-sm font-medium transition hover:brightness-105'
                 )}
               >
-                {loadingId === pack.id ? 'Opening checkout…' : 'Buy credits'}
+                Buy credits
               </button>
             </div>
           ))}
