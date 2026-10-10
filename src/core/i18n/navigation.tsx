@@ -26,8 +26,11 @@ export function Link({ href, locale, prefetch, ...rest }: LinkProps) {
   if (/^(https?:|mailto:|tel:|#)/.test(href)) {
     return <a href={href} {...rest} />;
   }
+  // Split hash/search the same way as useRouter — TanStack only scrolls
+  // when `hash` is a separate option, not when it is embedded in `to`.
+  const { to, search, hash } = toNavigateOptions(href);
   const Comp = RouterLink as any;
-  return <Comp to={href} {...rest} />;
+  return <Comp to={to} search={search} hash={hash} {...rest} />;
 }
 
 export function usePathname(): string {
