@@ -1278,5 +1278,20 @@
   "site.hotel.faq9_q": "길이를 늘리거나 HD로 만들 수 있나요?",
   "site.hotel.faq9_a": "네. 출력 길이는 3~15초 참조 영상을 따르며 입력 해상도는 720×720~3840×3840픽셀입니다. 직접 올린 영상은 원래 구도를 유지하고 기본 부스 템플릿은 가로 화면입니다.",
   "site.hotel.faq10_q": "Hotel Lobby 기본 템플릿을 바꿀 수 있나요?",
-  "site.hotel.faq10_a": "네. 기본 참조 영상을 삭제하고 직접 준비한 3~15초 MP4 또는 MOV를 업로드할 수 있습니다. 길이는 자동으로 설정됩니다."
+  "site.hotel.faq10_a": "네. 기본 참조 영상을 삭제하고 직접 준비한 3~15초 MP4 또는 MOV를 업로드할 수 있습니다. 길이는 자동으로 설정됩니다.",
+  "site.hotel.compare1": "업로드 자료",
+  "site.hotel.compare2": "사진 1~2장(기본 영상 포함)",
+  "site.hotel.compare3": "4~30초 원본 영상과 참조 자료",
+  "site.hotel.compare4": "원본 움직임 유지",
+  "site.hotel.compare5": "예, 템플릿 또는 직접 올린 영상에서",
+  "site.hotel.compare6": "예, 모션 전송에서",
+  "site.hotel.compare7": "Hotel Lobby 원본 영상을 직접 준비해야 하나요",
+  "site.hotel.compare8": "아니요",
+  "site.hotel.compare9": "해당 동작을 원한다면 필요",
+  "site.hotel.compare10": "기본 출력",
+  "site.hotel.compare11": "참조 영상에 맞춰짐",
+  "site.hotel.compare12": "최대 1080p · 원본 기준",
+  "site.hotel.compare13": "프롬프트 작성",
+  "site.hotel.compare14": "기본 프롬프트 입력 불필요",
+  "site.hotel.compare15": "선택 사항 · 작업 방식에 따라 다름"
 }
