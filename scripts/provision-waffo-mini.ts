@@ -34,14 +34,18 @@ async function main() {
   const merchantId = process.env.WAFFO_MERCHANT_ID;
   const privateKey = process.env.WAFFO_PRIVATE_KEY;
   if (!storeId || !merchantId || !privateKey) {
-    throw new Error('WAFFO_STORE_ID, WAFFO_MERCHANT_ID and WAFFO_PRIVATE_KEY are required');
+    throw new Error(
+      'WAFFO_STORE_ID, WAFFO_MERCHANT_ID and WAFFO_PRIVATE_KEY are required'
+    );
   }
 
   // This must be copied from the ACTIVE Admin/DB setting, not an assumed
   // up-to-date local .env value. Otherwise a proposed merged mapping is stale.
   const rawMapping = process.env.WAFFO_PRODUCT_IDS_MAPPING;
   if (!rawMapping) {
-    throw new Error('Set WAFFO_PRODUCT_IDS_MAPPING to the current active Admin mapping');
+    throw new Error(
+      'Set WAFFO_PRODUCT_IDS_MAPPING to the current active Admin mapping'
+    );
   }
   let current: unknown;
   try {
@@ -51,17 +55,25 @@ async function main() {
   }
   // Validate all pre-existing IDs without changing them.
   const existing = current as Record<string, unknown>;
-  if (existing?.mini) {
-    if (typeof existing.mini !== 'string') {
-      throw new Error('Invalid existing Mini product ID');
-    }
-    console.log('Mini mapping already exists. No SKU created; verify its price in Waffo.');
+  const existingMini =
+    typeof existing?.mini === 'string' ? existing.mini.trim() : '';
+  if (existing?.mini !== undefined && !existingMini) {
+    throw new Error('Invalid existing Mini product ID');
+  }
+  if (existingMini) {
+    // Still require starter/creator/studio (and non-empty values) before exit.
+    withMiniWaffoProduct(current, existingMini);
+    console.log(
+      `Mini mapping already exists (${existingMini}). No SKU created; verify its price in Waffo.`
+    );
     return;
   }
   withMiniWaffoProduct(current, 'PENDING_MINI_ID');
 
   if (process.env.WAFFO_MINI_CREATE !== 'true') {
-    console.log('Dry run passed: current mapping has existing packs and no Mini.');
+    console.log(
+      'Dry run passed: current mapping has existing packs and no Mini.'
+    );
     console.log('No Waffo or local configuration changes made.');
     return;
   }
@@ -69,7 +81,9 @@ async function main() {
     environment === 'prod' &&
     process.env.WAFFO_MINI_CONFIRM_PROD_PROVISION !== 'true'
   ) {
-    throw new Error('Production creation requires WAFFO_MINI_CONFIRM_PROD_PROVISION=true');
+    throw new Error(
+      'Production creation requires WAFFO_MINI_CONFIRM_PROD_PROVISION=true'
+    );
   }
 
   const client = new WaffoPancake({
@@ -106,9 +120,13 @@ async function main() {
 
   const proposedMapping = withMiniWaffoProduct(current, product.id);
   console.log('Verified created price and checkout availability.');
-  console.log('Proposed mapping; MANUALLY merge into the active Admin setting:');
+  console.log(
+    'Proposed mapping; MANUALLY merge into the active Admin setting:'
+  );
   console.log(JSON.stringify(proposedMapping, null, 2));
-  console.log('No mapping, DB, environment files or existing products were modified.');
+  console.log(
+    'No mapping, DB, environment files or existing products were modified.'
+  );
 }
 
 main().catch((error: any) => {
