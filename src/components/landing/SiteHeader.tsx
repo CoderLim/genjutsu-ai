@@ -6,12 +6,8 @@ import { Link } from '@/core/i18n/navigation';
 import { envConfigs } from '@/config';
 import { cn } from '@/lib/cn';
 import { m } from '@/paraglide/messages.js';
-import {
-  ChevronDownIcon,
-  GlobeIcon,
-  MenuIcon,
-  RaphaelLogo,
-} from '@/components/icons';
+import { ChevronDownIcon, MenuIcon, RaphaelLogo } from '@/components/icons';
+import { LocaleSelector } from '@/components/locale-selector';
 import { SiteUserMenu } from '@/components/site-user-menu';
 import {
   DropdownMenu,
@@ -166,13 +162,7 @@ export function SiteHeader() {
 
           <div className="flex shrink-0 items-center gap-2">
             <UpgradePill />
-            <button
-              type="button"
-              aria-label="Language"
-              className="text-muted-foreground hover:bg-accent hover:text-foreground inline-flex size-9 items-center justify-center rounded-md transition-colors"
-            >
-              <GlobeIcon className="size-4" />
-            </button>
+            <LocaleSelector className="text-muted-foreground hover:bg-accent hover:text-foreground size-9" />
             <AuthSlot />
           </div>
         </nav>
@@ -238,13 +228,7 @@ export function SiteHeader() {
                   </Link>
                   <div className="mt-6 flex flex-col gap-3">
                     <UpgradePill className="w-fit" />
-                    <button
-                      type="button"
-                      className="text-muted-foreground hover:bg-accent hover:text-foreground inline-flex w-fit items-center gap-2 rounded-md px-2 py-2 text-sm"
-                    >
-                      <GlobeIcon className="size-4" />
-                      Language
-                    </button>
+                    <LocaleSelector variant="pill" className="w-fit" />
                     <AuthSlot className="w-full" />
                   </div>
                 </div>
