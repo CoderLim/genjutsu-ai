@@ -525,6 +525,7 @@ Keep `.env.example` minimal; don't add provider keys to it.
 7. **Always verify `pnpm build` passes** after making changes
 8. **Return `respData`/`respErr`** from API routes
 9. **Run the `security-scan` skill before every `git commit`** — it checks for leaked secrets, injection/XSS/logic vulnerabilities in the diff, and `.gitignore`/`.dockerignore` gaps. HIGH findings block the commit.
+10. **Higgsfield Genjutsu = homepage pipeline** — any feature that calls Higgsfield Genjutsu must use the same lifecycle as the homepage (`GeneratorPanel` → `/api/genjutsu/*`): `attempt` → `upload-url` → upload → `seal-inputs` → `generate` → poll `status`. Do not add a parallel product-scoped upload/seal/generate chain. UI/preset differences (fixed template, fixed prompt) are fine; pipeline parity is required. See `.cursor/rules/higgsfield-genjutsu-pipeline.mdc`. (`/ai-zombie-hug`’s `/api/zombie-hug/*` generate path is known debt — align when next touched.)
 
 ## Cloud Sandbox Notes (ShipAny Code / e2b)
 

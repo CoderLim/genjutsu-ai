@@ -1,0 +1,32 @@
+---
+description: Higgsfield Genjutsu features must use the homepage generation pipeline
+alwaysApply: true
+---
+
+# Higgsfield = homepage Genjutsu pipeline
+
+Any feature that calls **Higgsfield Genjutsu** (motion transfer / object swap) must follow the **homepage** lifecycle — do not invent a parallel upload/seal/generate chain.
+
+## Canonical client chain
+
+Reference: `GeneratorPanel` → `/api/genjutsu/*`
+
+1. `POST /api/genjutsu/attempt` — persist `ai_task` (`initiated`) before upload
+2. `POST /api/genjutsu/upload-url` — bind staging keys + signed/proxy uploads
+3. Upload media
+4. `POST /api/genjutsu/seal-inputs` — immutable sealed inputs → `ready`
+5. `POST /api/genjutsu/generate` — estimate, reserve credits, `submitGenjutsu`
+6. Poll `GET /api/genjutsu/status`
+
+Shared engine: `submitGenjutsu` / billing / seal helpers in `@/modules/genjutsu/*`.
+
+## Rules
+
+- **New Higgsfield pages/presets** (trend landings, fixed templates, etc.): extend or call `/api/genjutsu/*` + the steps above. Product UI may differ (fixed prompt/template, N photos); the **API lifecycle must not diverge**.
+- **Do not** ship a second `generate.ts` / `upload-url.ts` that re-implements reserve → seal → submit (e.g. copying homepage into `/api/<preset>/`). Thin product routes only if they forward into the genjutsu chain.
+- Client-editable prompt / preset metadata is fine; **pipeline parity with homepage is the priority**.
+- Non-Higgsfield providers (Kling, Fal hotel-lobby, etc.) are out of scope for this rule.
+
+## Known debt
+
+`/ai-zombie-hug` still uses `/api/zombie-hug/upload-url` + `/generate` (seal folded into generate). Treat as legacy; when touching zombie-hug generation, align it to the homepage chain above.

@@ -31,11 +31,13 @@ wrangler.jsonc
 # deploy
 .vercel
 
-# editors (keep .cursor/skills — cross-agent symlink to .claude/skills)
+# editors (keep .cursor/skills symlink + committed Cursor rules)
 .idea
 .vscode
 .cursor/*
 !.cursor/skills
+!.cursor/rules/
+!.cursor/rules/**
 
 # misc
 .DS_Store
