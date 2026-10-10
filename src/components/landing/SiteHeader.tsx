@@ -24,10 +24,10 @@ import {
 } from '@/components/ui/sheet';
 
 const NAV_LINKS = [
-  { label: 'Feature', href: '/#feature' },
-  { label: 'How it works', href: '/#how-it-works' },
-  { label: 'Pricing', href: '/#pricing' },
-  { label: 'Blog', href: '/blog' },
+  { label: m['site.header.feature'], href: '/#feature' },
+  { label: m['site.header.how'], href: '/#how-it-works' },
+  { label: m['site.header.pricing'], href: '/#pricing' },
+  { label: m['site.header.blog'], href: '/blog' },
 ] as const;
 
 const TRENDING_LINKS = [
@@ -70,7 +70,7 @@ function UpgradePill({ className }: { className?: string }) {
         className
       )}
     >
-      Upgrade
+      {m['site.header.upgrade']()}
       <span className="absolute -top-2 -right-1 rounded bg-[#e05256] px-1 py-px text-[9px] leading-none font-bold text-white">
         -50%
       </span>
@@ -87,7 +87,7 @@ function SignInButton({ className }: { className?: string }) {
         className
       )}
     >
-      Sign in
+      {m['site.header.signin']()}
     </Link>
   );
 }
@@ -135,7 +135,7 @@ export function SiteHeader() {
               <DropdownMenu>
                 <DropdownMenuTrigger className={navLinkClass}>
                   <TrendingHotMark className="mr-1" />
-                  Trending
+                  {m['site.header.trending']()}
                   <ChevronDownIcon className="ml-1 size-3.5 opacity-70" />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" className="min-w-40">
@@ -151,7 +151,7 @@ export function SiteHeader() {
               </DropdownMenu>
               {NAV_LINKS.map((item) => (
                 <Link key={item.href} href={item.href} className={navLinkClass}>
-                  {item.label}
+                  {item.label()}
                 </Link>
               ))}
               <Link href="/creations" className={navLinkClass}>
@@ -175,7 +175,7 @@ export function SiteHeader() {
             <AuthSlot />
             <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
               <SheetTrigger
-                aria-label="Open menu"
+                aria-label={m['site.header.menu']()}
                 className="text-foreground hover:bg-accent inline-flex size-9 items-center justify-center rounded-md transition-colors"
               >
                 <MenuIcon className="size-5" />
@@ -194,7 +194,7 @@ export function SiteHeader() {
                   <div className="border-border/60 border-b py-3">
                     <p className="text-muted-foreground flex items-center gap-1 text-xs font-medium tracking-wide uppercase">
                       <TrendingHotMark className="size-3" />
-                      Trending
+                      {m['site.header.trending']()}
                     </p>
                     <div className="mt-1 flex flex-col">
                       {TRENDING_LINKS.map((item) => (
@@ -216,7 +216,7 @@ export function SiteHeader() {
                       className="border-border/60 border-b py-3 text-sm font-medium"
                       onClick={() => setSheetOpen(false)}
                     >
-                      {item.label}
+                      {item.label()}
                     </Link>
                   ))}
                   <Link
