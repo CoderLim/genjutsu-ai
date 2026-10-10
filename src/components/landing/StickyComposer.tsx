@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { ArrowUp, Mic, Plus } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
+import { m } from '@/paraglide/messages.js';
 import { GeneratorPanel } from '@/components/landing/GeneratorPanel';
 
 type StickyComposerProps = {
@@ -57,7 +58,7 @@ export function StickyComposer({
       {!expanded ? (
         <button
           type="button"
-          aria-label="Voice input"
+          aria-label={m['site.sticky.voice']()}
           className="absolute -top-11 right-[max(1rem,calc(50%-410px+4.5rem))] flex size-9 items-center justify-center rounded-full bg-emerald-600/90 text-white shadow-lg shadow-emerald-900/40 transition hover:bg-emerald-500"
         >
           <Mic className="size-4" />
@@ -68,11 +69,11 @@ export function StickyComposer({
         <div className="relative mx-auto w-full max-w-[820px]">
           <button
             type="button"
-            aria-label="Collapse composer"
+            aria-label={m['site.sticky.collapse_aria']()}
             className="text-foreground/80 hover:text-foreground absolute -top-9 right-0 rounded-full border border-white/10 bg-[rgba(74,56,44,0.88)] px-3 py-1 text-xs backdrop-blur-xl"
             onClick={() => setExpanded(false)}
           >
-            Collapse
+            {m['site.sticky.collapse']()}
           </button>
           <div className="overflow-hidden rounded-[24px] border border-white/10 bg-[rgba(74,56,44,0.94)] p-2 shadow-2xl backdrop-blur-2xl">
             <GeneratorPanel hidePromo />
@@ -82,7 +83,7 @@ export function StickyComposer({
         <div
           role="button"
           tabIndex={0}
-          aria-label="Open Genjutsu generator"
+          aria-label={m['site.sticky.open_generator']()}
           className="app-workspace-composer-collapsed-frame mx-auto flex w-full max-w-[820px] items-center gap-3 rounded-[24px] border border-white/10 bg-[rgba(74,56,44,0.88)] px-3 py-2 shadow-2xl backdrop-blur-2xl"
           onClick={() => setExpanded(true)}
           onKeyDown={(e) => {
@@ -102,13 +103,13 @@ export function StickyComposer({
           </button>
           <div className="min-w-0 flex-1 text-left">
             <p className="text-foreground/35 truncate text-base font-medium sm:text-sm">
-              Add a reference video and product, clothing, object, or scene images to start...
+              {m['site.sticky.composer_hint']()}
             </p>
           </div>
           <button
             type="button"
             tabIndex={-1}
-            aria-label="Generate"
+            aria-label={m['site.generator.generate']()}
             disabled
             className="bg-primary text-primary-foreground flex size-10 shrink-0 items-center justify-center rounded-full opacity-50"
           >
