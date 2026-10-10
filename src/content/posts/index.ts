@@ -16,6 +16,7 @@ import { baseLocale } from '@/paraglide/runtime.js';
 export const BLOG_POST_SLUGS: readonly string[] = [
   'higgsfield-genjutsu-alternative',
   'how-to-make-bulin-47-ai-video',
+  'how-to-make-rumpelstiltskin-ai-video',
 ];
 
 export type BlogPostMeta = {
