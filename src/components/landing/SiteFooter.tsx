@@ -3,6 +3,7 @@ import { Github } from 'lucide-react';
 import { Link } from '@/core/i18n/navigation';
 import { envConfigs } from '@/config';
 import { cn } from '@/lib/cn';
+import { m } from '@/paraglide/messages.js';
 import { RaphaelLogo } from '@/components/icons';
 import { FOOTER_COLUMNS } from '@/components/landing/content';
 
@@ -68,9 +69,7 @@ export function SiteFooter() {
                   </p>
                 </div>
                 <p className="text-md text-muted-foreground mt-6">
-                  Restyle any video without changing who or what is in it — new
-                  scenes, styles, and objects while keeping the original motion.
-                  Powered by Higgsfield Genjutsu.
+                  {m['site.footer.description']()}
                 </p>
                 <a
                   href={GITHUB_REPO_URL}
@@ -114,7 +113,7 @@ export function SiteFooter() {
               'lg:flex-row lg:items-center lg:text-left'
             )}
           >
-            <p>© 2026 • {envConfigs.app_name} All rights reserved.</p>
+            <p>© 2026 • {envConfigs.app_name} {m['site.footer.copyright']()}</p>
             <div className="flex flex-wrap items-center justify-center gap-4 lg:justify-end">
               <a
                 href={`mailto:${envConfigs.app_support_email}`}
@@ -126,19 +125,19 @@ export function SiteFooter() {
                 href="/privacy-policy"
                 className="hover:text-foreground transition-colors"
               >
-                Privacy Policy
+                {m['site.footer.privacy']()}
               </Link>
               <Link
                 href="/terms-of-service"
                 className="hover:text-foreground transition-colors"
               >
-                Terms of Service
+                {m['site.footer.terms']()}
               </Link>
               <Link
                 href="/refund-policy"
                 className="hover:text-foreground transition-colors"
               >
-                Refund Policy
+                {m['site.footer.refund']()}
               </Link>
             </div>
           </div>
