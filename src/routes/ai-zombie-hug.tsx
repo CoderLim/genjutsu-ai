@@ -10,13 +10,11 @@ import {
 import { Link } from '@/core/i18n/navigation';
 import { localeLinks, socialMeta } from '@/lib/seo';
 import { getLocale } from '@/paraglide/runtime.js';
+import { m } from '@/paraglide/messages.js';
 import { SiteFooter } from '@/components/landing/SiteFooter';
 import { SiteHeader } from '@/components/landing/SiteHeader';
 import { ZombieHugGeneratorPanel } from '@/components/landing/ZombieHugGeneratorPanel';
 
-const PAGE_TITLE = 'AI Zombie Hug: Turn Two Photos Into the Zombie Hug Video';
-const PAGE_DESCRIPTION =
-  'Make the AI zombie hug trend video from two photos: the lowered gun, the embrace, the hard cut to a warm memory. Copy-paste prompt and the 3 steps inside.';
 
 const FAQ_ITEMS = [
   {
@@ -134,18 +132,14 @@ function AiZombieHugPage() {
         <section className="mx-auto w-full max-w-7xl px-4 pt-20 pb-12 text-center sm:pt-24 md:px-5 md:pb-16">
           <div className="border-primary/20 bg-primary/10 text-primary mx-auto mb-4 flex w-fit items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium">
             <WandSparkles className="size-3.5" />
-            AI zombie hug · Genjutsu motion transfer
+            {m['site.zombie.hero_badge']()}
           </div>
 
           <h1 className="text-foreground mx-auto max-w-4xl text-[34px] leading-[1.08] font-bold tracking-[-1.4px] sm:text-[44px] md:text-[56px]">
-            AI Zombie Hug: The Two-Photo Trend Where Nobody Pulls the Trigger
+            {m['site.zombie.hero_title']()}
           </h1>
           <p className="text-muted-foreground mx-auto mt-5 max-w-3xl text-base leading-7 sm:text-lg">
-            The AI zombie hug is a two-photo AI video trend: someone you love
-            appears as a zombie, you raise a gun and can&apos;t fire it, they
-            rush at you — and the cold gray scene hard-cuts to a warm memory of
-            the two of you holding each other. It takes about 10 minutes to make
-            and two clear photos to start.
+            {m['site.zombie.hero_desc']()}
           </p>
 
           <div id="generator" className="mt-8 scroll-mt-24 text-left sm:mt-10">
@@ -158,59 +152,40 @@ function AiZombieHugPage() {
         <section id="zombie-hug-trend" className="scroll-mt-24 py-14 md:py-20">
           <div className="mx-auto max-w-5xl">
             <h2 className="text-foreground text-3xl font-semibold tracking-tight sm:text-4xl">
-              What Is the AI Zombie Hug Trend?
+              {m['site.zombie.trend_title']()}
             </h2>
             <div className="text-muted-foreground mt-5 space-y-4 text-sm leading-7 sm:text-base">
               <p>
-                The zombie hug trend (also written <em>AI zombie hug</em> or{' '}
-                <em>zombie hug AI video</em>) is the emotional branch of the{' '}
-                <a
-                  href="#ai-zombie-trend"
-                  className="text-primary underline-offset-2 hover:underline"
-                >
-                  AI zombie trend
-                </a>
-                . Instead of a jumpscare, it plays the same story in four beats:
+                {m['site.zombie.trend_intro1']()}
               </p>
               <ol className="list-decimal space-y-3 pl-5">
                 <li>
                   <strong className="text-foreground/80">
-                    The impossible choice
+                    {m['site.zombie.beat1_title']()}
                   </strong>{' '}
-                  — a gun raised at someone you love, now a zombie.
+                  {m['site.zombie.beat1_desc']()}
                 </li>
                 <li>
                   <strong className="text-foreground/80">
-                    Still you, underneath
+                    {m['site.zombie.beat2_title']()}
                   </strong>{' '}
-                  — one detail you recognize: a necklace, a collar tag, cloudy
-                  eyes that still look like theirs.
+                  {m['site.zombie.beat2_desc']()}
                 </li>
                 <li>
                   <strong className="text-foreground/80">
-                    An embrace, not an ending
+                    {m['site.zombie.beat3_title']()}
                   </strong>{' '}
-                  — the gun comes down, your arms open, they run into them.
+                  {m['site.zombie.beat3_desc']()}
                 </li>
                 <li>
                   <strong className="text-foreground/80">
-                    Back to your best day
+                    {m['site.zombie.beat4_title']()}
                   </strong>{' '}
-                  — the instant they reach you, the scene hard-cuts to the two
-                  of you in warm light: laughing, holding on, alive.
+                  {m['site.zombie.beat4_desc']()}
                 </li>
               </ol>
               <p>
-                That reversal is why it spread so fast. If you&apos;re looking
-                for the broader format — friends, family, pets, all of it — see
-                the{' '}
-                <a
-                  href="#ai-zombie-trend"
-                  className="text-primary underline-offset-2 hover:underline"
-                >
-                  AI zombie trend
-                </a>{' '}
-                notes below.
+                {m['site.zombie.trend_intro2']()}
               </p>
             </div>
           </div>
@@ -219,10 +194,10 @@ function AiZombieHugPage() {
         <section className="py-14 md:py-20">
           <div className="mx-auto max-w-3xl text-center">
             <p className="text-primary text-xs font-semibold tracking-[0.18em] uppercase">
-              Three steps
+              {m['site.zombie.three_steps']()}
             </p>
             <h2 className="text-foreground mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
-              How to Make an AI Zombie Hug Video
+              {m['site.zombie.how_title']()}
             </h2>
           </div>
 
@@ -230,18 +205,18 @@ function AiZombieHugPage() {
             {[
               {
                 icon: Images,
-                title: '1. Pick your two photos',
-                text: 'One clear, front-facing photo of the person who turns (no sunglasses, no group shots) and one of yourself. A selfie is enough. The hug needs two faces: you lowering the gun, and the two of you in the memory.',
+                title: m['site.zombie.step1_title'](),
+                text: m['site.zombie.step1_desc'](),
               },
               {
                 icon: Sparkles,
-                title: '2. Generate on this page',
-                text: 'Upload both photos above. The zombie hug motion template is already loaded — Genjutsu motion transfer maps your faces onto the cold standoff and the warm embrace in one clip.',
+                title: m['site.zombie.step2_title'](),
+                text: m['site.zombie.step2_desc'](),
               },
               {
                 icon: Film,
-                title: '3. Download and post',
-                text: 'Keep it 9:16 for TikTok, Reels and Shorts. Label the video as AI where the platform asks.',
+                title: m['site.zombie.step3_title'](),
+                text: m['site.zombie.step3_desc'](),
               },
             ].map((step) => {
               const Icon = step.icon;
@@ -266,16 +241,14 @@ function AiZombieHugPage() {
 
           <div className="border-border/70 bg-card/60 mx-auto mt-12 max-w-3xl rounded-2xl border p-5 sm:p-6">
             <h3 className="text-foreground text-lg font-semibold">
-              Copy-paste prompts
+              {m['site.zombie.prompt_title']()}
             </h3>
             <p className="text-muted-foreground mt-2 text-sm leading-6">
-              Building the cold and warm beats yourself in CapCut or Dreamina?
-              Use the same pose in both so the cut lands. This page skips that
-              step — the template already carries both beats.
+              {m['site.zombie.prompt_desc']()}
             </p>
             <div className="text-muted-foreground mt-5 space-y-4 text-sm leading-6">
               <div>
-                <p className="text-foreground/85 font-medium">Cold beat</p>
+                <p className="text-foreground/85 font-medium">{m['site.zombie.cold']()}</p>
                 <blockquote className="border-border/60 bg-background/50 mt-2 rounded-xl border p-4">
                   Cinematic 9:16 shot, rainy empty city street at dusk. A young
                   woman with pale gray skin, clouded eyes and a thin streak of
@@ -288,7 +261,7 @@ function AiZombieHugPage() {
               </div>
               <div>
                 <p className="text-foreground/85 font-medium">
-                  Warm beat (same pose)
+                  {m['site.zombie.warm']()}
                 </p>
                 <blockquote className="border-border/60 bg-background/50 mt-2 rounded-xl border p-4">
                   Cinematic 9:16 shot, golden sunset beach. The same young
@@ -303,14 +276,14 @@ function AiZombieHugPage() {
 
         <section className="py-14 md:py-20">
           <h2 className="text-foreground text-3xl font-semibold tracking-tight sm:text-4xl">
-            Photos That Decide Whether It Works
+            {m['site.zombie.photo_title']()}
           </h2>
           <div className="border-border/70 mt-7 overflow-x-auto rounded-2xl border">
             <table className="w-full min-w-[560px] border-collapse text-left text-sm">
               <thead className="bg-card text-foreground/80">
                 <tr>
-                  <th className="px-4 py-3 font-semibold">What you need</th>
-                  <th className="px-4 py-3 font-semibold">Why it matters</th>
+                  <th className="px-4 py-3 font-semibold">{m['site.zombie.need']()}</th>
+                  <th className="px-4 py-3 font-semibold">{m['site.zombie.why']()}</th>
                 </tr>
               </thead>
               <tbody className="text-muted-foreground divide-border/60 divide-y">
@@ -346,7 +319,7 @@ function AiZombieHugPage() {
 
         <section className="py-14 md:py-20">
           <h2 className="text-foreground text-3xl font-semibold tracking-tight sm:text-4xl">
-            Three Versions People Are Making
+            {m['site.zombie.versions_title']()}
           </h2>
           <div className="mt-7 grid gap-3 md:grid-cols-3">
             {[
@@ -379,19 +352,15 @@ function AiZombieHugPage() {
         <section id="ai-zombie-trend" className="scroll-mt-24 py-14 md:py-20">
           <div className="mx-auto max-w-5xl">
             <h2 className="text-foreground text-3xl font-semibold tracking-tight sm:text-4xl">
-              AI Zombie Hug vs. AI Zombie Trend: What&apos;s the Difference?
+              {m['site.zombie.vs_title']()}
             </h2>
             <p className="text-muted-foreground mt-5 text-sm leading-7 sm:text-base">
-              The AI zombie trend is the whole format — any loved one, any
-              ending. The AI zombie hug is the version where the gun goes down
-              and the story resolves in an embrace. Same engine, same two
-              photos, one different beat. For more motion-transfer workflows
-              beyond this preset, see{' '}
+              {m['site.zombie.vs_desc1']()}{' '}
               <Link
                 href="/"
                 className="text-primary underline-offset-2 hover:underline"
               >
-                Genjutsu motion transfer
+                {m['site.hero.motion']()}
               </Link>
               .
             </p>
@@ -420,9 +389,9 @@ function AiZombieHugPage() {
           <div className="border-border/70 bg-card/60 rounded-[26px] border p-6 text-center sm:p-10">
             <ul className="text-muted-foreground mx-auto mb-5 flex max-w-xl flex-col gap-2 text-left text-sm">
               {[
-                'Two clear photos decide likeness more than the prompt',
-                'The lowered gun is the emotional beat — keep one fixed detail',
-                '9:16 travels farthest on TikTok, Reels, and Shorts',
+                m['site.zombie.cta_tip1'](),
+                m['site.zombie.cta_tip2'](),
+                m['site.zombie.cta_tip3'](),
               ].map((tip) => (
                 <li key={tip} className="flex gap-2">
                   <CheckCircle2 className="text-primary mt-0.5 size-4 shrink-0" />
@@ -431,17 +400,16 @@ function AiZombieHugPage() {
               ))}
             </ul>
             <h2 className="text-foreground text-2xl font-semibold tracking-tight sm:text-3xl">
-              Your story starts here
+              {m['site.zombie.cta_title']()}
             </h2>
             <p className="text-muted-foreground mx-auto mt-3 max-w-2xl text-sm leading-7">
-              Upload two photos and get the cold standoff, the lowered gun and
-              the warm embrace in one clip.
+              {m['site.zombie.cta_desc']()}
             </p>
             <a
               href="#generator"
               className="mt-6 inline-flex h-11 items-center justify-center rounded-xl bg-[rgb(204,144,92)] px-6 text-sm font-semibold text-[rgb(247,246,243)] transition hover:brightness-105"
             >
-              Generate
+              {m['site.generator.generate']()}
             </a>
           </div>
         </section>
@@ -462,11 +430,11 @@ export const Route = createFileRoute('/ai-zombie-hug')({
     const { canonical, alternates } = localeLinks('/ai-zombie-hug', locale);
     return {
       meta: [
-        { title: PAGE_TITLE },
-        { name: 'description', content: PAGE_DESCRIPTION },
+        { title: m['site.zombie.page_title']() },
+        { name: 'description', content: m['site.zombie.page_description']() },
         ...socialMeta({
-          title: PAGE_TITLE,
-          description: PAGE_DESCRIPTION,
+          title: m['site.zombie.page_title'](),
+          description: m['site.zombie.page_description'](),
           url: canonical,
         }),
       ],
