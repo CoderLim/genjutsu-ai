@@ -1,10 +1,98 @@
+import { useEffect, useRef, useState } from 'react';
+import { useMutation } from '@tanstack/react-query';
 import { Check } from 'lucide-react';
+import { toast } from 'sonner';
 
-import { Link } from '@/core/i18n/navigation';
-import { GENJUTSU_CREDIT_PACKS } from '@/modules/genjutsu/pricing';
+import { useSession } from '@/core/auth/client';
+import { usePathname, useRouter } from '@/core/i18n/navigation';
+import {
+  GENJUTSU_CREDIT_PACKS,
+  type GenjutsuPublicCreditPackId,
+} from '@/modules/genjutsu/pricing';
+import { apiPost } from '@/lib/api-client';
 import { cn } from '@/lib/cn';
 
+function isPublicPackId(id: string): id is GenjutsuPublicCreditPackId {
+  return GENJUTSU_CREDIT_PACKS.some((pack) => pack.id === id);
+}
+
 export function PricingSection() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const { data: session, isPending: sessionPending } = useSession();
+  const [loadingId, setLoadingId] = useState<string | null>(null);
+  const autoBuyStarted = useRef(false);
+
+  const checkoutMutation = useMutation({
+    mutationFn: (productId: string) =>
+      apiPost<{ checkout_url?: string }>('/api/payment/checkout', {
+        product_id: productId,
+        redirect: `${pathname}#pricing`,
+      }),
+    onSuccess: (data) => {
+      if (!data?.checkout_url) {
+        toast.error('Checkout failed');
+        setLoadingId(null);
+        return;
+      }
+      window.location.href = data.checkout_url;
+    },
+    onError: (err: Error) => {
+      toast.error(err.message || 'Checkout failed');
+      setLoadingId(null);
+    },
+  });
+
+  function clearBuyQuery() {
+    if (typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has('buy')) return;
+    url.searchParams.delete('buy');
+    const next = `${url.pathname}${url.search}${url.hash || '#pricing'}`;
+    window.history.replaceState({}, '', next);
+  }
+
+  function startCheckout(productId: string) {
+    if (loadingId) return;
+    setLoadingId(productId);
+    checkoutMutation.mutate(productId);
+  }
+
+  function handleBuy(productId: string) {
+    if (!isPublicPackId(productId) || loadingId) return;
+
+    if (!session?.user) {
+      const callbackUrl = encodeURIComponent(
+        `${pathname}?buy=${productId}#pricing`
+      );
+      router.push(`/sign-in?callbackUrl=${callbackUrl}`);
+      return;
+    }
+
+    startCheckout(productId);
+  }
+
+  // Resume checkout after sign-in: /?buy=mini#pricing
+  useEffect(() => {
+    if (sessionPending || autoBuyStarted.current) return;
+    if (typeof window === 'undefined') return;
+
+    const buy = new URLSearchParams(window.location.search).get('buy');
+    if (!buy || !isPublicPackId(buy)) return;
+
+    autoBuyStarted.current = true;
+    clearBuyQuery();
+
+    if (!session?.user) {
+      const callbackUrl = encodeURIComponent(`${pathname}?buy=${buy}#pricing`);
+      router.push(`/sign-in?callbackUrl=${callbackUrl}`);
+      return;
+    }
+
+    startCheckout(buy);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot resume after auth
+  }, [sessionPending, session?.user, pathname]);
+
   return (
     <section id="pricing" className="scroll-mt-24 py-12 md:py-20">
       <div className="container mx-auto px-4">
@@ -63,18 +151,21 @@ export function PricingSection() {
                 </li>
               </ul>
 
-              <Link
-                href="/pricing"
+              <button
+                type="button"
+                disabled={loadingId !== null}
+                onClick={() => handleBuy(pack.id)}
                 className={cn(
                   'mt-auto flex h-10 w-full items-center justify-center rounded-lg',
                   pack.highlighted
                     ? 'bg-primary text-primary-foreground'
                     : 'border-border bg-background text-foreground border',
-                  'text-sm font-medium transition hover:brightness-105'
+                  'text-sm font-medium transition hover:brightness-105',
+                  'disabled:pointer-events-none disabled:opacity-60'
                 )}
               >
-                Buy credits
-              </Link>
+                {loadingId === pack.id ? 'Opening checkout…' : 'Buy credits'}
+              </button>
             </div>
           ))}
         </div>
