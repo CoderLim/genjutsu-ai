@@ -10,8 +10,9 @@ const starter = {
   providerEnvironment: 'prod',
 };
 
-test('public V2 packs always charge their catalog prices', () => {
+test('Mini and existing V2 packs always charge their catalog prices', () => {
   for (const [productId, catalogAmountCents] of [
+    ['mini', 999],
     ['starter', 1499],
     ['creator', 4999],
     ['studio', 9999],
@@ -37,16 +38,20 @@ test('public V2 packs always charge their catalog prices', () => {
 });
 
 test('public V2 checkouts fail closed on stale or malformed test overrides', () => {
-  for (const testAmountRaw of ['1', '1499', '100', '-1', '1.9', 'foo', '000']) {
-    assert.throws(
-      () =>
-        resolveGenjutsuCheckoutAmount({
-          ...starter,
-          providerEnvironment: 'test',
-          testAmountRaw,
-        }),
-      /Test payment amount override is not allowed/
-    );
+  for (const productId of ['mini', 'starter']) {
+    for (const testAmountRaw of ['1', '1499', '100', '-1', '1.9', 'foo', '000']) {
+      assert.throws(
+        () =>
+          resolveGenjutsuCheckoutAmount({
+            ...starter,
+            productId,
+            catalogAmountCents: productId === 'mini' ? 999 : 1499,
+            providerEnvironment: 'test',
+            testAmountRaw,
+          }),
+        /Test payment amount override is not allowed/
+      );
+    }
   }
 });
 
