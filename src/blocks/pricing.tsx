@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { m } from '@/paraglide/messages.js';
 
 import { useSession } from '@/core/auth/client';
 import { useRouter } from '@/core/i18n/navigation';
@@ -48,7 +49,7 @@ export function Pricing({ title }: { title?: string } = {}) {
   const groups: PricingGroup[] = [
     {
       key: 'credits',
-      label: 'Credit Packs',
+      label: m['site.pricing.packs'](),
       plans: listVisibleCreditPacks(session?.user?.email).map((pack) => {
         const currency = pack.currency || 'usd';
         const priceLabel =
@@ -58,22 +59,22 @@ export function Pricing({ title }: { title?: string } = {}) {
         return {
           id: pack.id,
           name: pack.name,
-          description: `${pack.credits.toLocaleString()} credits · one-time purchase`,
+          description: m['site.pricing.pack_description']({ count: pack.credits.toLocaleString() }),
           price: priceLabel,
           featured: pack.highlighted,
           badge:
             pack.id === 'smoke'
-              ? 'Dev only'
+              ? m['site.pricing.dev_only']()
               : pack.highlighted
-                ? 'Popular'
+                ? m['site.pricing.popular']()
                 : undefined,
           features: [
-            `${pack.credits.toLocaleString()} Genjutsu credits`,
-            'One-time purchase',
-            'No subscription',
-            'Motion Transfer & Object Swap',
+            m['site.pricing.credits_genjutsu']({ count: pack.credits.toLocaleString() }),
+            m['site.pricing.purchase_once'](),
+            m['site.pricing.no_subscription'](),
+            m['site.pricing.modes'](),
           ],
-          buttonText: 'Buy credits',
+          buttonText: m['site.pricing.buy'](),
           productId: pack.id,
           productName: `${pack.name} Credits`,
           priceInCents: pack.priceCents,
@@ -99,14 +100,14 @@ export function Pricing({ title }: { title?: string } = {}) {
       }),
     onSuccess: (data) => {
       if (!data?.checkout_url) {
-        toast.error('Checkout failed');
+        toast.error(m['site.pricing.checkout_failed']());
         setLoadingProvider(null);
         return;
       }
       window.location.href = data.checkout_url;
     },
     onError: (err: any) => {
-      toast.error(err?.message || 'Checkout failed');
+      toast.error(err?.message || m['site.pricing.checkout_failed']());
       setLoadingProvider(null);
     },
   });
@@ -134,7 +135,7 @@ export function Pricing({ title }: { title?: string } = {}) {
 
     if (!defaultProvider) {
       toast.error(
-        'No payment provider configured. Enable Waffo in Admin → Settings.'
+        m['site.pricing.no_provider']()
       );
       return;
     }
@@ -161,11 +162,10 @@ export function Pricing({ title }: { title?: string } = {}) {
       <div className="mx-auto max-w-6xl">
         <div className="mb-16 text-center">
           <h2 className="font-serif text-4xl font-normal tracking-tight sm:text-5xl">
-            {title ?? 'Genjutsu credits'}
+            {title ?? m['site.pricing.standalone_title']()}
           </h2>
           <p className="text-muted-foreground mx-auto mt-5 max-w-2xl">
-            Pay only for what you generate. Buy credits once, use them for
-            Motion Transfer or Object Swap, and come back whenever you need.
+            {m['site.pricing.standalone_description']()}
           </p>
         </div>
 
