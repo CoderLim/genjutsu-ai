@@ -9,12 +9,12 @@ import {
 import { Link } from '@/core/i18n/navigation';
 import { cn } from '@/lib/cn';
 import { m } from '@/paraglide/messages.js';
+import { getLocalizedGenjutsuPromptIdeas } from '@/components/landing/genjutsu-prompts-i18n';
 import {
   GENJUTSU_CHANGE_EXAMPLES,
   GENJUTSU_CHANGE_ITEMS,
   GENJUTSU_HOW_IT_WORKS,
   GENJUTSU_HOWTO_STEPS,
-  GENJUTSU_PROMPT_IDEAS,
   GENJUTSU_VS_ROWS,
 } from '@/components/landing/content';
 
@@ -215,7 +215,7 @@ export function PromptIdeas({
           description={m['site.seo.ideas_desc']()}
         />
         <div className="mx-auto mt-12 grid max-w-[1180px] gap-8 sm:grid-cols-2">
-          {GENJUTSU_PROMPT_IDEAS.slice(0, 8).map((item) => (
+          {getLocalizedGenjutsuPromptIdeas().slice(0, 8).map((item) => (
             <article
               key={item.title}
               className="rounded-2xl border border-white/8 bg-white/[0.03] p-6"
