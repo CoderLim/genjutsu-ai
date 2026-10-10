@@ -1,22 +1,31 @@
-import { GENJUTSU_FAQS } from '@/components/landing/content';
 import { m } from '@/paraglide/messages.js';
+import { GENJUTSU_FAQS } from '@/components/landing/content';
 
-const FAQ_COPY = [
-  { question: m['site.seo.faq1_q'], answer: m['site.seo.faq1_a'] },
-  { question: m['site.seo.faq2_q'], answer: m['site.seo.faq2_a'] },
-  { question: m['site.seo.faq3_q'], answer: m['site.seo.faq3_a'] },
-  { question: m['site.seo.faq4_q'], answer: m['site.seo.faq4_a'] },
-  { question: m['site.seo.faq5_q'], answer: m['site.seo.faq5_a'] },
-  { question: m['site.seo.faq6_q'], answer: m['site.seo.faq6_a'] },
-  { question: m['site.seo.faq7_q'], answer: m['site.seo.faq7_a'] },
-  { question: m['site.seo.faq8_q'], answer: m['site.seo.faq8_a'] },
-  { question: m['site.seo.faq9_q'], answer: m['site.seo.faq9_a'] },
-];
+/** Resolve message fns at call time — module-level capture breaks during Paraglide HMR. */
+const FAQ_KEYS = [
+  ['site.seo.faq1_q', 'site.seo.faq1_a'],
+  ['site.seo.faq2_q', 'site.seo.faq2_a'],
+  ['site.seo.faq3_q', 'site.seo.faq3_a'],
+  ['site.seo.faq4_q', 'site.seo.faq4_a'],
+  ['site.seo.faq5_q', 'site.seo.faq5_a'],
+  ['site.seo.faq6_q', 'site.seo.faq6_a'],
+  ['site.seo.faq7_q', 'site.seo.faq7_a'],
+  ['site.seo.faq8_q', 'site.seo.faq8_a'],
+  ['site.seo.faq9_q', 'site.seo.faq9_a'],
+] as const;
+
+function msg(key: (typeof FAQ_KEYS)[number][number]): string | undefined {
+  const fn = m[key];
+  return typeof fn === 'function' ? fn() : undefined;
+}
 
 export function getLocalizedGenjutsuFaqs() {
-  return GENJUTSU_FAQS.map((item, index) => ({
-    ...item,
-    question: FAQ_COPY[index]?.question() ?? item.question,
-    answer: FAQ_COPY[index]?.answer() ?? item.answer,
-  }));
+  return GENJUTSU_FAQS.map((item, index) => {
+    const keys = FAQ_KEYS[index];
+    return {
+      ...item,
+      question: (keys && msg(keys[0])) ?? item.question,
+      answer: (keys && msg(keys[1])) ?? item.answer,
+    };
+  });
 }
