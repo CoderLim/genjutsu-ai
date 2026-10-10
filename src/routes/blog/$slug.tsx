@@ -6,12 +6,12 @@ import { Link } from '@/core/i18n/navigation';
 import { envConfigs } from '@/config';
 import { absoluteUrl, localeLinks, socialMeta } from '@/lib/seo';
 import { m } from '@/paraglide/messages.js';
-import { getLocale } from '@/paraglide/runtime.js';
+import { baseLocale, getLocale } from '@/paraglide/runtime.js';
 import { SiteFooter } from '@/components/landing/SiteFooter';
 import { SiteHeader } from '@/components/landing/SiteHeader';
 import { MarkdownContent } from '@/components/markdown-content';
 import { mdxComponents } from '@/components/mdx-components';
-import { formatPostDate, loadLocalPost } from '@/content/posts';
+import { formatPostDate, getLocalPostLocales, loadLocalPost } from '@/content/posts';
 import { getBlogPostFn } from '@/content/posts/server';
 
 export const Route = createFileRoute('/blog/$slug')({
@@ -27,7 +27,20 @@ export const Route = createFileRoute('/blog/$slug')({
     if (!loaderData) return {};
     const { locale, post } = loaderData;
     const title = `${post.title} | ${envConfigs.app_name}`;
-    const { canonical, alternates } = localeLinks(`/blog/${post.slug}`, locale);
+    // A locale-specific URL can show fallback English content, but that is
+    // not a translated article and must not be declared as one to crawlers.
+    const availableLocales =
+      post.source === 'local' ? getLocalPostLocales(post.slug) : [baseLocale];
+    const contentLocale = availableLocales.includes(locale)
+      ? locale
+      : availableLocales.includes(baseLocale)
+        ? baseLocale
+        : (availableLocales[0] ?? baseLocale);
+    const { canonical, alternates } = localeLinks(
+      `/blog/${post.slug}`,
+      contentLocale,
+      availableLocales
+    );
     const image = post.image ? absoluteUrl(post.image) : undefined;
     return {
       meta: [
@@ -51,7 +64,7 @@ export const Route = createFileRoute('/blog/$slug')({
             description: post.description,
             datePublished: post.createdAt,
             dateModified: post.createdAt,
-            inLanguage: locale,
+            inLanguage: contentLocale,
             mainEntityOfPage: canonical,
             ...(image ? { image: [image] } : {}),
             author: {
