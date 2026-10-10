@@ -1,12 +1,24 @@
 import { useState } from 'react';
+import { Flame } from 'lucide-react';
 
 import { useSession } from '@/core/auth/client';
 import { Link } from '@/core/i18n/navigation';
 import { envConfigs } from '@/config';
 import { cn } from '@/lib/cn';
 import { m } from '@/paraglide/messages.js';
-import { GlobeIcon, MenuIcon, RaphaelLogo } from '@/components/icons';
+import {
+  ChevronDownIcon,
+  GlobeIcon,
+  MenuIcon,
+  RaphaelLogo,
+} from '@/components/icons';
 import { SiteUserMenu } from '@/components/site-user-menu';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
   Sheet,
   SheetContent,
@@ -22,9 +34,25 @@ const NAV_LINKS = [
   { label: 'Blog', href: '/blog' },
 ] as const;
 
+const TRENDING_LINKS = [
+  { label: 'Hotel Lobby', href: '/hotel-lobby-ai' },
+  { label: 'Zombie Hug', href: '/ai-zombie-hug' },
+] as const;
+
 const navLinkClass =
   'hover:bg-accent hover:text-accent-foreground inline-flex h-10 items-center justify-center rounded-md px-4 py-2 text-sm font-medium transition-colors';
 
+function TrendingHotMark({ className }: { className?: string }) {
+  return (
+    <Flame
+      className={cn('size-3.5 shrink-0', className)}
+      color="#ff6b35"
+      fill="#ff6b35"
+      stroke="#ff6b35"
+      aria-hidden
+    />
+  );
+}
 function BrandLink({ className }: { className?: string }) {
   return (
     <Link href="/" className={cn('flex items-center gap-2', className)}>
@@ -99,10 +127,6 @@ function AuthSlot({ className }: { className?: string }) {
 
 export function SiteHeader() {
   const [sheetOpen, setSheetOpen] = useState(false);
-  const navLinks = [
-    ...NAV_LINKS,
-    { label: m['creations.nav'](), href: '/creations' },
-  ];
 
   return (
     <section className="text-foreground relative z-[260] py-3">
@@ -112,11 +136,31 @@ export function SiteHeader() {
           <div className="flex min-w-0 items-center gap-2 xl:gap-4">
             <BrandLink />
             <div className="flex items-center">
-              {navLinks.map((item) => (
+              <DropdownMenu>
+                <DropdownMenuTrigger className={navLinkClass}>
+                  <TrendingHotMark className="mr-1" />
+                  Trending
+                  <ChevronDownIcon className="ml-1 size-3.5 opacity-70" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="min-w-40">
+                  {TRENDING_LINKS.map((item) => (
+                    <DropdownMenuItem
+                      key={item.href}
+                      render={<Link href={item.href} />}
+                    >
+                      {item.label}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+              {NAV_LINKS.map((item) => (
                 <Link key={item.href} href={item.href} className={navLinkClass}>
                   {item.label}
                 </Link>
               ))}
+              <Link href="/creations" className={navLinkClass}>
+                {m['creations.nav']()}
+              </Link>
             </div>
           </div>
 
@@ -157,7 +201,25 @@ export function SiteHeader() {
                   </SheetTitle>
                 </SheetHeader>
                 <div className="flex h-full flex-col overflow-y-auto px-4 pt-2 pb-8">
-                  {navLinks.map((item) => (
+                  <div className="border-border/60 border-b py-3">
+                    <p className="text-muted-foreground flex items-center gap-1 text-xs font-medium tracking-wide uppercase">
+                      <TrendingHotMark className="size-3" />
+                      Trending
+                    </p>
+                    <div className="mt-1 flex flex-col">
+                      {TRENDING_LINKS.map((item) => (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          className="py-2 pl-2 text-sm font-medium"
+                          onClick={() => setSheetOpen(false)}
+                        >
+                          {item.label}
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                  {NAV_LINKS.map((item) => (
                     <Link
                       key={item.href}
                       href={item.href}
@@ -167,6 +229,13 @@ export function SiteHeader() {
                       {item.label}
                     </Link>
                   ))}
+                  <Link
+                    href="/creations"
+                    className="border-border/60 border-b py-3 text-sm font-medium"
+                    onClick={() => setSheetOpen(false)}
+                  >
+                    {m['creations.nav']()}
+                  </Link>
                   <div className="mt-6 flex flex-col gap-3">
                     <UpgradePill className="w-fit" />
                     <button
