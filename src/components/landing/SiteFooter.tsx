@@ -1,8 +1,12 @@
+import { Github } from 'lucide-react';
+
 import { Link } from '@/core/i18n/navigation';
 import { envConfigs } from '@/config';
 import { cn } from '@/lib/cn';
 import { RaphaelLogo } from '@/components/icons';
 import { FOOTER_COLUMNS } from '@/components/landing/content';
+
+const GITHUB_REPO_URL = 'https://github.com/limbuilder/genjutsu-ai';
 
 const isExternalHref = (href: string) => /^https?:\/\//.test(href);
 
@@ -68,6 +72,16 @@ export function SiteFooter() {
                   scenes, styles, and objects while keeping the original motion.
                   Powered by Higgsfield Genjutsu.
                 </p>
+                <a
+                  href={GITHUB_REPO_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Genjutsu AI on GitHub"
+                  title="GitHub"
+                  className="text-muted-foreground hover:text-foreground mt-5 inline-flex size-9 items-center justify-center rounded-md transition-colors"
+                >
+                  <Github className="size-5" />
+                </a>
               </div>
             </div>
 
