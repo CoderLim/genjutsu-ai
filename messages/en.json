@@ -1364,5 +1364,10 @@
   "site.zombie.version3_title": "The family version",
   "site.zombie.version3_desc": "A parent you'd never shoot. This one lands hardest with people doing it as a memory, so keep the zombie makeup light around the eyes and mouth.",
   "site.zombie.cold_prompt": "Cinematic 9:16 shot, rainy empty city street at dusk. A young woman with pale gray skin, clouded eyes and a thin streak of dried blood on her cheek stands six meters away, breathing hard. In the foreground, a man's hands shake as he raises a pistol, then slowly lowers it. She screams and charges toward him. Desaturated blue-gray grade, shallow depth of field, film grain, 24 fps.",
-  "site.zombie.warm_prompt": "Cinematic 9:16 shot, golden sunset beach. The same young woman, alive and healthy, laughing as she runs into the man's open arms. He lifts her off the ground. Warm golden grade, soft lens flare, film grain, 24 fps."
+  "site.zombie.warm_prompt": "Cinematic 9:16 shot, golden sunset beach. The same young woman, alive and healthy, laughing as she runs into the man's open arms. He lifts her off the ground. Warm golden grade, soft lens flare, film grain, 24 fps.",
+  "site.zombie.survivor_note": "Uninfected / gun holder. Clear front-facing photo of you.",
+  "site.zombie.loved_note": "Infected then restored. Same person in early zombie / later human shots.",
+  "site.zombie.upload_photo": "Upload photo",
+  "site.zombie.photo_hint": "JPG, PNG or WebP · up to 12 MB",
+  "site.zombie.provider_label": "Higgsfield Genjutsu · motion transfer"
 }
