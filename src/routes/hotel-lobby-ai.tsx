@@ -124,6 +124,23 @@ const HOTEL_CAST_COPY = [
   [m['site.hotel.cast5_title'], m['site.hotel.cast5_desc']],
   [m['site.hotel.cast6_title'], m['site.hotel.cast6_desc']],
 ];
+const HOTEL_COMPARISON_COPY = [
+  m['site.hotel.compare1'],
+  m['site.hotel.compare2'],
+  m['site.hotel.compare3'],
+  m['site.hotel.compare4'],
+  m['site.hotel.compare5'],
+  m['site.hotel.compare6'],
+  m['site.hotel.compare7'],
+  m['site.hotel.compare8'],
+  m['site.hotel.compare9'],
+  m['site.hotel.compare10'],
+  m['site.hotel.compare11'],
+  m['site.hotel.compare12'],
+  m['site.hotel.compare13'],
+  m['site.hotel.compare14'],
+  m['site.hotel.compare15'],
+];
 const HOTEL_TIPS_COPY = [
   m['site.hotel.tip1'],
   m['site.hotel.tip2'],
@@ -423,7 +440,7 @@ function HotelLobbyAiPage() {
                         'No fixed prompt exposed',
                         'Optional / workflow-dependent',
                       ],
-                    ].map((row) => (
+                    ].map((row, rowIndex) => (
                       <tr key={row[0]}>
                         {row.map((cell, index) => (
                           <td
@@ -434,7 +451,7 @@ function HotelLobbyAiPage() {
                                 : 'px-4 py-3'
                             }
                           >
-                            {cell}
+                            {HOTEL_COMPARISON_COPY[rowIndex * 3 + index]?.() ?? cell}
                           </td>
                         ))}
                       </tr>
