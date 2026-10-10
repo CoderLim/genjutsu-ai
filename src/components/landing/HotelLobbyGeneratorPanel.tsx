@@ -8,6 +8,7 @@ import {
 } from 'react';
 import { Download, LoaderCircle, Play, RotateCcw, Upload } from 'lucide-react';
 import { toast } from 'sonner';
+import { m } from '@/paraglide/messages.js';
 
 import { useSession } from '@/core/auth/client';
 import { Link } from '@/core/i18n/navigation';
@@ -206,7 +207,7 @@ function PersonSlot({
             type="button"
             disabled={disabled}
             onClick={onRemove}
-            aria-label={`Remove ${title.toLowerCase()}`}
+            aria-label={m['site.common.remove_item']({ name: title })}
             className="absolute top-2 right-2 flex size-8 items-center justify-center rounded-full bg-black/70 text-white/80 backdrop-blur transition hover:bg-black/90 disabled:opacity-40"
           >
             <CloseIcon className="size-4" />
@@ -220,7 +221,7 @@ function PersonSlot({
           className="flex aspect-[4/5] w-full flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-white/14 bg-white/[0.025] text-center text-white/42 transition hover:border-[rgba(204,144,92,0.55)] hover:bg-[rgba(204,144,92,0.05)] hover:text-[rgb(220,155,99)] disabled:cursor-not-allowed disabled:opacity-50"
         >
           <ImageModeIcon className="size-6" />
-          <span className="text-xs font-medium">Add photo</span>
+          <span className="text-xs font-medium">{m['site.common.add_photo']()}</span>
         </button>
       )}
     </div>
@@ -341,7 +342,7 @@ export function HotelLobbyGeneratorPanel() {
       clipDurationSeconds < MIN_REFERENCE_VIDEO_SECONDS ||
       clipDurationSeconds > MAX_REFERENCE_VIDEO_SECONDS
     ) {
-      toast.error('Trim the clip to between 3 and 15 seconds');
+      toast.error(m['site.hotel.trim_error']());
       return;
     }
 
@@ -394,11 +395,11 @@ export function HotelLobbyGeneratorPanel() {
   const setImageAt = (slot: 'first' | 'second', file: File | null) => {
     if (!file) return;
     if (!file.type.startsWith('image/')) {
-      toast.error('Please choose an image file');
+      toast.error(m['site.hotel.image_required']());
       return;
     }
     if (file.size <= 0 || file.size > MAX_IMAGE_BYTES) {
-      toast.error('Reference images must be 12 MB or smaller');
+      toast.error(m['site.hotel.image_size']());
       return;
     }
 
@@ -429,11 +430,11 @@ export function HotelLobbyGeneratorPanel() {
   const replaceVideo = async (file: File | null) => {
     if (!file) return;
     if (!['video/mp4', 'video/quicktime'].includes(file.type)) {
-      toast.error('Use an MP4 or MOV reference video');
+      toast.error(m['site.hotel.video_type']());
       return;
     }
     if (file.size <= 0 || file.size > MAX_VIDEO_BYTES) {
-      toast.error('Reference video must be 80 MB or smaller');
+      toast.error(m['site.hotel.video_size']());
       return;
     }
 
@@ -444,7 +445,7 @@ export function HotelLobbyGeneratorPanel() {
         durationSeconds < MIN_REFERENCE_VIDEO_SECONDS ||
         durationSeconds > MAX_REFERENCE_VIDEO_SECONDS
       ) {
-        toast.error('Reference video must be between 3 and 15 seconds');
+        toast.error(m['site.hotel.video_duration']());
         return;
       }
       try {
@@ -474,7 +475,7 @@ export function HotelLobbyGeneratorPanel() {
       setResultUrl(null);
       setPhase('idle');
     } catch {
-      toast.error('Could not read this video. Try MP4 or MOV.');
+      toast.error(m['site.hotel.video_unreadable']());
     }
   };
 
@@ -536,7 +537,7 @@ export function HotelLobbyGeneratorPanel() {
 
     setPhase('idle');
     throw new Error(
-      'Generation is still running. Keep this generation ID before starting another job.'
+      m['site.hotel.running']()
     );
   };
 
@@ -548,23 +549,23 @@ export function HotelLobbyGeneratorPanel() {
       return;
     }
     if (!video || sourceDuration == null) {
-      toast.error('Use the preset template or upload a reference video');
+      toast.error(m['site.hotel.need_video']());
       return;
     }
     if (!firstImage) {
-      toast.error('Add the first person photo');
+      toast.error(m['site.hotel.need_first']());
       return;
     }
     if (
       clipDurationSeconds < MIN_REFERENCE_VIDEO_SECONDS ||
       clipDurationSeconds > MAX_REFERENCE_VIDEO_SECONDS
     ) {
-      toast.error('Trim the clip to between 3 and 15 seconds');
+      toast.error(m['site.hotel.trim_error']());
       return;
     }
     if (!estimatedCredits) {
       toast.error(
-        'Still reading the reference video length. Try again in a moment.'
+        m['site.hotel.reading_duration']()
       );
       return;
     }
@@ -702,10 +703,10 @@ export function HotelLobbyGeneratorPanel() {
         : phase === 'generating'
           ? providerStatus
             ? `Generating · ${providerStatus}`
-            : 'Generating…'
+            : m['site.common.generating']()
           : phase === 'saving'
-            ? 'Saving your video…'
-            : 'Generate';
+            ? m['site.common.saving']()
+            : m['site.generator.generate']();
 
   return (
     <div className="mx-auto w-full max-w-[1120px]">
@@ -715,16 +716,15 @@ export function HotelLobbyGeneratorPanel() {
             <div className="mb-3 flex items-start justify-between gap-3">
               <div>
                 <p className="text-sm font-semibold text-white/90">
-                  Reference performance
+                  {m['site.hotel.reference']()}
                 </p>
                 <p className="mt-0.5 text-xs leading-5 text-white/40">
-                  The Hotel Lobby preset is loaded by default. Trim below, or
-                  remove it to use your own 3–15s motion reference.
+                  {m['site.hotel.reference_note']()}
                 </p>
               </div>
               {video?.kind === 'template' ? (
                 <span className="shrink-0 rounded-full border border-[rgba(204,144,92,0.18)] bg-[rgba(204,144,92,0.08)] px-2.5 py-1 text-[10px] font-semibold text-[rgb(220,155,99)]">
-                  Preset
+                  {m['site.hotel.preset']()}
                 </span>
               ) : null}
             </div>
@@ -774,7 +774,7 @@ export function HotelLobbyGeneratorPanel() {
                     type="button"
                     onClick={clearVideo}
                     disabled={busy}
-                    aria-label="Remove reference video"
+                    aria-label={m['site.generator.video_remove']()}
                     className="absolute top-2 right-2 flex size-8 items-center justify-center rounded-full bg-black/70 text-white/80 backdrop-blur transition hover:bg-black/90 disabled:opacity-40"
                   >
                     <CloseIcon className="size-4" />
@@ -825,7 +825,7 @@ export function HotelLobbyGeneratorPanel() {
                   </span>
                   <span>
                     <span className="block text-sm font-medium text-white/82">
-                      Upload reference video
+                      {m['site.hotel.upload_video']()}
                     </span>
                     <span className="mt-1 block text-xs text-white/38">
                       MP4 or MOV · 3–15s · 720–3840px · up to 80 MB
@@ -840,8 +840,8 @@ export function HotelLobbyGeneratorPanel() {
                 >
                   <RotateCcw className="size-3.5" />
                   {templateAvailable
-                    ? 'Use preset template'
-                    : 'Retry preset template'}
+                    ? m['site.hotel.restore']()
+                    : m['site.hotel.retry']()}
                 </button>
               </div>
             )}
@@ -850,8 +850,8 @@ export function HotelLobbyGeneratorPanel() {
           <div className="p-4 sm:p-5">
             <div className="grid grid-cols-2 gap-3">
               <PersonSlot
-                title="First person"
-                note="Required · left performer, or a photo containing both subjects."
+                title={m['site.hotel.first']()}
+                note={m['site.hotel.first_note']()}
                 item={firstImage}
                 inputRef={firstImageInputRef}
                 disabled={busy}
@@ -859,8 +859,8 @@ export function HotelLobbyGeneratorPanel() {
                 onRemove={() => clearImageAt('first')}
               />
               <PersonSlot
-                title="Second person"
-                note="Optional · right performer when using separate photos."
+                title={m['site.hotel.second']()}
+                note={m['site.hotel.second_note']()}
                 item={secondImage}
                 inputRef={secondImageInputRef}
                 disabled={busy}
@@ -876,18 +876,17 @@ export function HotelLobbyGeneratorPanel() {
             <div className="mb-4 flex flex-col gap-3 rounded-xl border border-amber-400/20 bg-amber-400/[0.06] px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="font-medium text-amber-100/90">
-                  Not enough credits
+                  {m['genjutsu.credits.insufficient_title']()}
                 </p>
                 <p className="mt-0.5 text-xs text-amber-100/55">
-                  Need {creditError.required.toLocaleString()} · balance{' '}
-                  {creditError.balance.toLocaleString()}
+                  {m['site.common.required_balance']({ required: creditError.required.toLocaleString(), balance: creditError.balance.toLocaleString() })}
                 </p>
               </div>
               <Link
                 href="/pricing"
                 className="inline-flex h-8 shrink-0 items-center justify-center rounded-lg bg-[rgb(204,144,92)] px-3 text-xs font-semibold text-white transition hover:brightness-105"
               >
-                Buy credits
+                {m['site.pricing.buy']()}
               </Link>
             </div>
           ) : null}
@@ -908,12 +907,12 @@ export function HotelLobbyGeneratorPanel() {
               )}
               <span>
                 {!session?.user
-                  ? 'Sign in to generate'
+                  ? m['site.common.signin_generate']()
                   : busy
                     ? phaseLabel
                     : estimatedCredits
-                      ? `Generate (~${estimatedCredits} credits)`
-                      : 'Generate'}
+                      ? m['site.common.generate_estimate']({ count: String(estimatedCredits) })
+                      : m['site.generator.generate']()}
               </span>
             </button>
           </div>
@@ -924,7 +923,7 @@ export function HotelLobbyGeneratorPanel() {
         <div className="mt-5 overflow-hidden rounded-[24px] border border-white/10 bg-[rgba(25,20,17,0.94)] p-3 shadow-2xl sm:p-4">
           <div className="mb-3 flex items-center justify-between gap-3 px-1">
             <div>
-              <p className="text-sm font-semibold text-white/90">Your video</p>
+              <p className="text-sm font-semibold text-white/90">{m['site.common.your_video']()}</p>
               <p className="mt-0.5 text-xs text-white/38">Kling O3</p>
             </div>
             <a
@@ -941,7 +940,7 @@ export function HotelLobbyGeneratorPanel() {
               className="inline-flex h-9 items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 text-xs font-medium text-white/70 transition hover:bg-white/10 hover:text-white"
             >
               <Download className="size-3.5" />
-              Download
+              {m['site.common.download']()}
             </a>
           </div>
           <video
@@ -953,7 +952,7 @@ export function HotelLobbyGeneratorPanel() {
           />
           {generationId ? (
             <p className="mt-2 px-1 text-[10px] text-white/25">
-              Generation {generationId.slice(0, 8)}
+              {m['site.common.generation_id']({ id: generationId.slice(0, 8) })}
             </p>
           ) : null}
         </div>
