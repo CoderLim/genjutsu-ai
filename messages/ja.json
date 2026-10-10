@@ -1278,5 +1278,20 @@
   "site.hotel.faq9_q": "長い動画やHD画質にも対応しますか？",
   "site.hotel.faq9_a": "はい。出力の長さは3～15秒の参照動画に従い、入力解像度は720×720～3840×3840ピクセルに対応します。カスタム動画は元の構図を維持し、ブースのテンプレートは横型です。",
   "site.hotel.faq10_q": "Hotel Lobbyのテンプレートは差し替えられますか？",
-  "site.hotel.faq10_a": "はい。初期設定の動画を削除して、自分の3～15秒のMP4またはMOVをアップロードできます。動画の長さは自動で取得されます。"
+  "site.hotel.faq10_a": "はい。初期設定の動画を削除して、自分の3～15秒のMP4またはMOVをアップロードできます。動画の長さは自動で取得されます。",
+  "site.hotel.compare1": "アップロードする素材",
+  "site.hotel.compare2": "写真1～2枚（テンプレート動画込み）",
+  "site.hotel.compare3": "4～30秒の元動画と参照素材",
+  "site.hotel.compare4": "元動画の動きを維持",
+  "site.hotel.compare5": "はい。テンプレートまたは差し替え動画から",
+  "site.hotel.compare6": "はい。モーション転写で",
+  "site.hotel.compare7": "Hotel Lobbyの動画を自分で用意する必要",
+  "site.hotel.compare8": "不要",
+  "site.hotel.compare9": "その動きを使用したい場合は必要",
+  "site.hotel.compare10": "標準の出力",
+  "site.hotel.compare11": "参照動画に合わせる",
+  "site.hotel.compare12": "最大1080p・元動画に合わせる",
+  "site.hotel.compare13": "プロンプト入力",
+  "site.hotel.compare14": "固定プロンプトの入力は不要",
+  "site.hotel.compare15": "任意・ワークフローによる"
 }
