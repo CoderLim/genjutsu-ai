@@ -1387,5 +1387,18 @@
   "site.hotel.trim_end": "종료 위치",
   "site.hotel.trim_action": "자르기",
   "site.hotel.trimming": "자르는 중…",
-  "site.hotel.trim_note": "핸들을 드래그한 뒤 자르기를 누르세요. 크레딧은 잘라낸 영상 길이를 기준으로 계산됩니다."
+  "site.hotel.trim_note": "핸들을 드래그한 뒤 자르기를 누르세요. 크레딧은 잘라낸 영상 길이를 기준으로 계산됩니다.",
+  "site.bulin.page_title": "Bulin 47 AI Video Generator",
+  "site.bulin.page_description": "Upload one photo and generate a Bulin 47 freestyle AI video with a fixed Objects Swap template.",
+  "site.bulin.hero_badge": "Bulin 47 · Objects Swap",
+  "site.bulin.hero_title": "Bulin 47 AI Video Generator",
+  "site.bulin.hero_desc": "Upload one clear photo. We lock in the freestyle template and run Objects Swap so you appear on the mic.",
+  "site.bulin.photo_title": "Your photo (@Image1)",
+  "site.bulin.photo_note": "Required · front-facing, face + upper body, authorized likeness only.",
+  "site.bulin.upload_photo": "Upload photo",
+  "site.bulin.photo_hint": "JPG / PNG / WebP",
+  "site.bulin.upload_required": "Upload one photo to generate",
+  "site.bulin.image_type": "Please upload a JPG, PNG, WebP, or GIF image",
+  "site.bulin.image_size": "Images must be 12 MB or smaller",
+  "site.bulin.provider_label": "Higgsfield Genjutsu · Objects Swap"
 }
