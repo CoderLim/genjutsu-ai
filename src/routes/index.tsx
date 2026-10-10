@@ -22,9 +22,7 @@ import { SiteHeader } from '@/components/landing/SiteHeader';
 import { StickyComposer } from '@/components/landing/StickyComposer';
 import { Testimonials } from '@/components/landing/Testimonials';
 
-const PAGE_TITLE = 'Genjutsu AI Video Generator — Video Restyling';
-const PAGE_DESCRIPTION =
-  'Genjutsu AI restyles any video without changing who or what is in it. Transfer motion into a new scene, style, or objects — upload a clip, write a prompt, get your new video in minutes.';
+
 
 function HomePage() {
   return (
@@ -90,11 +88,11 @@ export const Route = createFileRoute('/')({
     };
     return {
       meta: [
-        { title: PAGE_TITLE },
-        { name: 'description', content: PAGE_DESCRIPTION },
+        { title: m['site.home.meta_title']() },
+        { name: 'description', content: m['site.home.meta_description']() },
         ...socialMeta({
-          title: PAGE_TITLE,
-          description: PAGE_DESCRIPTION,
+          title: m['site.home.meta_title'](),
+          description: m['site.home.meta_description'](),
           url: canonical,
         }),
       ],
