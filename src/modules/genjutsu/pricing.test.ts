@@ -119,7 +119,7 @@ test('credit gate chooses the smallest pack that covers the deficit', () => {
       requiredCredits: 820,
       email: 'alice@example.com',
     })?.id,
-    'starter'
+    'mini'
   );
 });
 
