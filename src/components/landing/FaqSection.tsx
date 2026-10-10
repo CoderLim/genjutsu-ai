@@ -3,6 +3,7 @@ import type { FaqItem } from '@/types/landing';
 
 import { envConfigs } from '@/config';
 import { cn } from '@/lib/cn';
+import { m } from '@/paraglide/messages.js';
 import { FAQ_ITEMS } from '@/components/landing/content';
 import {
   Accordion,
@@ -20,7 +21,7 @@ type FaqSectionProps = {
 
 export function FaqSection({
   items = FAQ_ITEMS,
-  title = 'Frequently Asked Questions',
+  title = m['site.faq.title'](),
   className,
   description,
 }: FaqSectionProps) {
@@ -48,7 +49,7 @@ export function FaqSection({
             </p>
           ) : (
             <p className="text-foreground/70 mt-6 text-base font-medium">
-              Have another question? Contact us at{' '}
+              {m['site.faq.support']()}{' '}
               <a
                 href={`mailto:${supportEmail}`}
                 className="text-primary underline-offset-2 hover:underline"
