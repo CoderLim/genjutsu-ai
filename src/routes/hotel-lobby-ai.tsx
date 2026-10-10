@@ -96,11 +96,47 @@ const PHOTO_TIPS = [
   'Try a second run if identity or hand gestures drift. Video generation is stochastic.',
 ] as const;
 
+
+const HOTEL_FAQ_COPY = [
+  { question: m['site.hotel.faq1_q'], answer: m['site.hotel.faq1_a'] },
+  { question: m['site.hotel.faq2_q'], answer: m['site.hotel.faq2_a'] },
+  { question: m['site.hotel.faq3_q'], answer: m['site.hotel.faq3_a'] },
+  { question: m['site.hotel.faq4_q'], answer: m['site.hotel.faq4_a'] },
+  { question: m['site.hotel.faq5_q'], answer: m['site.hotel.faq5_a'] },
+  { question: m['site.hotel.faq6_q'], answer: m['site.hotel.faq6_a'] },
+  { question: m['site.hotel.faq7_q'], answer: m['site.hotel.faq7_a'] },
+  { question: m['site.hotel.faq8_q'], answer: m['site.hotel.faq8_a'] },
+  { question: m['site.hotel.faq9_q'], answer: m['site.hotel.faq9_a'] },
+  { question: m['site.hotel.faq10_q'], answer: m['site.hotel.faq10_a'] },
+];
+function getHotelFaqItems() {
+  return FAQ_ITEMS.map((item, index) => ({
+    ...item,
+    question: HOTEL_FAQ_COPY[index]?.question() ?? item.question,
+    answer: HOTEL_FAQ_COPY[index]?.answer() ?? item.answer,
+  }));
+}
+const HOTEL_CAST_COPY = [
+  [m['site.hotel.cast1_title'], m['site.hotel.cast1_desc']],
+  [m['site.hotel.cast2_title'], m['site.hotel.cast2_desc']],
+  [m['site.hotel.cast3_title'], m['site.hotel.cast3_desc']],
+  [m['site.hotel.cast4_title'], m['site.hotel.cast4_desc']],
+  [m['site.hotel.cast5_title'], m['site.hotel.cast5_desc']],
+  [m['site.hotel.cast6_title'], m['site.hotel.cast6_desc']],
+];
+const HOTEL_TIPS_COPY = [
+  m['site.hotel.tip1'],
+  m['site.hotel.tip2'],
+  m['site.hotel.tip3'],
+  m['site.hotel.tip4'],
+  m['site.hotel.tip5'],
+];
+
 function faqJsonLd() {
   return {
     '@context': 'https://schema.org',
     '@type': 'FAQPage',
-    mainEntity: FAQ_ITEMS.map((item) => ({
+    mainEntity: getHotelFaqItems().map((item) => ({
       '@type': 'Question',
       name: item.question,
       acceptedAnswer: {
@@ -328,13 +364,13 @@ function HotelLobbyAiPage() {
               {m['site.hotel.cast_title']()}
             </h2>
             <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {CAST_IDEAS.map(([title, text]) => (
+              {CAST_IDEAS.map(([title, text], index) => (
                 <div
                   key={title}
                   className="rounded-2xl border border-white/8 bg-white/[0.025] p-5"
                 >
-                  <h3 className="font-semibold text-white/86">{title}</h3>
-                  <p className="mt-2 text-sm leading-6 text-white/42">{text}</p>
+                  <h3 className="font-semibold text-white/86">{HOTEL_CAST_COPY[index]?.[0]() ?? title}</h3>
+                  <p className="mt-2 text-sm leading-6 text-white/42">{HOTEL_CAST_COPY[index]?.[1]() ?? text}</p>
                 </div>
               ))}
             </div>
@@ -415,13 +451,13 @@ function HotelLobbyAiPage() {
                 {m['site.hotel.photo_tips']()}
               </h2>
               <ul className="mt-6 space-y-4">
-                {PHOTO_TIPS.map((tip) => (
+                {PHOTO_TIPS.map((tip, index) => (
                   <li
                     key={tip}
                     className="flex gap-3 text-sm leading-6 text-white/46"
                   >
                     <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-[rgb(204,144,92)]" />
-                    <span>{tip}</span>
+                    <span>{HOTEL_TIPS_COPY[index]?.() ?? tip}</span>
                   </li>
                 ))}
               </ul>
@@ -448,7 +484,7 @@ function HotelLobbyAiPage() {
               {m['site.hotel.faq_title']()}
             </h2>
             <div className="mt-7 divide-y divide-white/7 rounded-2xl border border-white/8 bg-white/[0.02] px-5 sm:px-7">
-              {FAQ_ITEMS.map((item) => (
+              {getHotelFaqItems().map((item) => (
                 <details key={item.question} className="group py-5">
                   <summary className="cursor-pointer list-none pr-6 text-sm font-semibold text-white/82 sm:text-base">
                     {item.question}
