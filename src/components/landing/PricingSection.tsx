@@ -10,6 +10,7 @@ import {
 } from '@/modules/genjutsu/pricing';
 import { apiPost } from '@/lib/api-client';
 import { cn } from '@/lib/cn';
+import { m } from '@/paraglide/messages.js';
 
 function isPublicPackId(id: string): id is GenjutsuPublicCreditPackId {
   return GENJUTSU_CREDIT_PACKS.some((pack) => pack.id === id);
@@ -88,11 +89,10 @@ export function PricingSection() {
       <div className="container mx-auto px-4">
         <div className="mx-auto mb-10 max-w-3xl text-center">
           <h2 className="text-foreground mb-4 text-3xl font-semibold lg:text-4xl">
-            Genjutsu AI Pricing
+            {m['site.pricing.title']()}
           </h2>
           <p className="text-muted-foreground text-base">
-            No subscription. Choose a one-time credit pack and spend credits on
-            Genjutsu Motion Transfer or Object Swap.
+            {m['site.pricing.description']()}
           </p>
         </div>
 
@@ -110,7 +110,7 @@ export function PricingSection() {
             >
               {pack.highlighted ? (
                 <span className="bg-primary text-primary-foreground absolute top-0 right-0 rounded-tr-xl rounded-bl-md px-2 py-0.5 text-[10px] font-semibold">
-                  Popular
+                  {m['site.pricing.popular']()}
                 </span>
               ) : null}
 
@@ -120,24 +120,24 @@ export function PricingSection() {
               <p className="text-foreground mt-3 text-3xl font-bold">
                 ${(pack.priceCents / 100).toFixed(2)}
               </p>
-              <p className="text-muted-foreground text-sm">one-time</p>
+              <p className="text-muted-foreground text-sm">{m['site.pricing.once']()}</p>
 
               <p className="text-primary mt-5 text-2xl font-semibold tabular-nums">
-                {pack.credits.toLocaleString()} credits
+                {m['site.pricing.credits']({ count: pack.credits.toLocaleString() })}
               </p>
 
               <ul className="text-muted-foreground mt-5 space-y-2 text-sm">
                 <li className="flex items-center gap-2">
                   <Check className="text-primary size-4" />
-                  No subscription
+                  {m['site.pricing.no_subscription']()}
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="text-primary size-4" />
-                  Motion Transfer
+                  {m['site.hero.motion']()}
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="text-primary size-4" />
-                  Object Swap
+                  {m['site.hero.objects']()}
                 </li>
               </ul>
 
@@ -152,16 +152,14 @@ export function PricingSection() {
                   'text-sm font-medium transition hover:brightness-105'
                 )}
               >
-                Buy credits
+                {m['site.pricing.buy']()}
               </button>
             </div>
           ))}
         </div>
 
         <p className="text-muted-foreground mx-auto mt-6 max-w-2xl text-center text-sm leading-relaxed">
-          Credits are calculated by the server for each generation. Longer
-          videos and higher resolutions may require more credits, and a single
-          pack may not cover every generation.
+          {m['site.pricing.note']()}
         </p>
       </div>
     </section>
