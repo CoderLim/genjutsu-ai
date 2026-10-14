@@ -1,304 +1,253 @@
-# Burning Bridges AI 专题：fal Kling O3 V2V Edit 技术方案
+# Burning Bridges AI：基于 Hotel Lobby 原链路复用的 15 秒 Kling O3 专题方案
 
-- **日期**：2026-10-14
-- **状态**：待实现 / 待素材授权确认
-- **目标仓库**：CoderLim/genjutsu-ai
-- **范围**：专题页 + 1 张角色照片 + 固定参考视频 + 异步生成、积分与作品回收
-- **不包含**：本 PR 不修改生产代码、不部署、不下载或上传 Drake 官方 MV / 音轨
+- 日期：2026-10-14
+- 状态：技术方案已确认，尚未实施
+- 决策：**方案 A：固定 15 秒参考片，fal Kling O3 Standard Video-to-Video Edit，单次生成**
+- 核心约束：**复用现有 `HotelLobbyGeneratorPanel` 和全部 `/api/hotel-lobby/*` 后端生成链路；不复制组件，不创建第二套 API、扣费、任务状态机、R2 上传、Webhook 或轮询**
+- 本次提交仅为方案文档，不包含业务代码或模板视频
 
-## 1. 背景和产品决策
+## 1. 一句话技术方案
 
-近期“Drake Burning Bridges / where she at”派对换人视频传播较广。用户想用自己的照片（或获得授权的人物/宠物图片）替换舞台中央表演者，并保留举杯、面向镜头、挥手、遮额眺望等动作，以及原视频的镜头运动和周围人群。
+把 Hotel Lobby 从“只有一套硬编码模板的生成器”改为“**支持配置的同一套 Kling O3 生成器**”。
 
-**首版不是从文本重新生成整段视频，而是基于我们拥有使用权的参考视频做单主角 Video-to-Video Edit。**
+- `/hotel-lobby-ai` → `<HotelLobbyGeneratorPanel />`（默认 preset = `hotel-lobby`，所有旧行为保持不变）。
+- `/burning-bridges-ai` → `<HotelLobbyGeneratorPanel presetId="burning-bridges" />`（固定 15s 参考片、只上传 1 张角色图片、没有视频替换/裁剪/第二张图）。
+- 两个页面调用**同一套**现有 `/api/hotel-lobby/template*`、`upload-url`、`generate`、`status`、`webhook`、`source`、`result`。
+- `presetId` 是业务配置选择器，**不是自由填写的任意视频 URL / prompt / scene**。服务器根据白名单生成最终参数。
 
-已定 MVP：
-1. **模型**：fal-ai/kling-video/o3/standard/video-to-video/edit；Pro 仅作为对照实验，不默认开放质量切换。
-2. **入口**：/burning-bridges-ai；主 CTA：Upload a photo → Generate。
-3. **视频**：固定一段 **10 秒、9:16、720×1280 或更高** 的授权/自制派对参考片；可多模板配置，但首版只启用一个。
-4. **图片**：1 张明确包含单主体的人物或宠物图（本人或经同意的照片）；**1 个 @Element1**；不替换其他宾客。
-5. **音频**：向 Kling 显式发送 keep_audio: false；用户可在 TikTok/Reels 使用其平台提供的官方音频。产品不分发 MV 原版音轨。
-6. **用户体验**：预览模板 → 上传照片 → 展示服务端报价 → 余额校验 → 生成 → 刷新可恢复 → 预览/下载 → My Creations。
-7. **范围边界**：不支持自定义原视频、整段 20–30 秒拼接、多人换脸、直接 TikTok 导入、无登录游客支付。迭代再做。
+> 刻意不引入 `src/modules/kling-v2v/*`、`src/modules/burning-bridges/service.ts`、`src/routes/api/burning-bridges/*`，也不拷贝现有 Hotel Lobby 的 billing、storage、reconcile、组件或 API 文件。这比把 Hotel Lobby 拆成通用大型引擎风险更小，也更符合目前流量与产品阶段。
 
-### 素材授权是 Go/No-Go 前置条件
+## 2. 方案 A 的规格与价格
 
-- Drake 官方 MV 以及其片段、录音、人物肖像有独立的使用与商业传播风险；**公开网站不得默认抓取、裁剪、托管、再分发官方 MV 和音频**。
-- 上线模板应为自制或取得适当授权的派对视频；如果要求与 MV 原片完全相同的现场/镜头，必须先获得素材的相应使用权。
-- 可以在 SEO 解释热点来源，并附官方视频链接；页面不得暗示 Drake、唱片公司或 TikTok 官方合作。
-- 实际产品标题可用 Burning Bridges AI Video Maker，但演示素材与文案需要如实标注“inspired party template”，不能宣称“原 MV 片段一键换脸”却展示自制片。
-- 用户上传需有本人/被摄者同意与处理权利，不支持未经同意的真实人物冒充、欺骗或违规深伪内容。
-
-## 2. 官方 API 已核对约束（2026-10-14）
-
-官方文档：
-- Standard 参数：https://fal.ai/models/fal-ai/kling-video/o3/standard/video-to-video/edit/api
-- Standard 公开价格：https://fal.ai/models/fal-ai/kling-video/o3/standard/video-to-video/edit
-- Pro 参数：https://fal.ai/models/fal-ai/kling-video/o3/pro/video-to-video/edit/api
-- Pro 公开价格：https://fal.ai/models/fal-ai/kling-video/o3/pro/video-to-video/edit
-
-| 属性 | Standard V2V Edit |
+| 项目 | Burning Bridges 方案 A |
 | --- | --- |
-| 模型 ID | fal-ai/kling-video/o3/standard/video-to-video/edit |
-| 必填字段 | prompt, video_url |
-| 参考视频 | .mp4 / .mov，**3–15 秒**，宽高需在 720–3840 px 范围，最大 **200 MB** |
-| 角色引用 | elements: [{ frontal_image_url, reference_image_urls }]；Element 参考图总计至少一张，额外参考图可有 1–3 张 |
-| 总素材数限制 | 视频模式中 elements + image_urls 的总数量最多 4（以接口最终校验为准） |
-| 原始音轨 | keep_audio（默认 true；本功能明确 false） |
-| 其他可用参数 | shot_type（推荐 customize）；可选 image_urls 用 @ImageN 指代 |
-| 输出 | video.url（MP4）以及可能的文件元数据 |
-| **不可当作 V2V Edit 输入** | duration、resolution、aspect_ratio、generate_audio：本 endpoint 的文档未列为可提交的编辑参数，输出时长/画幅主要由参考视频决定 |
+| 接口 | `fal-ai/kling-video/o3/standard/video-to-video/edit` |
+| 视频 | **固定 15 秒**，9:16，服务端 R2 模板 |
+| 用户上传 | **1 张** JPG/PNG/WebP 图片，上限沿用现有 12 MB |
+| 替换目标 | 模板中镜头前景的**唯一主角**；背景客人尽量保留 |
+| 原始视频上传 | 不开放，避免二次复杂度 |
+| 视频裁剪 | 不开放，固定使用整段模板 |
+| 第二人上传 | 不开放 |
+| 音频 | `keep_audio: false`（与 Hotel Lobby 当前 `true` 不同，**必须按 preset 配置**）；使用平台官方曲库或有授权音轨 |
+| API 模型成本估算 | 15 × $0.126 = **$1.89** |
+| 站内积分估算 | `ceil(1.89 × 100 × 1.7)` = **322 credits** |
+| 输出时长/画幅 | 参考片驱动；不向该模型提交 `duration`、`resolution`、`aspect_ratio` 等不支持的参数 |
+| 后续版本 | >15s 分段拼接、更多角色/模板、Pro 对照实验暂不做 |
 
-**选择 edit 而非 reference：** edit 的目标是修改原片主体、尽量维持现有镜头/场景；reference 适合以视频为参考重新生成镜头，可能改变背景和镜头。即使 edit 也不是逐像素保留，必须通过实际质量实验验证。
+模型文档：https://fal.ai/models/fal-ai/kling-video/o3/standard/video-to-video/edit/api
 
-**定价快照**：Standard $0.126/输出秒，Pro $0.168/输出秒。价格会变化，严禁在前端写死为最终扣费依据。视频样例 10s Standard **$1.26**、15s **$1.89**；不含存储、带宽、支付及额外重试成本。
+官方要求视频为 MP4/MOV、**3–15 秒、宽高分别 720–3840px**、最大 200MB；站内现行视频 80MB 限制更严格，继续沿用。需要使用实际已裁剪/封装的 15 秒素材，而不是上传 20 秒后指望后端自动截断。尽量让源文件真实媒体时长不超过 15.0 秒，避免编码时间基造成边界失败。
 
-**重要**：热门原版剪辑常见 15–20 秒或更长，不能把完整 20 秒直接提交给 V2V Edit。MVP 固定 10 秒；阶段二才做两段分别生成与合成。
+成本是模型标价预估，不等于净利润；依旧让**服务端**计算并预扣积分，不能信客户端自报时长/积分。
 
-## 3. 仓库现状与复用点
+## 3. 检查仓库后的复用清单
 
-仓库以 TanStack Start + Nitro/Cloudflare、Drizzle、R2、FalProvider、现有积分钱包为底座。
+| 现有文件 | 是否复用 | 仅需调整 |
+| --- | --- | --- |
+| `src/components/landing/HotelLobbyGeneratorPanel.tsx` | **原组件复用** | 增加可选 `presetId`；固定模板时隐藏视频移除/换视频/裁剪；Burning 只渲染 1 个 PersonSlot；替换对应文案 |
+| `src/components/landing/hotel-lobby-trim-bar.tsx` | 原样保留 | Burning 隐藏，Hotel Lobby 继续可用 |
+| `src/routes/api/hotel-lobby/template.ts` | **原 endpoint 复用** | 接受白名单 `presetId` query，按 preset 选模板 |
+| `src/routes/api/hotel-lobby/template-meta.ts` | **原 endpoint 复用** | 以 preset 查询模板时长、可用状态及展示用积分 |
+| `src/routes/api/hotel-lobby/template-file.ts` | **原 endpoint 复用** | Hotel Lobby 裁剪使用；如 Burning 不允许裁剪，Burning 页面不用此接口 |
+| `src/routes/api/hotel-lobby/upload-url.ts` | **原 endpoint 复用** | `presetId` 可选；Burning 强制 `useDefaultTemplate=true` 且**恰好一张图**，拒绝自定义视频 |
+| `src/routes/api/hotel-lobby/generate.ts` | **原 endpoint 复用** | 解析 preset → 固定模板/图片数/Prompt/音频；沿用 seal、真实时长校验、预扣、提交；重复 generationId 校验 preset |
+| `src/modules/hotel-lobby/service.ts` | **原 service 复用** | `keep_audio` 从已验证的 preset 配置读取，Hotel Lobby 默认保持 true |
+| `src/modules/hotel-lobby/storage.ts` | **原存储逻辑复用** | `getHotelLobbyTemplateVideoKey(presetId)` 可选择不同模板；staging/sealed/results 全部沿用既有 R2 prefix |
+| `src/modules/hotel-lobby/pricing.ts` | **完全复用** | 已是相同 Kling 模型、$0.126/s；现有 15 秒 322 credits 单测可直接用 |
+| `src/modules/hotel-lobby/billing.ts` | **同一扣费状态机** | 在 `options` 存 `presetId/version`，新旧任务兼容；增加跨 preset 重放冲突判定 |
+| `src/modules/hotel-lobby/reconcile.ts` | **直接复用** | 不建第二套 fal 查询/落 R2/终态退款 |
+| `src/routes/api/hotel-lobby/status.ts` | **直接复用** | 不新增 status endpoint |
+| `src/routes/api/hotel-lobby/webhook.ts` | **直接复用** | 不新增 webhook endpoint |
+| `src/routes/api/hotel-lobby/source/$generationId.ts`、`result/$generationId.ts` | **直接复用** | 保留认证与用户隔离；下载文件名可以按 preset 做小调整 |
+| `src/hooks/use-credit-gate.ts`、现有积分弹窗 | **直接复用** | 不新增支付/余额检查 |
+| `src/routes/creations.tsx`、`src/routes/api/user/generations.ts` | **复用既有列表** | 从 `options.presetId` 区分展示名称，并继续使用 Hotel Lobby status/result 媒体路径 |
+| `src/routes/hotel-lobby-ai.tsx` | **维持原页** | 不改原页 SEO，默认 preset 无需改调用 |
+| **新增** `src/routes/burning-bridges-ai.tsx` | 只新增**专题展示页** | SEO、FAQ、示例视频、现有生成组件 1 个实例 |
+| **新增** `src/modules/hotel-lobby/presets.ts` | 只新增**轻量配置** | whitelist registry、固定 Prompt、音频、模板 key、图片槽位配置；**无业务服务或生成引擎** |
 
-已核实的实现：
-- src/modules/hotel-lobby/pricing.ts：HOTEL_LOBBY_MODEL 与本次模型完全相同；价格 $0.126/s；3–15s 校验。
-- src/modules/hotel-lobby/service.ts：FalProvider、fal_api_key、@Video1 与 @ElementN、webhook、Kling payload。
-- src/modules/hotel-lobby/storage.ts：R2 签名上传、staging → sealed copy、私有模板、结果固化、R2 对象归属校验。
-- src/modules/hotel-lobby/billing.ts：aiTask scene、余额检查、事务预扣、CAS 状态、失败返还积分。
-- src/modules/hotel-lobby/reconcile.ts：webhook / polling 后查询 fal、结果落 R2 再标完成。
-- src/components/landing/HotelLobbyGeneratorPanel.tsx：本地预览、图片上传、积分弹窗、生成轮询、恢复与下载。
-- src/routes/api/hotel-lobby/{upload-url,generate,status,webhook,result/*,template,template-meta,template-file}.ts：对应的可用路由形式。
-- src/routes/hotel-lobby-ai.tsx：专题 landing SEO、FAQ 与 HowTo JSON-LD、生成器区。
-- src/routes/creations.tsx：全站作品页面。
-- src/modules/genjutsu/pricing.ts：100 credits / provider USD × 1.7 成本倍率，按 ceil 计费。
-- .cursor/rules/higgsfield-genjutsu-pipeline.mdc：强制 Higgsfield 专题复用首页链；**明确排除 Kling/Fal 专题**，因此本项目可沿 Hotel Lobby 路线。
+**不要**为了重用去把旧文件全部改名或大规模重构。保持 Hotel Lobby 的对外 API 和 `hotel-lobby` storage prefix，专注于加一个 preset 参数，先完成最小可回归变更。
 
-**不要**为 Burning Bridges 完整复制 Hotel Lobby 的 billing / storage / reconcile 文件。建议把二者共性的 Kling V2V 生命周期按场景配置抽为公共引擎，再由不同 preset / 业务路由调用。首期 refactor 不改变 Hotel Lobby 对外 API 或持久化格式，以回归测试保证原业务正常。
+## 4. preset 配置（唯一新增的后端概念）
 
-### 建议的代码划分（实施目标，并非现有文件）
-
-~~~text
-src/core/ai/kling-o3-v2v.ts               # Fal payload 构造、官方参数校验（不含业务场景）
-src/modules/kling-v2v/                     # scene-aware 状态机、成本、封存/落盘
-  pricing.ts
-  task-lifecycle.ts
-  storage.ts
-  reconcile.ts
-  presets.ts
-src/modules/burning-bridges/
-  preset.ts                                # 模板 registry、固定 prompt、业务约束
-src/components/landing/BurningBridgesGeneratorPanel.tsx
-src/routes/burning-bridges-ai.tsx
-src/routes/api/burning-bridges/
-  template.ts
-  upload-url.ts
-  generate.ts
-  status.ts
-  webhook.ts
-  result/$generationId.ts
-~~~
-
-- **原则**：共享 Kling 代码不 import hotel-lobby 私有实现；既有 Hotel Lobby 逐步迁入共享引擎，保持 API 外观不变。具体跨模块依赖要遵守 AGENTS.md（必要时让 billing 通过既有 ai-tasks 模块协调 credits，避免横向直接耦合）。
-- 可以先通过薄 adapter 将 Hotel Lobby 现有校验、R2、账务、状态逻辑参数化为 scene 配置；切勿因为赶热点把 scene 固定写成 hotel-lobby 并与新页面共用任务记录。
-- 一切价格、prompt、模板 ID 由服务端查 registry；浏览器不能传 provider URL、任意 prompt、场景 key 或 credits。
-- 移除 UI 中与本 endpoint 无关的 resolution / promptExpansion / aspectRatio 选择，避免让用户误以为 Kling 支持这些参数。
-
-## 4. 固定模板与 Prompt
-
-### 模板配置
+示意结构（非已实现代码）：
 
 ~~~ts
-type BurningBridgesPreset = {
-  id: string;
+type KlingV2VPreset = {
+  id: 'hotel-lobby' | 'burning-bridges';
   version: number;
-  videoKey: string;            // 私有 R2 中的已授权视频
-  width: number;
-  height: number;
-  durationSeconds: number;     // 服务端从素材实际探测并校验
+  templateVideoKey: string;
+  imageCount: { min: number; max: number };
+  allowCustomVideo: boolean;
+  allowTrim: boolean;
+  promptFor(imageCount: number): string;
+  keepAudio: boolean;
   enabled: boolean;
-  rightsStatus: 'owned' | 'licensed';
-  rightsEvidenceRef: string;   // 内部授权凭据引用，不在前端暴露
 };
 
-const preset = {
-  id: 'party-walk-10s-v1',
-  version: 1,
-  videoKey: 'burning-bridges/templates/party-walk-10s-v1.mp4',
-  width: 720,
-  height: 1280,
-  durationSeconds: 10,
-  enabled: true,
-  rightsStatus: 'owned',
-  rightsEvidenceRef: 'REQUIRED_BEFORE_ENABLE',
-};
+const PRESETS = {
+  'hotel-lobby': {
+    version: 1,
+    templateVideoKey: '<existing HOTEL_LOBBY_TEMPLATE_VIDEO_KEY>',
+    imageCount: { min: 1, max: 2 },
+    allowCustomVideo: true,
+    allowTrim: true,
+    promptFor: buildHotelLobbyPrompt,
+    keepAudio: true,
+    enabled: true
+  },
+  'burning-bridges': {
+    version: 1,
+    templateVideoKey: 'hotel-lobby/templates/burning-bridges-15s-v1.mp4',
+    imageCount: { min: 1, max: 1 },
+    allowCustomVideo: false,
+    allowTrim: false,
+    promptFor: buildBurningBridgesPrompt,
+    keepAudio: false,
+    enabled: false // 取得有权使用的素材 + smoke 成功后再打开
+  }
+} satisfies Record<string, KlingV2VPreset>;
 ~~~
 
-这是数据结构示例，**不是已经存在/已授权/已上传的素材**。不能仅凭配置字段为 owned 就视为拥有版权；必须由运营确认素材与凭据，然后才打开 enabled。
+- `hotel-lobby` 保持默认：无 `presetId` 时必须等价于当前生产行为。配置中的 `<existing HOTEL_LOBBY_TEMPLATE_VIDEO_KEY>` 是伪代码，实际沿用 `envConfigs.hotel_lobby_template_video_key` 及当前默认值。
+- `burning-bridges` 暂时将素材放在 `hotel-lobby/templates/` 下，是为了**继续通过现有 getHotelLobbyTemplateVideoKey / R2 归属校验**，不做重命名或跨 prefix 存储改造。
+- `templateVideoKey`、prompt、音频、图片数、可用状态等都只在服务端生效；客户端只能发送选中的合法 ID。
+- 不允许客户端提供任意 `templateVideoKey` / 原片 URL；服务端任何未知、禁用 ID 都返回明确的 400/404。
+- `version` 和模板视频 key（最好另存 ETag）封存到 `aiTask.options`；替换模板后不应该影响已提交任务。
+- **本方案不表示官方 Drake MV 已获授权**。制作真正可公开使用的素材前不得把示意 key 设为 enabled。
 
-服务端应：
-- 创建任务时固化 preset ID + version + R2 videoKey + ETag/版本，避免模板更换时旧任务错误绑定新版本。
-- R2 模板设只读、私有；前台可获得短时预览 URL / 代理流，但生成所用 URL 仍由服务端解析。
-- 素材校验 **3–15s**、长宽各 720–3840、支持 MP4/MOV、产品层最大 80 MB（沿用 Hotel Lobby，比 fal 的 200 MB 更严格）。
-- 对原片超 15s 必须预裁剪/转码后作为模板；本版不在用户点击 Generate 时临时切割。
-- 仅 9:16 模板，输出也预期为竖版；以实际结果为准，不传不存在的 aspect_ratio 参数。
-
-### 单主角替换 Prompt（V1）
+### Burning Bridges Prompt（服务端固定）
 
 ~~~text
 In @Video1, replace only the main foreground performer who approaches
-and interacts with the camera with the person or character from @Element1.
-Keep the same timing, body gestures, hand movements, camera movement,
-framing, party lighting, and crowd in the background.
-Keep every background guest unchanged. Maintain the new subject's facial
-features, outfit, and identity consistently in all frames.
-Do not introduce extra people or change the camera sequence.
+the camera with the person or character from @Element1.
+Preserve the original timing, body movements, gestures, camera motion,
+party lighting and surrounding guests.
+Do not replace anyone in the background. Keep the new subject's
+appearance and identity consistent throughout the whole video.
 ~~~
 
-建议用 1 张正脸/上半身参考图传作 frontal_image_url；为了兼容 Kling Element 的 reference_image_urls 必填约束，**MVP 可复用同一图片作为 reference_image_urls[0]**，与 Hotel Lobby 现有实现一致。后续测试第二视角，未验证前不在页面承诺多图提升质量。
+与 Hotel Lobby 相同，通过 `elements: [{ frontal_image_url: imageUrl, reference_image_urls: [imageUrl] }]` 引用唯一主体。`shot_type: "customize"`，`keep_audio: false`。短 prompt 优先，通过小样本验证人物是否替换成功，不能假定“其他人百分之百不会被改”。
 
-### 实际 fal payload（服务器构造）
+## 5. 前端：只有一个生成组件，两套 preset
 
-~~~json
-{
-  "prompt": "In @Video1, replace only the main foreground performer with @Element1. Preserve the original timing, gestures, camera and surrounding guests. Keep the new identity consistent.",
-  "video_url": "<server-signed-r2-url>",
-  "elements": [
-    {
-      "frontal_image_url": "<server-signed-r2-image-url>",
-      "reference_image_urls": ["<server-signed-r2-image-url>"]
-    }
-  ],
-  "keep_audio": false,
-  "shot_type": "customize"
-}
+**最小实现**：直接在当前组件增加 `presetId?: 'hotel-lobby' | 'burning-bridges'`，默认 `hotel-lobby`。
+
+~~~tsx
+// 旧页面，调用方式保持不变
+<HotelLobbyGeneratorPanel />
+
+// 新专题，仍然使用同一个组件
+<HotelLobbyGeneratorPanel presetId="burning-bridges" />
 ~~~
 
-使用现有 FalProvider.generate 队列提交 + HTTPS webhook；不在请求线程用 fal.subscribe 阻塞 Cloudflare Worker。密钥读取既有 Admin Settings AI 的 **fal_api_key**，仅服务器侧使用。
+组件内部根据服务端提供的 preset 信息有条件展示：
 
-## 5. 用户交互与 API 合同
+- Hotel Lobby：保持 1–2 张图片、可更换视频、TrimBar、当前提示文案，功能和 DOM 尽量不变。
+- Burning Bridges：只显示竖屏模板预览和**一个**人物上传卡片；**完全隐藏**移除模板、上传/更换视频、TrimBar 和第二个人物槽位；不能通过调用旧事件绕过限制。
+- 预览容器：Hotel Lobby 仍 `aspect-video`；Burning Bridges 用 `aspect-[9/16]` + `object-contain`。现有生成后视频预览也根据 preset 选择容器比例。
+- 文案：不要继续显示“两个人面对麦克风”“Orange Booth”等 Hotel Lobby 文字；局部 props/消息映射支持 EN/JA/KO，禁止用新组件复制整份 JSX。
+- 图片上传、压缩/校验（如现有）、本地预览、额度不足弹窗、上传进度、队列状态、生成结果、下载按钮、登录跳转等完全沿用原组件方法。
+- 仍只调用 `/api/hotel-lobby/*`。将 `presetId` 加入 `/template?...`、`/template-meta?...`、`upload-url` 和 `generate` 请求。Burning 的 `useDefaultTemplate` 恒为 true，前端只传图片。
+- 模板不可用时 UI 禁止生成，不提供“删了再上传自己的 MV”的回退入口。
+- 现有 `HotelLobbyGeneratorPanel` 只有组件内 `generationId` 状态，刷新不会自动回到同一生成进度。**最低限度先让 My Creations 能恢复结果；如果要回到生成器原位，在同一组件上增加 URL/session 恢复 generationId，不再做第二套轮询。**
 
-### 页面
+## 6. 后端：只对旧接口增加 preset 参数
 
-- 首屏 H1：Burning Bridges AI Video Generator（或 Video Maker），展示**自有/获授权** Before/After 和 10s 预览。
-- 生成器只有 1 个图片槽位（上传/移除/预览），模板不可被用户替换；显示“Replace main performer only”。
-- 图片支持 JPG/PNG/WebP、最大 12 MB，客户端检查单主体提示；服务端再次校验扩展名、文件头/MIME、R2 HEAD 长度与归属。真实图片审核按现行站点规则执行。
-- 展示“10s · Vertical · Kling O3 · ~215 credits”（初期可依据预估）；提交前请求服务端最终报价；Loading 包含 Uploading / Queued / Generating / Saving。
-- 未登录复用已有登录跳转；余额不足复用 InsufficientCreditsModal；刷新、支付返回后支持 generationId 恢复。
-- 作品完成后固定私有结果路由，可预览、下载；My Creations 显示 Burning Bridges 来源，不暴露 signed URL。
-- 如模板未启用/缺失/授权未确认：禁止生成，页面改为 Coming soon 或提供自定义合法素材的替代方案。
-
-### 端点
-
-| Method | Endpoint | 行为 |
-| --- | --- | --- |
-| GET | /api/burning-bridges/template | 返回公开模板 ID/版本、缩略图/短时预览、实际时长与可用状态（不暴露 R2 内部 key） |
-| POST | /api/burning-bridges/upload-url | session + generationId + 单图类型/长度 → 单图 R2 signed PUT |
-| POST | /api/burning-bridges/generate | session + generationId + presetId + imageKey + 文件元数据 → seal、服务端定价、reserve、submit |
-| GET | /api/burning-bridges/status?generationId=... | 仅本用户查询，轮询/对账并返回业务状态 |
-| POST | /api/burning-bridges/webhook | fal 唤醒；按 request_id 定位，**重新向 fal 查询**，不信任 webhook body 中的 URL 或结果 |
-| GET | /api/burning-bridges/result/:generationId | 登录本人/管理员鉴权，校验 R2 key 归属，短时签名播放；?download=1 提供下载 |
-
-采用当前 src/lib/api-client.ts 的响应习惯。不要信任客户端传入 durationSeconds、credits、model、prompt、scene、video_url。服务端直接查 preset registry + R2 元信息，必须对相同 generationId 的不同图片哈希/预置版本请求返回 **409 CONFLICT**，不能拿旧任务伪装为新任务。
-
-可选额外 GET /api/burning-bridges/quote?templateId=...；报价无需上传，可依据实际模板长度。最终 reserve 仍然必须服务端再算。
-
-### 数据记录
-
-继续沿用 aiTask，scene = **burning-bridges**，provider = fal，model = Kling O3 Standard 完整 ID：
-- id / userId / scene / model / costCredits / creditId / taskId（fal request_id）。
-- options 持久化 presetId、presetVersion、sealedVideoKey、sealedImageKeys、durationSeconds、keepAudio=false、inputFingerprint。
-- taskInfo 包含 estimatedProviderCostUsd、providerReceipt / recoveryRequestId（必要时）。
-- taskResult 含完成后 R2 videoKey、providerStatus、异常/退款元信息。
-- scene 与 userId 应参与所有读写 WHERE 和 webhook 任务定位；作品查询与管理后台要能区分 Hotel Lobby。
-- 同一代生成 ID 只能一次 charge 与一次 fal submit，不允许失败重试创建第二笔同 ID 提交。
-
-## 6. 服务端状态机与异常恢复（P0）
+仍然是**同一**条生成路径：
 
 ~~~text
-upload image
-  -> verify R2 object metadata / ownership
-  -> seal image + versioned template snapshot
-  -> server-side quote
-  -> atomic reserve credits + ai_task(reserved)
-  -> CAS claim(submitting)
-  -> fal.queue.submit
-       -> request_id persisted -> submitted -> query / webhook wake-up
-       -> provider FAILED -> refund once -> refunded
-       -> provider COMPLETED -> persist video to R2 -> completed
-  -> authenticated result / My Creations
+Burning / Hotel Lobby 页面
+  → 同一个 HotelLobbyGeneratorPanel（presetId 不同）
+  → /api/hotel-lobby/template、template-meta（读取白名单模板）
+  → /api/hotel-lobby/upload-url（只签 1 张图上传）
+  → R2 existing image staging
+  → /api/hotel-lobby/generate（preset 校验 / seal）
+  → Hotel Lobby 现有 estimate → reserve → CAS claim → FalProvider.generate
+  → 同一个 /api/hotel-lobby/webhook、status（fal 查询）
+  → 同一个 reconcile → R2 persist → completed/refunded
+  → 同一个 /api/hotel-lobby/result/:generationId
+  → My Creations
 ~~~
 
-重点不是 happy path，而是**避免“fal 已扣钱但站点认为失败、甚至再次扣款提交”**：
+### 需要补的最小校验
 
-1. **区分 submit 阶段与 bind 阶段**：fal 成功返回 request_id 后，后续 markSubmitted / DB 写入失败**不得落入 submit 失败分类并退款或二次提交**。
-2. **恢复 request_id**：在正常任务表 bind 失败时，把已知 ID 写入可恢复字段/独立恢复记录并告警；如果 DB 同样不可写，至少在结构化日志/独立持久化恢复通道留下 generationId、scene、requestId 和时间戳。不得只记录“unknown, hasRequestId=false”。
-3. **未知提交结果**：网络超时、429、5xx、Cloudflare 中断不能证明 fal 未受理；标记 submission_unknown、保留积分，禁止自动重投。只有确定的拒绝（经 classifyFalSubmitFailure 判定）或 fal 官方终态 FAILED 才可退款。
-4. **任务扫描**：定时扫描超时的 submitting / submission_unknown / submitted / completing / refunding，按 request_id 再查 fal；无 ID 的 unknown 转人工恢复队列，且在后台展示积压数量和年龄。不能靠用户保持页面打开才能最终完成。
-5. **webhook 竞态**：webhook 可能早于 DB bind 到达；无法匹配时记录可重试事件，让后续扫描消化；绝不根据任意 webhook 的内容直接把任务标 SUCCESS。
-6. **结果持久化**：确认 fal 成功后下载 result video，校验非空、合理媒体类型/长度，保存至用户私有 R2，HEAD 核验，再标 completed；R2 失败保持 completing 继续重试，**不能退款已经成功生成的 fal 任务**。
-7. **幂等退款与结算**：数据库 CAS + creditId revoke 保证并发 webhook、轮询、扫描只退款一次；不要丢失错误状态或把 refunded 再显示为 processing。
-8. **隐私**：R2 私有存储、短时 URL、result 路由校验 userId；日志不记录照片原始 URL、敏感人脸信息或密钥。限制 template-file 代理带宽，设置上行大小/频率/并发限额。
+1. **既有接口默认兼容**：未传 `presetId` 等价 `hotel-lobby`。旧上传路径、旧模板配置、旧任务在新版本仍可用。
+2. **Burning 强制**：`presetId=burning-bridges` + `useDefaultTemplate=true`，图片恰好 1 张；拒绝 videoKey、自定义视频、第二张图、任意 prompt 或主动覆盖模型。
+3. **服务端才可信**：服务端从 preset registry 取得模板 key + Prompt + `keep_audio`；使用 R2 HEAD / metadata 验实际时长和宽高、文件大小，**扣费之前**完成校验；浏览器传的 `durationSeconds` 最多作为提示。
+4. **15s 边界**：现有 `normalizeHotelLobbyDuration` 对原始媒体时长存在容差 + round，账单会 round 到 15。上线素材仍应真实 `<=15.00s`，在模板上线预检中用精确探测值拒绝超时素材，不能因为容差就把 15.x 秒交给 fal。
+5. **输入封存**：继续用 `sealHotelLobbyInputs`，源视频从对应 preset 选择；封存后的 key 继续 `hotel-lobby/sealed-inputs/.../`，结果仍 `hotel-lobby/results/.../`。
+6. **幂等绑定**：`aiTask.options` 加入 `presetId/presetVersion/keepAudio`；已有任务缺失 `presetId` 等价 `hotel-lobby`。更新 `assertTaskMatches` 比对这些字段以及原有图片/视频输入。当前 `generate.ts` 在校验传入配置前就可能直接返回同 `generationId` 的旧任务：必须改成先检查 preset 是否匹配，否则 **409 Conflict**。
+7. **保持 scene 不变**：MVP 统一 `aiTask.scene = 'hotel-lobby'`，因为 status/webhook/result/creations 当前都按此 scene 路由；**通过 options.presetId 区分产品**，避免新增 scene 后漏掉扫描、作品列表、鉴权、管理工具。后续真做通用模型平台再迁移 scene。
+8. **My Creations**：`/api/user/generations` 读取 `options.presetId`，Hotel Lobby 用旧名称，Burning 展示 Burning Bridges；保持同一个 `statusPathFor` / `generationMediaBasePath`。可按 preset 输出下载文件名，不开新 media endpoint。
+9. **fal payload**：复用 `submitHotelLobby`，仅把 `keep_audio: true` 改为可信参数（Hotel Lobby 默认 true，Burning false）；不要引入一套 `submitBurningBridges` 或重复调用 FalProvider。
 
-现有 Hotel Lobby 已实现多数 reserve/reconcile 逻辑，但其 generate.ts 存在“submit 返回 request_id 后 bind 失败进入同一 catch”的边界风险；本次提取公共引擎时需拆开 catch 范围并加恢复测试，也要确保 Hotel Lobby 不回归。
+### 共享 bug：Fal request_id 在 bind 失败时丢失（上线 P0）
 
-## 7. 成本与积分
+当前 `/api/hotel-lobby/generate.ts` 将 Fal submit 与 `markHotelLobbySubmitted` 放进同一 try/catch。假设 fal 返回 `requestId` 后 DB bind 失败，后续误判为 submit 异常，可能进入 `submission_unknown` 且没有保存已知 ID，既增加成本又影响用户恢复。
 
-和当前站点定价公式一致（src/modules/genjutsu/pricing.ts）：
-- providerCost = **ceil/input 计费秒数 × 0.126 USD**（以实际传给 Kling 的模板长度和平台计费规则核对；不是任由客户端报秒数）。
-- displayedCredits = **ceil(providerCost × 100 × 1.7)**。
-- 10s：$1.26 → **215 credits**；12s：$1.512 → **258 credits**；15s：$1.89 → **322 credits**。
-- 用户付费积分包对应的实际美元收入另行计算毛利；**1.7 倍是 credit 刻度的成本倍率，不等于 70% 真实毛利率**，也未扣支付费、退款、R2。
-- 引入独立的 model price 配置/服务端 rate snapshot，更新时与 quote + reserve 同步；收费之前校验实际 billedSeconds，不允许结果超 15s 或超预算。
-- 服务器最低额度不足使用全站既有 Finish Pass / 小额积分包机制，不新建一套支付链路。
-- 不提供免费生成承诺。测试时用内部有额度账号，不把 fal 成本转嫁成无人值守的开放免费额度。
+本次只在**原链路**内修复：
+- submit 和 bind 使用独立错误边界；保存已获得的 `requestId`（必要时独立 recovery 记录 / 可查询日志），绝不把 bind 失败判成“fal 明确拒绝”而退款。
+- unknown 保留积分、禁止自动二次提交；可靠扫描/人工恢复手段能够根据保存的 requestId 补绑、继续 reconcile。
+- webhook 早于 bind、R2 落盘失败、并发 status/webhook、幂等退款覆盖测试。不要借 Burning 独立复制一份“更安全”的链路。
+- 当前 webhook 依赖已绑定的 requestId，失配 webhook 不自动找回任务；这一点要通过原链路的 recovery 设计解决。
 
-## 8. 质量验证 / 验收
+## 7. 文件改动边界（希望实施 PR 尽量小）
 
-先在 fal Playground 与 staging 运行小样本，不凭演示视频推断效果稳定：
-- [ ] 已有可商用/获授权 10s 竖版模板，权利与作者记录齐全，且不包含未经授权 MV 原音。
-- [ ] 同模板 3 种主体：真人照片（取得同意）、动画角色、宠物；每类至少 5 次（共 ≥15 次）；记录 fal request_id / 实际费用 / 生成时长 / 主角替换成功率。
-- [ ] 主角识别清楚、动作大体一致、邻近宾客不被误替换、手遮脸后身份能恢复；在观感不佳时不自动宣称“完美保留”。
-- [ ] 比较 Prompt A（短命令）/ B（强调背景不变），挑选最优；必要时用 Pro 做小样本对照，只有收益覆盖成本才开放。
-- [ ] 720×1280、3s、10s、15s、非法尺寸/时长、视频格式与图片内容类型前置校验，超限不得扣费。
-- [ ] 标准 Fal payload 不夹带不支持的 duration、resolution、aspect_ratio 参数；keep_audio=false 验证输出无未经授权音轨。
-- [ ] 生成过程重试、重复点击、刷新、购买积分返回、网络中断，不重复 submit / 扣费。
-- [ ] 4xx 拒绝、5xx/429/超时、provider FAILED、bind DB 异常、webhook 乱序、R2 存储失败、fal result URL 过期等故障注入覆盖。
-- [ ] 已受理 request_id 必须可恢复；unknown / query error 计数有告警和人工处置入口。
-- [ ] 完成任务可在 My Creations 重新打开、下载；其它账号无法访问该结果。
-- [ ] Hotel Lobby 原有路径、账务、UI 与测试无行为回归。
-- [ ] 桌面 + iOS Safari + Android Chrome 上传/播放/下载；至少验证一次弱网。
+**预期新增**：
+1. `src/modules/hotel-lobby/presets.ts` —— 轻量配置与 Burning Prompt。
+2. `src/routes/burning-bridges-ai.tsx` —— 页面 SEO、示例/FAQ、实例化**已有**组件。
 
-建议测试文件：src/modules/kling-v2v/*.test.ts、src/modules/burning-bridges/*.test.ts，以及一条含 fal fake、R2 fake 的 API 级 E2E。CI：pnpm test、pnpm build、pnpm e2e:genjutsu（既有回归），另做真实 fal smoke（管理员手动开关）。
+**预期局部修改**：
+- `src/components/landing/HotelLobbyGeneratorPanel.tsx` —— preset props + 隐藏/文案/画幅分支；其余生成函数复用。
+- `src/modules/hotel-lobby/storage.ts` —— 读多个可信模板。
+- `src/modules/hotel-lobby/service.ts` —— 配置 `keep_audio` 与 prompt。
+- `src/modules/hotel-lobby/billing.ts` —— preset 任务快照/冲突校验。
+- `src/routes/api/hotel-lobby/{template,template-meta,upload-url,generate}.ts` —— 传递/校验 preset，**不增加同等新 API**。
+- `src/routes/api/user/generations.ts`、`src/routes/creations.tsx` —— 展示分辨。
+- 必要的消息字典、sitemap、SEO、本来就存在的测试与共享 requestId 恢复点。
 
-## 9. 运营 SEO / 可观测性 / 上线
+**本期不应新增**：
+- `src/components/landing/BurningBridgesGeneratorPanel.tsx`（如只有一个薄的 1 行包装组件也无必要）
+- `src/modules/burning-bridges/{billing,storage,reconcile,service}.ts`
+- `src/modules/kling-v2v/*`（暂不为两模板做大重构）
+- `src/routes/api/burning-bridges/{upload-url,generate,status,webhook,result}.ts`
+- 新数据库 task 表、独立 credit scene、独立支付、独立生成日志系统、分段合成任务。
 
-SEO 建议（描述必须与授权素材的实际效果一致）：
-- URL：/burning-bridges-ai
-- Title：Burning Bridges AI Video Generator | Make the Party Trend
-- H1：Make Your Own Burning Bridges AI Party Video
-- Description：Upload one photo to replace the lead in a party-style AI video. Generate a short vertical clip with Kling O3.
-- FAQ：What is the trend? / Can I use one photo? / How long? / Does it use the original MV? / Is audio included? / Why might a generation fail?
-- HowTo / VideoObject / FAQPage 结构化数据只在展示的真实内容与 metadata 成立时添加；不要伪造评价或时长。
-- 关联 Hotel Lobby、Zombie Hug、Genjutsu Object Swap 页面；sitemap 和 hreflang 按现有路由惯例接入；i18n 先跟随站点已启用语言，未翻译不要输出空壳。
+## 8. 验收/回归测试
 
-监控：template_view、photo_selected、quote_viewed、generate_clicked、insufficient_credits、upload_failed、provider_submitted、provider_failed、result_persisted、download_clicked。后台记录 scene、presetVersion、requestId、provider_cost_estimate、reserve_credits、state_age；追踪 unknown/bind_failed/R2_persist_retry。真实生产素材/用户图片不得进入 analytics payload。
+### 15s Burning Bridges 的正常路径
+- [ ] 已准备**有权用于商业网站**的 15.0 秒以内 9:16 模板，编码正确，授权证据可查。**未经授权不得把 Drake 官方 MV、原片片段或原音作为公开模板。**
+- [ ] `/burning-bridges-ai` 只显示一个角色图片槽位与固定视频，不出现 Hotel Lobby 的第二张图、视频替换、TrimBar 或麦克风文案。
+- [ ] 模板预览/时长/报价均读取 `presetId=burning-bridges`；模板不可用时禁用 Generate。
+- [ ] 发送 Kling O3 Standard payload 包含 `keep_audio:false`、唯一 `@Element1`、固定可信模板 URL，不包含不支持的参数。
+- [ ] 后端按真实 15s → $1.89 → **322 credits** 计算，先预扣；上传失败、预检失败不扣费。
+- [ ] 生成成功先落 R2 再标 completed，同一结果可在 My Creations 查看与下载。
+- [ ] 对实际用户授权图、动物/动画素材分别抽样验证效果；保真度不作未经测量的保证。
 
-上线顺序：
-1. P0：授权模板准备（录制或合法取得）、上传 R2、注册 preset（默认 disabled）。
-2. P0：公共 Kling V2V engine 整理 + 幂等恢复补强 + Hotel Lobby 回归测试。
-3. P0：Burning Bridges 薄业务模块/API + 生成器 UI + SEO/法律文案 + My Creations。
-4. P0：staging 真实测试、成本核对、故障注入与限流；确认模板授权文件。
-5. P0：preset enabled + 小流量放开，观察 request_id recoverability、失败退款、效果投诉。
-6. P1：多模板 / 多视角主体图片；P2：20–30s 分段生成与拼接（独立付费/结果编排、分段失败政策、音画同步评估）。
+### Hotel Lobby 不能回归
+- [ ] 旧页面不传 `presetId` 仍使用旧模板、1–2 张角色照片、上传替换视频及 TrimBar。
+- [ ] 旧 `keep_audio:true`、原价格算法、既有 API 入参、Webhook、Result/Source URL 和原用户任务记录不变。
+- [ ] 旧任务无 `options.presetId` 仍能在 status / My Creations 正常识别为 Hotel Lobby。
+- [ ] 两个页面同时使用时 template-meta、template URL 不串模板；不同 generationId 不串任务，不能通过 URL/DB key 读取他人的上传内容。
+- [ ] 同 `generationId` 先以 hotel-lobby 提交、后改 burning-bridges 请求 → 409，且无重复扣费。
 
-**最终上线门槛**：模板合法可用；10s 主角换人效果至少在小样本中过关；不存在重复扣费；fal 已接单时 request_id 能恢复；成果已落 R2 才对用户显示成功。
+### 关键异常
+- [ ] 未授权、非法 preset、Burning 提交第二张图/上传自定义视频、过长/非法尺寸模板全部前置拒绝。
+- [ ] submit 已成功但 DB bind 失败能够恢复 requestId；不要重复提交、错误退款或永久吃掉积分。
+- [ ] fal FAILED 仅退款一次；fal 成功但 R2 暂时失败能够继续保存；乱序/重复 webhook 幂等。
+- [ ] 充值返回或页面刷新后，至少可在既有 My Creations 恢复任务进度/成品，不能依赖原页面持续打开。
+- [ ] `pnpm test`、`pnpm build`、现有 Hotel Lobby / Genjutsu 回归验证；真实 fal smoke 在有授权素材后进行。
 
-## 10. 待确认项（不阻塞文档）
+## 9. 上线步骤与素材边界
 
-- 10s 自制模板的具体镜头与授权记录；**若实际追求 MV 原片一比一复刻，则先解决授权，否则不公开该模板**。
-- 15 次测试的实际换人成功率、宠物表现与速度，以及 Standard/Pro 的主观效果差距。
-- fal 生产账单是否按实际模板整数秒收费、是否有平台价格变化；以最终账单校准公开预估。
-- 长视频路线由新的异步转码/合成服务完成；Cloudflare Worker 当前不适合直接承担长视频 FFmpeg 转码，此项留 P2。
+1. 先取得/拍摄**可商用、有权使用的**派对动作参考片并裁剪为 15.0 秒以内，上传既有 R2 的 `hotel-lobby/templates/burning-bridges-15s-v1.mp4`。
+2. 增加 preset 配置（默认 enabled=false）、旧生成组件小范围兼容分支和原 API preset 参数。
+3. 将 requestId bind 失败恢复修在现有 Hotel Lobby 生成链路，完成回归测试。
+4. 加 Burning 专题页面（SEO 与使用说明），做好只有一个角色上传的前端交互及语言文案。
+5. 管理员在 staging 做 15s 实际生成和成本检查后才启用 preset 并部署；出现稳定性/版权问题可以单独关 Burning preset，不影响 Hotel Lobby。
+
+**上线不等于使用 Drake 的原始素材。** 未取得授权时可做“同类派对视频风格”的自制模板，并在页面明确标记为 inspired，不宣称是官方 MV 或官方合作；音轨由用户在发布平台内按其许可使用。
 
 ---
 
-**本文件是技术设计，不代表开发、素材授权、真实模型调用或上线已经完成。**
+**本文件为方案 A 的审查修订版，实际仓库尚未新增 Burning 页面或修改业务代码。**
