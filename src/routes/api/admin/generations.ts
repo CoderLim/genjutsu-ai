@@ -496,7 +496,9 @@ async function GET({ request }: { request: Request }) {
         }),
         inputMedia,
         sourceVideoUrl: hasSourceVideo
-          ? `${mediaBase}/source/${encodeURIComponent(row.id)}`
+          ? isKairo
+            ? `/api/admin/generations/${encodeURIComponent(row.id)}/media?index=0`
+            : `${mediaBase}/source/${encodeURIComponent(row.id)}`
           : null,
         videoUrl:
           row.status === 'completed'
