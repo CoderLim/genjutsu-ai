@@ -14,6 +14,10 @@ import {
   KAIRO_BAD_TIMES_PREVIEW_PATH,
 } from '@/modules/kairo-bad-times/constants';
 import { ApiError, apiGet, apiPost, uploadToSignedUrl } from '@/lib/api-client';
+import {
+  friendlyKairoGenerationError,
+  prepareKairoReferenceImage,
+} from '@/lib/kairo-image-preflight';
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
 import { useCreditGate } from '@/hooks/use-credit-gate';
@@ -80,7 +84,7 @@ type PersistedGeneration = {
   kind?: 'preview' | 'full';
 };
 
-const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
+const MAX_ORIGINAL_IMAGE_BYTES = 40 * 1024 * 1024;
 const STORAGE_KEY_PREFIX = 'kairo-bad-times:active-generation:';
 
 function sleep(ms: number) {
@@ -188,7 +192,7 @@ export function KairoBadTimesGeneratorPanel({
 
         if (polled.providerStatus === 'submission_unknown') {
           setPhase('locked');
-          setJobError(polled.error || m['site.generator.pending']());
+          setJobError(friendlyKairoGenerationError(polled.error || m['site.generator.pending']()));
           return;
         }
 
@@ -219,7 +223,7 @@ export function KairoBadTimesGeneratorPanel({
             setJobError('');
             return;
           }
-          setJobError(polled.error || m['site.generator.failed']());
+          setJobError(friendlyKairoGenerationError(polled.error || m['site.generator.failed']()));
           void creditsQuery.refetch();
           return;
         }
@@ -295,8 +299,8 @@ export function KairoBadTimesGeneratorPanel({
       toast.error(m['site.kairo.image_type']());
       return;
     }
-    if (file.size > MAX_IMAGE_BYTES) {
-      toast.error(m['site.kairo.image_size']());
+    if (file.size > MAX_ORIGINAL_IMAGE_BYTES) {
+      toast.error('Please choose a photo smaller than 40 MB.');
       return;
     }
     setPhoto((current) => {
@@ -345,8 +349,10 @@ export function KairoBadTimesGeneratorPanel({
     setGenerationId(id);
 
     try {
-      const contentTypes = [photo.file.type || 'image/jpeg'];
-      const contentLengths = [photo.file.size];
+      // Decode and resize before signing/uploading or reserving paid credits.
+      const uploadFile = await prepareKairoReferenceImage(photo.file);
+      const contentTypes = [uploadFile.type];
+      const contentLengths = [uploadFile.size];
 
       const setup = await apiPost<UploadSetup>(
         '/api/kairo-bad-times/upload-url',
@@ -364,7 +370,7 @@ export function KairoBadTimesGeneratorPanel({
       const upload = setup.uploads[0];
       await uploadToSignedUrl({
         url: upload.uploadUrl,
-        file: photo.file,
+        file: uploadFile,
         headers: upload.uploadHeaders,
       });
 
@@ -407,6 +413,8 @@ export function KairoBadTimesGeneratorPanel({
       await pollUntilComplete(id, start.reservedCredits || 0);
     } catch (error) {
       setPhase('idle');
+      // Submission can fail after a successful reserve/refund transaction.
+      void creditsQuery.refetch();
       if (error instanceof ApiError) {
         const data =
           error.data && typeof error.data === 'object'
@@ -423,14 +431,16 @@ export function KairoBadTimesGeneratorPanel({
           });
           return;
         }
-        setJobError(error.message);
-        toast.error(error.message);
+        const friendlyMessage = friendlyKairoGenerationError(error.message);
+        setJobError(friendlyMessage);
+        toast.error(friendlyMessage);
         return;
       }
       const message =
         error instanceof Error ? error.message : 'Generation failed';
-      setJobError(message);
-      toast.error(message);
+      const friendlyMessage = friendlyKairoGenerationError(message);
+      setJobError(friendlyMessage);
+      toast.error(friendlyMessage);
     }
   };
 

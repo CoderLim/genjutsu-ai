@@ -465,8 +465,10 @@ export async function refundKairoBadTimesGeneration(params: {
       return task ?? null;
     }
 
-    if (task.creditId) {
-      await revoke(task.creditId, tx);
+    // Never mark a generation refunded unless its consumed credits were restored.
+    // Throwing rolls back both the refund claim and any partial credit updates.
+    if (!task.creditId || !(await revoke(task.creditId, tx))) {
+      throw new Error('Failed to restore Kairo Bad Times credits');
     }
 
     await tx

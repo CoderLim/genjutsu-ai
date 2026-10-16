@@ -23,6 +23,12 @@ import {
   assertHotelLobbySealedInputKeysOwned,
   createHotelLobbyR2ReadUrl,
 } from '@/modules/hotel-lobby/storage';
+import { getKairoBadTimesTaskByGenerationId } from '@/modules/kairo-bad-times/billing';
+import { KAIRO_BAD_TIMES_SCENE } from '@/modules/kairo-bad-times/constants';
+import {
+  assertKairoBadTimesSealedImageKeyOwned,
+  createKairoBadTimesR2ReadUrl,
+} from '@/modules/kairo-bad-times/storage';
 import { hasPermission } from '@/modules/rbac/service';
 
 function errorResponse(message: string, status: number) {
@@ -69,17 +75,28 @@ async function GET({
   const genjutsuTask = hotelTask
     ? null
     : await getGenjutsuTaskByGenerationId(params.generationId);
-  const task = hotelTask ?? genjutsuTask;
+  const kairoTask = hotelTask || genjutsuTask
+    ? null
+    : await getKairoBadTimesTaskByGenerationId(params.generationId);
+  const task = hotelTask ?? genjutsuTask ?? kairoTask;
   if (!task) return errorResponse('Generation not found', 404);
 
   const options = parseOptions(task.options);
   const videoKey =
-    typeof options?.videoKey === 'string' ? options.videoKey : null;
+    typeof options?.videoKey === 'string'
+      ? options.videoKey
+      : task.scene === KAIRO_BAD_TIMES_SCENE &&
+          typeof options?.templateVideoKey === 'string'
+        ? options.templateVideoKey
+        : null;
   const imageKeys = Array.isArray(options?.imageKeys)
     ? options.imageKeys.filter(
         (value: unknown): value is string => typeof value === 'string'
       )
-    : [];
+    : task.scene === KAIRO_BAD_TIMES_SCENE &&
+        typeof options?.imageKey === 'string'
+      ? [options.imageKey]
+      : [];
 
   if (!videoKey) return errorResponse('Generation input not found', 404);
 
@@ -88,6 +105,27 @@ async function GET({
   const index = rawIndex == null ? Number.NaN : Number(rawIndex);
   if (!Number.isInteger(index) || index < 0 || index > imageKeys.length) {
     return errorResponse('Invalid media index', 400);
+  }
+
+  if (task.scene === KAIRO_BAD_TIMES_SCENE) {
+    if (
+      !videoKey.startsWith('kairo-bad-times/templates/') ||
+      !/^[A-Za-z0-9._/-]+\.mp4$/.test(videoKey)
+    ) {
+      return errorResponse('Generation input not found', 404);
+    }
+    try {
+      assertKairoBadTimesSealedImageKeyOwned({
+        userId: task.userId,
+        generationId: task.id,
+        imageKey: imageKeys[0] || '',
+      });
+    } catch {
+      return errorResponse('Generation input not found', 404);
+    }
+    const key = index === 0 ? videoKey : imageKeys[index - 1];
+    if (!key) return errorResponse('Generation input not found', 404);
+    return redirectResponse(await createKairoBadTimesR2ReadUrl(key));
   }
 
   if (task.scene === HOTEL_LOBBY_SCENE) {

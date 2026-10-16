@@ -16,6 +16,7 @@ import {
 } from '@/modules/genjutsu/pricing';
 import { estimateSeedanceProviderCost } from '@/modules/genjutsu/seedance';
 import { HOTEL_LOBBY_SCENE } from '@/modules/hotel-lobby/billing';
+import { KAIRO_BAD_TIMES_SCENE } from '@/modules/kairo-bad-times/constants';
 import { displayNameForHotelLobbyPresetId } from '@/modules/hotel-lobby/presets';
 import {
   estimateH3LabCredits,
@@ -260,13 +261,17 @@ async function GET({ request }: { request: Request }) {
         !Array.isArray(info.uploadRecovery)
           ? (info.uploadRecovery as Record<string, unknown>)
           : null;
+      const isKairo = row.scene === KAIRO_BAD_TIMES_SCENE;
       const hasSourceVideo =
-        typeof options?.videoKey === 'string' && options.videoKey.length > 0;
+        (typeof options?.videoKey === 'string' && options.videoKey.length > 0) ||
+        (isKairo && typeof options?.templateVideoKey === 'string');
       const imageKeys = Array.isArray(options?.imageKeys)
         ? options.imageKeys.filter(
             (value: unknown): value is string => typeof value === 'string'
           )
-        : [];
+        : isKairo && typeof options?.imageKey === 'string'
+          ? [options.imageKey]
+          : [];
       const contentTypes = Array.isArray(options?.contentTypes)
         ? options.contentTypes
         : [];
@@ -330,7 +335,7 @@ async function GET({ request }: { request: Request }) {
           typeof options?.resolution === 'string' ? options.resolution : null,
         aspectRatio:
           typeof options?.aspectRatio === 'string' ? options.aspectRatio : null,
-        preview: options?.preview === true,
+        preview: options?.preview === true || options?.kind === 'preview',
         status: row.status,
         attemptStage:
           typeof info?.attemptStage === 'string' ? info.attemptStage : null,
