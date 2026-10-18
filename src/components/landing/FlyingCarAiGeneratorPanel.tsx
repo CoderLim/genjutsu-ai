@@ -955,6 +955,8 @@ export function FlyingCarAiGeneratorPanel({
               poster={FLYING_CAR_AI_TEMPLATE_POSTER_PATH}
               className="relative mx-auto aspect-[3/4] max-h-[420px] w-full rounded-2xl border border-white/10"
               objectFit="contain"
+              autoPlay
+              loop
               onStatusChange={setTemplateStatus}
             />
           </div>

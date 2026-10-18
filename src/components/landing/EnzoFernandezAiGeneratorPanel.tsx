@@ -955,6 +955,8 @@ export function EnzoFernandezAiGeneratorPanel({
               poster={ENZO_FERNANDEZ_AI_TEMPLATE_POSTER_PATH}
               className="relative mx-auto aspect-[4/3] max-h-[420px] w-full rounded-2xl border border-white/10"
               objectFit="contain"
+              autoPlay
+              loop
               onStatusChange={setTemplateStatus}
             />
           </div>
