@@ -52,15 +52,3 @@ export async function resolveFixedTemplatePreviewUrl(params: {
 
   throw new Error(`Unknown fixed template product: ${product}`);
 }
-
-/** Canonical page preview path — Relative URL for <video src>. */
-export function fixedTemplatePreviewPath(params: {
-  product: string;
-  aspect?: string;
-  subject?: string;
-}): string {
-  const query = new URLSearchParams({ product: params.product });
-  if (params.aspect) query.set('aspect', params.aspect);
-  if (params.subject) query.set('subject', params.subject);
-  return `/api/genjutsu/template?${query.toString()}`;
-}

@@ -23,7 +23,7 @@ import {
   SMALLTOWN_TEMPLATE_PATH,
   SMALLTOWN_TEMPLATE_POSTER_PATH,
 } from '@/modules/smalltown-boy-dance/constants';
-import { fixedTemplatePreviewPath } from '@/modules/templates/preview';
+import { fixedTemplatePreviewPath } from '@/modules/templates/paths';
 import {
   ZOMBIE_HUG_DEFAULT_RESOLUTION,
   ZOMBIE_HUG_MODE,
