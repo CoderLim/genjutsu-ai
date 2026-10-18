@@ -647,10 +647,6 @@ export const FOOTER_COLUMNS: FooterColumn[] = [
         href: '/flying-car-ai',
       },
       {
-        label: 'A2O LITE AI',
-        href: '/a2o-lite-ai',
-      },
-      {
         label: 'Enzo Fernandez AI',
         href: '/enzo-fernandez-ai',
       },
@@ -681,6 +677,15 @@ export const FOOTER_COLUMNS: FooterColumn[] = [
       {
         label: 'AI Zombie Hug',
         href: '/ai-zombie-hug',
+      },
+    ],
+  },
+  {
+    title: 'More Tools',
+    links: [
+      {
+        label: 'A2O LITE AI',
+        href: 'https://a2oliteai.org',
       },
       {
         label: 'Person Remover',

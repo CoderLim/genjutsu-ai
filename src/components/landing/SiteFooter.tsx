@@ -13,6 +13,8 @@ function translatedFooterText(value: string) {
       return m['site.footer.about']();
     case 'Tools':
       return m['site.footer.tools']();
+    case 'More Tools':
+      return m['site.footer.more_tools']();
     case 'Features':
       return m['site.footer.features']();
     case 'Pricing':
@@ -107,7 +109,7 @@ export function SiteFooter() {
               </div>
             </div>
 
-            <div className="grid w-full max-w-md grid-cols-2 gap-8">
+            <div className="grid w-full max-w-2xl grid-cols-2 gap-8 sm:grid-cols-3">
               {FOOTER_COLUMNS.map((column) => (
                 <div key={translatedFooterText(column.title)}>
                   <p className="text-foreground mb-6 font-bold">
