@@ -9,7 +9,8 @@ export const SMALLTOWN_PRODUCT_ID = SMALLTOWN_BOY_DANCE_PRODUCT;
 
 export const SMALLTOWN_MODE: GenjutsuMode = 'objects-swap';
 
-export const SMALLTOWN_TEMPLATE_PATH = '/videos/smalltown-boy-dance-tpl.mp4';
+/** Preview plays the same R2 object seal uses (signed via API). */
+export const SMALLTOWN_TEMPLATE_PATH = `/api/genjutsu/template?product=${SMALLTOWN_PRODUCT_ID}`;
 export const SMALLTOWN_TEMPLATE_POSTER_PATH =
   '/videos/smalltown-boy-dance-tpl-poster.jpg';
 

@@ -6,7 +6,8 @@ export const A2O_LITE_AI_PRODUCT_ID = A2O_LITE_AI_PRODUCT;
 
 export const A2O_LITE_AI_MODE: GenjutsuMode = 'objects-swap';
 
-export const A2O_LITE_AI_TEMPLATE_PATH = '/videos/a2o-lite-ai-tpl.mp4';
+/** Preview plays the same R2 object seal uses (signed via API). */
+export const A2O_LITE_AI_TEMPLATE_PATH = `/api/genjutsu/template?product=${A2O_LITE_AI_PRODUCT_ID}`;
 export const A2O_LITE_AI_TEMPLATE_POSTER_PATH =
   '/videos/a2o-lite-ai-tpl-poster.jpg';
 
@@ -32,21 +33,21 @@ export function isA2oLiteAiResolution(
  * replacement appearance.
  */
 export const A2O_LITE_AI_DEFAULT_PROMPT = [
-  "In the original source video, identify the two dancers by their positions and distinctive visual cues in the opening shot:",
-  "",
-  "Dancer A: the foreground dancer closest to the camera at the start, originally wearing white oval sunglasses. Replace Dancer A with Reference 1.",
-  "",
-  "Dancer B: the separate dancer standing behind Dancer A at the start, initially partially hidden by Dancer A. Replace Dancer B with Reference 2.",
-  "",
-  "These opening-shot details identify the ORIGINAL dancers only; they are NOT appearance instructions for the replacements. Do not use original hair colors as identity cues.",
-  "",
+  'In the original source video, identify the two dancers by their positions and distinctive visual cues in the opening shot:',
+  '',
+  'Dancer A: the foreground dancer closest to the camera at the start, originally wearing white oval sunglasses. Replace Dancer A with Reference 1.',
+  '',
+  'Dancer B: the separate dancer standing behind Dancer A at the start, initially partially hidden by Dancer A. Replace Dancer B with Reference 2.',
+  '',
+  'These opening-shot details identify the ORIGINAL dancers only; they are NOT appearance instructions for the replacements. Do not use original hair colors as identity cues.',
+  '',
   "Replace BOTH original dancers completely with their assigned reference people. Reference 1 controls Dancer A's visible face, hair, clothing, and accessories; Reference 2 controls Dancer B's visible face, hair, clothing, and accessories. Where a reference does not show an outfit detail, create a coherent appearance that matches that reference rather than copying the original dancer's distinctive look.",
-  "",
+  '',
   "The original white oval sunglasses are ONLY an identifying cue for Dancer A. Do not retain or invent those sunglasses unless Reference 1 shows them. Do not retain the original dancers' faces, hairstyles, or distinctive accessories when they differ from their assigned references.",
-  "",
-  "Keep both replacements consistent through solo close-ups, two-person shots, occlusions, turns, camera cuts, and position changes. Once assigned from the opening shot, track each dancer by identity and continuity, NOT by who is in front later. Never swap the two assignments, merge their identities, or apply one reference to both dancers.",
-  "",
-  "Preserve the source choreography, movements, timing, camera work, framing, environment, and composition. Both original dancers must be visibly replaced; do not leave either dancer unchanged.",
+  '',
+  'Keep both replacements consistent through solo close-ups, two-person shots, occlusions, turns, camera cuts, and position changes. Once assigned from the opening shot, track each dancer by identity and continuity, NOT by who is in front later. Never swap the two assignments, merge their identities, or apply one reference to both dancers.',
+  '',
+  'Preserve the source choreography, movements, timing, camera work, framing, environment, and composition. Both original dancers must be visibly replaced; do not leave either dancer unchanged.',
 ].join('\n');
 
 /** No legacy prompt versions are accepted; new attempts use the current prompt. */

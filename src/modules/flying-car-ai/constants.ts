@@ -6,7 +6,8 @@ export const FLYING_CAR_AI_PRODUCT_ID = FLYING_CAR_AI_PRODUCT;
 
 export const FLYING_CAR_AI_MODE: GenjutsuMode = 'objects-swap';
 
-export const FLYING_CAR_AI_TEMPLATE_PATH = '/videos/flying-car-ai-tpl.mp4';
+/** Preview plays the same R2 object seal uses (signed via API). */
+export const FLYING_CAR_AI_TEMPLATE_PATH = `/api/genjutsu/template?product=${FLYING_CAR_AI_PRODUCT_ID}`;
 export const FLYING_CAR_AI_TEMPLATE_POSTER_PATH =
   '/videos/flying-car-ai-tpl-poster.jpg';
 

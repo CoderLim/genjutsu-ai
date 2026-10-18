@@ -9,7 +9,8 @@ export const CRAZY_FROG_PRODUCT_ID = CRAZY_FROG_PRODUCT;
 
 export const CRAZY_FROG_MODE: GenjutsuMode = 'objects-swap';
 
-export const CRAZY_FROG_TEMPLATE_PATH = '/videos/crazy-frog-tpl.mp4';
+/** Preview plays the same R2 object seal uses (signed via API). */
+export const CRAZY_FROG_TEMPLATE_PATH = `/api/genjutsu/template?product=${CRAZY_FROG_PRODUCT_ID}`;
 export const CRAZY_FROG_TEMPLATE_POSTER_PATH =
   '/videos/crazy-frog-tpl-poster.jpg';
 

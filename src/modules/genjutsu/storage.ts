@@ -4,6 +4,8 @@ import { envConfigs } from '@/config';
 import { getAllConfigs } from '@/modules/config/service';
 import { getStorage } from '@/modules/storage/service';
 
+import type { GenjutsuProductId } from './types';
+
 const UPLOAD_EXPIRES_SECONDS = 15 * 60;
 const READ_EXPIRES_SECONDS = 60 * 60;
 
@@ -1062,6 +1064,26 @@ export async function ensureFlyingCarAiTemplateInR2() {
     localRelative: 'public/videos/flying-car-ai-tpl.mp4',
     label: 'Flying Car AI',
   });
+}
+
+/**
+ * Signed preview URL for a fixed-template product page — same R2 key seal uses.
+ * Does not fall back to /videos/*; missing R2 fails loudly so preview matches generate.
+ */
+export async function getGenjutsuProductTemplatePreviewUrl(
+  product: GenjutsuProductId
+) {
+  const key =
+    product === 'smalltown-boy-dance'
+      ? await ensureSmalltownBoyDanceTemplateInR2()
+      : product === 'crazy-frog'
+        ? await ensureCrazyFrogTemplateInR2()
+        : product === 'a2o-lite-ai'
+          ? await ensureA2oLiteAiTemplateInR2()
+          : product === 'enzo-fernandez-ai'
+            ? await ensureEnzoFernandezAiTemplateInR2()
+            : await ensureFlyingCarAiTemplateInR2();
+  return createGenjutsuR2ReadUrl(key);
 }
 
 /** HEAD helper that returns false on missing objects (does not throw). */

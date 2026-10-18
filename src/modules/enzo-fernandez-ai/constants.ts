@@ -6,8 +6,8 @@ export const ENZO_FERNANDEZ_AI_PRODUCT_ID = ENZO_FERNANDEZ_AI_PRODUCT;
 
 export const ENZO_FERNANDEZ_AI_MODE: GenjutsuMode = 'objects-swap';
 
-export const ENZO_FERNANDEZ_AI_TEMPLATE_PATH =
-  '/videos/enzo-fernandez-ai-tpl.mp4';
+/** Preview plays the same R2 object seal uses (signed via API). */
+export const ENZO_FERNANDEZ_AI_TEMPLATE_PATH = `/api/genjutsu/template?product=${ENZO_FERNANDEZ_AI_PRODUCT_ID}`;
 export const ENZO_FERNANDEZ_AI_TEMPLATE_POSTER_PATH =
   '/videos/enzo-fernandez-ai-tpl-poster.jpg';
 
