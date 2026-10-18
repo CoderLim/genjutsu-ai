@@ -258,10 +258,12 @@ async function POST({ request }: { request: Request }) {
     if (isProductPreview) {
       const productLabel = isA2oLiteAi
         ? 'A2O Lite AI'
-        : isEnzoFernandezAi
-          ? 'Enzo Fernandez AI'
-          : 'Crazy Frog';
-      const previewImageCount = isEnzoFernandezAi ? 1 : 2;
+        : isFlyingCarAi
+          ? 'Flying Car AI'
+          : isEnzoFernandezAi
+            ? 'Enzo Fernandez AI'
+            : 'Crazy Frog';
+      const previewImageCount = isSingleImageProduct ? 1 : 2;
       const previewUploadCount = previewImageCount + 1;
       if (
         contentTypes.length !== previewUploadCount ||
