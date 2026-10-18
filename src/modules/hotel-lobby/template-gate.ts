@@ -49,3 +49,38 @@ export function hotelLobbyTemplateMediaIdentity(
 ): string {
   return `${presetId}\0${previewUrl}`;
 }
+
+/**
+ * Monotonic request guard so stale template-meta responses (after Retry or
+ * preset switch) cannot overwrite newer state.
+ */
+export function createAsyncRequestGuard() {
+  let seq = 0;
+  return {
+    begin(): number {
+      seq += 1;
+      return seq;
+    },
+    /** Drop in-flight work without starting a replacement request. */
+    invalidate(): void {
+      seq += 1;
+    },
+    isCurrent(token: number): boolean {
+      return token === seq;
+    },
+  };
+}
+
+/** Bust cached template preview URL so <video> reloads on Retry. */
+export function withHotelLobbyTemplateRetryParam(
+  previewUrl: string,
+  retryToken: number | string = Date.now()
+): string {
+  const url = new URL(previewUrl, 'https://template.local');
+  url.searchParams.set('_retry', String(retryToken));
+  // Preserve relative /api/... paths (URL() absolutizes them).
+  if (previewUrl.startsWith('/')) {
+    return `${url.pathname}${url.search}`;
+  }
+  return url.toString();
+}

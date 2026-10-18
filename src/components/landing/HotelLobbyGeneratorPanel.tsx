@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -28,9 +29,11 @@ import {
   HOTEL_LOBBY_MIN_VIDEO_EDGE_PX,
 } from '@/modules/hotel-lobby/pricing';
 import {
+  createAsyncRequestGuard,
   deriveHotelLobbyTemplateGate,
   hotelLobbyTemplateMediaIdentity,
   shouldResetHotelLobbyTemplateMedia,
+  withHotelLobbyTemplateRetryParam,
   type HotelLobbyTemplateMediaStatus,
 } from '@/modules/hotel-lobby/template-gate';
 import { hotelLobbyTemplateProxyUrl } from '@/modules/hotel-lobby/template-proxy-url';
@@ -305,7 +308,6 @@ export function HotelLobbyGeneratorPanel({
 } = {}) {
   const presetId = resolvePanelPresetId(presetIdProp);
   const clientDefaults = getHotelLobbyPresetClientDefaults(presetId);
-  const previewUrl = clientDefaults.previewUrl;
   const { data: session, isPending: sessionPending } = useSession();
   const creditsQuery = useUserCredits(Boolean(session?.user));
   const creditGate = useCreditGate({
@@ -317,13 +319,15 @@ export function HotelLobbyGeneratorPanel({
   const secondImageInputRef = useRef<HTMLInputElement>(null);
   const mountedRef = useRef(true);
   const localUrlsRef = useRef<Set<string>>(new Set());
+  const templateMetaRequestGuardRef = useRef(createAsyncRequestGuard());
+  const templatePreviewUrlRef = useRef(clientDefaults.previewUrl);
 
   const previewVideoRef = useRef<HTMLVideoElement>(null);
   const resultPanelRef = useRef<HTMLDivElement>(null);
   const generationStartedAtRef = useRef<number | null>(null);
   const [video, setVideo] = useState<VideoSource | null>({
     kind: 'template',
-    url: previewUrl,
+    url: clientDefaults.previewUrl,
   });
   /** Independent of browser media — set only from template-meta. */
   const [r2TemplateAvailable, setR2TemplateAvailable] = useState<
@@ -356,6 +360,8 @@ export function HotelLobbyGeneratorPanel({
   const maxImages = presetMeta?.imageCount.max ?? clientDefaults.imageCount.max;
   const presetEnabled = presetMeta?.enabled ?? clientDefaults.enabled;
   const aspectRatio = presetMeta?.aspectRatio ?? clientDefaults.aspectRatio;
+  const previewUrl = presetMeta?.previewUrl ?? clientDefaults.previewUrl;
+  templatePreviewUrlRef.current = previewUrl;
   const posterUrl = presetMeta?.posterUrl ?? clientDefaults.posterUrl;
   const downloadPrefix =
     presetMeta?.downloadPrefix ?? clientDefaults.downloadPrefix;
@@ -517,93 +523,113 @@ export function HotelLobbyGeneratorPanel({
     });
   }, [jobBusy, resultUrl, generationId]);
 
-  useEffect(() => {
-    let cancelled = false;
-    const defaults = getHotelLobbyPresetClientDefaults(presetId);
-    setVideo({ kind: 'template', url: defaults.previewUrl });
-    // Reset R2 signal only — media status resets via identity effect when URL/preset changes.
-    setR2TemplateAvailable(null);
-    setPresetMeta(null);
+  /**
+   * Shared template-meta + optional video reload for initial preset load and Retry.
+   * Uses a request guard so stale responses cannot overwrite newer Retry/preset work.
+   */
+  const loadTemplateMeta = useCallback(
+    (mode: 'preset' | 'retry') => {
+      const token = templateMetaRequestGuardRef.current.begin();
+      const defaults = getHotelLobbyPresetClientDefaults(presetId);
+      // Loading — do not inherit prior meta failure.
+      setR2TemplateAvailable(null);
 
-    void apiGet<{
-      durationSeconds: number | null;
-      estimatedCredits: number | null;
-      templateAvailable: boolean;
-      presetId: HotelLobbyPresetId;
-      enabled: boolean;
-      allowCustomVideo: boolean;
-      allowTrim: boolean;
-      aspectRatio: string;
-      previewUrl: string;
-      posterUrl: string;
-      downloadPrefix: string;
-      displayName: string;
-      imageCount: { min: number; max: number };
-    }>(templateMetaUrlFor(presetId))
-      .then((data) => {
-        if (cancelled) return;
-        const r2Ready = data.templateAvailable !== false;
-        const nextMeta: PresetUiMeta = {
-          presetId: isHotelLobbyPresetId(data.presetId)
-            ? data.presetId
-            : presetId,
-          enabled: data.enabled !== false,
-          templateAvailable: r2Ready,
-          allowCustomVideo:
-            typeof data.allowCustomVideo === 'boolean'
-              ? data.allowCustomVideo
-              : defaults.allowCustomVideo,
-          allowTrim:
-            typeof data.allowTrim === 'boolean'
-              ? data.allowTrim
-              : defaults.allowTrim,
-          aspectRatio: data.aspectRatio || defaults.aspectRatio,
-          previewUrl: data.previewUrl || defaults.previewUrl,
-          posterUrl: data.posterUrl || defaults.posterUrl,
-          downloadPrefix: data.downloadPrefix || defaults.downloadPrefix,
-          displayName: data.displayName || defaults.displayName,
-          imageCount: data.imageCount || defaults.imageCount,
-          estimatedCredits: data.estimatedCredits,
-        };
-        setPresetMeta(nextMeta);
-        // Never touch templateMediaStatus here — same URL must keep `ready`.
-        setR2TemplateAvailable(r2Ready);
-        setVideo((current) =>
-          current?.kind === 'template'
-            ? {
-                ...current,
-                url: nextMeta.previewUrl,
-                // Fixed-template previews: prefer browser duration so a
-                // stale R2 object cannot skew the credit estimate.
-                durationSeconds: !nextMeta.allowCustomVideo
-                  ? current.durationSeconds
-                  : typeof data.durationSeconds === 'number' &&
-                      Number.isFinite(data.durationSeconds) &&
-                      data.durationSeconds > 0
-                    ? data.durationSeconds
-                    : current.durationSeconds,
-              }
-            : current
-        );
-      })
-      .catch(() => {
-        if (cancelled) return;
-        // Fail closed for fixed templates — never fall back to custom-video UX.
-        setPresetMeta({
-          ...defaults,
-          templateAvailable: false,
-          estimatedCredits: null,
+      if (mode === 'preset') {
+        setPresetMeta(null);
+        setVideo({ kind: 'template', url: defaults.previewUrl });
+      } else {
+        // Retry: bust video cache; keep uploaded photos / other inputs.
+        setVideo({
+          kind: 'template',
+          url: withHotelLobbyTemplateRetryParam(templatePreviewUrlRef.current),
         });
-        setR2TemplateAvailable(false);
-        if (!defaults.allowCustomVideo) {
-          setVideo({ kind: 'template', url: defaults.previewUrl });
-        }
-      });
+      }
 
+      void apiGet<{
+        durationSeconds: number | null;
+        estimatedCredits: number | null;
+        templateAvailable: boolean;
+        presetId: HotelLobbyPresetId;
+        enabled: boolean;
+        allowCustomVideo: boolean;
+        allowTrim: boolean;
+        aspectRatio: string;
+        previewUrl: string;
+        posterUrl: string;
+        downloadPrefix: string;
+        displayName: string;
+        imageCount: { min: number; max: number };
+      }>(templateMetaUrlFor(presetId))
+        .then((data) => {
+          if (!templateMetaRequestGuardRef.current.isCurrent(token)) return;
+          const r2Ready = data.templateAvailable !== false;
+          const nextMeta: PresetUiMeta = {
+            presetId: isHotelLobbyPresetId(data.presetId)
+              ? data.presetId
+              : presetId,
+            enabled: data.enabled !== false,
+            templateAvailable: r2Ready,
+            allowCustomVideo:
+              typeof data.allowCustomVideo === 'boolean'
+                ? data.allowCustomVideo
+                : defaults.allowCustomVideo,
+            allowTrim:
+              typeof data.allowTrim === 'boolean'
+                ? data.allowTrim
+                : defaults.allowTrim,
+            aspectRatio: data.aspectRatio || defaults.aspectRatio,
+            previewUrl: data.previewUrl || defaults.previewUrl,
+            posterUrl: data.posterUrl || defaults.posterUrl,
+            downloadPrefix: data.downloadPrefix || defaults.downloadPrefix,
+            displayName: data.displayName || defaults.displayName,
+            imageCount: data.imageCount || defaults.imageCount,
+            estimatedCredits: data.estimatedCredits,
+          };
+          setPresetMeta(nextMeta);
+          // Never touch templateMediaStatus here — same URL must keep `ready`.
+          setR2TemplateAvailable(r2Ready);
+          setVideo((current) => {
+            if (current?.kind !== 'template') return current;
+            // Retry already set a cache-busted URL; keep it so media reloads.
+            // Preset load (or meta URL change) adopts the canonical preview URL.
+            const nextUrl =
+              mode === 'retry' ? current.url : nextMeta.previewUrl;
+            return {
+              ...current,
+              url: nextUrl,
+              durationSeconds: !nextMeta.allowCustomVideo
+                ? current.durationSeconds
+                : typeof data.durationSeconds === 'number' &&
+                    Number.isFinite(data.durationSeconds) &&
+                    data.durationSeconds > 0
+                  ? data.durationSeconds
+                  : current.durationSeconds,
+            };
+          });
+        })
+        .catch(() => {
+          if (!templateMetaRequestGuardRef.current.isCurrent(token)) return;
+          // Fail closed for fixed templates — never fall back to custom-video UX.
+          setPresetMeta({
+            ...defaults,
+            templateAvailable: false,
+            estimatedCredits: null,
+          });
+          setR2TemplateAvailable(false);
+          if (mode === 'preset' && !defaults.allowCustomVideo) {
+            setVideo({ kind: 'template', url: defaults.previewUrl });
+          }
+        });
+    },
+    [presetId]
+  );
+
+  useEffect(() => {
+    loadTemplateMeta('preset');
     return () => {
-      cancelled = true;
+      templateMetaRequestGuardRef.current.invalidate();
     };
-  }, [presetId]);
+  }, [presetId, loadTemplateMeta]);
 
   // Reset media status only when template identity (preset + URL) changes.
   useEffect(() => {
@@ -828,14 +854,10 @@ export function HotelLobbyGeneratorPanel({
       URL.revokeObjectURL(video.url);
       localUrlsRef.current.delete(video.url);
     }
-    // Keep r2 signal; only bust media identity via new URL → loading → ready/error.
-    const join = previewUrl.includes('?') ? '&' : '?';
-    setVideo({
-      kind: 'template',
-      url: `${previewUrl}${join}_retry=${Date.now()}`,
-    });
+    // Re-check R2 meta + reload video. Do not clear uploaded photos.
     setResultUrl(null);
     setPhase('idle');
+    loadTemplateMeta('retry');
   };
 
   const pollUntilComplete = async (id: string) => {
