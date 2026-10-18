@@ -1206,6 +1206,8 @@
   "site.common.generate_estimate": "생성하기(약 {count}크레딧)",
   "site.common.required_balance": "필요: {required} · 잔액: {balance}",
   "site.common.generation_id": "생성 ID: {id}",
+  "site.common.template_unavailable": "템플릿 영상을 불러오지 못했습니다. 사용 가능한지 확인한 뒤 다시 시도하세요.",
+  "site.common.template_retry": "템플릿 다시 시도",
   "site.hotel.reference": "참조 퍼포먼스 영상",
   "site.hotel.reference_note": "Hotel Lobby 템플릿이 기본으로 설정되어 있습니다. 길이를 조정하거나 삭제하고 3~15초 참조 영상으로 변경할 수 있습니다.",
   "site.hotel.preset": "템플릿",

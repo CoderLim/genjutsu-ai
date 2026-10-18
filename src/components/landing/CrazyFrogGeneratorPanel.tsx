@@ -40,9 +40,11 @@ import {
 } from '@/lib/upload-diagnostics';
 import { m } from '@/paraglide/messages.js';
 import { useCreditGate } from '@/hooks/use-credit-gate';
+import type { FixedTemplateMediaStatus } from '@/hooks/use-fixed-template-media';
 import { useUserCredits } from '@/hooks/use-user-credits';
 import { InsufficientCreditsModal } from '@/components/credits/insufficient-credits-modal';
 import { ChevronDownIcon, CloseIcon, ImageModeIcon } from '@/components/icons';
+import { FixedTemplatePreview } from '@/components/landing/FixedTemplatePreview';
 import {
   Tooltip,
   TooltipContent,
@@ -460,10 +462,13 @@ export function CrazyFrogGeneratorPanel() {
   const [jobError, setJobError] = useState('');
   const [progressPercent, setProgressPercent] = useState(0);
   const [waitTipIndex, setWaitTipIndex] = useState(0);
+  const [templateStatus, setTemplateStatus] =
+    useState<FixedTemplateMediaStatus>('loading');
   const creditGate = useCreditGate({
     balance: creditsQuery.data?.balance,
     email: session?.user?.email,
   });
+  const templateReady = templateStatus === 'ready';
 
   const frontInputRef = useRef<HTMLInputElement>(null);
   const backInputRef = useRef<HTMLInputElement>(null);
@@ -791,6 +796,10 @@ export function CrazyFrogGeneratorPanel() {
       return;
     }
     if (busy) return;
+    if (!templateReady) {
+      toast.error(m['site.common.template_unavailable']());
+      return;
+    }
     if (!frontPhoto?.file || !backPhoto?.file) {
       toast.error(m['site.crazy.upload_required']());
       return;
@@ -1026,7 +1035,10 @@ export function CrazyFrogGeneratorPanel() {
   };
 
   const canGenerate =
-    Boolean(frontPhoto?.file && backPhoto?.file) && !busy && !sessionPending;
+    Boolean(frontPhoto?.file && backPhoto?.file) &&
+    templateReady &&
+    !busy &&
+    !sessionPending;
 
   const progressResolution =
     busy && resultKind === 'preview' ? '480p' : resolution;
@@ -1036,21 +1048,13 @@ export function CrazyFrogGeneratorPanel() {
       <div className="overflow-hidden rounded-[26px] border border-white/10 bg-[rgba(30,23,19,0.92)] shadow-[0_30px_90px_-30px_rgba(0,0,0,0.85)] backdrop-blur-2xl">
         <div className="grid gap-0 lg:grid-cols-2 lg:items-stretch">
           <div className="flex flex-col border-b border-white/8 p-4 sm:p-5 lg:border-r lg:border-b-0">
-            {/*
-              Keep width+aspect in sync. `max-h` alone with `w-full` breaks 4:3
-              and letterboxes the template — cap width instead (420 * 4/3).
-            */}
-            <div className="relative mx-auto aspect-[4/3] w-full max-w-[min(100%,560px)] overflow-hidden rounded-2xl border border-white/10 bg-black">
-              <video
-                src={CRAZY_FROG_TEMPLATE_PATH}
-                poster={CRAZY_FROG_TEMPLATE_POSTER_PATH}
-                controls
-                muted
-                playsInline
-                preload="metadata"
-                className="size-full object-cover"
-              />
-            </div>
+            <FixedTemplatePreview
+              src={CRAZY_FROG_TEMPLATE_PATH}
+              poster={CRAZY_FROG_TEMPLATE_POSTER_PATH}
+              className="relative mx-auto aspect-[4/3] w-full max-w-[min(100%,560px)] rounded-2xl border border-white/10"
+              objectFit="cover"
+              onStatusChange={setTemplateStatus}
+            />
           </div>
 
           <div className="flex min-h-0 flex-col p-4 sm:p-5 lg:h-full">

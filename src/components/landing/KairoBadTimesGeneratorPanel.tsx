@@ -22,9 +22,11 @@ import {
 import { cn } from '@/lib/utils';
 import { m } from '@/paraglide/messages.js';
 import { useCreditGate } from '@/hooks/use-credit-gate';
+import type { FixedTemplateMediaStatus } from '@/hooks/use-fixed-template-media';
 import { useUserCredits } from '@/hooks/use-user-credits';
 import { InsufficientCreditsModal } from '@/components/credits/insufficient-credits-modal';
 import { CloseIcon, ImageModeIcon } from '@/components/icons';
+import { FixedTemplatePreview } from '@/components/landing/FixedTemplatePreview';
 import {
   Tooltip,
   TooltipContent,
@@ -131,6 +133,8 @@ export function KairoBadTimesGeneratorPanel({
   const [resultKind, setResultKind] = useState<'preview' | 'full'>('full');
   const [jobError, setJobError] = useState('');
   const [progressPercent, setProgressPercent] = useState(0);
+  const [templateMediaStatus, setTemplateMediaStatus] =
+    useState<FixedTemplateMediaStatus>('loading');
 
   const photoInputRef = useRef<HTMLInputElement>(null);
   const photoUrlRef = useRef<string | null>(null);
@@ -138,10 +142,16 @@ export function KairoBadTimesGeneratorPanel({
   const resultPanelRef = useRef<HTMLDivElement>(null);
 
   const busy = phase !== 'idle' && phase !== 'locked';
-  const templateAvailable = templateMeta?.templateAvailable === true;
+  const templateMetaAvailable = templateMeta?.templateAvailable === true;
+  const templateMediaReady = templateMediaStatus === 'ready';
+  const templateAvailable = templateMetaAvailable && templateMediaReady;
   const estimatedCredits = templateMeta?.estimatedCredits ?? null;
   const previewEstimatedCredits = templateMeta?.previewEstimatedCredits ?? null;
   const fallbackPaths = getKairoBadTimesPublicPreviewPaths(subject);
+
+  useEffect(() => {
+    setTemplateMediaStatus('loading');
+  }, [subject]);
 
   useEffect(() => {
     let cancelled = false;
@@ -635,17 +645,14 @@ export function KairoBadTimesGeneratorPanel({
             {/*
               Cap width so 9:16 stays within one viewport (240 * 16/9 ≈ 427px).
             */}
-            <div className="relative mx-auto aspect-[9/16] w-full max-w-[min(100%,240px)] overflow-hidden rounded-2xl border border-white/10 bg-black">
-              <video
-                key={previewUrl}
-                src={previewUrl}
-                poster={posterUrl}
-                controls
-                playsInline
-                preload="metadata"
-                className="size-full object-cover"
-              />
-            </div>
+            <FixedTemplatePreview
+              key={previewUrl}
+              src={previewUrl}
+              poster={posterUrl}
+              objectFit="cover"
+              className="relative mx-auto aspect-[9/16] w-full max-w-[min(100%,240px)] rounded-2xl border border-white/10"
+              onStatusChange={setTemplateMediaStatus}
+            />
             <p className="mt-2 text-center text-xs text-white/38">
               {subject === 'pet'
                 ? m['site.kairo.template_note_pet']()

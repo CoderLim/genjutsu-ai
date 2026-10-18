@@ -75,9 +75,11 @@ export const MOTION_TEMPLATES: MotionTemplate[] = [
     id: 'zombie-hug',
     titleKey: 'site.templates.zombie_hug',
     poster: '/readme/zombie-hug.jpg',
+    // Proxy so homepage Recreate can fetch() same-origin (signed R2 has no CORS).
     sourceVideo: fixedTemplatePreviewPath({
       product: 'zombie-hug',
       aspect: '9:16',
+      delivery: 'proxy',
     }),
     prompt: ZOMBIE_HUG_PROMPT,
     mode: ZOMBIE_HUG_MODE,
@@ -152,7 +154,10 @@ export const MOTION_TEMPLATES: MotionTemplate[] = [
     id: 'hotel-lobby',
     titleKey: 'site.templates.hotel_lobby',
     poster: '/readme/hotel-lobby.jpg',
-    sourceVideo: fixedTemplatePreviewPath({ product: 'hotel-lobby' }),
+    sourceVideo: fixedTemplatePreviewPath({
+      product: 'hotel-lobby',
+      delivery: 'proxy',
+    }),
     prompt: buildHotelLobbyPrompt(2),
     mode: 'objects-swap',
     resolution: '720p',
@@ -283,7 +288,19 @@ UNDER NO CIRCUMSTANCES CHANGE THE CHARACTERS' IDENTITIES! THEY MUST LOOK EXACTLY
   },
 ];
 
-/** Preview URL for gallery cards — same path as source for fixed-template products. */
+/**
+ * Gallery <video> can use redirect delivery; Recreate fetch uses sourceVideo
+ * (proxy for zombie-hug / hotel-lobby).
+ */
 export function getMotionTemplatePreviewSrc(template: MotionTemplate): string {
+  if (template.id === 'zombie-hug') {
+    return fixedTemplatePreviewPath({
+      product: 'zombie-hug',
+      aspect: '9:16',
+    });
+  }
+  if (template.id === 'hotel-lobby') {
+    return fixedTemplatePreviewPath({ product: 'hotel-lobby' });
+  }
   return template.sourceVideo;
 }

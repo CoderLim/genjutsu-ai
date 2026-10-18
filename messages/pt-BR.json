@@ -119,6 +119,8 @@
   "site.common.generate_estimate": "Gerar (~{count} créditos)",
   "site.common.required_balance": "Necessário: {required} · saldo: {balance}",
   "site.common.generation_id": "Geração {id}",
+  "site.common.template_unavailable": "Falha ao carregar o vídeo do modelo. Verifique se está disponível e tente novamente.",
+  "site.common.template_retry": "Tentar modelo novamente",
   "genjutsu.credits.insufficient_title": "Créditos insuficientes",
   "genjutsu.credits.insufficient_description": "Esta geração precisa de {count} créditos.",
   "genjutsu.credits.balance": "Seu saldo",

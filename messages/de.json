@@ -119,6 +119,8 @@
   "site.common.generate_estimate": "Generieren (~{count} Credits)",
   "site.common.required_balance": "Benötigt: {required} · Guthaben: {balance}",
   "site.common.generation_id": "Generierung {id}",
+  "site.common.template_unavailable": "Vorlagenvideo konnte nicht geladen werden. Prüfen Sie die Verfügbarkeit und versuchen Sie es erneut.",
+  "site.common.template_retry": "Vorlage erneut versuchen",
   "genjutsu.credits.insufficient_title": "Nicht genügend Credits",
   "genjutsu.credits.insufficient_description": "Für diese Generierung sind {count} Credits erforderlich.",
   "genjutsu.credits.balance": "Dein Guthaben",

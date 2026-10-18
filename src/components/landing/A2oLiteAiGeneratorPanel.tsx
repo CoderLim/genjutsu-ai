@@ -41,9 +41,11 @@ import {
 } from '@/lib/upload-diagnostics';
 import { m } from '@/paraglide/messages.js';
 import { useCreditGate } from '@/hooks/use-credit-gate';
+import type { FixedTemplateMediaStatus } from '@/hooks/use-fixed-template-media';
 import { useUserCredits } from '@/hooks/use-user-credits';
 import { InsufficientCreditsModal } from '@/components/credits/insufficient-credits-modal';
 import { ChevronDownIcon, CloseIcon, ImageModeIcon } from '@/components/icons';
+import { FixedTemplatePreview } from '@/components/landing/FixedTemplatePreview';
 import {
   Tooltip,
   TooltipContent,
@@ -413,10 +415,13 @@ export function A2oLiteAiGeneratorPanel({
   const [resultKind, setResultKind] = useState<'preview' | 'full' | null>(null);
   const [jobError, setJobError] = useState('');
   const [progressPercent, setProgressPercent] = useState(0);
+  const [templateStatus, setTemplateStatus] =
+    useState<FixedTemplateMediaStatus>('loading');
   const creditGate = useCreditGate({
     balance: creditsQuery.data?.balance,
     email: session?.user?.email,
   });
+  const templateReady = templateStatus === 'ready';
 
   const frontInputRef = useRef<HTMLInputElement>(null);
   const backInputRef = useRef<HTMLInputElement>(null);
@@ -714,6 +719,10 @@ export function A2oLiteAiGeneratorPanel({
       return;
     }
     if (busy) return;
+    if (!templateReady) {
+      toast.error(m['site.common.template_unavailable']());
+      return;
+    }
     if (!frontPhoto || !backPhoto) {
       toast.error(m['site.a2o.upload_required']());
       return;
@@ -935,26 +944,23 @@ export function A2oLiteAiGeneratorPanel({
   };
 
   const canGenerate =
-    Boolean(frontPhoto && backPhoto) && !busy && !sessionPending;
+    Boolean(frontPhoto && backPhoto) &&
+    templateReady &&
+    !busy &&
+    !sessionPending;
 
   return (
     <div className="mx-auto w-full max-w-[1120px]">
       <div className="overflow-hidden rounded-[26px] border border-white/10 bg-[rgba(30,23,19,0.92)] shadow-[0_30px_90px_-30px_rgba(0,0,0,0.85)] backdrop-blur-2xl">
         <div className="grid gap-0 lg:grid-cols-[0.9fr_1.1fr]">
           <div className="flex items-center justify-center border-b border-white/8 p-4 sm:p-5 lg:border-r lg:border-b-0">
-            <div className="relative mx-auto aspect-video max-h-[420px] w-full overflow-hidden rounded-2xl border border-white/10 bg-black">
-              <video
-                src={A2O_LITE_AI_TEMPLATE_PATH}
-                poster={A2O_LITE_AI_TEMPLATE_POSTER_PATH}
-                controls
-                autoPlay
-                muted
-                loop
-                playsInline
-                preload="metadata"
-                className="size-full object-contain"
-              />
-            </div>
+            <FixedTemplatePreview
+              src={A2O_LITE_AI_TEMPLATE_PATH}
+              poster={A2O_LITE_AI_TEMPLATE_POSTER_PATH}
+              className="relative mx-auto aspect-video max-h-[420px] w-full rounded-2xl border border-white/10"
+              objectFit="contain"
+              onStatusChange={setTemplateStatus}
+            />
           </div>
 
           <div className="flex items-center justify-center p-4 sm:p-5">

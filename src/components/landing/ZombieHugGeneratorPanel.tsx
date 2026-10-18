@@ -26,9 +26,11 @@ import { ApiError, apiGet, apiPost, uploadToSignedUrl } from '@/lib/api-client';
 import { cn } from '@/lib/cn';
 import { m } from '@/paraglide/messages.js';
 import { useCreditGate } from '@/hooks/use-credit-gate';
+import type { FixedTemplateMediaStatus } from '@/hooks/use-fixed-template-media';
 import { useUserCredits } from '@/hooks/use-user-credits';
 import { InsufficientCreditsModal } from '@/components/credits/insufficient-credits-modal';
 import { ChevronDownIcon, CloseIcon, ImageModeIcon } from '@/components/icons';
+import { FixedTemplatePreview } from '@/components/landing/FixedTemplatePreview';
 import {
   Tooltip,
   TooltipContent,
@@ -252,6 +254,9 @@ export function ZombieHugGeneratorPanel() {
   const [resultAspectRatio, setResultAspectRatio] =
     useState<ZombieHugAspectRatio>(ZOMBIE_HUG_DEFAULT_ASPECT_RATIO);
   const [jobError, setJobError] = useState('');
+  const [templateStatus, setTemplateStatus] =
+    useState<FixedTemplateMediaStatus>('loading');
+  const templateReady = templateStatus === 'ready';
 
   const survivorInputRef = useRef<HTMLInputElement>(null);
   const lovedOneInputRef = useRef<HTMLInputElement>(null);
@@ -686,6 +691,10 @@ export function ZombieHugGeneratorPanel() {
       return;
     }
     if (busy) return;
+    if (!templateReady) {
+      toast.error(m['site.common.template_unavailable']());
+      return;
+    }
     if (!survivorImage || !lovedOneImage) {
       toast.error(m['site.zombie.upload_both']());
       return;
@@ -897,29 +906,25 @@ export function ZombieHugGeneratorPanel() {
   };
 
   const canGenerate =
-    Boolean(survivorImage && lovedOneImage) && !busy && !sessionPending;
+    Boolean(survivorImage && lovedOneImage) &&
+    templateReady &&
+    !busy &&
+    !sessionPending;
 
   return (
     <div className="mx-auto w-full max-w-[1120px]">
       <div className="overflow-hidden rounded-[26px] border border-white/10 bg-[rgba(22,24,28,0.94)] shadow-[0_30px_90px_-30px_rgba(0,0,0,0.85)] backdrop-blur-2xl">
         <div className="grid gap-0 lg:grid-cols-[0.9fr_1.1fr]">
           <div className="flex items-center justify-center border-b border-white/8 p-4 sm:p-5 lg:border-r lg:border-b-0">
-            <div
+            <FixedTemplatePreview
+              src={templateUrl}
               className={cn(
-                'relative mx-auto max-h-[420px] w-full overflow-hidden rounded-2xl border border-white/10 bg-black',
+                'relative mx-auto max-h-[420px] w-full rounded-2xl border border-white/10',
                 aspectRatio === '9:16' ? 'aspect-[9/16]' : 'aspect-video'
               )}
-            >
-              <video
-                key={templateUrl}
-                src={templateUrl}
-                controls
-                muted
-                playsInline
-                preload="metadata"
-                className="size-full object-contain"
-              />
-            </div>
+              objectFit="contain"
+              onStatusChange={setTemplateStatus}
+            />
           </div>
 
           <div className="p-4 sm:p-5">

@@ -1206,6 +1206,8 @@
   "site.common.generate_estimate": "生成する（約{count}クレジット）",
   "site.common.required_balance": "必要：{required} · 残高：{balance}",
   "site.common.generation_id": "生成ID：{id}",
+  "site.common.template_unavailable": "テンプレート動画を読み込めませんでした。利用可能か確認してから再試行してください。",
+  "site.common.template_retry": "テンプレートを再試行",
   "site.hotel.reference": "参照パフォーマンス動画",
   "site.hotel.reference_note": "Hotel Lobbyテンプレートが初期設定されています。長さを調整するか、削除して3～15秒の動画に変更できます。",
   "site.hotel.preset": "テンプレート",

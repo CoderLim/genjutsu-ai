@@ -12,21 +12,55 @@ async function GET({ request }: { request: Request }) {
     });
   }
 
+  const delivery = searchParams.get('delivery');
+  const proxy = delivery === 'proxy';
+
   try {
     const previewUrl = await resolveFixedTemplatePreviewUrl({
       product,
       aspect: searchParams.get('aspect'),
       subject: searchParams.get('subject'),
     });
-    return new Response(null, {
-      status: 302,
-      headers: {
-        Location: previewUrl,
-        'Cache-Control': 'private, max-age=300',
-        'X-Template-Source': 'r2',
-        'X-Template-Product': product,
-      },
-    });
+
+    if (!proxy) {
+      return new Response(null, {
+        status: 302,
+        headers: {
+          Location: previewUrl,
+          'Cache-Control': 'private, max-age=300',
+          'X-Template-Source': 'r2',
+          'X-Template-Product': product,
+          'X-Template-Delivery': 'redirect',
+        },
+      });
+    }
+
+    const upstream = await fetch(previewUrl);
+    if (!upstream.ok || !upstream.body) {
+      return new Response('Template upstream fetch failed', {
+        status: 503,
+        headers: {
+          'Cache-Control': 'no-store',
+          'X-Template-Source': 'missing',
+          'X-Template-Product': product,
+          'X-Template-Delivery': 'proxy',
+        },
+      });
+    }
+
+    const headers = new Headers();
+    headers.set(
+      'Content-Type',
+      upstream.headers.get('content-type') || 'video/mp4'
+    );
+    headers.set('Cache-Control', 'private, max-age=300');
+    const length = upstream.headers.get('content-length');
+    if (length) headers.set('Content-Length', length);
+    headers.set('X-Template-Source', 'r2');
+    headers.set('X-Template-Product', product);
+    headers.set('X-Template-Delivery', 'proxy');
+
+    return new Response(upstream.body, { status: 200, headers });
   } catch (error) {
     console.error('fixed template preview unavailable:', product, error);
     const message =

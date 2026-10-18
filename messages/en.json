@@ -1206,6 +1206,8 @@
   "site.common.generate_estimate": "Generate (~{count} credits)",
   "site.common.required_balance": "Need {required} · balance {balance}",
   "site.common.generation_id": "Generation {id}",
+  "site.common.template_unavailable": "Template video failed to load. Check that the template is available, then retry.",
+  "site.common.template_retry": "Retry template",
   "site.hotel.reference": "Reference performance",
   "site.hotel.reference_note": "The Hotel Lobby preset is loaded by default. Trim below, or remove it to use your own 3–15s motion reference.",
   "site.hotel.preset": "Preset",
