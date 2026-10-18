@@ -1067,22 +1067,67 @@ export async function ensureFlyingCarAiTemplateInR2() {
 }
 
 /**
+ * Logical R2 key for a Genjutsu product template (same key seal uses).
+ * Exhaustive over GenjutsuProductId — unknown products must not fall through
+ * to another product's template.
+ */
+export function getGenjutsuProductTemplateVideoKey(
+  product: GenjutsuProductId
+): string {
+  switch (product) {
+    case 'smalltown-boy-dance':
+      return getSmalltownBoyDanceTemplateVideoKey();
+    case 'crazy-frog':
+      return getCrazyFrogTemplateVideoKey();
+    case 'a2o-lite-ai':
+      return getA2oLiteAiTemplateVideoKey();
+    case 'enzo-fernandez-ai':
+      return getEnzoFernandezAiTemplateVideoKey();
+    case 'flying-car-ai':
+      return getFlyingCarAiTemplateVideoKey();
+    default: {
+      const _exhaustive: never = product;
+      throw new Error(
+        `Unknown Genjutsu product template: ${String(_exhaustive)}`
+      );
+    }
+  }
+}
+
+/**
+ * Ensure the R2 object for a Genjutsu product template (same key seal uses).
+ */
+export async function ensureGenjutsuProductTemplateInR2(
+  product: GenjutsuProductId
+): Promise<string> {
+  switch (product) {
+    case 'smalltown-boy-dance':
+      return ensureSmalltownBoyDanceTemplateInR2();
+    case 'crazy-frog':
+      return ensureCrazyFrogTemplateInR2();
+    case 'a2o-lite-ai':
+      return ensureA2oLiteAiTemplateInR2();
+    case 'enzo-fernandez-ai':
+      return ensureEnzoFernandezAiTemplateInR2();
+    case 'flying-car-ai':
+      return ensureFlyingCarAiTemplateInR2();
+    default: {
+      const _exhaustive: never = product;
+      throw new Error(
+        `Unknown Genjutsu product template: ${String(_exhaustive)}`
+      );
+    }
+  }
+}
+
+/**
  * Signed preview URL for a fixed-template product page — same R2 key seal uses.
  * Does not fall back to /videos/*; missing R2 fails loudly so preview matches generate.
  */
 export async function getGenjutsuProductTemplatePreviewUrl(
   product: GenjutsuProductId
 ) {
-  const key =
-    product === 'smalltown-boy-dance'
-      ? await ensureSmalltownBoyDanceTemplateInR2()
-      : product === 'crazy-frog'
-        ? await ensureCrazyFrogTemplateInR2()
-        : product === 'a2o-lite-ai'
-          ? await ensureA2oLiteAiTemplateInR2()
-          : product === 'enzo-fernandez-ai'
-            ? await ensureEnzoFernandezAiTemplateInR2()
-            : await ensureFlyingCarAiTemplateInR2();
+  const key = await ensureGenjutsuProductTemplateInR2(product);
   return createGenjutsuR2ReadUrl(key);
 }
 

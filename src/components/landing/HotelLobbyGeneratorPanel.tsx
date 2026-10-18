@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -27,6 +28,15 @@ import {
   HOTEL_LOBBY_MAX_VIDEO_EDGE_PX,
   HOTEL_LOBBY_MIN_VIDEO_EDGE_PX,
 } from '@/modules/hotel-lobby/pricing';
+import {
+  createAsyncRequestGuard,
+  deriveHotelLobbyTemplateGate,
+  hotelLobbyTemplateMediaIdentity,
+  shouldResetHotelLobbyTemplateMedia,
+  withHotelLobbyTemplateRetryParam,
+  type HotelLobbyTemplateMediaStatus,
+} from '@/modules/hotel-lobby/template-gate';
+import { hotelLobbyTemplateProxyUrl } from '@/modules/hotel-lobby/template-proxy-url';
 import { ApiError, apiGet, apiPost, uploadToSignedUrl } from '@/lib/api-client';
 import { trimVideoToFile } from '@/lib/trim-video';
 import { cn } from '@/lib/utils';
@@ -298,7 +308,6 @@ export function HotelLobbyGeneratorPanel({
 } = {}) {
   const presetId = resolvePanelPresetId(presetIdProp);
   const clientDefaults = getHotelLobbyPresetClientDefaults(presetId);
-  const previewUrl = clientDefaults.previewUrl;
   const { data: session, isPending: sessionPending } = useSession();
   const creditsQuery = useUserCredits(Boolean(session?.user));
   const creditGate = useCreditGate({
@@ -310,18 +319,23 @@ export function HotelLobbyGeneratorPanel({
   const secondImageInputRef = useRef<HTMLInputElement>(null);
   const mountedRef = useRef(true);
   const localUrlsRef = useRef<Set<string>>(new Set());
+  const templateMetaRequestGuardRef = useRef(createAsyncRequestGuard());
+  const templatePreviewUrlRef = useRef(clientDefaults.previewUrl);
 
   const previewVideoRef = useRef<HTMLVideoElement>(null);
   const resultPanelRef = useRef<HTMLDivElement>(null);
   const generationStartedAtRef = useRef<number | null>(null);
   const [video, setVideo] = useState<VideoSource | null>({
     kind: 'template',
-    url: previewUrl,
+    url: clientDefaults.previewUrl,
   });
-  // Stay false until <video> loadedmetadata — do not optimistically allow Generate.
-  const [templateAvailable, setTemplateAvailable] = useState(false);
-  /** Explicit media/R2 failure — do not treat "still loading" as unavailable. */
-  const [templateLoadError, setTemplateLoadError] = useState(false);
+  /** Independent of browser media — set only from template-meta. */
+  const [r2TemplateAvailable, setR2TemplateAvailable] = useState<
+    boolean | null
+  >(null);
+  const [templateMediaStatus, setTemplateMediaStatus] =
+    useState<HotelLobbyTemplateMediaStatus>('loading');
+  const templateMediaIdentityRef = useRef<string | null>(null);
   const [presetMeta, setPresetMeta] = useState<PresetUiMeta | null>(null);
   const [firstImage, setFirstImage] = useState<MediaItem | null>(null);
   const [secondImage, setSecondImage] = useState<MediaItem | null>(null);
@@ -346,6 +360,8 @@ export function HotelLobbyGeneratorPanel({
   const maxImages = presetMeta?.imageCount.max ?? clientDefaults.imageCount.max;
   const presetEnabled = presetMeta?.enabled ?? clientDefaults.enabled;
   const aspectRatio = presetMeta?.aspectRatio ?? clientDefaults.aspectRatio;
+  const previewUrl = presetMeta?.previewUrl ?? clientDefaults.previewUrl;
+  templatePreviewUrlRef.current = previewUrl;
   const posterUrl = presetMeta?.posterUrl ?? clientDefaults.posterUrl;
   const downloadPrefix =
     presetMeta?.downloadPrefix ?? clientDefaults.downloadPrefix;
@@ -447,8 +463,20 @@ export function HotelLobbyGeneratorPanel({
     (minImages < 2 || Boolean(secondImage)) &&
     clipDurationSeconds >= MIN_REFERENCE_VIDEO_SECONDS &&
     clipDurationSeconds <= MAX_REFERENCE_VIDEO_SECONDS;
-  const canPreview = presetEnabled && inputsReady && !busy && !sessionPending;
-  const canGenerateFull = canPreview && (allowCustomVideo || templateAvailable);
+  const { fixedTemplateReady, showTemplateError } =
+    deriveHotelLobbyTemplateGate({
+      allowCustomVideo,
+      r2Available: r2TemplateAvailable,
+      mediaStatus: templateMediaStatus,
+    });
+  // Preview and Full share the same fixed-template readiness gate.
+  const canPreview =
+    presetEnabled &&
+    inputsReady &&
+    !busy &&
+    !sessionPending &&
+    fixedTemplateReady;
+  const canGenerateFull = canPreview;
 
   useEffect(() => {
     mountedRef.current = true;
@@ -495,106 +523,131 @@ export function HotelLobbyGeneratorPanel({
     });
   }, [jobBusy, resultUrl, generationId]);
 
-  useEffect(() => {
-    let cancelled = false;
-    const defaults = getHotelLobbyPresetClientDefaults(presetId);
-    setVideo({ kind: 'template', url: defaults.previewUrl });
-    // Gate Generate on <video> loadedmetadata for fixed templates; do not
-    // optimistically enable before the browser proves the R2 preview loads.
-    setTemplateAvailable(false);
-    setTemplateLoadError(false);
-    setPresetMeta(null);
+  /**
+   * Shared template-meta + optional video reload for initial preset load and Retry.
+   * Uses a request guard so stale responses cannot overwrite newer Retry/preset work.
+   */
+  const loadTemplateMeta = useCallback(
+    (mode: 'preset' | 'retry') => {
+      const token = templateMetaRequestGuardRef.current.begin();
+      const defaults = getHotelLobbyPresetClientDefaults(presetId);
+      // Loading — do not inherit prior meta failure.
+      setR2TemplateAvailable(null);
 
-    void apiGet<{
-      durationSeconds: number | null;
-      estimatedCredits: number | null;
-      templateAvailable: boolean;
-      presetId: HotelLobbyPresetId;
-      enabled: boolean;
-      allowCustomVideo: boolean;
-      allowTrim: boolean;
-      aspectRatio: string;
-      previewUrl: string;
-      posterUrl: string;
-      downloadPrefix: string;
-      displayName: string;
-      imageCount: { min: number; max: number };
-    }>(templateMetaUrlFor(presetId))
-      .then((data) => {
-        if (cancelled) return;
-        const r2Ready = data.templateAvailable !== false;
-        const nextMeta: PresetUiMeta = {
-          presetId: isHotelLobbyPresetId(data.presetId)
-            ? data.presetId
-            : presetId,
-          enabled: data.enabled !== false,
-          templateAvailable: r2Ready,
-          allowCustomVideo:
-            typeof data.allowCustomVideo === 'boolean'
-              ? data.allowCustomVideo
-              : defaults.allowCustomVideo,
-          allowTrim:
-            typeof data.allowTrim === 'boolean'
-              ? data.allowTrim
-              : defaults.allowTrim,
-          aspectRatio: data.aspectRatio || defaults.aspectRatio,
-          previewUrl: data.previewUrl || defaults.previewUrl,
-          posterUrl: data.posterUrl || defaults.posterUrl,
-          downloadPrefix: data.downloadPrefix || defaults.downloadPrefix,
-          displayName: data.displayName || defaults.displayName,
-          imageCount: data.imageCount || defaults.imageCount,
-          estimatedCredits: data.estimatedCredits,
-        };
-        setPresetMeta(nextMeta);
-        if (!r2Ready) {
-          setTemplateAvailable(false);
-          setTemplateLoadError(true);
-        } else if (nextMeta.allowCustomVideo) {
-          // Custom-video presets may use meta duration without waiting on media.
-          setTemplateAvailable(true);
-          setTemplateLoadError(false);
-        } else {
-          // Fixed templates: re-gate until the new preview URL fires loadedmetadata.
-          setTemplateAvailable(false);
-          setTemplateLoadError(false);
-        }
-        setVideo((current) =>
-          current?.kind === 'template'
-            ? {
-                ...current,
-                url: nextMeta.previewUrl,
-                // Public fixed-template previews: prefer browser duration so a
-                // stale R2 object cannot skew the credit estimate.
-                durationSeconds: !nextMeta.allowCustomVideo
-                  ? current.durationSeconds
-                  : typeof data.durationSeconds === 'number' &&
-                      Number.isFinite(data.durationSeconds) &&
-                      data.durationSeconds > 0
-                    ? data.durationSeconds
-                    : current.durationSeconds,
-              }
-            : current
-        );
-      })
-      .catch(() => {
-        if (cancelled) return;
-        // Fail closed for fixed templates — never fall back to custom-video UX.
-        setPresetMeta({
-          ...defaults,
-          templateAvailable: false,
-          estimatedCredits: null,
+      if (mode === 'preset') {
+        setPresetMeta(null);
+        setVideo({ kind: 'template', url: defaults.previewUrl });
+      } else {
+        // Retry: bust video cache; keep uploaded photos / other inputs.
+        setVideo({
+          kind: 'template',
+          url: withHotelLobbyTemplateRetryParam(templatePreviewUrlRef.current),
         });
-        setTemplateAvailable(false);
-        setTemplateLoadError(true);
-        if (!defaults.allowCustomVideo) {
-          setVideo({ kind: 'template', url: defaults.previewUrl });
-        }
-      });
+      }
 
+      void apiGet<{
+        durationSeconds: number | null;
+        estimatedCredits: number | null;
+        templateAvailable: boolean;
+        presetId: HotelLobbyPresetId;
+        enabled: boolean;
+        allowCustomVideo: boolean;
+        allowTrim: boolean;
+        aspectRatio: string;
+        previewUrl: string;
+        posterUrl: string;
+        downloadPrefix: string;
+        displayName: string;
+        imageCount: { min: number; max: number };
+      }>(templateMetaUrlFor(presetId))
+        .then((data) => {
+          if (!templateMetaRequestGuardRef.current.isCurrent(token)) return;
+          const r2Ready = data.templateAvailable !== false;
+          const nextMeta: PresetUiMeta = {
+            presetId: isHotelLobbyPresetId(data.presetId)
+              ? data.presetId
+              : presetId,
+            enabled: data.enabled !== false,
+            templateAvailable: r2Ready,
+            allowCustomVideo:
+              typeof data.allowCustomVideo === 'boolean'
+                ? data.allowCustomVideo
+                : defaults.allowCustomVideo,
+            allowTrim:
+              typeof data.allowTrim === 'boolean'
+                ? data.allowTrim
+                : defaults.allowTrim,
+            aspectRatio: data.aspectRatio || defaults.aspectRatio,
+            previewUrl: data.previewUrl || defaults.previewUrl,
+            posterUrl: data.posterUrl || defaults.posterUrl,
+            downloadPrefix: data.downloadPrefix || defaults.downloadPrefix,
+            displayName: data.displayName || defaults.displayName,
+            imageCount: data.imageCount || defaults.imageCount,
+            estimatedCredits: data.estimatedCredits,
+          };
+          setPresetMeta(nextMeta);
+          // Never touch templateMediaStatus here — same URL must keep `ready`.
+          setR2TemplateAvailable(r2Ready);
+          setVideo((current) => {
+            if (current?.kind !== 'template') return current;
+            // Retry already set a cache-busted URL; keep it so media reloads.
+            // Preset load (or meta URL change) adopts the canonical preview URL.
+            const nextUrl =
+              mode === 'retry' ? current.url : nextMeta.previewUrl;
+            return {
+              ...current,
+              url: nextUrl,
+              durationSeconds: !nextMeta.allowCustomVideo
+                ? current.durationSeconds
+                : typeof data.durationSeconds === 'number' &&
+                    Number.isFinite(data.durationSeconds) &&
+                    data.durationSeconds > 0
+                  ? data.durationSeconds
+                  : current.durationSeconds,
+            };
+          });
+        })
+        .catch(() => {
+          if (!templateMetaRequestGuardRef.current.isCurrent(token)) return;
+          // Fail closed for fixed templates — never fall back to custom-video UX.
+          setPresetMeta({
+            ...defaults,
+            templateAvailable: false,
+            estimatedCredits: null,
+          });
+          setR2TemplateAvailable(false);
+          if (mode === 'preset' && !defaults.allowCustomVideo) {
+            setVideo({ kind: 'template', url: defaults.previewUrl });
+          }
+        });
+    },
+    [presetId]
+  );
+
+  useEffect(() => {
+    loadTemplateMeta('preset');
     return () => {
-      cancelled = true;
+      templateMetaRequestGuardRef.current.invalidate();
     };
-  }, [presetId]);
+  }, [presetId, loadTemplateMeta]);
+
+  // Reset media status only when template identity (preset + URL) changes.
+  useEffect(() => {
+    if (video?.kind !== 'template') {
+      templateMediaIdentityRef.current = null;
+      return;
+    }
+    const nextIdentity = hotelLobbyTemplateMediaIdentity(presetId, video.url);
+    if (
+      shouldResetHotelLobbyTemplateMedia({
+        previousIdentity: templateMediaIdentityRef.current,
+        nextIdentity,
+      })
+    ) {
+      templateMediaIdentityRef.current = nextIdentity;
+      setTemplateMediaStatus('loading');
+    }
+  }, [presetId, video]);
 
   useEffect(() => {
     if (video?.kind !== 'template') return;
@@ -660,7 +713,7 @@ export function HotelLobbyGeneratorPanel({
     try {
       const sourceUrl =
         video.kind === 'template'
-          ? '/api/hotel-lobby/template-file'
+          ? hotelLobbyTemplateProxyUrl(presetId)
           : video.url;
       const trimmed = await trimVideoToFile({
         sourceUrl,
@@ -680,7 +733,7 @@ export function HotelLobbyGeneratorPanel({
         localUrlsRef.current.delete(video.url);
       }
 
-      setTemplateAvailable(true);
+      setTemplateMediaStatus('ready');
       setVideo({
         kind: 'upload',
         file: trimmed,
@@ -801,15 +854,10 @@ export function HotelLobbyGeneratorPanel({
       URL.revokeObjectURL(video.url);
       localUrlsRef.current.delete(video.url);
     }
-    setTemplateAvailable(false);
-    setTemplateLoadError(false);
-    const join = previewUrl.includes('?') ? '&' : '?';
-    setVideo({
-      kind: 'template',
-      url: `${previewUrl}${join}_retry=${Date.now()}`,
-    });
+    // Re-check R2 meta + reload video. Do not clear uploaded photos.
     setResultUrl(null);
     setPhase('idle');
+    loadTemplateMeta('retry');
   };
 
   const pollUntilComplete = async (id: string) => {
@@ -864,7 +912,7 @@ export function HotelLobbyGeneratorPanel({
       toast.error(m['site.crazy.unavailable']());
       return;
     }
-    if (!isPreview && !allowCustomVideo && !templateAvailable) {
+    if (!fixedTemplateReady) {
       toast.error(m['site.crazy.unavailable']());
       return;
     }
@@ -941,9 +989,7 @@ export function HotelLobbyGeneratorPanel({
       if (!useFullTemplate) {
         const sourceUrl =
           video.kind === 'template'
-            ? video.url.startsWith('/api/')
-              ? '/api/hotel-lobby/template-file'
-              : video.url
+            ? hotelLobbyTemplateProxyUrl(presetId)
             : video.url;
 
         if (isPreview) {
@@ -1183,8 +1229,7 @@ export function HotelLobbyGeneratorPanel({
                       const seconds = event.currentTarget.duration;
                       if (!Number.isFinite(seconds) || seconds <= 0) return;
                       if (video.kind === 'template') {
-                        setTemplateAvailable(true);
-                        setTemplateLoadError(false);
+                        setTemplateMediaStatus('ready');
                         setVideo((current) =>
                           current?.kind === 'template'
                             ? { ...current, durationSeconds: seconds }
@@ -1194,14 +1239,13 @@ export function HotelLobbyGeneratorPanel({
                     }}
                     onError={() => {
                       if (video.kind !== 'template') return;
-                      setTemplateAvailable(false);
-                      setTemplateLoadError(true);
+                      setTemplateMediaStatus('error');
                       // Custom-video presets can drop a broken template slot;
                       // fixed templates keep the frame and show retry overlay.
                       if (allowCustomVideo) setVideo(null);
                     }}
                   />
-                  {video.kind === 'template' && templateLoadError ? (
+                  {video.kind === 'template' && showTemplateError ? (
                     <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/75 px-4 text-center">
                       <p className="text-sm text-white/75">
                         {m['site.common.template_unavailable']()}
@@ -1288,7 +1332,7 @@ export function HotelLobbyGeneratorPanel({
                   className="inline-flex items-center gap-1.5 text-xs font-medium text-[rgb(220,155,99)] transition hover:text-[rgb(235,174,119)] disabled:opacity-50"
                 >
                   <RotateCcw className="size-3.5" />
-                  {templateAvailable
+                  {fixedTemplateReady || allowCustomVideo
                     ? m['site.hotel.restore']()
                     : m['site.hotel.retry']()}
                 </button>
@@ -1376,7 +1420,7 @@ export function HotelLobbyGeneratorPanel({
         </div>
 
         <div className="border-t border-white/8 p-4 sm:p-5">
-          {!presetEnabled || (!allowCustomVideo && templateLoadError) ? (
+          {!presetEnabled || showTemplateError ? (
             <p className="mb-3 text-center text-xs text-white/40 sm:text-left">
               {m['site.crazy.unavailable']()}
             </p>

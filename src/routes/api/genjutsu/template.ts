@@ -35,7 +35,9 @@ async function GET({ request }: { request: Request }) {
       });
     }
 
-    const upstream = await fetch(previewUrl);
+    // Stream upstream body — do not buffer the whole video into Worker memory.
+    // Proxy mode never exposes the signed R2 URL (no Location / body URL leak).
+    const upstream = await fetch(previewUrl, { signal: request.signal });
     if (!upstream.ok || !upstream.body) {
       return new Response('Template upstream fetch failed', {
         status: 503,

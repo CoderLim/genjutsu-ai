@@ -16,6 +16,9 @@ type FixedTemplatePreviewProps = {
   videoClassName?: string;
   /** object-cover vs object-contain */
   objectFit?: 'contain' | 'cover';
+  /** Opt-in; blocked autoplay must not mark the template as failed. */
+  autoPlay?: boolean;
+  loop?: boolean;
   onStatusChange?: (status: FixedTemplateMediaStatus) => void;
 };
 
@@ -29,6 +32,8 @@ export function FixedTemplatePreview({
   className,
   videoClassName,
   objectFit = 'contain',
+  autoPlay = false,
+  loop = false,
   onStatusChange,
 }: FixedTemplatePreviewProps) {
   const media = useFixedTemplateMedia(src);
@@ -46,6 +51,8 @@ export function FixedTemplatePreview({
         controls
         muted
         playsInline
+        autoPlay={autoPlay}
+        loop={loop}
         preload="metadata"
         className={cn(
           'size-full',

@@ -959,6 +959,8 @@ export function A2oLiteAiGeneratorPanel({
               poster={A2O_LITE_AI_TEMPLATE_POSTER_PATH}
               className="relative mx-auto aspect-video max-h-[420px] w-full rounded-2xl border border-white/10"
               objectFit="contain"
+              autoPlay
+              loop
               onStatusChange={setTemplateStatus}
             />
           </div>
