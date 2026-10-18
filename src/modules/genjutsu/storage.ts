@@ -969,7 +969,7 @@ export function getEnzoFernandezAiTemplateVideoKey() {
 export function getFlyingCarAiTemplateVideoKey() {
   return (
     envConfigs.flying_car_ai_template_video_key?.trim() ||
-    'genjutsu/templates/flying-car-ai-v1.mp4'
+    'genjutsu/templates/flying-car-ai-v2.mp4'
   );
 }
 

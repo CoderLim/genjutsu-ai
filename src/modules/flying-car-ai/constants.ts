@@ -11,7 +11,7 @@ export const FLYING_CAR_AI_TEMPLATE_POSTER_PATH =
   '/videos/flying-car-ai-tpl-poster.jpg';
 
 /** ffprobe duration of public/videos/flying-car-ai-tpl.mp4 */
-export const FLYING_CAR_AI_TEMPLATE_DURATION_SECONDS = 30.000181;
+export const FLYING_CAR_AI_TEMPLATE_DURATION_SECONDS = 14.38599;
 
 /** Source is 672×848; nearest Seedance aspect. */
 export const FLYING_CAR_AI_ASPECT_RATIO: HiggsfieldSeedanceAspectRatio = '3:4';
