@@ -31,6 +31,7 @@ const NAV_LINKS = [
 ] as const;
 
 const TRENDING_LINKS = [
+  { label: 'Flying Car AI', href: '/flying-car-ai' },
   { label: 'A2O LITE AI', href: '/a2o-lite-ai' },
   { label: 'Enzo Fernandez AI', href: '/enzo-fernandez-ai' },
   { label: 'Crazy Frog AI', href: '/crazy-frog-ai' },

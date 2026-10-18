@@ -47,6 +47,10 @@ const FAQ_KEYS = [
 
 const EXPLORE_LINKS = [
   {
+    label: () => m['site.a2o.seo.more_flying_car'](),
+    href: '/flying-car-ai',
+  },
+  {
     label: () => m['site.a2o.seo.more_crazy'](),
     href: '/crazy-frog-ai',
   },

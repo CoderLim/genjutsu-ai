@@ -16,6 +16,7 @@ const STATIC_PATHS = [
   '/hotel-lobby-ai',
   '/a2o-lite-ai',
   '/enzo-fernandez-ai',
+  '/flying-car-ai',
   '/crazy-frog-ai',
   '/kairo-bad-times',
   '/smalltown-boy-dance',
@@ -35,6 +36,8 @@ const LIMITED_STATIC_PATH_LOCALES: Record<string, readonly string[]> = {
   '/text-to-image': [baseLocale],
   // Bulin 47's visible editorial content is not fully localized yet.
   '/bulin-47-ai': [baseLocale],
+  // Flying Car SEO copy is English-only for now.
+  '/flying-car-ai': [baseLocale],
 };
 
 function enabledContentLocales(values: readonly string[]): string[] {

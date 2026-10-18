@@ -15,7 +15,8 @@ export type GenjutsuProductId =
   | 'smalltown-boy-dance'
   | 'crazy-frog'
   | 'a2o-lite-ai'
-  | 'enzo-fernandez-ai';
+  | 'enzo-fernandez-ai'
+  | 'flying-car-ai';
 
 export type GenjutsuProviderTarget = {
   provider: GenjutsuProvider;

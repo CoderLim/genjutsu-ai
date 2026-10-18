@@ -222,6 +222,11 @@ export const envConfigs: Record<string, string> = {
     procEnv.ENZO_FERNANDEZ_AI_TEMPLATE_VIDEO_KEY ??
     'genjutsu/templates/enzo-fernandez-ai-v1.mp4',
 
+  // Flying Car AI (server-only). Fixed R2 template; client uploads one image.
+  flying_car_ai_template_video_key:
+    procEnv.FLYING_CAR_AI_TEMPLATE_VIDEO_KEY ??
+    'genjutsu/templates/flying-car-ai-v1.mp4',
+
   // Locale (public)
   locale: publicEnv('VITE_DEFAULT_LOCALE') ?? 'en',
 };

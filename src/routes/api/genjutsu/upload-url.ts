@@ -28,6 +28,17 @@ import {
   assertEnzoFernandezAiProviderBinding,
   EnzoFernandezAiProviderBindingError,
 } from '@/modules/enzo-fernandez-ai/provider';
+import { isAllowedFlyingCarAiPrompt } from '@/modules/flying-car-ai/assert';
+import {
+  FLYING_CAR_AI_ASPECT_RATIO,
+  FLYING_CAR_AI_MODE,
+  FLYING_CAR_AI_PRODUCT_ID,
+  FLYING_CAR_AI_RESOLUTIONS,
+} from '@/modules/flying-car-ai/constants';
+import {
+  assertFlyingCarAiProviderBinding,
+  FlyingCarAiProviderBindingError,
+} from '@/modules/flying-car-ai/provider';
 import {
   assertGenerationId,
   bindGenjutsuUploadInputs,
@@ -48,11 +59,13 @@ import {
   ensureA2oLiteAiTemplateInR2,
   ensureCrazyFrogTemplateInR2,
   ensureEnzoFernandezAiTemplateInR2,
+  ensureFlyingCarAiTemplateInR2,
   ensureSmalltownBoyDanceTemplateInR2,
   GENJUTSU_PROXY_UPLOAD_MAX_BYTES,
   getA2oLiteAiTemplateVideoKey,
   getCrazyFrogTemplateVideoKey,
   getEnzoFernandezAiTemplateVideoKey,
+  getFlyingCarAiTemplateVideoKey,
   getGenjutsuInputKey,
   getSmalltownBoyDanceTemplateVideoKey,
 } from '@/modules/genjutsu/storage';
@@ -103,15 +116,21 @@ async function POST({ request }: { request: Request }) {
     const isCrazyFrog = product === CRAZY_FROG_PRODUCT_ID;
     const isA2oLiteAi = product === A2O_LITE_AI_PRODUCT_ID;
     const isEnzoFernandezAi = product === ENZO_FERNANDEZ_AI_PRODUCT_ID;
+    const isFlyingCarAi = product === FLYING_CAR_AI_PRODUCT_ID;
+    const isSingleImageProduct = isEnzoFernandezAi || isFlyingCarAi;
     const isProductPreview =
-      (isCrazyFrog || isA2oLiteAi || isEnzoFernandezAi) &&
+      (isCrazyFrog || isA2oLiteAi || isEnzoFernandezAi || isFlyingCarAi) &&
       body.preview === true;
     // Full fixed templates: server template + image-only uploads.
     // Preview: client uploads a trimmed ≤4s clip + reference image(s).
     const isFixedTemplateProduct =
-      (isSmalltown || isCrazyFrog || isA2oLiteAi || isEnzoFernandezAi) &&
+      (isSmalltown ||
+        isCrazyFrog ||
+        isA2oLiteAi ||
+        isEnzoFernandezAi ||
+        isFlyingCarAi) &&
       !isProductPreview;
-    const fixedTemplateImageCount = isEnzoFernandezAi
+    const fixedTemplateImageCount = isSingleImageProduct
       ? FIXED_TEMPLATE_SINGLE_IMAGE_COUNT
       : FIXED_TEMPLATE_DUAL_IMAGE_COUNT;
 
@@ -149,9 +168,11 @@ async function POST({ request }: { request: Request }) {
       return respErr(
         isA2oLiteAi
           ? 'A2O Lite AI preview must use 480p'
-          : isEnzoFernandezAi
-            ? 'Enzo Fernandez AI preview must use 480p'
-            : 'Crazy Frog preview must use 480p',
+          : isFlyingCarAi
+            ? 'Flying Car AI preview must use 480p'
+            : isEnzoFernandezAi
+              ? 'Enzo Fernandez AI preview must use 480p'
+              : 'Crazy Frog preview must use 480p',
         { status: 400 }
       );
     }
@@ -194,6 +215,29 @@ async function POST({ request }: { request: Request }) {
     if (isEnzoFernandezAi && !isAllowedEnzoFernandezAiPrompt(prompt)) {
       return respErr(
         'Enzo Fernandez AI prompt does not match the fixed product prompt',
+        {
+          status: 400,
+        }
+      );
+    }
+    if (isFlyingCarAi && mode !== FLYING_CAR_AI_MODE) {
+      return respErr('Flying Car AI only supports objects-swap', {
+        status: 400,
+      });
+    }
+    if (
+      isFlyingCarAi &&
+      !FLYING_CAR_AI_RESOLUTIONS.includes(
+        resolution as (typeof FLYING_CAR_AI_RESOLUTIONS)[number]
+      )
+    ) {
+      return respErr('Flying Car AI only supports 480p and 720p', {
+        status: 400,
+      });
+    }
+    if (isFlyingCarAi && !isAllowedFlyingCarAiPrompt(prompt)) {
+      return respErr(
+        'Flying Car AI prompt does not match the fixed product prompt',
         {
           status: 400,
         }
@@ -259,7 +303,7 @@ async function POST({ request }: { request: Request }) {
             ? 'Upload exactly two reference images (lead and chaser)'
             : isA2oLiteAi
               ? 'Upload exactly two reference images'
-              : isEnzoFernandezAi
+              : isSingleImageProduct
                 ? 'Upload exactly one reference image'
                 : 'Upload exactly two reference images (front and back)',
           { status: 400 }
@@ -269,7 +313,7 @@ async function POST({ request }: { request: Request }) {
         const mime = contentType.split(';', 1)[0]?.trim().toLowerCase() || '';
         if (!mime.startsWith('image/')) {
           return respErr(
-            isEnzoFernandezAi
+            isSingleImageProduct
               ? 'Upload must be an image (JPG, PNG, WebP, or GIF)'
               : 'Both uploads must be images (JPG, PNG, WebP, or GIF)',
             { status: 400 }
@@ -284,14 +328,18 @@ async function POST({ request }: { request: Request }) {
               ? getCrazyFrogTemplateVideoKey()
               : isA2oLiteAi
                 ? getA2oLiteAiTemplateVideoKey()
-                : isEnzoFernandezAi
-                  ? getEnzoFernandezAiTemplateVideoKey()
-                  : getSmalltownBoyDanceTemplateVideoKey()
+                : isFlyingCarAi
+                  ? getFlyingCarAiTemplateVideoKey()
+                  : isEnzoFernandezAi
+                    ? getEnzoFernandezAiTemplateVideoKey()
+                    : getSmalltownBoyDanceTemplateVideoKey()
           );
         } else if (isCrazyFrog) {
           await ensureCrazyFrogTemplateInR2();
         } else if (isA2oLiteAi) {
           await ensureA2oLiteAiTemplateInR2();
+        } else if (isFlyingCarAi) {
+          await ensureFlyingCarAiTemplateInR2();
         } else if (isEnzoFernandezAi) {
           await ensureEnzoFernandezAiTemplateInR2();
         } else {
@@ -305,9 +353,11 @@ async function POST({ request }: { request: Request }) {
               ? 'Crazy Frog template is not configured in R2.'
               : isA2oLiteAi
                 ? 'A2O Lite AI template is not configured in R2.'
-                : isEnzoFernandezAi
-                  ? 'Enzo Fernandez AI template is not configured in R2.'
-                  : 'Smalltown Boy Dance template is not configured in R2.'),
+                : isFlyingCarAi
+                  ? 'Flying Car AI template is not configured in R2.'
+                  : isEnzoFernandezAi
+                    ? 'Enzo Fernandez AI template is not configured in R2.'
+                    : 'Smalltown Boy Dance template is not configured in R2.'),
           { code: 'TEMPLATE_NOT_CONFIGURED' },
           { status: 503 }
         );
@@ -356,6 +406,9 @@ async function POST({ request }: { request: Request }) {
     if (isEnzoFernandezAi && existing) {
       assertEnzoFernandezAiProviderBinding(existing.provider, existing.model);
     }
+    if (isFlyingCarAi && existing) {
+      assertFlyingCarAiProviderBinding(existing.provider, existing.model);
+    }
     const target = existing
       ? {
           provider: (existing.provider ||
@@ -374,6 +427,16 @@ async function POST({ request }: { request: Request }) {
       ...target,
     });
 
+    const productAspectRatio = isCrazyFrog
+      ? CRAZY_FROG_ASPECT_RATIO
+      : isA2oLiteAi
+        ? A2O_LITE_AI_ASPECT_RATIO
+        : isFlyingCarAi
+          ? FLYING_CAR_AI_ASPECT_RATIO
+          : isEnzoFernandezAi
+            ? ENZO_FERNANDEZ_AI_ASPECT_RATIO
+            : SMALLTOWN_ASPECT_RATIO;
+
     if (isFixedTemplateProduct) {
       await bindGenjutsuUploadInputs({
         generationId,
@@ -384,13 +447,7 @@ async function POST({ request }: { request: Request }) {
         product,
         ...target,
         useDefaultTemplate: true,
-        aspectRatio: isCrazyFrog
-          ? CRAZY_FROG_ASPECT_RATIO
-          : isA2oLiteAi
-            ? A2O_LITE_AI_ASPECT_RATIO
-            : isEnzoFernandezAi
-              ? ENZO_FERNANDEZ_AI_ASPECT_RATIO
-              : SMALLTOWN_ASPECT_RATIO,
+        aspectRatio: productAspectRatio,
         imageKeys: normalizedInputs.map((item) => item.key),
         contentTypes: normalizedInputs.map((item) => item.contentType),
         contentLengths,
@@ -408,9 +465,11 @@ async function POST({ request }: { request: Request }) {
         aspectRatio: isProductPreview
           ? isA2oLiteAi
             ? A2O_LITE_AI_ASPECT_RATIO
-            : isEnzoFernandezAi
-              ? ENZO_FERNANDEZ_AI_ASPECT_RATIO
-              : CRAZY_FROG_ASPECT_RATIO
+            : isFlyingCarAi
+              ? FLYING_CAR_AI_ASPECT_RATIO
+              : isEnzoFernandezAi
+                ? ENZO_FERNANDEZ_AI_ASPECT_RATIO
+                : CRAZY_FROG_ASPECT_RATIO
           : undefined,
         videoKey: normalizedInputs[0].key,
         imageKeys: normalizedInputs.slice(1).map((item) => item.key),
@@ -465,7 +524,8 @@ async function POST({ request }: { request: Request }) {
   } catch (error: any) {
     if (
       error instanceof A2oLiteAiProviderBindingError ||
-      error instanceof EnzoFernandezAiProviderBindingError
+      error instanceof EnzoFernandezAiProviderBindingError ||
+      error instanceof FlyingCarAiProviderBindingError
     ) {
       return respErr(error.message, { status: 400 });
     }

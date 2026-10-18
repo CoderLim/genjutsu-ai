@@ -35,6 +35,18 @@ import {
   EnzoFernandezAiProviderBindingError,
 } from '@/modules/enzo-fernandez-ai/provider';
 import {
+  assertFlyingCarAiInputs,
+  FlyingCarAiPreflightError,
+} from '@/modules/flying-car-ai/assert';
+import {
+  FLYING_CAR_AI_ASPECT_RATIO,
+  FLYING_CAR_AI_PRODUCT_ID,
+} from '@/modules/flying-car-ai/constants';
+import {
+  assertFlyingCarAiProviderBinding,
+  FlyingCarAiProviderBindingError,
+} from '@/modules/flying-car-ai/provider';
+import {
   assertGenerationId,
   claimGenjutsuSubmission,
   getGenjutsuTaskById,
@@ -307,9 +319,19 @@ async function POST({ request }: { request: Request }) {
       assertEnzoFernandezAiInputs(taskOptions);
       assertEnzoFernandezAiProviderBinding(task.provider, task.model);
     }
+    if (product === FLYING_CAR_AI_PRODUCT_ID) {
+      if (!task) {
+        throw new FlyingCarAiPreflightError(
+          'Flying Car AI generation must start from a saved attempt'
+        );
+      }
+      assertFlyingCarAiInputs(taskOptions);
+      assertFlyingCarAiProviderBinding(task.provider, task.model);
+    }
     const target =
       (product === A2O_LITE_AI_PRODUCT_ID ||
-        product === ENZO_FERNANDEZ_AI_PRODUCT_ID) &&
+        product === ENZO_FERNANDEZ_AI_PRODUCT_ID ||
+        product === FLYING_CAR_AI_PRODUCT_ID) &&
       task
         ? {
             provider: task.provider as GenjutsuProvider,
@@ -333,7 +355,9 @@ async function POST({ request }: { request: Request }) {
             ? A2O_LITE_AI_ASPECT_RATIO
             : product === ENZO_FERNANDEZ_AI_PRODUCT_ID
               ? ENZO_FERNANDEZ_AI_ASPECT_RATIO
-              : undefined;
+              : product === FLYING_CAR_AI_PRODUCT_ID
+                ? FLYING_CAR_AI_ASPECT_RATIO
+                : undefined;
 
     if (isSeedanceFamilyProvider(target.provider) && !hasStorageInput(input)) {
       throw new Error(
@@ -484,7 +508,9 @@ async function POST({ request }: { request: Request }) {
         error instanceof A2oLiteAiPreflightError ||
         error instanceof A2oLiteAiProviderBindingError ||
         error instanceof EnzoFernandezAiPreflightError ||
-        error instanceof EnzoFernandezAiProviderBindingError
+        error instanceof EnzoFernandezAiProviderBindingError ||
+        error instanceof FlyingCarAiPreflightError ||
+        error instanceof FlyingCarAiProviderBindingError
       ) {
         await refundGenjutsuGeneration({
           generationId,

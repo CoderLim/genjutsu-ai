@@ -13,6 +13,7 @@ export const SMALLTOWN_BOY_DANCE_PRODUCT = 'smalltown-boy-dance' as const;
 export const CRAZY_FROG_PRODUCT = 'crazy-frog' as const;
 export const A2O_LITE_AI_PRODUCT = 'a2o-lite-ai' as const;
 export const ENZO_FERNANDEZ_AI_PRODUCT = 'enzo-fernandez-ai' as const;
+export const FLYING_CAR_AI_PRODUCT = 'flying-car-ai' as const;
 
 /** Keep inline to avoid a cycle with seedance-higgsfield.ts → workflow. */
 const SEEDANCE_HIGGSFIELD_MODEL_ID =
@@ -27,7 +28,8 @@ export function isGenjutsuProductId(
     value === SMALLTOWN_BOY_DANCE_PRODUCT ||
     value === CRAZY_FROG_PRODUCT ||
     value === A2O_LITE_AI_PRODUCT ||
-    value === ENZO_FERNANDEZ_AI_PRODUCT
+    value === ENZO_FERNANDEZ_AI_PRODUCT ||
+    value === FLYING_CAR_AI_PRODUCT
   );
 }
 

@@ -57,6 +57,10 @@ const FAQ_KEYS = [
 
 const EXPLORE_LINKS = [
   {
+    label: () => m['site.enzo.seo.more_flying_car'](),
+    href: '/flying-car-ai',
+  },
+  {
     label: () => m['site.enzo.seo.more_crazy'](),
     href: '/crazy-frog-ai',
   },

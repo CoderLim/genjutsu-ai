@@ -17,6 +17,12 @@ import {
   ENZO_FERNANDEZ_AI_PRODUCT_ID,
   ENZO_FERNANDEZ_AI_RESOLUTIONS,
 } from '@/modules/enzo-fernandez-ai/constants';
+import { isAllowedFlyingCarAiPrompt } from '@/modules/flying-car-ai/assert';
+import {
+  FLYING_CAR_AI_MODE,
+  FLYING_CAR_AI_PRODUCT_ID,
+  FLYING_CAR_AI_RESOLUTIONS,
+} from '@/modules/flying-car-ai/constants';
 import {
   assertGenerationId,
   createGenjutsuAttempt,
@@ -126,6 +132,30 @@ async function POST({ request }: { request: Request }) {
     if (isEnzoFernandezAi && !isAllowedEnzoFernandezAiPrompt(prompt)) {
       return respErr(
         'Enzo Fernandez AI prompt does not match the fixed product prompt',
+        {
+          status: 400,
+        }
+      );
+    }
+    const isFlyingCarAi = product === FLYING_CAR_AI_PRODUCT_ID;
+    if (isFlyingCarAi && mode !== FLYING_CAR_AI_MODE) {
+      return respErr('Flying Car AI only supports objects-swap', {
+        status: 400,
+      });
+    }
+    if (
+      isFlyingCarAi &&
+      !FLYING_CAR_AI_RESOLUTIONS.includes(
+        resolution as (typeof FLYING_CAR_AI_RESOLUTIONS)[number]
+      )
+    ) {
+      return respErr('Flying Car AI only supports 480p and 720p', {
+        status: 400,
+      });
+    }
+    if (isFlyingCarAi && !isAllowedFlyingCarAiPrompt(prompt)) {
+      return respErr(
+        'Flying Car AI prompt does not match the fixed product prompt',
         {
           status: 400,
         }

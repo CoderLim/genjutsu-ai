@@ -10,6 +10,10 @@ import {
   ENZO_FERNANDEZ_AI_TEMPLATE_PATH,
   ENZO_FERNANDEZ_AI_TEMPLATE_POSTER_PATH,
 } from '@/modules/enzo-fernandez-ai/constants';
+import {
+  FLYING_CAR_AI_TEMPLATE_PATH,
+  FLYING_CAR_AI_TEMPLATE_POSTER_PATH,
+} from '@/modules/flying-car-ai/constants';
 import { buildHotelLobbyPrompt } from '@/modules/hotel-lobby/prompt';
 import {
   KAIRO_BAD_TIMES_POSTER_PATH,
@@ -88,6 +92,14 @@ export const MOTION_TEMPLATES: MotionTemplate[] = [
     sourceVideo: ENZO_FERNANDEZ_AI_TEMPLATE_PATH,
     href: '/enzo-fernandez-ai',
     aspect: 'landscape',
+  },
+  {
+    id: 'flying-car-ai',
+    titleKey: 'site.templates.flying_car_ai',
+    poster: FLYING_CAR_AI_TEMPLATE_POSTER_PATH,
+    sourceVideo: FLYING_CAR_AI_TEMPLATE_PATH,
+    href: '/flying-car-ai',
+    aspect: 'portrait',
   },
   {
     id: 'a2o-lite-ai',
