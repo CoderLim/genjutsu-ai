@@ -1,8 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 
-import { getZombieHugTemplatePreviewUrl } from '@/modules/genjutsu/storage';
+import { resolveFixedTemplatePreviewUrl } from '@/modules/templates/preview';
 import {
-  getZombieHugPublicTemplatePath,
   isZombieHugAspectRatio,
   ZOMBIE_HUG_DEFAULT_ASPECT_RATIO,
   type ZombieHugAspectRatio,
@@ -16,30 +15,36 @@ async function GET({ request }: { request: Request }) {
     : ZOMBIE_HUG_DEFAULT_ASPECT_RATIO;
 
   try {
-    const previewUrl = await getZombieHugTemplatePreviewUrl(aspectRatio);
+    const previewUrl = await resolveFixedTemplatePreviewUrl({
+      product: 'zombie-hug',
+      aspect: aspectRatio,
+    });
     return new Response(null, {
       status: 302,
       headers: {
         Location: previewUrl,
-        'Cache-Control': 'public, max-age=300',
-        'X-Zombie-Hug-Template-Source': 'r2',
+        'Cache-Control': 'private, max-age=300',
+        'X-Template-Source': 'r2',
+        'X-Template-Product': 'zombie-hug',
         'X-Zombie-Hug-Aspect-Ratio': aspectRatio,
       },
     });
   } catch (error) {
-    console.warn(
-      'zombie-hug R2 template unavailable, preview falling back to public file:',
-      error
+    console.error('zombie-hug template preview unavailable:', error);
+    return new Response(
+      error instanceof Error
+        ? error.message
+        : 'Zombie hug template is not configured in R2',
+      {
+        status: 503,
+        headers: {
+          'Cache-Control': 'no-store',
+          'X-Template-Source': 'missing',
+          'X-Template-Product': 'zombie-hug',
+          'X-Zombie-Hug-Aspect-Ratio': aspectRatio,
+        },
+      }
     );
-    return new Response(null, {
-      status: 302,
-      headers: {
-        Location: getZombieHugPublicTemplatePath(aspectRatio),
-        'Cache-Control': 'public, max-age=60',
-        'X-Zombie-Hug-Template-Source': 'public-fallback',
-        'X-Zombie-Hug-Aspect-Ratio': aspectRatio,
-      },
-    });
   }
 }
 

@@ -104,7 +104,7 @@ const PRESETS = {
     get templateVideoKey() {
       return hotelLobbyTemplateVideoKey();
     },
-    previewUrl: '/api/hotel-lobby/template',
+    previewUrl: '/api/genjutsu/template?product=hotel-lobby',
     posterUrl: '/readme/hotel-lobby.jpg',
     downloadPrefix: 'hotel-lobby',
     imageCount: { min: 1, max: 2 },
@@ -122,7 +122,8 @@ const PRESETS = {
     creditDescription: 'Reserve credits for Crazy Frog AI generation',
     templateVideoKey: CRAZY_FROG_TEMPLATE_KEY,
     localTemplatePath: 'public/videos/crazy-frog-tpl.mp4',
-    previewUrl: '/videos/crazy-frog-tpl.mp4',
+    // Legacy hotel-lobby preset only — page preview uses genjutsu crazy-frog product.
+    previewUrl: '/api/genjutsu/template?product=crazy-frog',
     posterUrl: '/videos/crazy-frog-tpl-poster.jpg',
     downloadPrefix: 'crazy-frog',
     imageCount: { min: 2, max: 2 },
@@ -142,7 +143,7 @@ const PRESETS = {
     creditDescription: 'Reserve credits for Rumpelstiltskin AI generation',
     templateVideoKey: RUMPELSTILTSKIN_TEMPLATE_KEY,
     localTemplatePath: 'public/videos/rumpelstiltskin-tpl.mp4',
-    previewUrl: '/videos/rumpelstiltskin-tpl.mp4',
+    previewUrl: '/api/genjutsu/template?product=rumpelstiltskin',
     posterUrl: '/videos/rumpelstiltskin-tpl-poster.jpg',
     downloadPrefix: 'rumpelstiltskin',
     imageCount: { min: 1, max: 1 },
@@ -160,7 +161,7 @@ const PRESETS = {
     creditDescription: 'Reserve credits for Bulin 47 AI generation',
     templateVideoKey: BULIN_47_TEMPLATE_KEY,
     localTemplatePath: 'public/videos/bulin47-tpl.mp4',
-    previewUrl: '/videos/bulin47-tpl.mp4',
+    previewUrl: '/api/genjutsu/template?product=bulin-47',
     posterUrl: '/videos/bulin47-tpl-poster.jpg',
     downloadPrefix: 'bulin-47',
     imageCount: { min: 1, max: 1 },

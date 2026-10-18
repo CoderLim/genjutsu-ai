@@ -8,6 +8,8 @@ async function GET({ request }: { request: Request }) {
   try {
     const { searchParams } = new URL(request.url);
     // Preview may load a disabled preset (Generate stays blocked elsewhere).
+    // Keep this route on hotel-lobby R2 keys — `crazy-frog` conflicts with the
+    // genjutsu product id on `/api/genjutsu/template`.
     const preset = resolveHotelLobbyPreset(searchParams.get('presetId'), {
       requireEnabled: false,
     });
@@ -16,7 +18,9 @@ async function GET({ request }: { request: Request }) {
       status: 302,
       headers: {
         Location: url,
-        'Cache-Control': 'public, max-age=300',
+        'Cache-Control': 'private, max-age=300',
+        'X-Template-Source': 'r2',
+        'X-Template-Product': preset.id,
       },
     });
   } catch (error) {
@@ -24,9 +28,11 @@ async function GET({ request }: { request: Request }) {
     const message =
       error instanceof HotelLobbyPreflightError
         ? error.message
-        : 'Hotel Lobby template is not configured';
+        : error instanceof Error
+          ? error.message
+          : 'Hotel Lobby template is not configured';
     return new Response(message, {
-      status: error instanceof HotelLobbyPreflightError ? 400 : 404,
+      status: error instanceof HotelLobbyPreflightError ? 400 : 503,
       headers: { 'Cache-Control': 'no-store' },
     });
   }

@@ -50,7 +50,10 @@ test('rumpelstiltskin preset is fixed template, one image', () => {
   assert.equal(preset.allowTrim, false);
   assert.equal(preset.keepAudio, true);
   assert.equal(preset.aspectRatio, '16:9');
-  assert.equal(preset.previewUrl, '/videos/rumpelstiltskin-tpl.mp4');
+  assert.equal(
+    preset.previewUrl,
+    '/api/genjutsu/template?product=rumpelstiltskin'
+  );
   assert.equal(preset.downloadPrefix, 'rumpelstiltskin');
   assert.match(preset.templateVideoKey, /rumpelstiltskin-v1\.mp4$/);
 });
@@ -64,7 +67,7 @@ test('bulin-47 preset is fixed template, one image, portrait', () => {
   assert.equal(preset.allowTrim, false);
   assert.equal(preset.keepAudio, true);
   assert.equal(preset.aspectRatio, '9:16');
-  assert.equal(preset.previewUrl, '/videos/bulin47-tpl.mp4');
+  assert.equal(preset.previewUrl, '/api/genjutsu/template?product=bulin-47');
   assert.equal(preset.downloadPrefix, 'bulin-47');
   assert.match(preset.templateVideoKey, /bulin-47-v1\.mp4$/);
 });
@@ -148,7 +151,7 @@ test('public meta includes UI fields', () => {
     resolveHotelLobbyPreset(BULIN_47_PRESET_ID)
   );
   assert.equal(meta.presetId, BULIN_47_PRESET_ID);
-  assert.equal(meta.previewUrl, '/videos/bulin47-tpl.mp4');
+  assert.equal(meta.previewUrl, '/api/genjutsu/template?product=bulin-47');
   assert.equal(meta.posterUrl, '/videos/bulin47-tpl-poster.jpg');
   assert.equal(meta.downloadPrefix, 'bulin-47');
   assert.equal(meta.allowCustomVideo, false);

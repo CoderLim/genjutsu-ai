@@ -23,11 +23,11 @@ import {
   SMALLTOWN_TEMPLATE_PATH,
   SMALLTOWN_TEMPLATE_POSTER_PATH,
 } from '@/modules/smalltown-boy-dance/constants';
+import { fixedTemplatePreviewPath } from '@/modules/templates/preview';
 import {
   ZOMBIE_HUG_DEFAULT_RESOLUTION,
   ZOMBIE_HUG_MODE,
   ZOMBIE_HUG_PROMPT,
-  ZOMBIE_HUG_PUBLIC_TEMPLATE_PATH_9X16,
 } from '@/modules/zombie-hug/prompt';
 
 type MotionTemplateBase = {
@@ -61,10 +61,6 @@ export function isMotionTemplateApply(
   return !('href' in template && typeof template.href === 'string');
 }
 
-/** Served from R2 via hotel-lobby API (not a static public/ file). */
-const HOTEL_LOBBY_TEMPLATE_FILE_PATH = '/api/hotel-lobby/template-file';
-const HOTEL_LOBBY_TEMPLATE_PREVIEW_PATH = '/api/hotel-lobby/template';
-
 const DEFAULT_OBJECTS_RESOLUTION = '720p' as const;
 
 /**
@@ -79,7 +75,10 @@ export const MOTION_TEMPLATES: MotionTemplate[] = [
     id: 'zombie-hug',
     titleKey: 'site.templates.zombie_hug',
     poster: '/readme/zombie-hug.jpg',
-    sourceVideo: ZOMBIE_HUG_PUBLIC_TEMPLATE_PATH_9X16,
+    sourceVideo: fixedTemplatePreviewPath({
+      product: 'zombie-hug',
+      aspect: '9:16',
+    }),
     prompt: ZOMBIE_HUG_PROMPT,
     mode: ZOMBIE_HUG_MODE,
     resolution: ZOMBIE_HUG_DEFAULT_RESOLUTION,
@@ -137,7 +136,7 @@ export const MOTION_TEMPLATES: MotionTemplate[] = [
     id: 'bulin-47',
     titleKey: 'site.templates.bulin_47',
     poster: '/videos/bulin47-tpl-poster.jpg',
-    sourceVideo: '/videos/bulin47-tpl.mp4',
+    sourceVideo: fixedTemplatePreviewPath({ product: 'bulin-47' }),
     href: '/bulin-47-ai',
     aspect: 'portrait',
   },
@@ -145,7 +144,7 @@ export const MOTION_TEMPLATES: MotionTemplate[] = [
     id: 'rumpelstiltskin',
     titleKey: 'site.templates.rumpelstiltskin',
     poster: '/videos/rumpelstiltskin-tpl-poster.jpg',
-    sourceVideo: '/videos/rumpelstiltskin-tpl.mp4',
+    sourceVideo: fixedTemplatePreviewPath({ product: 'rumpelstiltskin' }),
     href: '/ai-rumpelstiltskin',
     aspect: 'landscape',
   },
@@ -153,7 +152,7 @@ export const MOTION_TEMPLATES: MotionTemplate[] = [
     id: 'hotel-lobby',
     titleKey: 'site.templates.hotel_lobby',
     poster: '/readme/hotel-lobby.jpg',
-    sourceVideo: HOTEL_LOBBY_TEMPLATE_FILE_PATH,
+    sourceVideo: fixedTemplatePreviewPath({ product: 'hotel-lobby' }),
     prompt: buildHotelLobbyPrompt(2),
     mode: 'objects-swap',
     resolution: '720p',
@@ -284,8 +283,7 @@ UNDER NO CIRCUMSTANCES CHANGE THE CHARACTERS' IDENTITIES! THEY MUST LOOK EXACTLY
   },
 ];
 
-/** Optional preview URL when it differs from the downloadable source. */
+/** Preview URL for gallery cards — same path as source for fixed-template products. */
 export function getMotionTemplatePreviewSrc(template: MotionTemplate): string {
-  if (template.id === 'hotel-lobby') return HOTEL_LOBBY_TEMPLATE_PREVIEW_PATH;
   return template.sourceVideo;
 }

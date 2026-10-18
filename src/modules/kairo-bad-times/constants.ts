@@ -64,8 +64,9 @@ export const KAIRO_BAD_TIMES_SHORT_PREVIEW_SECONDS = 4;
 export const KAIRO_BAD_TIMES_LOCAL_PREVIEW_TEMPLATE_PATH =
   'public/videos/kairo-bad-times-tpl-preview.mp4';
 
-/** Public static preview paths (no provider branding) — human. */
-export const KAIRO_BAD_TIMES_PREVIEW_PATH = '/videos/kairo-bad-times-tpl.mp4';
+/** Page preview — same R2 master seal uses (signed via shared template API). */
+export const KAIRO_BAD_TIMES_PREVIEW_PATH =
+  '/api/genjutsu/template?product=kairo-bad-times&subject=human';
 export const KAIRO_BAD_TIMES_POSTER_PATH =
   '/videos/kairo-bad-times-tpl-poster.jpg';
 
@@ -75,7 +76,7 @@ export const KAIRO_BAD_TIMES_LOCAL_PET_TEMPLATE_PATH =
 export const KAIRO_BAD_TIMES_LOCAL_PET_PREVIEW_TEMPLATE_PATH =
   'public/videos/kairo-bad-times-tpl-pet-preview.mp4';
 export const KAIRO_BAD_TIMES_PET_PREVIEW_PATH =
-  '/videos/kairo-bad-times-tpl-pet.mp4';
+  '/api/genjutsu/template?product=kairo-bad-times&subject=pet';
 export const KAIRO_BAD_TIMES_PET_POSTER_PATH =
   '/videos/kairo-bad-times-tpl-pet-poster.jpg';
 

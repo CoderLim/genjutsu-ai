@@ -14,7 +14,6 @@ import { toast } from 'sonner';
 import { useSession } from '@/core/auth/client';
 import { estimateGenjutsuCredits } from '@/modules/genjutsu/pricing';
 import {
-  getZombieHugPublicTemplatePath,
   getZombieHugTemplateDurationSeconds,
   ZOMBIE_HUG_ASPECT_RATIOS,
   ZOMBIE_HUG_DEFAULT_ASPECT_RATIO,
@@ -80,7 +79,7 @@ type PersistedGeneration = {
 };
 
 const templateApiUrl = (aspectRatio: ZombieHugAspectRatio) =>
-  `/api/zombie-hug/template?aspect=${encodeURIComponent(aspectRatio)}`;
+  `/api/genjutsu/template?product=zombie-hug&aspect=${encodeURIComponent(aspectRatio)}`;
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
 
 const chipClass =
@@ -919,12 +918,6 @@ export function ZombieHugGeneratorPanel() {
                 playsInline
                 preload="metadata"
                 className="size-full object-contain"
-                onError={() => {
-                  const fallback = getZombieHugPublicTemplatePath(aspectRatio);
-                  if (templateUrl !== fallback) {
-                    setTemplateUrl(fallback);
-                  }
-                }}
               />
             </div>
           </div>
