@@ -29,8 +29,8 @@ export function isA2oLiteAiResolution(
 /**
  * Logical references only. `buildSeedanceWorkflowPrompt` maps
  * Reference 1/2 onto the active provider's image tokens.
- * Hair color and opening depth identify the original dancers, not the
- * replacement appearance.
+ * Opening position and white sunglasses identify the original dancers, not
+ * the replacement appearance.
  */
 export const A2O_LITE_AI_DEFAULT_PROMPT = [
   'In the original source video, identify the two dancers by their positions and distinctive visual cues in the opening shot:',
