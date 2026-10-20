@@ -46,6 +46,8 @@ function videoJsonLd() {
     thumbnailUrl: absoluteUrl(TEMPLATE_POSTER),
     uploadDate: TEMPLATE_UPLOAD_DATE,
     duration: TEMPLATE_DURATION,
+    width: 488,
+    height: 854,
   };
 }
 
@@ -63,12 +65,6 @@ function breadcrumbJsonLd(canonical: string) {
       {
         '@type': 'ListItem',
         position: 2,
-        name: 'AI Video Templates',
-        item: absoluteUrl('/'),
-      },
-      {
-        '@type': 'ListItem',
-        position: 3,
         name: 'Coldplay Kiss Cam',
         item: canonical,
       },
@@ -131,11 +127,16 @@ export const Route = createFileRoute('/coldplay-kiss-cam')({
     const locale = loaderData?.locale ?? 'en';
     const title = m['site.kisscam.page_title']({}, { locale });
     const description = m['site.kisscam.page_description']({}, { locale });
-    const { canonical, alternates } = localeLinks(PAGE_PATH, locale);
+    // English-only editorial for now — don't advertise empty locale variants.
+    const { canonical, alternates } = localeLinks(PAGE_PATH, locale, ['en']);
     return {
       meta: [
         { title },
         { name: 'description', content: description },
+        {
+          name: 'robots',
+          content: 'index,follow,max-image-preview:large',
+        },
         ...socialMeta({
           title,
           description,
