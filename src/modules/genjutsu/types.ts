@@ -16,7 +16,8 @@ export type GenjutsuProductId =
   | 'crazy-frog'
   | 'a2o-lite-ai'
   | 'enzo-fernandez-ai'
-  | 'flying-car-ai';
+  | 'flying-car-ai'
+  | 'coldplay-kiss-cam';
 
 export type GenjutsuProviderTarget = {
   provider: GenjutsuProvider;

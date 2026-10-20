@@ -12,6 +12,17 @@ import {
   A2oLiteAiProviderBindingError,
   assertA2oLiteAiProviderBinding,
 } from '@/modules/a2o-lite-ai/provider';
+import { isAllowedColdplayKissCamPrompt } from '@/modules/coldplay-kiss-cam/assert';
+import {
+  COLDPLAY_KISS_CAM_ASPECT_RATIO,
+  COLDPLAY_KISS_CAM_MODE,
+  COLDPLAY_KISS_CAM_PRODUCT_ID,
+  COLDPLAY_KISS_CAM_RESOLUTIONS,
+} from '@/modules/coldplay-kiss-cam/constants';
+import {
+  assertColdplayKissCamProviderBinding,
+  ColdplayKissCamProviderBindingError,
+} from '@/modules/coldplay-kiss-cam/provider';
 import {
   CRAZY_FROG_ASPECT_RATIO,
   CRAZY_FROG_PRODUCT_ID,
@@ -57,12 +68,14 @@ import {
   createGenjutsuProxyUploadDescriptor,
   createGenjutsuR2UploadDescriptor,
   ensureA2oLiteAiTemplateInR2,
+  ensureColdplayKissCamTemplateInR2,
   ensureCrazyFrogTemplateInR2,
   ensureEnzoFernandezAiTemplateInR2,
   ensureFlyingCarAiTemplateInR2,
   ensureSmalltownBoyDanceTemplateInR2,
   GENJUTSU_PROXY_UPLOAD_MAX_BYTES,
   getA2oLiteAiTemplateVideoKey,
+  getColdplayKissCamTemplateVideoKey,
   getCrazyFrogTemplateVideoKey,
   getEnzoFernandezAiTemplateVideoKey,
   getFlyingCarAiTemplateVideoKey,
@@ -117,9 +130,14 @@ async function POST({ request }: { request: Request }) {
     const isA2oLiteAi = product === A2O_LITE_AI_PRODUCT_ID;
     const isEnzoFernandezAi = product === ENZO_FERNANDEZ_AI_PRODUCT_ID;
     const isFlyingCarAi = product === FLYING_CAR_AI_PRODUCT_ID;
+    const isColdplayKissCam = product === COLDPLAY_KISS_CAM_PRODUCT_ID;
     const isSingleImageProduct = isEnzoFernandezAi || isFlyingCarAi;
     const isProductPreview =
-      (isCrazyFrog || isA2oLiteAi || isEnzoFernandezAi || isFlyingCarAi) &&
+      (isCrazyFrog ||
+        isA2oLiteAi ||
+        isEnzoFernandezAi ||
+        isFlyingCarAi ||
+        isColdplayKissCam) &&
       body.preview === true;
     // Full fixed templates: server template + image-only uploads.
     // Preview: client uploads a trimmed ≤4s clip + reference image(s).
@@ -128,7 +146,8 @@ async function POST({ request }: { request: Request }) {
         isCrazyFrog ||
         isA2oLiteAi ||
         isEnzoFernandezAi ||
-        isFlyingCarAi) &&
+        isFlyingCarAi ||
+        isColdplayKissCam) &&
       !isProductPreview;
     const fixedTemplateImageCount = isSingleImageProduct
       ? FIXED_TEMPLATE_SINGLE_IMAGE_COUNT
@@ -168,11 +187,13 @@ async function POST({ request }: { request: Request }) {
       return respErr(
         isA2oLiteAi
           ? 'A2O Lite AI preview must use 480p'
-          : isFlyingCarAi
-            ? 'Flying Car AI preview must use 480p'
-            : isEnzoFernandezAi
-              ? 'Enzo Fernandez AI preview must use 480p'
-              : 'Crazy Frog preview must use 480p',
+          : isColdplayKissCam
+            ? 'Coldplay Kiss Cam preview must use 480p'
+            : isFlyingCarAi
+              ? 'Flying Car AI preview must use 480p'
+              : isEnzoFernandezAi
+                ? 'Enzo Fernandez AI preview must use 480p'
+                : 'Crazy Frog preview must use 480p',
         { status: 400 }
       );
     }
@@ -243,6 +264,29 @@ async function POST({ request }: { request: Request }) {
         }
       );
     }
+    if (isColdplayKissCam && mode !== COLDPLAY_KISS_CAM_MODE) {
+      return respErr('Coldplay Kiss Cam only supports objects-swap', {
+        status: 400,
+      });
+    }
+    if (
+      isColdplayKissCam &&
+      !COLDPLAY_KISS_CAM_RESOLUTIONS.includes(
+        resolution as (typeof COLDPLAY_KISS_CAM_RESOLUTIONS)[number]
+      )
+    ) {
+      return respErr('Coldplay Kiss Cam only supports 480p and 720p', {
+        status: 400,
+      });
+    }
+    if (isColdplayKissCam && !isAllowedColdplayKissCamPrompt(prompt)) {
+      return respErr(
+        'Coldplay Kiss Cam prompt does not match the fixed product prompt',
+        {
+          status: 400,
+        }
+      );
+    }
 
     const contentTypes = Array.isArray(body.contentTypes)
       ? body.contentTypes.filter(
@@ -258,11 +302,13 @@ async function POST({ request }: { request: Request }) {
     if (isProductPreview) {
       const productLabel = isA2oLiteAi
         ? 'A2O Lite AI'
-        : isFlyingCarAi
-          ? 'Flying Car AI'
-          : isEnzoFernandezAi
-            ? 'Enzo Fernandez AI'
-            : 'Crazy Frog';
+        : isColdplayKissCam
+          ? 'Coldplay Kiss Cam'
+          : isFlyingCarAi
+            ? 'Flying Car AI'
+            : isEnzoFernandezAi
+              ? 'Enzo Fernandez AI'
+              : 'Crazy Frog';
       const previewImageCount = isSingleImageProduct ? 1 : 2;
       const previewUploadCount = previewImageCount + 1;
       if (
@@ -303,7 +349,7 @@ async function POST({ request }: { request: Request }) {
         return respErr(
           isCrazyFrog
             ? 'Upload exactly two reference images (lead and chaser)'
-            : isA2oLiteAi
+            : isA2oLiteAi || isColdplayKissCam
               ? 'Upload exactly two reference images'
               : isSingleImageProduct
                 ? 'Upload exactly one reference image'
@@ -330,16 +376,20 @@ async function POST({ request }: { request: Request }) {
               ? getCrazyFrogTemplateVideoKey()
               : isA2oLiteAi
                 ? getA2oLiteAiTemplateVideoKey()
-                : isFlyingCarAi
-                  ? getFlyingCarAiTemplateVideoKey()
-                  : isEnzoFernandezAi
-                    ? getEnzoFernandezAiTemplateVideoKey()
-                    : getSmalltownBoyDanceTemplateVideoKey()
+                : isColdplayKissCam
+                  ? getColdplayKissCamTemplateVideoKey()
+                  : isFlyingCarAi
+                    ? getFlyingCarAiTemplateVideoKey()
+                    : isEnzoFernandezAi
+                      ? getEnzoFernandezAiTemplateVideoKey()
+                      : getSmalltownBoyDanceTemplateVideoKey()
           );
         } else if (isCrazyFrog) {
           await ensureCrazyFrogTemplateInR2();
         } else if (isA2oLiteAi) {
           await ensureA2oLiteAiTemplateInR2();
+        } else if (isColdplayKissCam) {
+          await ensureColdplayKissCamTemplateInR2();
         } else if (isFlyingCarAi) {
           await ensureFlyingCarAiTemplateInR2();
         } else if (isEnzoFernandezAi) {
@@ -355,11 +405,13 @@ async function POST({ request }: { request: Request }) {
               ? 'Crazy Frog template is not configured in R2.'
               : isA2oLiteAi
                 ? 'A2O Lite AI template is not configured in R2.'
-                : isFlyingCarAi
-                  ? 'Flying Car AI template is not configured in R2.'
-                  : isEnzoFernandezAi
-                    ? 'Enzo Fernandez AI template is not configured in R2.'
-                    : 'Smalltown Boy Dance template is not configured in R2.'),
+                : isColdplayKissCam
+                  ? 'Coldplay Kiss Cam template is not configured in R2.'
+                  : isFlyingCarAi
+                    ? 'Flying Car AI template is not configured in R2.'
+                    : isEnzoFernandezAi
+                      ? 'Enzo Fernandez AI template is not configured in R2.'
+                      : 'Smalltown Boy Dance template is not configured in R2.'),
           { code: 'TEMPLATE_NOT_CONFIGURED' },
           { status: 503 }
         );
@@ -411,6 +463,9 @@ async function POST({ request }: { request: Request }) {
     if (isFlyingCarAi && existing) {
       assertFlyingCarAiProviderBinding(existing.provider, existing.model);
     }
+    if (isColdplayKissCam && existing) {
+      assertColdplayKissCamProviderBinding(existing.provider, existing.model);
+    }
     const target = existing
       ? {
           provider: (existing.provider ||
@@ -433,11 +488,13 @@ async function POST({ request }: { request: Request }) {
       ? CRAZY_FROG_ASPECT_RATIO
       : isA2oLiteAi
         ? A2O_LITE_AI_ASPECT_RATIO
-        : isFlyingCarAi
-          ? FLYING_CAR_AI_ASPECT_RATIO
-          : isEnzoFernandezAi
-            ? ENZO_FERNANDEZ_AI_ASPECT_RATIO
-            : SMALLTOWN_ASPECT_RATIO;
+        : isColdplayKissCam
+          ? COLDPLAY_KISS_CAM_ASPECT_RATIO
+          : isFlyingCarAi
+            ? FLYING_CAR_AI_ASPECT_RATIO
+            : isEnzoFernandezAi
+              ? ENZO_FERNANDEZ_AI_ASPECT_RATIO
+              : SMALLTOWN_ASPECT_RATIO;
 
     if (isFixedTemplateProduct) {
       await bindGenjutsuUploadInputs({
@@ -467,11 +524,13 @@ async function POST({ request }: { request: Request }) {
         aspectRatio: isProductPreview
           ? isA2oLiteAi
             ? A2O_LITE_AI_ASPECT_RATIO
-            : isFlyingCarAi
-              ? FLYING_CAR_AI_ASPECT_RATIO
-              : isEnzoFernandezAi
-                ? ENZO_FERNANDEZ_AI_ASPECT_RATIO
-                : CRAZY_FROG_ASPECT_RATIO
+            : isColdplayKissCam
+              ? COLDPLAY_KISS_CAM_ASPECT_RATIO
+              : isFlyingCarAi
+                ? FLYING_CAR_AI_ASPECT_RATIO
+                : isEnzoFernandezAi
+                  ? ENZO_FERNANDEZ_AI_ASPECT_RATIO
+                  : CRAZY_FROG_ASPECT_RATIO
           : undefined,
         videoKey: normalizedInputs[0].key,
         imageKeys: normalizedInputs.slice(1).map((item) => item.key),
@@ -527,7 +586,8 @@ async function POST({ request }: { request: Request }) {
     if (
       error instanceof A2oLiteAiProviderBindingError ||
       error instanceof EnzoFernandezAiProviderBindingError ||
-      error instanceof FlyingCarAiProviderBindingError
+      error instanceof FlyingCarAiProviderBindingError ||
+      error instanceof ColdplayKissCamProviderBindingError
     ) {
       return respErr(error.message, { status: 400 });
     }

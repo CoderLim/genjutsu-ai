@@ -7,6 +7,12 @@ import {
   A2O_LITE_AI_PRODUCT_ID,
   A2O_LITE_AI_RESOLUTIONS,
 } from '@/modules/a2o-lite-ai/constants';
+import { isAllowedColdplayKissCamPrompt } from '@/modules/coldplay-kiss-cam/assert';
+import {
+  COLDPLAY_KISS_CAM_MODE,
+  COLDPLAY_KISS_CAM_PRODUCT_ID,
+  COLDPLAY_KISS_CAM_RESOLUTIONS,
+} from '@/modules/coldplay-kiss-cam/constants';
 import {
   CRAZY_FROG_PRODUCT_ID,
   CRAZY_FROG_RESOLUTIONS,
@@ -156,6 +162,30 @@ async function POST({ request }: { request: Request }) {
     if (isFlyingCarAi && !isAllowedFlyingCarAiPrompt(prompt)) {
       return respErr(
         'Flying Car AI prompt does not match the fixed product prompt',
+        {
+          status: 400,
+        }
+      );
+    }
+    const isColdplayKissCam = product === COLDPLAY_KISS_CAM_PRODUCT_ID;
+    if (isColdplayKissCam && mode !== COLDPLAY_KISS_CAM_MODE) {
+      return respErr('Coldplay Kiss Cam only supports objects-swap', {
+        status: 400,
+      });
+    }
+    if (
+      isColdplayKissCam &&
+      !COLDPLAY_KISS_CAM_RESOLUTIONS.includes(
+        resolution as (typeof COLDPLAY_KISS_CAM_RESOLUTIONS)[number]
+      )
+    ) {
+      return respErr('Coldplay Kiss Cam only supports 480p and 720p', {
+        status: 400,
+      });
+    }
+    if (isColdplayKissCam && !isAllowedColdplayKissCamPrompt(prompt)) {
+      return respErr(
+        'Coldplay Kiss Cam prompt does not match the fixed product prompt',
         {
           status: 400,
         }

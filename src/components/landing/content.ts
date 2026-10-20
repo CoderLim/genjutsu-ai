@@ -643,6 +643,10 @@ export const FOOTER_COLUMNS: FooterColumn[] = [
     title: 'Tools',
     links: [
       {
+        label: 'Coldplay Kiss Cam',
+        href: '/coldplay-kiss-cam',
+      },
+      {
         label: 'Flying Car AI',
         href: '/flying-car-ai',
       },

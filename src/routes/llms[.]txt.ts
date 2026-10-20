@@ -18,6 +18,12 @@ const STATIC_PAGES: { path: string; title: string; description: string }[] = [
     description: 'One-photo Bulin 47 freestyle AI video generator',
   },
   {
+    path: '/coldplay-kiss-cam',
+    title: 'Coldplay Kiss Cam AI Video',
+    description:
+      'Two-photo stadium kiss-cam AI video generator (fixed circular overlay template)',
+  },
+  {
     path: '/a2o-lite-ai',
     title: 'A2O LITE AI Video Generator',
     description:

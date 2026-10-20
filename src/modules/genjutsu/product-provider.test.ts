@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import {
   A2O_LITE_AI_PRODUCT,
+  COLDPLAY_KISS_CAM_PRODUCT,
   CRAZY_FROG_PRODUCT,
   ENZO_FERNANDEZ_AI_PRODUCT,
   FLYING_CAR_AI_PRODUCT,
@@ -57,6 +58,15 @@ test('flying-car-ai follows the mode env router', () => {
   assert.deepEqual(target, fallback);
 });
 
+test('coldplay-kiss-cam follows the mode env router', () => {
+  const fallback = resolveGenjutsuProviderTarget('objects-swap');
+  const target = resolveProductProviderTarget(
+    COLDPLAY_KISS_CAM_PRODUCT,
+    'objects-swap'
+  );
+  assert.deepEqual(target, fallback);
+});
+
 test('unknown product falls back to mode env router', () => {
   const fallback = resolveGenjutsuProviderTarget('objects-swap');
   const viaProduct = resolveProductProviderTarget(
@@ -84,6 +94,7 @@ test('isGenjutsuProductId allowlist', () => {
   assert.equal(isGenjutsuProductId(A2O_LITE_AI_PRODUCT), true);
   assert.equal(isGenjutsuProductId(ENZO_FERNANDEZ_AI_PRODUCT), true);
   assert.equal(isGenjutsuProductId(FLYING_CAR_AI_PRODUCT), true);
+  assert.equal(isGenjutsuProductId(COLDPLAY_KISS_CAM_PRODUCT), true);
   assert.equal(isGenjutsuProductId('bulin-47'), false);
   assert.equal(isGenjutsuProductId(''), false);
 });

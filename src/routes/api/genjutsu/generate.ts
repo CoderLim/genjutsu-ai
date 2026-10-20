@@ -14,6 +14,18 @@ import {
   assertA2oLiteAiProviderBinding,
 } from '@/modules/a2o-lite-ai/provider';
 import {
+  assertColdplayKissCamInputs,
+  ColdplayKissCamPreflightError,
+} from '@/modules/coldplay-kiss-cam/assert';
+import {
+  COLDPLAY_KISS_CAM_ASPECT_RATIO,
+  COLDPLAY_KISS_CAM_PRODUCT_ID,
+} from '@/modules/coldplay-kiss-cam/constants';
+import {
+  assertColdplayKissCamProviderBinding,
+  ColdplayKissCamProviderBindingError,
+} from '@/modules/coldplay-kiss-cam/provider';
+import {
   assertCrazyFrogInputs,
   CrazyFrogPreflightError,
 } from '@/modules/crazy-frog/assert';
@@ -328,10 +340,20 @@ async function POST({ request }: { request: Request }) {
       assertFlyingCarAiInputs(taskOptions);
       assertFlyingCarAiProviderBinding(task.provider, task.model);
     }
+    if (product === COLDPLAY_KISS_CAM_PRODUCT_ID) {
+      if (!task) {
+        throw new ColdplayKissCamPreflightError(
+          'Coldplay Kiss Cam generation must start from a saved attempt'
+        );
+      }
+      assertColdplayKissCamInputs(taskOptions);
+      assertColdplayKissCamProviderBinding(task.provider, task.model);
+    }
     const target =
       (product === A2O_LITE_AI_PRODUCT_ID ||
         product === ENZO_FERNANDEZ_AI_PRODUCT_ID ||
-        product === FLYING_CAR_AI_PRODUCT_ID) &&
+        product === FLYING_CAR_AI_PRODUCT_ID ||
+        product === COLDPLAY_KISS_CAM_PRODUCT_ID) &&
       task
         ? {
             provider: task.provider as GenjutsuProvider,
@@ -357,7 +379,9 @@ async function POST({ request }: { request: Request }) {
               ? ENZO_FERNANDEZ_AI_ASPECT_RATIO
               : product === FLYING_CAR_AI_PRODUCT_ID
                 ? FLYING_CAR_AI_ASPECT_RATIO
-                : undefined;
+                : product === COLDPLAY_KISS_CAM_PRODUCT_ID
+                  ? COLDPLAY_KISS_CAM_ASPECT_RATIO
+                  : undefined;
 
     if (isSeedanceFamilyProvider(target.provider) && !hasStorageInput(input)) {
       throw new Error(
@@ -510,7 +534,9 @@ async function POST({ request }: { request: Request }) {
         error instanceof EnzoFernandezAiPreflightError ||
         error instanceof EnzoFernandezAiProviderBindingError ||
         error instanceof FlyingCarAiPreflightError ||
-        error instanceof FlyingCarAiProviderBindingError
+        error instanceof FlyingCarAiProviderBindingError ||
+        error instanceof ColdplayKissCamPreflightError ||
+        error instanceof ColdplayKissCamProviderBindingError
       ) {
         await refundGenjutsuGeneration({
           generationId,

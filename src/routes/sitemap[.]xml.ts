@@ -14,6 +14,7 @@ const STATIC_PATHS = [
   '/pricing',
   '/genjutsu-prompts',
   '/hotel-lobby-ai',
+  '/coldplay-kiss-cam',
   '/a2o-lite-ai',
   '/enzo-fernandez-ai',
   '/flying-car-ai',
@@ -38,6 +39,8 @@ const LIMITED_STATIC_PATH_LOCALES: Record<string, readonly string[]> = {
   '/bulin-47-ai': [baseLocale],
   // Flying Car SEO copy is English-only for now.
   '/flying-car-ai': [baseLocale],
+  // Coldplay Kiss Cam SEO copy is English-only for now.
+  '/coldplay-kiss-cam': [baseLocale],
 };
 
 function enabledContentLocales(values: readonly string[]): string[] {

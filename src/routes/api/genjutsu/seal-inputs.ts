@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router';
 
 import { getAuth } from '@/core/auth';
 import { A2O_LITE_AI_PRODUCT_ID } from '@/modules/a2o-lite-ai/constants';
+import { COLDPLAY_KISS_CAM_PRODUCT_ID } from '@/modules/coldplay-kiss-cam/constants';
 import { CRAZY_FROG_PRODUCT_ID } from '@/modules/crazy-frog/constants';
 import { ENZO_FERNANDEZ_AI_PRODUCT_ID } from '@/modules/enzo-fernandez-ai/constants';
 import { FLYING_CAR_AI_PRODUCT_ID } from '@/modules/flying-car-ai/constants';
@@ -22,6 +23,7 @@ import {
   findExistingSealedGenjutsuTemplateInputs,
   genjutsuR2ObjectExists,
   getA2oLiteAiTemplateVideoKey,
+  getColdplayKissCamTemplateVideoKey,
   getCrazyFrogTemplateVideoKey,
   getEnzoFernandezAiTemplateVideoKey,
   getFlyingCarAiTemplateVideoKey,
@@ -122,7 +124,9 @@ async function POST({ request }: { request: Request }) {
               ? getEnzoFernandezAiTemplateVideoKey()
               : product === FLYING_CAR_AI_PRODUCT_ID
                 ? getFlyingCarAiTemplateVideoKey()
-                : getZombieHugTemplateVideoKey(templateAspectRatio);
+                : product === COLDPLAY_KISS_CAM_PRODUCT_ID
+                  ? getColdplayKissCamTemplateVideoKey()
+                  : getZombieHugTemplateVideoKey(templateAspectRatio);
     const videoKey =
       typeof currentOptions?.videoKey === 'string'
         ? currentOptions.videoKey

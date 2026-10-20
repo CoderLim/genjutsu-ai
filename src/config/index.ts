@@ -227,6 +227,11 @@ export const envConfigs: Record<string, string> = {
     procEnv.FLYING_CAR_AI_TEMPLATE_VIDEO_KEY ??
     'genjutsu/templates/flying-car-ai-v2.mp4',
 
+  // Coldplay Kiss Cam (server-only). Fixed R2 template; client uploads two images.
+  coldplay_kiss_cam_template_video_key:
+    procEnv.COLDPLAY_KISS_CAM_TEMPLATE_VIDEO_KEY ??
+    'genjutsu/templates/coldplay-kiss-cam-v1.mp4',
+
   // Locale (public)
   locale: publicEnv('VITE_DEFAULT_LOCALE') ?? 'en',
 };

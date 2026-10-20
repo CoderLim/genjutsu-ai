@@ -3,6 +3,10 @@ import {
   A2O_LITE_AI_TEMPLATE_POSTER_PATH,
 } from '@/modules/a2o-lite-ai/constants';
 import {
+  COLDPLAY_KISS_CAM_TEMPLATE_PATH,
+  COLDPLAY_KISS_CAM_TEMPLATE_POSTER_PATH,
+} from '@/modules/coldplay-kiss-cam/constants';
+import {
   CRAZY_FROG_TEMPLATE_PATH,
   CRAZY_FROG_TEMPLATE_POSTER_PATH,
 } from '@/modules/crazy-frog/constants';
@@ -84,6 +88,14 @@ export const MOTION_TEMPLATES: MotionTemplate[] = [
     prompt: ZOMBIE_HUG_PROMPT,
     mode: ZOMBIE_HUG_MODE,
     resolution: ZOMBIE_HUG_DEFAULT_RESOLUTION,
+    aspect: 'portrait',
+  },
+  {
+    id: 'coldplay-kiss-cam',
+    titleKey: 'site.templates.coldplay_kiss_cam',
+    poster: COLDPLAY_KISS_CAM_TEMPLATE_POSTER_PATH,
+    sourceVideo: COLDPLAY_KISS_CAM_TEMPLATE_PATH,
+    href: '/coldplay-kiss-cam',
     aspect: 'portrait',
   },
   {

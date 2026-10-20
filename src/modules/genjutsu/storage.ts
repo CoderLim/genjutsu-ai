@@ -975,6 +975,13 @@ export function getFlyingCarAiTemplateVideoKey() {
   );
 }
 
+export function getColdplayKissCamTemplateVideoKey() {
+  return (
+    envConfigs.coldplay_kiss_cam_template_video_key?.trim() ||
+    'genjutsu/templates/coldplay-kiss-cam-v1.mp4'
+  );
+}
+
 async function ensureGenjutsuPublicTemplateInR2(params: {
   key: string;
   localRelative: string;
@@ -1066,6 +1073,14 @@ export async function ensureFlyingCarAiTemplateInR2() {
   });
 }
 
+export async function ensureColdplayKissCamTemplateInR2() {
+  return ensureGenjutsuPublicTemplateInR2({
+    key: getColdplayKissCamTemplateVideoKey(),
+    localRelative: 'public/videos/coldplay-kiss-cam-tpl.mp4',
+    label: 'Coldplay Kiss Cam',
+  });
+}
+
 /**
  * Logical R2 key for a Genjutsu product template (same key seal uses).
  * Exhaustive over GenjutsuProductId — unknown products must not fall through
@@ -1085,6 +1100,8 @@ export function getGenjutsuProductTemplateVideoKey(
       return getEnzoFernandezAiTemplateVideoKey();
     case 'flying-car-ai':
       return getFlyingCarAiTemplateVideoKey();
+    case 'coldplay-kiss-cam':
+      return getColdplayKissCamTemplateVideoKey();
     default: {
       const _exhaustive: never = product;
       throw new Error(
@@ -1111,6 +1128,8 @@ export async function ensureGenjutsuProductTemplateInR2(
       return ensureEnzoFernandezAiTemplateInR2();
     case 'flying-car-ai':
       return ensureFlyingCarAiTemplateInR2();
+    case 'coldplay-kiss-cam':
+      return ensureColdplayKissCamTemplateInR2();
     default: {
       const _exhaustive: never = product;
       throw new Error(
