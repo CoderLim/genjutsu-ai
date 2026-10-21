@@ -982,6 +982,13 @@ export function getColdplayKissCamTemplateVideoKey() {
   );
 }
 
+export function getGangnamStyleAiTemplateVideoKey() {
+  return (
+    envConfigs.gangnam_style_ai_template_video_key?.trim() ||
+    'genjutsu/templates/gangnam-style-ai-v1.mp4'
+  );
+}
+
 async function ensureGenjutsuPublicTemplateInR2(params: {
   key: string;
   localRelative: string;
@@ -1081,6 +1088,14 @@ export async function ensureColdplayKissCamTemplateInR2() {
   });
 }
 
+export async function ensureGangnamStyleAiTemplateInR2() {
+  return ensureGenjutsuPublicTemplateInR2({
+    key: getGangnamStyleAiTemplateVideoKey(),
+    localRelative: 'public/videos/gangnam-style-ai-tpl.mp4',
+    label: 'Gangnam Style AI',
+  });
+}
+
 /**
  * Logical R2 key for a Genjutsu product template (same key seal uses).
  * Exhaustive over GenjutsuProductId — unknown products must not fall through
@@ -1102,6 +1117,8 @@ export function getGenjutsuProductTemplateVideoKey(
       return getFlyingCarAiTemplateVideoKey();
     case 'coldplay-kiss-cam':
       return getColdplayKissCamTemplateVideoKey();
+    case 'gangnam-style-ai':
+      return getGangnamStyleAiTemplateVideoKey();
     default: {
       const _exhaustive: never = product;
       throw new Error(
@@ -1130,6 +1147,8 @@ export async function ensureGenjutsuProductTemplateInR2(
       return ensureFlyingCarAiTemplateInR2();
     case 'coldplay-kiss-cam':
       return ensureColdplayKissCamTemplateInR2();
+    case 'gangnam-style-ai':
+      return ensureGangnamStyleAiTemplateInR2();
     default: {
       const _exhaustive: never = product;
       throw new Error(

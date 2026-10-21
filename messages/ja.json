@@ -2135,5 +2135,21 @@
   "site.kisscam.seo.link_templates": "more AI video templates",
   "site.kisscam.seo.more_intro_after": " on the home page, or jump to a nearby duo page:",
   "site.kisscam.seo.related_zombie": "AI Zombie Hug",
-  "site.kisscam.seo.related_crazy": "Crazy Frog AI"
+  "site.kisscam.seo.related_crazy": "Crazy Frog AI",
+  "site.gangnam.meta_title": "Gangnam Style AI — Dance Video Maker | Genjutsu",
+  "site.gangnam.meta_description": "Upload three photos and replace the dancers in the Gangnam Style AI template. Preview in seconds, then generate the full clip.",
+  "site.gangnam.hero_badge": "Gangnam Style · dance video · 3 photos",
+  "site.gangnam.hero_title": "Gangnam Style AI",
+  "site.gangnam.hero_description": "Upload three photos to replace the left, center, and right dancers in the template video.",
+  "site.gangnam.slot_left": "Left dancer",
+  "site.gangnam.slot_left_note": "Reference 1 · white tank in the original",
+  "site.gangnam.slot_center": "Center lead",
+  "site.gangnam.slot_center_note": "Reference 2 · plaid shirt, closest to camera",
+  "site.gangnam.slot_right": "Right dancer",
+  "site.gangnam.slot_right_note": "Reference 3 · dark shirt, grey hair",
+  "site.gangnam.need_photos": "Add all three photos to generate",
+  "site.gangnam.generator_title": "Create your clip",
+  "site.gangnam.image_type": "Please upload a JPG, PNG, WebP, or GIF image",
+  "site.gangnam.image_size": "Images must be 12 MB or smaller",
+  "site.gangnam.provider_label": "Gangnam Style dance swap"
 }

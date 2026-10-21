@@ -59,6 +59,18 @@ import {
   FlyingCarAiProviderBindingError,
 } from '@/modules/flying-car-ai/provider';
 import {
+  assertGangnamStyleAiInputs,
+  GangnamStyleAiPreflightError,
+} from '@/modules/gangnam-style-ai/assert';
+import {
+  GANGNAM_STYLE_AI_ASPECT_RATIO,
+  GANGNAM_STYLE_AI_PRODUCT_ID,
+} from '@/modules/gangnam-style-ai/constants';
+import {
+  assertGangnamStyleAiProviderBinding,
+  GangnamStyleAiProviderBindingError,
+} from '@/modules/gangnam-style-ai/provider';
+import {
   assertGenerationId,
   claimGenjutsuSubmission,
   getGenjutsuTaskById,
@@ -349,11 +361,21 @@ async function POST({ request }: { request: Request }) {
       assertColdplayKissCamInputs(taskOptions);
       assertColdplayKissCamProviderBinding(task.provider, task.model);
     }
+    if (product === GANGNAM_STYLE_AI_PRODUCT_ID) {
+      if (!task) {
+        throw new GangnamStyleAiPreflightError(
+          'Gangnam Style AI generation must start from a saved attempt'
+        );
+      }
+      assertGangnamStyleAiInputs(taskOptions);
+      assertGangnamStyleAiProviderBinding(task.provider, task.model);
+    }
     const target =
       (product === A2O_LITE_AI_PRODUCT_ID ||
         product === ENZO_FERNANDEZ_AI_PRODUCT_ID ||
         product === FLYING_CAR_AI_PRODUCT_ID ||
-        product === COLDPLAY_KISS_CAM_PRODUCT_ID) &&
+        product === COLDPLAY_KISS_CAM_PRODUCT_ID ||
+        product === GANGNAM_STYLE_AI_PRODUCT_ID) &&
       task
         ? {
             provider: task.provider as GenjutsuProvider,
@@ -381,7 +403,9 @@ async function POST({ request }: { request: Request }) {
                 ? FLYING_CAR_AI_ASPECT_RATIO
                 : product === COLDPLAY_KISS_CAM_PRODUCT_ID
                   ? COLDPLAY_KISS_CAM_ASPECT_RATIO
-                  : undefined;
+                  : product === GANGNAM_STYLE_AI_PRODUCT_ID
+                    ? GANGNAM_STYLE_AI_ASPECT_RATIO
+                    : undefined;
 
     if (isSeedanceFamilyProvider(target.provider) && !hasStorageInput(input)) {
       throw new Error(
@@ -536,7 +560,9 @@ async function POST({ request }: { request: Request }) {
         error instanceof FlyingCarAiPreflightError ||
         error instanceof FlyingCarAiProviderBindingError ||
         error instanceof ColdplayKissCamPreflightError ||
-        error instanceof ColdplayKissCamProviderBindingError
+        error instanceof ColdplayKissCamProviderBindingError ||
+        error instanceof GangnamStyleAiPreflightError ||
+        error instanceof GangnamStyleAiProviderBindingError
       ) {
         await refundGenjutsuGeneration({
           generationId,

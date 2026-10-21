@@ -29,6 +29,12 @@ import {
   FLYING_CAR_AI_PRODUCT_ID,
   FLYING_CAR_AI_RESOLUTIONS,
 } from '@/modules/flying-car-ai/constants';
+import { isAllowedGangnamStyleAiPrompt } from '@/modules/gangnam-style-ai/assert';
+import {
+  GANGNAM_STYLE_AI_MODE,
+  GANGNAM_STYLE_AI_PRODUCT_ID,
+  GANGNAM_STYLE_AI_RESOLUTIONS,
+} from '@/modules/gangnam-style-ai/constants';
 import {
   assertGenerationId,
   createGenjutsuAttempt,
@@ -186,6 +192,30 @@ async function POST({ request }: { request: Request }) {
     if (isColdplayKissCam && !isAllowedColdplayKissCamPrompt(prompt)) {
       return respErr(
         'Coldplay Kiss Cam prompt does not match the fixed product prompt',
+        {
+          status: 400,
+        }
+      );
+    }
+    const isGangnamStyleAi = product === GANGNAM_STYLE_AI_PRODUCT_ID;
+    if (isGangnamStyleAi && mode !== GANGNAM_STYLE_AI_MODE) {
+      return respErr('Gangnam Style AI only supports objects-swap', {
+        status: 400,
+      });
+    }
+    if (
+      isGangnamStyleAi &&
+      !GANGNAM_STYLE_AI_RESOLUTIONS.includes(
+        resolution as (typeof GANGNAM_STYLE_AI_RESOLUTIONS)[number]
+      )
+    ) {
+      return respErr('Gangnam Style AI only supports 480p and 720p', {
+        status: 400,
+      });
+    }
+    if (isGangnamStyleAi && !isAllowedGangnamStyleAiPrompt(prompt)) {
+      return respErr(
+        'Gangnam Style AI prompt does not match the fixed product prompt',
         {
           status: 400,
         }

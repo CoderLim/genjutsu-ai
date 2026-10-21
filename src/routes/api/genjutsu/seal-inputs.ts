@@ -6,6 +6,7 @@ import { COLDPLAY_KISS_CAM_PRODUCT_ID } from '@/modules/coldplay-kiss-cam/consta
 import { CRAZY_FROG_PRODUCT_ID } from '@/modules/crazy-frog/constants';
 import { ENZO_FERNANDEZ_AI_PRODUCT_ID } from '@/modules/enzo-fernandez-ai/constants';
 import { FLYING_CAR_AI_PRODUCT_ID } from '@/modules/flying-car-ai/constants';
+import { GANGNAM_STYLE_AI_PRODUCT_ID } from '@/modules/gangnam-style-ai/constants';
 import {
   assertGenerationId,
   claimGenjutsuSeal,
@@ -27,6 +28,7 @@ import {
   getCrazyFrogTemplateVideoKey,
   getEnzoFernandezAiTemplateVideoKey,
   getFlyingCarAiTemplateVideoKey,
+  getGangnamStyleAiTemplateVideoKey,
   getGenjutsuSealedInputKey,
   getSmalltownBoyDanceTemplateVideoKey,
   getZombieHugTemplateVideoKey,
@@ -126,7 +128,9 @@ async function POST({ request }: { request: Request }) {
                 ? getFlyingCarAiTemplateVideoKey()
                 : product === COLDPLAY_KISS_CAM_PRODUCT_ID
                   ? getColdplayKissCamTemplateVideoKey()
-                  : getZombieHugTemplateVideoKey(templateAspectRatio);
+                  : product === GANGNAM_STYLE_AI_PRODUCT_ID
+                    ? getGangnamStyleAiTemplateVideoKey()
+                    : getZombieHugTemplateVideoKey(templateAspectRatio);
     const videoKey =
       typeof currentOptions?.videoKey === 'string'
         ? currentOptions.videoKey

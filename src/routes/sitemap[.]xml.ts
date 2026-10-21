@@ -15,6 +15,7 @@ const STATIC_PATHS = [
   '/genjutsu-prompts',
   '/hotel-lobby-ai',
   '/coldplay-kiss-cam',
+  '/gangnam-style-ai',
   '/a2o-lite-ai',
   '/enzo-fernandez-ai',
   '/flying-car-ai',
@@ -41,6 +42,8 @@ const LIMITED_STATIC_PATH_LOCALES: Record<string, readonly string[]> = {
   '/flying-car-ai': [baseLocale],
   // Coldplay Kiss Cam SEO copy is English-only for now.
   '/coldplay-kiss-cam': [baseLocale],
+  // Gangnam Style AI SEO shell is English-only for now.
+  '/gangnam-style-ai': [baseLocale],
 };
 
 function enabledContentLocales(values: readonly string[]): string[] {

@@ -232,6 +232,11 @@ export const envConfigs: Record<string, string> = {
     procEnv.COLDPLAY_KISS_CAM_TEMPLATE_VIDEO_KEY ??
     'genjutsu/templates/coldplay-kiss-cam-v1.mp4',
 
+  // Gangnam Style AI (server-only). Fixed R2 template; client uploads three images.
+  gangnam_style_ai_template_video_key:
+    procEnv.GANGNAM_STYLE_AI_TEMPLATE_VIDEO_KEY ??
+    'genjutsu/templates/gangnam-style-ai-v1.mp4',
+
   // Locale (public)
   locale: publicEnv('VITE_DEFAULT_LOCALE') ?? 'en',
 };

@@ -15,6 +15,7 @@ export const A2O_LITE_AI_PRODUCT = 'a2o-lite-ai' as const;
 export const ENZO_FERNANDEZ_AI_PRODUCT = 'enzo-fernandez-ai' as const;
 export const FLYING_CAR_AI_PRODUCT = 'flying-car-ai' as const;
 export const COLDPLAY_KISS_CAM_PRODUCT = 'coldplay-kiss-cam' as const;
+export const GANGNAM_STYLE_AI_PRODUCT = 'gangnam-style-ai' as const;
 
 /** Keep inline to avoid a cycle with seedance-higgsfield.ts → workflow. */
 const SEEDANCE_HIGGSFIELD_MODEL_ID =
@@ -31,7 +32,8 @@ export function isGenjutsuProductId(
     value === A2O_LITE_AI_PRODUCT ||
     value === ENZO_FERNANDEZ_AI_PRODUCT ||
     value === FLYING_CAR_AI_PRODUCT ||
-    value === COLDPLAY_KISS_CAM_PRODUCT
+    value === COLDPLAY_KISS_CAM_PRODUCT ||
+    value === GANGNAM_STYLE_AI_PRODUCT
   );
 }
 

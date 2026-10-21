@@ -7,6 +7,7 @@ import {
   CRAZY_FROG_PRODUCT,
   ENZO_FERNANDEZ_AI_PRODUCT,
   FLYING_CAR_AI_PRODUCT,
+  GANGNAM_STYLE_AI_PRODUCT,
   isGenjutsuProductId,
   resolveGenjutsuProviderTarget,
   resolveProductProviderTarget,
@@ -67,6 +68,15 @@ test('coldplay-kiss-cam follows the mode env router', () => {
   assert.deepEqual(target, fallback);
 });
 
+test('gangnam-style-ai follows the mode env router', () => {
+  const fallback = resolveGenjutsuProviderTarget('objects-swap');
+  const target = resolveProductProviderTarget(
+    GANGNAM_STYLE_AI_PRODUCT,
+    'objects-swap'
+  );
+  assert.deepEqual(target, fallback);
+});
+
 test('unknown product falls back to mode env router', () => {
   const fallback = resolveGenjutsuProviderTarget('objects-swap');
   const viaProduct = resolveProductProviderTarget(
@@ -95,6 +105,7 @@ test('isGenjutsuProductId allowlist', () => {
   assert.equal(isGenjutsuProductId(ENZO_FERNANDEZ_AI_PRODUCT), true);
   assert.equal(isGenjutsuProductId(FLYING_CAR_AI_PRODUCT), true);
   assert.equal(isGenjutsuProductId(COLDPLAY_KISS_CAM_PRODUCT), true);
+  assert.equal(isGenjutsuProductId(GANGNAM_STYLE_AI_PRODUCT), true);
   assert.equal(isGenjutsuProductId('bulin-47'), false);
   assert.equal(isGenjutsuProductId(''), false);
 });

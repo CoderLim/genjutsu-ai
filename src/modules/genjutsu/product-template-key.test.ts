@@ -9,6 +9,7 @@ import {
   CRAZY_FROG_PRODUCT,
   ENZO_FERNANDEZ_AI_PRODUCT,
   FLYING_CAR_AI_PRODUCT,
+  GANGNAM_STYLE_AI_PRODUCT,
   SMALLTOWN_BOY_DANCE_PRODUCT,
 } from './workflow';
 
@@ -19,6 +20,7 @@ const ALL_PRODUCTS: GenjutsuProductId[] = [
   ENZO_FERNANDEZ_AI_PRODUCT,
   FLYING_CAR_AI_PRODUCT,
   COLDPLAY_KISS_CAM_PRODUCT,
+  GANGNAM_STYLE_AI_PRODUCT,
 ];
 
 test('each Genjutsu product maps to a distinct template key', () => {
@@ -64,5 +66,9 @@ test('product id is reflected in its default template key path', () => {
   assert.match(
     getGenjutsuProductTemplateVideoKey(COLDPLAY_KISS_CAM_PRODUCT),
     /coldplay-kiss-cam/
+  );
+  assert.match(
+    getGenjutsuProductTemplateVideoKey(GANGNAM_STYLE_AI_PRODUCT),
+    /gangnam-style-ai/
   );
 });
