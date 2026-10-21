@@ -1265,7 +1265,7 @@ export function GangnamStyleAiGeneratorPanel({
                 controls
                 autoPlay
                 playsInline
-                className="mx-auto aspect-[9/16] max-h-[720px] w-full max-w-md rounded-2xl bg-black object-contain"
+                className="mx-auto aspect-video max-h-[720px] w-full max-w-full rounded-2xl bg-black object-contain"
               />
             </div>
           ) : null}
