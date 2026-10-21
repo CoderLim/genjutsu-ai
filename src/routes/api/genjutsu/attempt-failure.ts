@@ -138,8 +138,28 @@ async function POST({ request }: { request: Request }) {
     }
 
     const binding = getGenjutsuUploadBinding(task);
-    const storageKey =
-      fileIndex === 0 ? binding?.videoKey : binding?.imageKeys?.[fileIndex - 1];
+    // Fixed-template products: clients only upload images at storage indices 1..N
+    // (contentTypes/lengths are image-only, 0-based). Preview/homepage: index 0 =
+    // video, 1+ = images (contentTypes aligned with storage index).
+    const useDefaultTemplate = binding?.useDefaultTemplate === true;
+    let storageKey: string | undefined;
+    let expectedContentType: string | undefined;
+    let expectedContentLength: number | undefined;
+    if (useDefaultTemplate) {
+      if (fileIndex >= 1) {
+        const imageIndex = fileIndex - 1;
+        storageKey = binding?.imageKeys?.[imageIndex];
+        expectedContentType = binding?.contentTypes?.[imageIndex];
+        expectedContentLength = binding?.contentLengths?.[imageIndex];
+      }
+    } else {
+      storageKey =
+        fileIndex === 0
+          ? binding?.videoKey
+          : binding?.imageKeys?.[fileIndex - 1];
+      expectedContentType = binding?.contentTypes?.[fileIndex];
+      expectedContentLength = binding?.contentLengths?.[fileIndex];
+    }
 
     let inspection = {
       exists: null as boolean | null,
@@ -158,8 +178,8 @@ async function POST({ request }: { request: Request }) {
           generationId,
           fileIndex,
           storageKey,
-          expectedContentType: binding.contentTypes[fileIndex],
-          expectedContentLength: binding.contentLengths[fileIndex],
+          expectedContentType,
+          expectedContentLength,
         });
       } catch (inspectError) {
         console.error('genjutsu attempt-failure inspect failed:', inspectError);

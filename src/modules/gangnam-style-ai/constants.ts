@@ -9,6 +9,13 @@ export const GANGNAM_STYLE_AI_MODE: GenjutsuMode = 'objects-swap';
 export const GANGNAM_STYLE_AI_TEMPLATE_PATH = `/api/genjutsu/template?product=${GANGNAM_STYLE_AI_PRODUCT_ID}`;
 export const GANGNAM_STYLE_AI_TEMPLATE_POSTER_PATH =
   '/videos/gangnam-style-ai-tpl-poster.jpg';
+/**
+ * Pre-trimmed 4s @480p-friendly clip for paid Preview uploads.
+ * Avoids client ffmpeg.wasm re-encode of the full ~19s / 1276×718 template
+ * (libx264 in-browser often fails on this asset).
+ */
+export const GANGNAM_STYLE_AI_PREVIEW_CLIP_PATH =
+  '/videos/gangnam-style-ai-preview-4s.mp4';
 
 /** ffprobe duration of public/videos/gangnam-style-ai-tpl.mp4 */
 export const GANGNAM_STYLE_AI_TEMPLATE_DURATION_SECONDS = 19.176825;

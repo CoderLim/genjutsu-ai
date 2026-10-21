@@ -1238,6 +1238,8 @@ export async function sealGenjutsuTemplateR2Inputs(params: {
   const a2oLiteAiKey = getA2oLiteAiTemplateVideoKey();
   const enzoFernandezAiKey = getEnzoFernandezAiTemplateVideoKey();
   const flyingCarAiKey = getFlyingCarAiTemplateVideoKey();
+  const coldplayKissCamKey = getColdplayKissCamTemplateVideoKey();
+  const gangnamStyleAiKey = getGangnamStyleAiTemplateVideoKey();
   const templateVideoKey =
     params.templateVideoKey === landscapeKey
       ? await ensureZombieHugTemplateInR2('16:9')
@@ -1253,7 +1255,11 @@ export async function sealGenjutsuTemplateR2Inputs(params: {
                 ? await ensureEnzoFernandezAiTemplateInR2()
                 : params.templateVideoKey === flyingCarAiKey
                   ? await ensureFlyingCarAiTemplateInR2()
-                  : params.templateVideoKey;
+                  : params.templateVideoKey === coldplayKissCamKey
+                    ? await ensureColdplayKissCamTemplateInR2()
+                    : params.templateVideoKey === gangnamStyleAiKey
+                      ? await ensureGangnamStyleAiTemplateInR2()
+                      : params.templateVideoKey;
 
   assertSafeObjectKey(templateVideoKey);
   if (!templateVideoKey.startsWith('genjutsu/')) {

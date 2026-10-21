@@ -644,12 +644,12 @@ async function POST({ request }: { request: Request }) {
     }
 
     return respData({
-      uploads: isFixedTemplateProduct
-        ? uploads.map((upload, fileIndex) => ({
-            ...upload,
-            index: fileIndex + 1,
-          }))
-        : uploads,
+      // Fixed-template full runs: storage indices are 1..N (0 reserved for
+      // server template). Preview / homepage: 0 = video, 1+ = images.
+      uploads: uploads.map((upload, fileIndex) => ({
+        ...upload,
+        index: isFixedTemplateProduct ? fileIndex + 1 : fileIndex,
+      })),
     });
   } catch (error: any) {
     if (

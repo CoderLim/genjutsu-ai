@@ -17,6 +17,7 @@ import {
   GANGNAM_STYLE_AI_DEFAULT_PROMPT,
   GANGNAM_STYLE_AI_DEFAULT_RESOLUTION,
   GANGNAM_STYLE_AI_MODE,
+  GANGNAM_STYLE_AI_PREVIEW_CLIP_PATH,
   GANGNAM_STYLE_AI_PRODUCT_ID,
   GANGNAM_STYLE_AI_RESOLUTIONS,
   GANGNAM_STYLE_AI_TEMPLATE_DURATION_SECONDS,
@@ -34,7 +35,6 @@ import {
   uploadToSignedUrl,
 } from '@/lib/api-client';
 import { cn } from '@/lib/cn';
-import { trimVideoToFile } from '@/lib/trim-video';
 import {
   collectUploadDiagnostics,
   type UploadClientDiagnostics,
@@ -184,10 +184,28 @@ function FloatingPanel({ children }: { children: ReactNode }) {
 }
 
 const activeGenerationKey = (userId: string) =>
-  `coldplay_kiss_cam_active_generation:${userId}`;
+  `gangnam_style_ai_active_generation:${userId}`;
 
 const sleep = (ms: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+/** Fetch the pre-baked 4s Preview clip (no client ffmpeg). */
+async function loadGangnamPreviewClipFile(): Promise<File> {
+  const response = await fetch(GANGNAM_STYLE_AI_PREVIEW_CLIP_PATH, {
+    cache: 'force-cache',
+  });
+  if (!response.ok) {
+    throw new Error(`Preview clip HTTP ${response.status}`);
+  }
+  const blob = await response.blob();
+  if (blob.size <= 0) {
+    throw new Error('Preview clip was empty');
+  }
+  return new File([blob], 'gangnam-style-ai-preview.mp4', {
+    type: blob.type || 'video/mp4',
+    lastModified: Date.now(),
+  });
+}
 
 function createMediaItem(file: File): MediaItem {
   return {
@@ -769,26 +787,15 @@ export function GangnamStyleAiGeneratorPanel({
     const prompt = GANGNAM_STYLE_AI_DEFAULT_PROMPT;
 
     try {
-      await apiPost('/api/genjutsu/attempt', {
-        generationId: id,
-        mode: GANGNAM_STYLE_AI_MODE,
-        resolution: targetResolution,
-        prompt,
-        product: GANGNAM_STYLE_AI_PRODUCT_ID,
-      });
-
+      // Preview uses a pre-baked 4s clip (full template is too heavy for
+      // browser ffmpeg.wasm). Prepare media before attempt so failures do
+      // not leave an orphan initiated task.
       let media: File[];
       if (isPreview) {
         let clipFile: File;
         let durationSeconds: number;
         try {
-          clipFile = await trimVideoToFile({
-            sourceUrl: GANGNAM_STYLE_AI_TEMPLATE_PATH,
-            startSeconds: 0,
-            endSeconds: PREVIEW_DURATION_SECONDS,
-            fileName: 'gangnam-style-ai-preview.mp4',
-            accurate: true,
-          });
+          clipFile = await loadGangnamPreviewClipFile();
           durationSeconds = await readLocalVideoDurationSeconds(clipFile);
         } catch (cause) {
           console.error('Gangnam Style AI preview preparation failed:', cause);
@@ -805,6 +812,15 @@ export function GangnamStyleAiGeneratorPanel({
         // Server seals the fixed R2 template; client only uploads three photos.
         media = [leftPhoto.file, centerPhoto.file, rightPhoto.file];
       }
+
+      await apiPost('/api/genjutsu/attempt', {
+        generationId: id,
+        mode: GANGNAM_STYLE_AI_MODE,
+        resolution: targetResolution,
+        prompt,
+        product: GANGNAM_STYLE_AI_PRODUCT_ID,
+      });
+
       const contentTypes = media.map(
         (file, index) =>
           file.type || (isPreview && index === 0 ? 'video/mp4' : 'image/jpeg')
@@ -836,6 +852,10 @@ export function GangnamStyleAiGeneratorPanel({
       for (let index = 0; index < sortedUploads.length; index += 1) {
         const upload = sortedUploads[index];
         if (!upload) throw new Error(m['site.generator.upload_url_missing']());
+        // Server storage index (fixed-template images are 1..N, not 0..N-1).
+        const storageIndex = Number.isInteger(upload.index)
+          ? upload.index
+          : index;
         try {
           const uploaded = await uploadToSignedUrl({
             url: upload.uploadUrl,
@@ -845,7 +865,7 @@ export function GangnamStyleAiGeneratorPanel({
           if (uploaded.attemptCount > 1) {
             await reportUploadRetrySucceeded({
               generationId: id,
-              fileIndex: index,
+              fileIndex: storageIndex,
               attemptCount: uploaded.attemptCount,
               uploadElapsedMs: uploaded.uploadElapsedMs,
             }).catch(() => undefined);
@@ -853,7 +873,7 @@ export function GangnamStyleAiGeneratorPanel({
         } catch (cause) {
           const report = await reportUploadFailure({
             generationId: id,
-            fileIndex: index,
+            fileIndex: storageIndex,
             cause,
           }).catch(() => null);
           if (report?.recovered) continue;

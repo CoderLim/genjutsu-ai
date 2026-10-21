@@ -69,7 +69,7 @@ export async function trimVideoToFile(params: {
     return data;
   };
 
-  const reencode = () =>
+  const reencode = (videoCodec: 'libx264' | 'mpeg4') =>
     run([
       '-i',
       inputName,
@@ -78,13 +78,29 @@ export async function trimVideoToFile(params: {
       '-t',
       duration.toFixed(3),
       '-c:v',
-      'libx264',
-      '-preset',
-      'veryfast',
-      '-crf',
-      '23',
+      videoCodec,
+      ...(videoCodec === 'libx264'
+        ? ['-preset', 'veryfast', '-crf', '23']
+        : ['-q:v', '5']),
       '-c:a',
       'aac',
+      '-movflags',
+      '+faststart',
+      outputName,
+    ]);
+
+  const streamCopy = () =>
+    run([
+      '-i',
+      inputName,
+      '-ss',
+      start.toFixed(3),
+      '-t',
+      duration.toFixed(3),
+      '-c',
+      'copy',
+      '-avoid_negative_ts',
+      'make_zero',
       '-movflags',
       '+faststart',
       outputName,
@@ -93,27 +109,26 @@ export async function trimVideoToFile(params: {
   let data: Uint8Array;
   try {
     if (params.accurate) {
-      data = await reencode();
+      try {
+        data = await reencode('libx264');
+      } catch {
+        // Some @ffmpeg/core builds / large sources fail libx264 in-browser.
+        try {
+          data = await reencode('mpeg4');
+        } catch {
+          data = await streamCopy();
+        }
+      }
     } else {
       try {
         // Prefer fast stream-copy for existing callers that do not need exact timing.
-        data = await run([
-          '-i',
-          inputName,
-          '-ss',
-          start.toFixed(3),
-          '-t',
-          duration.toFixed(3),
-          '-c',
-          'copy',
-          '-avoid_negative_ts',
-          'make_zero',
-          '-movflags',
-          '+faststart',
-          outputName,
-        ]);
+        data = await streamCopy();
       } catch {
-        data = await reencode();
+        try {
+          data = await reencode('libx264');
+        } catch {
+          data = await reencode('mpeg4');
+        }
       }
     }
   } finally {
