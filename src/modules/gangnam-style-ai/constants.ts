@@ -6,7 +6,14 @@ export const GANGNAM_STYLE_AI_PRODUCT_ID = GANGNAM_STYLE_AI_PRODUCT;
 
 export const GANGNAM_STYLE_AI_MODE: GenjutsuMode = 'objects-swap';
 
+/** R2-backed URL used by seal/generate (and optional diagnostics). */
 export const GANGNAM_STYLE_AI_TEMPLATE_PATH = `/api/genjutsu/template?product=${GANGNAM_STYLE_AI_PRODUCT_ID}`;
+/**
+ * Same-origin page demo — do not gate Generate on the R2 redirect player.
+ * Seal/generate still use the R2 key via /api/genjutsu/*.
+ */
+export const GANGNAM_STYLE_AI_TEMPLATE_DISPLAY_PATH =
+  '/videos/gangnam-style-ai-tpl.mp4';
 export const GANGNAM_STYLE_AI_TEMPLATE_POSTER_PATH =
   '/videos/gangnam-style-ai-tpl-poster.jpg';
 /**

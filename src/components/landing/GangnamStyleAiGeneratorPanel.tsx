@@ -20,8 +20,8 @@ import {
   GANGNAM_STYLE_AI_PREVIEW_CLIP_PATH,
   GANGNAM_STYLE_AI_PRODUCT_ID,
   GANGNAM_STYLE_AI_RESOLUTIONS,
+  GANGNAM_STYLE_AI_TEMPLATE_DISPLAY_PATH,
   GANGNAM_STYLE_AI_TEMPLATE_DURATION_SECONDS,
-  GANGNAM_STYLE_AI_TEMPLATE_PATH,
   GANGNAM_STYLE_AI_TEMPLATE_POSTER_PATH,
   type GangnamStyleAiResolution,
 } from '@/modules/gangnam-style-ai/constants';
@@ -41,7 +41,6 @@ import {
 } from '@/lib/upload-diagnostics';
 import { m } from '@/paraglide/messages.js';
 import { useCreditGate } from '@/hooks/use-credit-gate';
-import type { FixedTemplateMediaStatus } from '@/hooks/use-fixed-template-media';
 import { useUserCredits } from '@/hooks/use-user-credits';
 import { InsufficientCreditsModal } from '@/components/credits/insufficient-credits-modal';
 import { ChevronDownIcon, CloseIcon, ImageModeIcon } from '@/components/icons';
@@ -434,13 +433,10 @@ export function GangnamStyleAiGeneratorPanel({
   const [resultKind, setResultKind] = useState<'preview' | 'full' | null>(null);
   const [jobError, setJobError] = useState('');
   const [progressPercent, setProgressPercent] = useState(0);
-  const [templateStatus, setTemplateStatus] =
-    useState<FixedTemplateMediaStatus>('loading');
   const creditGate = useCreditGate({
     balance: creditsQuery.data?.balance,
     email: session?.user?.email,
   });
-  const templateReady = templateStatus === 'ready';
 
   const leftInputRef = useRef<HTMLInputElement>(null);
   const centerInputRef = useRef<HTMLInputElement>(null);
@@ -758,10 +754,6 @@ export function GangnamStyleAiGeneratorPanel({
       return;
     }
     if (busy) return;
-    if (!templateReady) {
-      toast.error(m['site.common.template_unavailable']());
-      return;
-    }
     if (!leftPhoto || !centerPhoto || !rightPhoto) {
       toast.error(m['site.gangnam.need_photos']());
       return;
@@ -985,10 +977,7 @@ export function GangnamStyleAiGeneratorPanel({
   };
 
   const canGenerate =
-    Boolean(leftPhoto && centerPhoto && rightPhoto) &&
-    templateReady &&
-    !busy &&
-    !sessionPending;
+    Boolean(leftPhoto && centerPhoto && rightPhoto) && !busy && !sessionPending;
 
   return (
     <div className="mx-auto w-full max-w-[1120px]">
@@ -996,13 +985,12 @@ export function GangnamStyleAiGeneratorPanel({
         <div className="grid gap-0 lg:grid-cols-[0.9fr_1.1fr]">
           <div className="flex items-center justify-center border-b border-white/8 p-4 sm:p-5 lg:border-r lg:border-b-0">
             <FixedTemplatePreview
-              src={GANGNAM_STYLE_AI_TEMPLATE_PATH}
+              src={GANGNAM_STYLE_AI_TEMPLATE_DISPLAY_PATH}
               poster={GANGNAM_STYLE_AI_TEMPLATE_POSTER_PATH}
               className="relative mx-auto aspect-[16/9] max-h-[420px] w-full rounded-2xl border border-white/10"
               objectFit="contain"
               autoPlay
               loop
-              onStatusChange={setTemplateStatus}
             />
           </div>
 
