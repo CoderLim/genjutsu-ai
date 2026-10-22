@@ -179,7 +179,8 @@ test('provider prompt carries both mappings once inside the shared object-swap r
     /Replace the pursuing rider wearing a red cap and dark jacket on the orange motorcycle with @Image 2/
   );
   assert.match(prompt, /same pursuing rider assigned to @Image 2/);
-  assert.equal(prompt.split('complete visible appearance').length - 1, 1);
+  assert.equal(prompt.split('complete reference appearance').length - 1, 1);
+  assert.match(prompt, /REFERENCE IDENTITY:/);
   assert.doesNotMatch(prompt, /Apply every @Image N/);
   assert.doesNotMatch(prompt, /face, hair, body, clothing/);
 });

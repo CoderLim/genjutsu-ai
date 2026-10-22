@@ -249,21 +249,27 @@ function referenceMappingLine(references: string[]) {
   return `Reference labels map to provider images as follows: ${referenceMappings(references)}.`;
 }
 
-function buildReferenceRules(input: {
-  video: string;
-  references: string[];
-  imageCount: number;
-}) {
-  if (input.imageCount <= 1) {
-    return [referenceMappingLine(input.references)];
-  }
+/**
+ * Shared identity rules for both Object Swap and Motion Transfer.
+ * Full-subject identity applies only when a reference defines the whole
+ * person/character/animal; partial edits must not rewrite unrelated identities.
+ * Defined once — do not duplicate per mode.
+ */
+export const SEEDANCE_REFERENCE_IDENTITY_RULES = [
+  'REFERENCE IDENTITY:',
+  "When a reference defines an entire person, character, or animal, use it as the authoritative identity: preserve facial features, hairstyle, age, body proportions, clothing, and other identity traits. Do not retain or blend the source performer's identity; adapt motion to the reference proportions; keep identity consistent across frames, cuts, and occlusions. For partial edits (clothing, props, objects, background, style), change only those elements and preserve unrelated identities. Respect explicit reference-to-target mappings; multiple references may be different subjects or multiple views of one subject.",
+].join('\n');
 
+const OBJECT_SWAP_RULES = [
+  'OBJECT SWAP:',
+  'Replace only specified targets with assigned references. Full-subject replacements (person, character, animal, or object) must use the complete reference appearance, not selected features; apply consistently across angles, close-ups, cuts, occlusions, and reappearances. A subject assigned to a reference is a replacement target. Preserve non-targets, motion, camera, timing, framing, and composition; integrate with original perspective, scale, lighting, and motion.',
+].join('\n');
+
+function motionTransferRules(video: string) {
   return [
-    referenceMappingLine(input.references),
-    'The reference images may represent different elements, different roles, or multiple views of the same element.',
-    `Use the user instruction to determine how each reference should be used in relation to ${input.video}.`,
-    'Do not blend, merge, or transfer visual traits between unrelated references unless the user explicitly asks for that.',
-  ];
+    'MOTION TRANSFER:',
+    `Use ${video} for motion, choreography, poses, camera, framing, timing, and shot progression. When a reference defines the performer, animate that reference subject rather than retaining the original performer's identity. Apply other reference-defined changes only as instructed. Keep referenced elements visually consistent; do not change motion, camera, timing, framing, or shot progression unless explicitly requested.`,
+  ].join('\n');
 }
 
 export function buildSeedanceWorkflowPrompt(input: {
@@ -281,31 +287,32 @@ export function buildSeedanceWorkflowPrompt(input: {
   const video = tokens.video;
   const references = tokens.images.slice(0, input.imageCount);
   const primary = references[0] || '@Image1';
-  const referenceRules = buildReferenceRules({
-    video,
-    references,
-    imageCount: input.imageCount,
-  });
+  const mappingLine = referenceMappingLine(references);
 
   if (input.mode === 'motion-transfer') {
-    return [
-      `Use ${video} as the source of motion, timing, poses, choreography, camera movement, framing, shot composition, and shot progression.`,
-      ...referenceRules,
-      input.imageCount === 1
-        ? `Use ${primary} as a visual reference according to the user instruction.`
-        : 'The references may define characters, products, wardrobe, props, locations, environments, visual appearance, or multiple views of the same element.',
-      `Preserve the motion, timing, camera movement, framing, and shot progression of ${video} as closely as possible.`,
-      'Apply only the character, product, wardrobe, prop, location, environment, or visual-appearance changes clearly indicated by the user instruction and references.',
-      'Keep all referenced elements visually consistent throughout the video.',
-      'Do not change motion, camera behavior, timing, framing, or shot progression unless the user explicitly requests it.',
-      userPrompt
-        ? `User instruction: ${userPrompt}`
-        : input.imageCount > 1
-          ? 'No explicit mapping was provided. Infer reference roles conservatively from visual correspondence. References may describe different elements or multiple views of the same element. Preserve the source motion, camera, timing, framing, and shot progression.'
-          : `If a clear visual correspondence exists, use ${primary} to guide that element's appearance while preserving the motion, camera, timing, framing, and shot progression from ${video}. Otherwise preserve the source appearance.`,
-    ]
-      .filter(Boolean)
-      .join('\n');
+    const lines = [motionTransferRules(video), mappingLine];
+
+    if (input.imageCount > 1) {
+      lines.push(
+        `Use the user instruction to determine how each reference relates to ${video}. Do not blend traits between unrelated references unless explicitly asked.`
+      );
+    }
+
+    lines.push(SEEDANCE_REFERENCE_IDENTITY_RULES);
+
+    if (userPrompt) {
+      lines.push(`User instruction: ${userPrompt}`);
+    } else if (input.imageCount > 1) {
+      lines.push(
+        'No explicit mapping was provided. Infer reference roles conservatively from visual correspondence. Preserve source motion, camera, timing, framing, and shot progression.'
+      );
+    } else {
+      lines.push(
+        `If a clear visual correspondence exists, use ${primary} to guide that element's appearance while preserving motion, camera, timing, framing, and shot progression from ${video}. Otherwise preserve the source appearance.`
+      );
+    }
+
+    return lines.join('\n');
   }
 
   const taskInstruction = userPrompt
@@ -314,22 +321,23 @@ export function buildSeedanceWorkflowPrompt(input: {
       ? 'No explicit mapping was provided. Use visual correspondence conservatively. Only modify targets with a clear match to the references, and do not merge unrelated references.'
       : `Replace the most prominent matching target in ${video} with Reference 1.`;
 
-  return [
+  const lines = [
     `Edit ${video} by replacing only the targets specified in the task instruction with their assigned reference images.`,
-    'REFERENCE MAPPING:',
-    'Use the task instruction to determine which reference image belongs to which target.',
-    'Different references may represent different targets or multiple views of the same target.',
-    'Do not merge unrelated reference identities or assign a reference to an unspecified target.',
-    referenceMappingLine(references),
-    'REPLACEMENT:',
-    'When an entire person, character, animal, or object is requested to be replaced, use the assigned reference for its complete visible appearance, not just selected features or accessories.',
-    'Apply the same replacement consistently whenever that target appears, including different camera angles, close-ups, camera cuts, occlusions, and reappearances.',
-    'When the instruction requests only a specific attribute, such as clothing or a prop, modify only that attribute.',
-    'PRESERVATION:',
-    'Preserve the original motion, timing, camera movement, framing, composition, and all elements that are not designated as replacement targets.',
-    'A subject explicitly assigned to a reference image is a replacement target, not an unrelated element to preserve.',
-    'Integrate replacements with the original perspective, scale, lighting, shadows, reflections, and motion.',
+    mappingLine,
+  ];
+
+  if (input.imageCount > 1) {
+    lines.push(
+      'Use the task instruction to map each reference to its target. Do not merge unrelated reference identities or assign a reference to an unspecified target.'
+    );
+  }
+
+  lines.push(
+    OBJECT_SWAP_RULES,
+    SEEDANCE_REFERENCE_IDENTITY_RULES,
     'TASK INSTRUCTION:',
-    taskInstruction,
-  ].join('\n');
+    taskInstruction
+  );
+
+  return lines.join('\n');
 }

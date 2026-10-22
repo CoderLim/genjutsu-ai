@@ -71,8 +71,9 @@ test('WaveSpeed dual-role object swap keeps mappings without repeating replaceme
   assert.match(prompt, /@Image 1/);
   assert.match(prompt, /@Image 2/);
   assert.doesNotMatch(prompt, /@Image1\b/);
-  assert.match(prompt, /complete visible appearance/);
-  assert.equal(prompt.split('complete visible appearance').length - 1, 1);
+  assert.match(prompt, /complete reference appearance/);
+  assert.equal(prompt.split('complete reference appearance').length - 1, 1);
+  assert.match(prompt, /REFERENCE IDENTITY:/);
   assert.doesNotMatch(prompt, /Apply every @Image N/);
   assert.match(
     prompt,
