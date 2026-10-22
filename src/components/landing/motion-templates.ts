@@ -181,7 +181,7 @@ export const MOTION_TEMPLATES: MotionTemplate[] = [
     poster: '/videos/unforgettable-ai-car-tpl-poster.jpg',
     sourceVideo: '/videos/unforgettable-ai-car-tpl.mp4',
     prompt:
-      'Replace the card-holding person in @Video1 with the adult in @Image1 — face, hair, build, outfit, and accessories. Keep the car, setting, camera path, and reveal timing. Show exactly two cards: 2 and 4, reading 24 left to right — do not mirror. Same identity before and after the lens clears. No duplicates, no new scenes.',
+      'Replace the card-holding person in @Video 1 with the adult in @Image 1 — face, hair, build, outfit, and accessories. Keep the car, setting, camera path, and reveal timing. Show exactly two cards: 2 and 4, reading 24 left to right — do not mirror. Same identity before and after the lens clears. No duplicates, no new scenes.',
     mode: 'objects-swap',
     resolution: DEFAULT_OBJECTS_RESOLUTION,
     aspect: 'landscape',
@@ -192,7 +192,7 @@ export const MOTION_TEMPLATES: MotionTemplate[] = [
     poster: '/videos/cat-to-dog-tpl-poster.jpg',
     sourceVideo: '/videos/cat-to-dog-tpl.mp4',
     prompt:
-      'Replace the cat in @Video1 with the subject in @Image1. Keep the original motion, camera path, lighting, and timing. Use only this authorized likeness.',
+      'Replace the cat in @Video 1 with the subject in @Image 1. Keep the original motion, camera path, lighting, and timing. Use only this authorized likeness.',
     mode: 'objects-swap',
     resolution: DEFAULT_OBJECTS_RESOLUTION,
     aspect: 'portrait',
@@ -203,7 +203,7 @@ export const MOTION_TEMPLATES: MotionTemplate[] = [
     poster: '/videos/cat-fight-tpl-poster.jpg',
     sourceVideo: '/videos/cat-fight-tpl.mp4',
     prompt:
-      'Replace the cats in @Video1 with the subject in @Image1. Keep the fight choreography, camera path, and timing. Use only this authorized likeness.',
+      'Replace the cats in @Video 1 with the subject in @Image 1. Keep the fight choreography, camera path, and timing. Use only this authorized likeness.',
     mode: 'objects-swap',
     resolution: DEFAULT_OBJECTS_RESOLUTION,
     aspect: 'landscape',
@@ -214,7 +214,7 @@ export const MOTION_TEMPLATES: MotionTemplate[] = [
     poster: '/videos/bruce-li-dog-tpl-poster.jpg',
     sourceVideo: '/videos/bruce-li-dog-tpl.mp4',
     prompt:
-      'Replace the dog in @Video1 with the subject in @Image1. Keep the kung-fu moves, camera path, and timing. Use only this authorized likeness.',
+      'Replace the dog in @Video 1 with the subject in @Image 1. Keep the kung-fu moves, camera path, and timing. Use only this authorized likeness.',
     mode: 'objects-swap',
     resolution: DEFAULT_OBJECTS_RESOLUTION,
     aspect: 'portrait',
@@ -225,7 +225,7 @@ export const MOTION_TEMPLATES: MotionTemplate[] = [
     poster: '/videos/cat-jackson-tpl-poster.jpg',
     sourceVideo: '/videos/cat-jackson-tpl.mp4',
     prompt:
-      'Replace the dancing cat in @Video1 with the subject in @Image1. Keep the dance moves, camera path, and timing. Use only this authorized likeness.',
+      'Replace the dancing cat in @Video 1 with the subject in @Image 1. Keep the dance moves, camera path, and timing. Use only this authorized likeness.',
     mode: 'objects-swap',
     resolution: DEFAULT_OBJECTS_RESOLUTION,
     aspect: 'landscape',
@@ -236,7 +236,7 @@ export const MOTION_TEMPLATES: MotionTemplate[] = [
     poster: '/videos/car-drop-tpl-poster.jpg',
     sourceVideo: '/videos/car-drop-tpl.mp4',
     prompt:
-      'Replace the car in @Video1 with the subject in @Image1. Keep the drop motion, camera path, and timing. Use only this authorized likeness.',
+      'Replace the car in @Video 1 with the subject in @Image 1. Keep the drop motion, camera path, and timing. Use only this authorized likeness.',
     mode: 'objects-swap',
     resolution: DEFAULT_OBJECTS_RESOLUTION,
     aspect: 'portrait',
@@ -247,7 +247,7 @@ export const MOTION_TEMPLATES: MotionTemplate[] = [
     poster: '/videos/two-cats-dance-tpl-poster.jpg',
     sourceVideo: '/videos/two-cats-dance-tpl.mp4',
     prompt:
-      'Replace the cats in @Video1 with the subject in @Image1. Keep the dance moves, camera path, and timing. Use only this authorized likeness.',
+      'Replace the cats in @Video 1 with the subject in @Image 1. Keep the dance moves, camera path, and timing. Use only this authorized likeness.',
     mode: 'objects-swap',
     resolution: DEFAULT_OBJECTS_RESOLUTION,
     aspect: 'portrait',
@@ -258,7 +258,7 @@ export const MOTION_TEMPLATES: MotionTemplate[] = [
     poster: '/videos/dog-two-girl-dance-tpl-poster.jpg',
     sourceVideo: '/videos/dog-two-girl-dance-tpl.mp4',
     prompt:
-      'Replace the puppy in @Video1 with the animal in @Image1. Keep the two girls dancing, camera path, and timing. Use only this authorized likeness.',
+      'Replace the puppy in @Video 1 with the animal in @Image 1. Keep the two girls dancing, camera path, and timing. Use only this authorized likeness.',
     mode: 'objects-swap',
     resolution: DEFAULT_OBJECTS_RESOLUTION,
     aspect: 'portrait',
@@ -269,7 +269,7 @@ export const MOTION_TEMPLATES: MotionTemplate[] = [
     poster: '/videos/long-trival-tpl-poster.jpg',
     sourceVideo: '/videos/long-trival-tpl.mp4',
     prompt:
-      'Replace the man in @Video1 with the subject in @Image1. Keep the gas-station dance moves, camera path, lighting, and timing. Use only this authorized likeness.',
+      'Replace the three main characters in @Video 1 with the people from the reference images, in their order of first appearance.\n\n@Image 1 replaces the opening dancer.\n@Image 2 replaces the selfie character.\n@Image 3 replaces the character stepping out of the car.\n\nPreserve their identities, faces, hairstyles, outfits, and body proportions throughout the video.\n\nKeep the original dance movements, camera angles, scene transitions, vehicles, lighting, and timing unchanged.',
     mode: 'objects-swap',
     resolution: DEFAULT_OBJECTS_RESOLUTION,
     aspect: 'portrait',
@@ -280,7 +280,7 @@ export const MOTION_TEMPLATES: MotionTemplate[] = [
     poster: '/videos/dog-kick-bottle-tpl-poster.jpg',
     sourceVideo: '/videos/dog-kick-bottle-tpl.mp4',
     prompt:
-      'Replace the dog in @Video1 with the subject in @Image1. Keep the bottle-kick motion, camera path, lighting, and timing. Use only this authorized likeness.',
+      'Replace the dog in @Video 1 with the subject in @Image 1. Keep the bottle-kick motion, camera path, lighting, and timing. Use only this authorized likeness.',
     mode: 'objects-swap',
     resolution: DEFAULT_OBJECTS_RESOLUTION,
     aspect: 'landscape',
@@ -290,8 +290,8 @@ export const MOTION_TEMPLATES: MotionTemplate[] = [
     titleKey: 'site.templates.3_meters_above_the_sky',
     poster: '/videos/3-meters-above-the-sky-tpl-poster.jpg',
     sourceVideo: '/videos/3-meters-above-the-sky-tpl.mp4',
-    prompt: `Character 1 @image 1
-Character 2 @image2
+    prompt: `Character 1 @Image 1
+Character 2 @Image 2
 
 UNDER NO CIRCUMSTANCES CHANGE THE CHARACTERS' IDENTITIES! THEY MUST LOOK EXACTLY LIKE THEIR REFERENCES! DO NOT ALTER THEIR FACIAL PROPORTIONS OR HAIRSTYLES!`,
     mode: 'motion-transfer',

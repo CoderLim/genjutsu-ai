@@ -1,9 +1,15 @@
 import {
   isSmalltownResolution,
+  LEGACY_SMALLTOWN_PROMPTS,
   SMALLTOWN_ASPECT_RATIO,
   SMALLTOWN_DEFAULT_PROMPT,
   SMALLTOWN_PRODUCT_ID,
 } from './constants';
+
+const ALLOWED_PROMPTS = new Set<string>([
+  ...LEGACY_SMALLTOWN_PROMPTS,
+  SMALLTOWN_DEFAULT_PROMPT,
+]);
 
 export class SmalltownBoyDancePreflightError extends Error {
   constructor(message: string) {
@@ -41,7 +47,10 @@ export function assertSmalltownBoyDanceInputs(options: TaskOptions | null) {
     );
   }
 
-  if (options.prompt !== SMALLTOWN_DEFAULT_PROMPT) {
+  if (
+    typeof options.prompt !== 'string' ||
+    !ALLOWED_PROMPTS.has(options.prompt)
+  ) {
     throw new SmalltownBoyDancePreflightError(
       'Smalltown Boy Dance prompt does not match the fixed product prompt'
     );

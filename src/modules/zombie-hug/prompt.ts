@@ -44,17 +44,17 @@ export function isZombieHugAspectRatio(
   );
 }
 
-export const ZOMBIE_HUG_PROMPT = `Replace the gun-holding character in all relevant shots with the person from @image1.
-Replace the second main character with the person from @image2, but with two different states depending on the scene:
+export const ZOMBIE_HUG_PROMPT = `Replace the gun-holding character in all relevant shots with the person from @Image 1.
+Replace the second main character with the person from @Image 2, but with two different states depending on the scene:
 
-State rules for @image2:
-- In the earlier shots, @image2 should appear as an infected zombie version of the same person.
-- In the later shots, @image2 should transition into the normal healthy human version of the same person.
+State rules for @Image 2:
+- In the earlier shots, @Image 2 should appear as an infected zombie version of the same person.
+- In the later shots, @Image 2 should transition into the normal healthy human version of the same person.
 - The zombie version and the human version must clearly be the same person, with consistent facial identity, hairstyle, and overall likeness.
 
 Character mapping:
-- @image1 = survivor / gun holder
-- @image2 = infected loved one in the early shots, then restored human in the later shots`;
+- @Image 1 = survivor / gun holder
+- @Image 2 = infected loved one in the early shots, then restored human in the later shots`;
 
 export const ZOMBIE_HUG_PUBLIC_TEMPLATE_PATH = '/videos/zombie-hug-tpl.mp4';
 export const ZOMBIE_HUG_PUBLIC_TEMPLATE_PATH_9X16 =

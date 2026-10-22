@@ -6,6 +6,7 @@ import {
   SmalltownBoyDancePreflightError,
 } from './assert';
 import {
+  LEGACY_SMALLTOWN_PROMPTS,
   SMALLTOWN_ASPECT_RATIO,
   SMALLTOWN_DEFAULT_PROMPT,
   SMALLTOWN_PRODUCT_ID,
@@ -74,6 +75,15 @@ test('rejects prompt tampering', () => {
         prompt: 'hacked prompt',
       }),
     SmalltownBoyDancePreflightError
+  );
+});
+
+test('accepts legacy no-space WaveSpeed tags for in-flight tasks', () => {
+  assert.doesNotThrow(() =>
+    assertSmalltownBoyDanceInputs({
+      ...validOptions,
+      prompt: LEGACY_SMALLTOWN_PROMPTS[0],
+    })
   );
 });
 
