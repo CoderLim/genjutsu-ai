@@ -2458,5 +2458,8 @@
   "site.zombie.vs_title": "Câlin zombie IA ou tendance zombie IA : quelle différence ?",
   "site.zombie.warm": "Scène chaleureuse (même pose)",
   "site.zombie.warm_prompt": "Plan cinématographique 9:16, plage au coucher du soleil doré. La même jeune femme, vivante et en bonne santé, rit en courant vers les bras ouverts de l’homme. Il la soulève du sol. Teintes dorées chaleureuses, léger halo optique, grain cinéma, 24 fps.",
-  "site.zombie.why": "Pourquoi c’est important"
+  "site.zombie.why": "Pourquoi c’est important",
+  "site.hotel.more_a2o": "Générateur vidéo IA A2O LITE",
+  "site.smalltown.seo.more_a2o": "Générateur vidéo IA A2O LITE",
+  "site.templates.a2o_lite_ai": "A2O LITE AI"
 }
