@@ -693,10 +693,12 @@ function ImageUploadSlot({
   items,
   onChange,
   signedIn,
+  onPreparingChange,
 }: {
   items: MediaItem[];
   onChange: (items: MediaItem[]) => void;
   signedIn: boolean;
+  onPreparingChange?: (preparing: boolean) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const itemsRef = useRef(items);
@@ -706,6 +708,10 @@ function ImageUploadSlot({
   const { dragging, setDragging, onDragOver, onDragLeave } = useDragHighlight();
   const previewItem = items.find((i) => i.id === previewId) ?? null;
   const canAdd = items.length < IMAGE_MAX;
+
+  useEffect(() => {
+    onPreparingChange?.(mergePrepare.isPreparing);
+  }, [mergePrepare.isPreparing, onPreparingChange]);
 
   const openPicker = useCallback(() => {
     if (!signedIn) {
@@ -739,61 +745,61 @@ function ImageUploadSlot({
           for (const item of accepted) URL.revokeObjectURL(item.url);
           accepted.length = 0;
         };
-        // Sequential prepare keeps peak memory lower on Android Chrome.
-        for (const file of batch) {
+        try {
+          // Sequential prepare keeps peak memory lower on Android Chrome.
+          for (const file of batch) {
+            if (!guard.isCurrent()) {
+              revokeAccepted();
+              return;
+            }
+            if (file.size <= 0 || file.size > MAX_REFERENCE_IMAGE_BYTES) {
+              toast.error(
+                m['site.generator.image_size_error']({ name: file.name })
+              );
+              continue;
+            }
+            try {
+              const prepared = await prepareReferenceImageFile({
+                file,
+                maxBytes: MAX_REFERENCE_IMAGE_BYTES,
+              });
+              if (!guard.isCurrent()) {
+                revokeAccepted();
+                return;
+              }
+              accepted.push(createMediaItem(prepared.file));
+            } catch {
+              if (!guard.isCurrent()) {
+                revokeAccepted();
+                return;
+              }
+              toast.error(m['site.generator.image_replace_failed']());
+            }
+          }
           if (!guard.isCurrent()) {
             revokeAccepted();
             return;
           }
-          if (file.size <= 0 || file.size > MAX_REFERENCE_IMAGE_BYTES) {
-            toast.error(
-              m['site.generator.image_size_error']({ name: file.name })
-            );
-            continue;
-          }
-          try {
-            const prepared = await prepareReferenceImageFile({
-              file,
-              maxBytes: MAX_REFERENCE_IMAGE_BYTES,
-            });
-            if (!guard.isCurrent()) {
-              revokeAccepted();
-              return;
-            }
-            accepted.push(createMediaItem(prepared.file));
-          } catch (cause) {
-            if (!guard.isCurrent()) {
-              revokeAccepted();
-              return;
-            }
-            toast.error(
-              cause instanceof UploadFileReadError
-                ? cause.message
-                : m['site.generator.image_read_error']()
-            );
-          }
-        }
-        if (!guard.isCurrent()) {
-          revokeAccepted();
-          return;
-        }
-        if (accepted.length === 0) return;
+          if (accepted.length === 0) return;
 
-        const latest = itemsRef.current;
-        const roomLeft = IMAGE_MAX - latest.length;
-        if (roomLeft <= 0) {
-          revokeAccepted();
-          return;
+          const latest = itemsRef.current;
+          const roomLeft = IMAGE_MAX - latest.length;
+          if (roomLeft <= 0) {
+            revokeAccepted();
+            return;
+          }
+          const toAdd = accepted.slice(0, roomLeft);
+          for (const item of accepted.slice(toAdd.length)) {
+            URL.revokeObjectURL(item.url);
+          }
+          if (!guard.isCurrent()) {
+            for (const item of toAdd) URL.revokeObjectURL(item.url);
+            return;
+          }
+          onChange([...latest, ...toAdd]);
+        } finally {
+          guard.settle();
         }
-        const toAdd = accepted.slice(0, roomLeft);
-        for (const item of accepted.slice(toAdd.length)) {
-          URL.revokeObjectURL(item.url);
-        }
-        if (!guard.isCurrent()) {
-          for (const item of toAdd) URL.revokeObjectURL(item.url);
-          return;
-        }
-        onChange([...latest, ...toAdd]);
       })();
     },
     [mergePrepare, onChange, signedIn]
@@ -1528,8 +1534,12 @@ export function GeneratorPanel({
     }
   }, [pollGeneration, session?.user?.id, status]);
 
+  const [imagesPreparing, setImagesPreparing] = useState(false);
+
   const canGenerate =
-    Boolean(video && images.length > 0) && status !== 'generating';
+    Boolean(video && images.length > 0) &&
+    status !== 'generating' &&
+    !imagesPreparing;
 
   // Provider selection comes from the same server resolver that starts jobs.
   // Until loaded, omit a potentially misleading estimate.
@@ -1591,6 +1601,10 @@ export function GeneratorPanel({
 
   const handleGenerate = async (kind: 'preview' | 'full' = 'full') => {
     if (!video || images.length === 0 || status === 'generating') return;
+    if (imagesPreparing) {
+      toast.error(m['site.generator.image_preparing']());
+      return;
+    }
 
     const targetResolution: Resolution =
       kind === 'preview' ? '480p' : resolution;
@@ -1865,6 +1879,7 @@ export function GeneratorPanel({
               items={images}
               onChange={setImages}
               signedIn={Boolean(session?.user)}
+              onPreparingChange={setImagesPreparing}
             />
           </div>
 

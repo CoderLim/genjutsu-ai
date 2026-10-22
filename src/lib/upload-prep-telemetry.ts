@@ -28,6 +28,10 @@ export type UploadPrepTelemetryPayload = {
   sampled: boolean;
 };
 
+const MAX_BATCH = 8;
+let pending: UploadPrepTelemetryPayload[] = [];
+let flushTimer: ReturnType<typeof setTimeout> | null = null;
+
 function classifyPrepErrorCode(cause: unknown): UploadPrepErrorCode {
   if (!(cause instanceof Error)) return 'unknown';
   const msg = cause.message.toLowerCase();
@@ -48,9 +52,44 @@ function shouldSampleSuccess(): boolean {
   return Math.random() < UPLOAD_PREP_SUCCESS_SAMPLE_RATE;
 }
 
+function flushPrepTelemetryQueue(): void {
+  flushTimer = null;
+  if (pending.length === 0) return;
+  const items = pending.splice(0, MAX_BATCH);
+  void apiPost('/api/genjutsu/upload-prep-event', {
+    event: 'upload_file_preparation_batch',
+    items,
+  }).catch(() => undefined);
+  if (pending.length > 0) {
+    flushTimer = setTimeout(flushPrepTelemetryQueue, 0);
+  }
+}
+
+function enqueuePrepTelemetry(
+  payload: UploadPrepTelemetryPayload,
+  immediate: boolean
+): void {
+  pending.push(payload);
+  if (immediate) {
+    if (flushTimer != null) {
+      clearTimeout(flushTimer);
+      flushTimer = null;
+    }
+    flushPrepTelemetryQueue();
+    return;
+  }
+  if (flushTimer == null) {
+    // Coalesce multi-slot selects into one POST (avoids 1s rate-limit drops).
+    flushTimer = setTimeout(flushPrepTelemetryQueue, 50);
+  }
+}
+
 /**
  * Fire-and-forget client diagnostic for image prepare outcomes.
  * Never blocks UI; never creates a generation attempt.
+ *
+ * Success events are 10% sampled — do not treat raw success/fail log counts
+ * as a true success rate without weighting by UPLOAD_PREP_SUCCESS_SAMPLE_RATE.
  */
 export function reportUploadPreparationTelemetry(params: {
   result: FilePreparationResult;
@@ -85,7 +124,5 @@ export function reportUploadPreparationTelemetry(params: {
     sampled: sampled || params.result === 'success',
   };
 
-  void apiPost('/api/genjutsu/upload-prep-event', payload).catch(
-    () => undefined
-  );
+  enqueuePrepTelemetry(payload, isFailure);
 }

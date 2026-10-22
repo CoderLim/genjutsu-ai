@@ -1707,6 +1707,8 @@
   "site.generator.upload_url_missing": "アップロード用URLがありません",
   "site.generator.image_read_error": "画像を読み取れませんでした。端末のファイルアプリから選び直してください。",
   "site.generator.upload_android_network_hint": "アップロードに失敗しました。端末のファイルアプリから画像を選び直す、Wi‑Fiに切り替える、または別のブラウザをお試しください。クレジットは消費されていません。",
+  "site.generator.image_preparing": "画像の読み込みが終わるまでお待ちください。",
+  "site.generator.image_replace_failed": "画像を更新できませんでした。以前の写真が選択されたままです。",
   "site.generator.video_duration_error": "元動画は{min}～{max}秒にしてください（現在：{actual}秒）",
   "site.generator.video_label": "動画",
   "site.generator.video_lightbox": "動画プレビュー",

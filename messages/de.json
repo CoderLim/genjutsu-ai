@@ -1707,6 +1707,8 @@
   "site.generator.upload_url_missing": "Upload-URL für den Speicher fehlt",
   "site.generator.image_read_error": "Dieses Bild konnte nicht gelesen werden. Bitte erneut über die Dateien-App auswählen.",
   "site.generator.upload_android_network_hint": "Upload fehlgeschlagen. Bitte Bild erneut über die Dateien-App wählen, zu WLAN wechseln oder einen anderen Browser nutzen. Es wurden keine Credits abgezogen.",
+  "site.generator.image_preparing": "Bitte warte, bis das Bild fertig geladen ist, bevor du generierst.",
+  "site.generator.image_replace_failed": "Bild konnte nicht aktualisiert werden. Das vorherige Foto bleibt ausgewählt.",
   "site.generator.video_duration_error": "Das Quellvideo muss {min}–{max} Sekunden lang sein (aktuell: {actual} s)",
   "site.generator.video_label": "Video",
   "site.generator.video_lightbox": "Videovorschau",

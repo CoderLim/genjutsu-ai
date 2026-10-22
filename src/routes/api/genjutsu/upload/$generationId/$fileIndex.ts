@@ -49,15 +49,26 @@ async function PUT({
   request: Request;
   params: { generationId: string; fileIndex: string };
 }) {
+  let generationIdForLog = params.generationId || 'unknown';
+  let fileIndexForLog = Number(params.fileIndex);
+  if (!Number.isInteger(fileIndexForLog)) fileIndexForLog = -1;
+
+  // Log rate-limits before returning so ops can distinguish "never reached
+  // Worker" (unknown / no app log) from "reached Worker but 429".
   const limited = enforceMinIntervalRateLimit(request, {
     intervalMs: 500,
     keyPrefix: 'genjutsu-upload-proxy',
   });
-  if (limited) return limited;
+  if (limited) {
+    logProxyUploadStage({
+      stage: 'rate_limited',
+      generationId: generationIdForLog,
+      fileIndex: fileIndexForLog,
+      detail: 'intervalMs=500',
+    });
+    return limited;
+  }
 
-  let generationIdForLog = params.generationId || 'unknown';
-  let fileIndexForLog = Number(params.fileIndex);
-  if (!Number.isInteger(fileIndexForLog)) fileIndexForLog = -1;
   let stage = 'entered';
 
   const fail = (

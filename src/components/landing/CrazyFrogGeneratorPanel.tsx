@@ -606,11 +606,9 @@ export function CrazyFrogGeneratorPanel() {
         setJobError('');
       } catch (cause) {
         if (!guard.isCurrent()) return;
-        toast.error(
-          cause instanceof UploadFileReadError
-            ? cause.message
-            : m['site.generator.image_read_error']()
-        );
+        toast.error(m['site.generator.image_replace_failed']());
+      } finally {
+        guard.settle();
       }
     })();
   };
@@ -802,6 +800,10 @@ export function CrazyFrogGeneratorPanel() {
       return;
     }
     if (busy) return;
+    if (imagePrepare.isAnyPreparing) {
+      toast.error(m['site.generator.image_preparing']());
+      return;
+    }
     if (!templateReady) {
       toast.error(m['site.common.template_unavailable']());
       return;
@@ -1048,6 +1050,7 @@ export function CrazyFrogGeneratorPanel() {
     Boolean(frontPhoto?.file && backPhoto?.file) &&
     templateReady &&
     !busy &&
+    !imagePrepare.isAnyPreparing &&
     !sessionPending;
 
   const progressResolution =

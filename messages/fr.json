@@ -1707,6 +1707,8 @@
   "site.generator.upload_url_missing": "URL de transfert vers le stockage manquante",
   "site.generator.image_read_error": "Impossible de lire cette image. Réessayez via l’appli Fichiers de votre téléphone.",
   "site.generator.upload_android_network_hint": "Échec du transfert. Réessayez via l’appli Fichiers, basculez en Wi‑Fi ou utilisez un autre navigateur. Aucun crédit n’a été débité.",
+  "site.generator.image_preparing": "Veuillez attendre la fin du chargement de l’image avant de générer.",
+  "site.generator.image_replace_failed": "Impossible de mettre à jour l’image. La photo précédente reste sélectionnée.",
   "site.generator.video_duration_error": "La vidéo source doit durer entre {min} et {max} secondes (durée actuelle : {actual} s)",
   "site.generator.video_label": "Vidéo",
   "site.generator.video_lightbox": "Aperçu vidéo",

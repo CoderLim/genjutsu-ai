@@ -546,11 +546,9 @@ export function FlyingCarAiGeneratorPanel({
         setJobError('');
       } catch (cause) {
         if (!guard.isCurrent()) return;
-        toast.error(
-          cause instanceof UploadFileReadError
-            ? cause.message
-            : m['site.generator.image_read_error']()
-        );
+        toast.error(m['site.generator.image_replace_failed']());
+      } finally {
+        guard.settle();
       }
     })();
   };
@@ -724,6 +722,10 @@ export function FlyingCarAiGeneratorPanel({
       return;
     }
     if (busy) return;
+    if (imagePrepare.isPreparing) {
+      toast.error(m['site.generator.image_preparing']());
+      return;
+    }
     if (!templateReady) {
       toast.error(m['site.common.template_unavailable']());
       return;
@@ -953,7 +955,11 @@ export function FlyingCarAiGeneratorPanel({
   };
 
   const canGenerate =
-    Boolean(photo) && templateReady && !busy && !sessionPending;
+    Boolean(photo) &&
+    templateReady &&
+    !busy &&
+    !imagePrepare.isPreparing &&
+    !sessionPending;
 
   return (
     <div className="mx-auto w-full max-w-[1120px]">

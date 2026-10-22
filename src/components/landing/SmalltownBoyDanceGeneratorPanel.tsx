@@ -500,11 +500,9 @@ export function SmalltownBoyDanceGeneratorPanel() {
         setJobError('');
       } catch (cause) {
         if (!guard.isCurrent()) return;
-        toast.error(
-          cause instanceof UploadFileReadError
-            ? cause.message
-            : m['site.generator.image_read_error']()
-        );
+        toast.error(m['site.generator.image_replace_failed']());
+      } finally {
+        guard.settle();
       }
     })();
   };
@@ -678,6 +676,10 @@ export function SmalltownBoyDanceGeneratorPanel() {
       return;
     }
     if (busy) return;
+    if (imagePrepare.isAnyPreparing) {
+      toast.error(m['site.generator.image_preparing']());
+      return;
+    }
     if (!templateReady) {
       toast.error(m['site.common.template_unavailable']());
       return;
@@ -873,6 +875,7 @@ export function SmalltownBoyDanceGeneratorPanel() {
     Boolean(frontPhoto && backPhoto) &&
     templateReady &&
     !busy &&
+    !imagePrepare.isAnyPreparing &&
     !sessionPending;
 
   return (

@@ -1,48 +1,80 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+
+import {
+  ImagePrepareSequencer,
+  MultiSlotImagePrepareSequencer,
+} from '@/lib/image-prepare-sequencer';
 
 /**
- * Per-slot sequence guard for async image preparation.
+ * Per-slot sequence guard + preparing flags for async image preparation.
  * Invalidating a slot (or unmount) makes in-flight prepares no-ops so they
  * cannot write state or leak object URLs after delete/replace/unmount.
  */
 export function useImagePrepareGuard<Slot extends string>(
   slots: readonly Slot[]
 ) {
-  const seqRef = useRef<Record<Slot, number>>(
-    Object.fromEntries(slots.map((slot) => [slot, 0])) as Record<Slot, number>
+  const sequencerRef = useRef<MultiSlotImagePrepareSequencer<Slot> | null>(
+    null
   );
-  const mountedRef = useRef(true);
+  if (!sequencerRef.current) {
+    sequencerRef.current = new MultiSlotImagePrepareSequencer(slots);
+  }
+  const sequencer = sequencerRef.current;
+
+  const [preparingVersion, setPreparingVersion] = useState(0);
+  const bump = useCallback(() => setPreparingVersion((v) => v + 1), []);
 
   useEffect(() => {
-    mountedRef.current = true;
     return () => {
-      mountedRef.current = false;
-      for (const slot of Object.keys(seqRef.current) as Slot[]) {
-        seqRef.current[slot] += 1;
-      }
+      sequencer.unmount();
     };
-  }, []);
+  }, [sequencer]);
 
-  const invalidate = (slot: Slot) => {
-    seqRef.current[slot] += 1;
-  };
+  const invalidate = useCallback(
+    (slot: Slot) => {
+      sequencer.invalidate(slot);
+      bump();
+    },
+    [bump, sequencer]
+  );
 
-  const begin = (slot: Slot) => {
-    const seq = ++seqRef.current[slot];
-    return {
-      isCurrent: () => mountedRef.current && seqRef.current[slot] === seq,
-    };
-  };
+  const begin = useCallback(
+    (slot: Slot) => {
+      const guard = sequencer.begin(slot);
+      bump();
+      return {
+        isCurrent: guard.isCurrent,
+        settle: () => {
+          guard.settle();
+          bump();
+        },
+      };
+    },
+    [bump, sequencer]
+  );
 
-  return { begin, invalidate };
+  // preparingVersion forces re-render when prepare flags change.
+  void preparingVersion;
+
+  const isPreparing = useCallback(
+    (slot: Slot) => sequencer.isPreparing(slot),
+    [sequencer, preparingVersion]
+  );
+
+  const isAnyPreparing = sequencer.isAnyPreparing();
+
+  return { begin, invalidate, isPreparing, isAnyPreparing };
 }
 
 /** Single-slot variant (one photo panels). */
 export function useSingleImagePrepareGuard() {
-  const { begin, invalidate } = useImagePrepareGuard(['photo'] as const);
+  const { begin, invalidate, isAnyPreparing } = useImagePrepareGuard([
+    'photo',
+  ] as const);
   return {
     begin: () => begin('photo'),
     invalidate: () => invalidate('photo'),
+    isPreparing: isAnyPreparing,
   };
 }
 
@@ -52,28 +84,35 @@ export function useSingleImagePrepareGuard() {
  * MediaItems already created when isCurrent() becomes false.
  */
 export function useImageMergePrepareGuard() {
-  const generationRef = useRef(0);
-  const mountedRef = useRef(true);
+  const sequencerRef = useRef(new ImagePrepareSequencer());
+  const [preparingVersion, setPreparingVersion] = useState(0);
+  const bump = useCallback(() => setPreparingVersion((v) => v + 1), []);
 
   useEffect(() => {
-    mountedRef.current = true;
     return () => {
-      mountedRef.current = false;
-      generationRef.current += 1;
+      sequencerRef.current.unmount();
     };
   }, []);
 
-  const invalidate = () => {
-    generationRef.current += 1;
-  };
+  const invalidate = useCallback(() => {
+    sequencerRef.current.invalidate();
+    bump();
+  }, [bump]);
 
-  const begin = () => {
-    const generation = ++generationRef.current;
+  const begin = useCallback(() => {
+    const guard = sequencerRef.current.begin();
+    bump();
     return {
-      isCurrent: () =>
-        mountedRef.current && generationRef.current === generation,
+      isCurrent: guard.isCurrent,
+      settle: () => {
+        guard.settle();
+        bump();
+      },
     };
-  };
+  }, [bump]);
 
-  return { begin, invalidate };
+  void preparingVersion;
+  const isPreparing = sequencerRef.current.isPreparing();
+
+  return { begin, invalidate, isPreparing };
 }

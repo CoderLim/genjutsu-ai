@@ -1707,6 +1707,8 @@
   "site.generator.upload_url_missing": "Falta la URL de subida al almacenamiento",
   "site.generator.image_read_error": "No se pudo leer esta imagen. Intenta seleccionarla de nuevo desde la app Archivos.",
   "site.generator.upload_android_network_hint": "Error al subir. Prueba a seleccionar la imagen desde la app Archivos, cambiar a Wi‑Fi o usar otro navegador. No se cobraron créditos.",
+  "site.generator.image_preparing": "Espera a que la imagen termine de cargarse antes de generar.",
+  "site.generator.image_replace_failed": "No se pudo actualizar la imagen. Se mantiene la foto anterior.",
   "site.generator.video_duration_error": "El vídeo de origen debe durar entre {min} y {max} segundos (duración actual: {actual}s)",
   "site.generator.video_label": "Vídeo",
   "site.generator.video_lightbox": "Vista previa del vídeo",

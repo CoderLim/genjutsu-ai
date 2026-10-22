@@ -1003,6 +1003,8 @@
   "site.generator.upload_url_missing": "Missing storage upload URL",
   "site.generator.image_read_error": "Could not read this image. Please try selecting it again through your phone's Files app.",
   "site.generator.upload_android_network_hint": "Upload failed. Please try selecting the image through your phone's Files app, switching to Wi-Fi, or using another browser. No credits were charged.",
+  "site.generator.image_preparing": "Please wait until your image finishes loading before generating.",
+  "site.generator.image_replace_failed": "Could not update the image. Your previous photo is still selected.",
   "site.templates.title": "Motion templates",
   "site.templates.description": "Hover a template to Use template or Preview. Use template fills this generator or opens the matching trend page—then add your images and generate.",
   "site.templates.use": "Use template",

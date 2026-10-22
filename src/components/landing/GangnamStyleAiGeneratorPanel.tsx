@@ -580,11 +580,9 @@ export function GangnamStyleAiGeneratorPanel({
         setJobError('');
       } catch (cause) {
         if (!guard.isCurrent()) return;
-        toast.error(
-          cause instanceof UploadFileReadError
-            ? cause.message
-            : m['site.generator.image_read_error']()
-        );
+        toast.error(m['site.generator.image_replace_failed']());
+      } finally {
+        guard.settle();
       }
     })();
   };
@@ -764,6 +762,10 @@ export function GangnamStyleAiGeneratorPanel({
       return;
     }
     if (busy) return;
+    if (imagePrepare.isAnyPreparing) {
+      toast.error(m['site.generator.image_preparing']());
+      return;
+    }
     if (!leftPhoto || !centerPhoto || !rightPhoto) {
       toast.error(m['site.gangnam.need_photos']());
       return;
@@ -987,7 +989,10 @@ export function GangnamStyleAiGeneratorPanel({
   };
 
   const canGenerate =
-    Boolean(leftPhoto && centerPhoto && rightPhoto) && !busy && !sessionPending;
+    Boolean(leftPhoto && centerPhoto && rightPhoto) &&
+    !busy &&
+    !imagePrepare.isAnyPreparing &&
+    !sessionPending;
 
   return (
     <div className="mx-auto w-full max-w-[1120px]">
