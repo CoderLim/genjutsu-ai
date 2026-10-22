@@ -184,10 +184,10 @@ export const MOTION_TEMPLATES: MotionTemplate[] = [
     aspect: 'landscape',
   },
   {
-    id: 'pink-tee-dance',
-    titleKey: 'site.templates.pink_tee_dance',
-    poster: '/videos/pink-tee-dance-tpl-poster.jpg',
-    sourceVideo: '/videos/pink-tee-dance-tpl.mp4',
+    id: 'say-it-right-dance',
+    titleKey: 'site.templates.say_it_right_dance',
+    poster: '/videos/say-it-right-dance-tpl-poster.jpg',
+    sourceVideo: '/videos/say-it-right-dance-tpl.mp4',
     prompt:
       'Replace the dancing girl in the pink T-shirt in @Video 1 with the person in @Image 1 — face, hair, build, and outfit. Keep the dance moves, camera path, crowd, lighting, and timing. Use only this authorized likeness.',
     mode: 'objects-swap',
