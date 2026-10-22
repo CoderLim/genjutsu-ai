@@ -251,13 +251,14 @@ function referenceMappingLine(references: string[]) {
 
 /**
  * Shared identity rules for both Object Swap and Motion Transfer.
- * Full-subject identity applies only when a reference defines the whole
- * person/character/animal; partial edits must not rewrite unrelated identities.
- * Defined once — do not duplicate per mode.
+ * Full-subject / reference-driven identity applies only in those scoped cases;
+ * partial edits must not rewrite unassigned subjects. Defined once — do not
+ * duplicate per mode.
  */
 export const SEEDANCE_REFERENCE_IDENTITY_RULES = [
   'REFERENCE IDENTITY:',
-  "When a reference defines an entire person, character, or animal, use it as the authoritative identity: preserve facial features, hairstyle, age, body proportions, clothing, and other identity traits. Do not retain or blend the source performer's identity; adapt motion to the reference proportions; keep identity consistent across frames, cuts, and occlusions. For partial edits (clothing, props, objects, background, style), change only those elements and preserve unrelated identities. Respect explicit reference-to-target mappings; multiple references may be different subjects or multiple views of one subject.",
+  "For full person, character, or animal replacement, or reference-driven subject animation, use the assigned reference as the authoritative identity and appearance: preserve facial features, hairstyle, apparent age, body proportions, clothing, and distinctive identity traits. Do not retain or blend the original performer's identity with that reference subject; adapt source motion to its proportions; keep identity consistent across frames, cuts, and occlusions.",
+  'For partial edits (clothing, accessories, props, background), modify only specified attributes or elements and preserve identities of subjects not explicitly assigned for replacement. Follow explicit reference-to-target mappings; multiple references may be different subjects or multiple views of one subject. Never blend unrelated identities.',
 ].join('\n');
 
 const OBJECT_SWAP_RULES = [

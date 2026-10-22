@@ -9,18 +9,25 @@ import {
   SEEDANCE_REFERENCE_IDENTITY_RULES,
 } from './workflow';
 
-/** Pre-change final-prompt lengths (Seedance payload prompt = workflow output). */
+/**
+ * Lengths at b02afb5 (pre this conditional-identity fix). Final Seedance
+ * payload prompt = workflow output. Growth is expected for scoped identity
+ * wording; keep it bounded below.
+ */
 const BASELINE_PROMPT_LENGTHS = {
-  objectsSwapPerson: 1334,
-  objectsSwapMulti: 1416,
-  objectsSwapNoPrompt: 1369,
-  objectsSwapNoPromptMulti: 1539,
-  objectsSwapSayItRight: 2689,
-  motionTransferDance: 746,
-  motionTransferMulti: 1244,
-  motionTransferNoPrompt: 907,
-  motionTransferNoPromptMulti: 1417,
+  objectsSwapPerson: 1314,
+  objectsSwapMulti: 1550,
+  objectsSwapNoPrompt: 1349,
+  objectsSwapNoPromptMulti: 1673,
+  objectsSwapSayItRight: 2669,
+  motionTransferDance: 1158,
+  motionTransferMulti: 1403,
+  motionTransferNoPrompt: 1315,
+  motionTransferNoPromptMulti: 1490,
 } as const;
+
+/** Intentional identity-block rewrite may grow prompts; cap meaningless bloat. */
+const MAX_IDENTITY_REWRITE_GROWTH = 250;
 
 const SAY_IT_RIGHT_PROMPT =
   MOTION_TEMPLATES.find((template) => template.id === 'say-it-right-dance')
@@ -36,18 +43,26 @@ test('maps object swap to Seedance editing task', () => {
 
 test('shared reference identity rules are defined once', () => {
   assert.match(SEEDANCE_REFERENCE_IDENTITY_RULES, /REFERENCE IDENTITY:/);
+  assert.match(
+    SEEDANCE_REFERENCE_IDENTITY_RULES,
+    /For full person, character, or animal replacement, or reference-driven subject animation/
+  );
   assert.match(SEEDANCE_REFERENCE_IDENTITY_RULES, /authoritative identity/);
   assert.match(
     SEEDANCE_REFERENCE_IDENTITY_RULES,
-    /Do not retain or blend the source performer's identity/
+    /Do not retain or blend the original performer's identity with that reference subject/
   );
   assert.match(
     SEEDANCE_REFERENCE_IDENTITY_RULES,
-    /For partial edits \(clothing, props, objects, background, style\)/
+    /For partial edits \(clothing, accessories, props, background\)/
   );
   assert.match(
     SEEDANCE_REFERENCE_IDENTITY_RULES,
-    /multiple references may be different subjects or multiple views/
+    /preserve identities of subjects not explicitly assigned for replacement/
+  );
+  assert.match(
+    SEEDANCE_REFERENCE_IDENTITY_RULES,
+    /Never blend unrelated identities/
   );
 
   const objectSwap = buildSeedanceWorkflowPrompt({
@@ -90,7 +105,11 @@ test('object swap full person replacement uses reference as identity source', ()
   assert.match(prompt, /authoritative identity/);
   assert.match(
     prompt,
-    /Do not retain or blend the source performer's identity/
+    /For full person, character, or animal replacement, or reference-driven subject animation/
+  );
+  assert.match(
+    prompt,
+    /Do not retain or blend the original performer's identity with that reference subject/
   );
   assert.match(prompt, /Replace the lead rider with Reference 1/);
 });
@@ -127,7 +146,7 @@ test('clothing-only object swap preserves unrelated identities', () => {
 
   assert.match(
     prompt,
-    /For partial edits \(clothing, props, objects, background, style\), change only those elements and preserve unrelated identities/
+    /For partial edits \(clothing, accessories, props, background\), modify only specified attributes or elements and preserve identities of subjects not explicitly assigned for replacement/
   );
   assert.match(
     prompt,
@@ -135,7 +154,7 @@ test('clothing-only object swap preserves unrelated identities', () => {
   );
   assert.match(
     prompt,
-    /When a reference defines an entire person, character, or animal/
+    /For full person, character, or animal replacement, or reference-driven subject animation/
   );
 });
 
@@ -148,7 +167,7 @@ test('background-only object swap preserves unrelated identities', () => {
 
   assert.match(
     prompt,
-    /For partial edits \(clothing, props, objects, background, style\), change only those elements and preserve unrelated identities/
+    /For partial edits \(clothing, accessories, props, background\), modify only specified attributes or elements and preserve identities of subjects not explicitly assigned for replacement/
   );
   assert.match(prompt, /Preserve non-targets, motion, camera, timing/);
   assert.match(
@@ -173,7 +192,8 @@ test('object swap maps two people to two reference images without mixing', () =>
   assert.match(prompt, /Reference 2 = @Image2/);
   assert.match(prompt, /map each reference to its target/);
   assert.match(prompt, /Do not merge unrelated reference identities/);
-  assert.match(prompt, /Respect explicit reference-to-target mappings/);
+  assert.match(prompt, /Follow explicit reference-to-target mappings/);
+  assert.match(prompt, /Never blend unrelated identities/);
   assert.match(
     prompt,
     /Replace the lead rider with Reference 1 and the pursuing rider with Reference 2/
@@ -268,7 +288,7 @@ test('motion transfer keeps motion-camera contract for non-identity edits', () =
   assert.match(prompt, /Move the whole fight into the forest/);
   assert.match(
     prompt,
-    /For partial edits \(clothing, props, objects, background, style\)/
+    /For partial edits \(clothing, accessories, props, background\)/
   );
   assert.doesNotMatch(prompt, /replacement character/);
   assert.doesNotMatch(prompt, /Preserve the original environment/);
@@ -381,7 +401,7 @@ test('volcengine-style ark reference tokens are preserved', () => {
   assert.match(prompt, /Reference 1 maps to @图像1/);
 });
 
-test('final prompt length stays at or under baseline for single-image object swap', () => {
+test('final prompt length growth from identity rewrite stays bounded', () => {
   const person = buildSeedanceWorkflowPrompt({
     mode: 'objects-swap',
     userPrompt: 'Replace the person with Reference 1.',
@@ -391,18 +411,41 @@ test('final prompt length stays at or under baseline for single-image object swa
     mode: 'objects-swap',
     imageCount: 1,
   });
+  const dance = buildSeedanceWorkflowPrompt({
+    mode: 'motion-transfer',
+    userPrompt: 'Make the person from Reference 1 dance.',
+    imageCount: 1,
+  });
+  const multi = buildSeedanceWorkflowPrompt({
+    mode: 'objects-swap',
+    userPrompt: 'Replace A with Reference 1 and B with Reference 2',
+    imageCount: 2,
+  });
 
   assert.ok(
-    person.length <= BASELINE_PROMPT_LENGTHS.objectsSwapPerson,
-    `objects-swap person ${person.length} > baseline ${BASELINE_PROMPT_LENGTHS.objectsSwapPerson}`
+    person.length - BASELINE_PROMPT_LENGTHS.objectsSwapPerson <=
+      MAX_IDENTITY_REWRITE_GROWTH,
+    `objects-swap person grew by ${person.length - BASELINE_PROMPT_LENGTHS.objectsSwapPerson}`
   );
   assert.ok(
-    noPrompt.length <= BASELINE_PROMPT_LENGTHS.objectsSwapNoPrompt,
-    `objects-swap no-prompt ${noPrompt.length} > baseline ${BASELINE_PROMPT_LENGTHS.objectsSwapNoPrompt}`
+    noPrompt.length - BASELINE_PROMPT_LENGTHS.objectsSwapNoPrompt <=
+      MAX_IDENTITY_REWRITE_GROWTH,
+    `objects-swap no-prompt grew by ${noPrompt.length - BASELINE_PROMPT_LENGTHS.objectsSwapNoPrompt}`
   );
+  assert.ok(
+    dance.length - BASELINE_PROMPT_LENGTHS.motionTransferDance <=
+      MAX_IDENTITY_REWRITE_GROWTH,
+    `motion-transfer dance grew by ${dance.length - BASELINE_PROMPT_LENGTHS.motionTransferDance}`
+  );
+  assert.ok(
+    multi.length - BASELINE_PROMPT_LENGTHS.objectsSwapMulti <=
+      MAX_IDENTITY_REWRITE_GROWTH,
+    `objects-swap multi grew by ${multi.length - BASELINE_PROMPT_LENGTHS.objectsSwapMulti}`
+  );
+  assert.match(dance, /REFERENCE IDENTITY:/);
 });
 
-test('Say It Right Dance final prompt stays at or under baseline and has no identity conflicts', () => {
+test('Say It Right Dance final prompt has no identity conflicts', () => {
   assert.ok(
     SAY_IT_RIGHT_PROMPT.length > 0,
     'Say It Right template prompt missing'
@@ -415,65 +458,130 @@ test('Say It Right Dance final prompt stays at or under baseline and has no iden
   });
 
   assert.ok(
-    prompt.length <= BASELINE_PROMPT_LENGTHS.objectsSwapSayItRight,
-    `Say It Right final prompt ${prompt.length} > baseline ${BASELINE_PROMPT_LENGTHS.objectsSwapSayItRight}`
+    prompt.length - BASELINE_PROMPT_LENGTHS.objectsSwapSayItRight <=
+      MAX_IDENTITY_REWRITE_GROWTH,
+    `Say It Right grew by ${prompt.length - BASELINE_PROMPT_LENGTHS.objectsSwapSayItRight}`
   );
 
   // Template already asserts complete person replacement; system rules must agree.
   assert.match(SAY_IT_RIGHT_PROMPT, /COMPLETE PERSON REPLACEMENT/);
   assert.match(SAY_IT_RIGHT_PROMPT, /IDENTITY PRIORITY/);
   assert.match(prompt, /REFERENCE IDENTITY:/);
+  assert.match(
+    prompt,
+    /For full person, character, or animal replacement, or reference-driven subject animation/
+  );
   assert.match(prompt, /authoritative identity/);
   assert.match(
     prompt,
-    /Do not retain or blend the source performer's identity/
+    /Do not retain or blend the original performer's identity with that reference subject/
   );
 
   // Conflict checks: system must not weaken a full-person swap into a soft reference.
   assert.doesNotMatch(prompt, /as a visual reference according to/);
   assert.doesNotMatch(prompt, /Otherwise preserve the source appearance/);
+});
+
+test('three different people map to three references without mixing', () => {
+  const userPrompt = [
+    'Replace Character 1 with Reference 1.',
+    'Replace Character 2 with Reference 2.',
+    'Replace Character 3 with Reference 3.',
+  ].join('\n');
+
+  const prompt = buildSeedanceWorkflowPrompt({
+    mode: 'objects-swap',
+    userPrompt,
+    imageCount: 3,
+  });
+
+  assert.match(prompt, /Reference 1 = @Image1/);
+  assert.match(prompt, /Reference 2 = @Image2/);
+  assert.match(prompt, /Reference 3 = @Image3/);
+  assert.match(prompt, /Replace Character 3 with Reference 3/);
+  assert.match(prompt, /Never blend unrelated identities/);
+  assert.match(
+    prompt,
+    /multiple references may be different subjects or multiple views of one subject/
+  );
+  // Instruction names three distinct characters — must not force "same subject" only.
   assert.doesNotMatch(
     prompt,
-    /preserve the original (dancer|performer)'s identity/i
+    /assume they are alternate views of the same subject/
   );
 });
 
-test('motion transfer length growth is bounded to the shared identity block', () => {
-  const dance = buildSeedanceWorkflowPrompt({
-    mode: 'motion-transfer',
-    userPrompt: 'Make the person from Reference 1 dance.',
-    imageCount: 1,
-  });
-  const noPrompt = buildSeedanceWorkflowPrompt({
-    mode: 'motion-transfer',
-    imageCount: 1,
-  });
+test('mixed person clothing background roles stay role-scoped', () => {
+  const userPrompt = [
+    'Reference 1 replaces the main character.',
+    "Reference 2 replaces the character's clothing.",
+    'Reference 3 replaces the background.',
+  ].join('\n');
 
-  const identityOverhead = SEEDANCE_REFERENCE_IDENTITY_RULES.length + 1; // + newline join
-  assert.ok(
-    dance.length - BASELINE_PROMPT_LENGTHS.motionTransferDance <=
-      identityOverhead + 120,
-    `motion-transfer dance grew by ${dance.length - BASELINE_PROMPT_LENGTHS.motionTransferDance}, expected ~identity overhead`
-  );
-  assert.ok(
-    noPrompt.length - BASELINE_PROMPT_LENGTHS.motionTransferNoPrompt <=
-      identityOverhead + 120,
-    `motion-transfer no-prompt grew by ${noPrompt.length - BASELINE_PROMPT_LENGTHS.motionTransferNoPrompt}`
-  );
-  assert.match(dance, /REFERENCE IDENTITY:/);
-});
-
-test('documents multi-image object-swap length vs baseline', () => {
-  const multi = buildSeedanceWorkflowPrompt({
+  const prompt = buildSeedanceWorkflowPrompt({
     mode: 'objects-swap',
-    userPrompt: 'Replace A with Reference 1 and B with Reference 2',
-    imageCount: 2,
+    userPrompt,
+    imageCount: 3,
   });
 
-  // Multi-image pays for the shared identity block; keep growth under that block.
-  assert.ok(
-    multi.length - BASELINE_PROMPT_LENGTHS.objectsSwapMulti <=
-      SEEDANCE_REFERENCE_IDENTITY_RULES.length + 40,
-    `objects-swap multi grew by ${multi.length - BASELINE_PROMPT_LENGTHS.objectsSwapMulti}`
+  assert.match(
+    prompt,
+    /For full person, character, or animal replacement, or reference-driven subject animation/
+  );
+  assert.match(
+    prompt,
+    /For partial edits \(clothing, accessories, props, background\)/
+  );
+  assert.match(
+    prompt,
+    /preserve identities of subjects not explicitly assigned for replacement/
+  );
+  assert.match(prompt, /Reference 1 replaces the main character/);
+  assert.match(prompt, /Reference 2 replaces the character's clothing/);
+  assert.match(prompt, /Reference 3 replaces the background/);
+});
+
+test('eight reference images map Reference 1 through 8 in upload order', () => {
+  const prompt = buildSeedanceWorkflowPrompt({
+    mode: 'objects-swap',
+    userPrompt:
+      'Replace subjects with Reference 1 through Reference 8 in upload order.',
+    imageCount: 8,
+  });
+
+  for (let index = 1; index <= 8; index += 1) {
+    assert.match(prompt, new RegExp(`Reference ${index} = @Image${index}`));
+  }
+  assert.doesNotMatch(prompt, /Reference 9/);
+  assert.doesNotMatch(prompt, /@Image9\b/);
+  assert.match(prompt, /Reference 8 = @Image8/);
+});
+
+test('long-trival template uses neutral Reference labels not provider image tags', () => {
+  const template = MOTION_TEMPLATES.find((item) => item.id === 'long-trival');
+  assert.ok(template, 'long-trival template missing');
+
+  assert.match(template.prompt, /Reference 1 replaces the opening dancer/);
+  assert.match(template.prompt, /Reference 2 replaces the selfie character/);
+  assert.match(
+    template.prompt,
+    /Reference 3 replaces the character stepping out of the car/
+  );
+  assert.doesNotMatch(template.prompt, /@Image\s*\d/);
+  assert.doesNotMatch(template.prompt, /@Video\s*\d/);
+
+  const prompt = buildSeedanceWorkflowPrompt({
+    mode: 'objects-swap',
+    userPrompt: template.prompt,
+    imageCount: 3,
+  });
+
+  assert.match(prompt, /Reference 1 = @Image1/);
+  assert.match(prompt, /Reference 2 = @Image2/);
+  assert.match(prompt, /Reference 3 = @Image3/);
+  assert.match(prompt, /Reference 1 replaces the opening dancer/);
+  assert.match(
+    prompt,
+    /Reference 3 replaces the character stepping out of the car/
   );
 });

@@ -81,6 +81,36 @@ test('WaveSpeed dual-role object swap keeps mappings without repeating replaceme
   );
 });
 
+test('WaveSpeed three-person object swap keeps spaced Image tokens and all mappings', () => {
+  const { body } = buildWavespeedSeedancePayload({
+    mode: 'objects-swap',
+    resolution: '480p',
+    prompt: [
+      'Replace Character 1 with Reference 1.',
+      'Replace Character 2 with Reference 2.',
+      'Replace Character 3 with Reference 3.',
+    ].join('\n'),
+    videoUrl: 'https://example.com/source.mp4',
+    imageUrls: [
+      'https://example.com/a.png',
+      'https://example.com/b.png',
+      'https://example.com/c.png',
+    ],
+    sourceDurationSeconds: 4,
+  });
+
+  const prompt = String(body.prompt);
+  assert.match(prompt, /@Video 1/);
+  assert.match(prompt, /Reference 1 = @Image 1/);
+  assert.match(prompt, /Reference 2 = @Image 2/);
+  assert.match(prompt, /Reference 3 = @Image 3/);
+  assert.match(prompt, /Replace Character 3 with Reference 3/);
+  assert.doesNotMatch(prompt, /@Image1\b/);
+  assert.doesNotMatch(prompt, /@Image2\b/);
+  assert.doesNotMatch(prompt, /@Image3\b/);
+  assert.match(prompt, /Never blend unrelated identities/);
+});
+
 test('WaveSpeed motion quote bills reference duration only', () => {
   const quote = estimateWavespeedSeedanceProviderCost({
     mode: 'motion-transfer',

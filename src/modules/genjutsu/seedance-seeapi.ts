@@ -57,12 +57,16 @@ function buildSeeapiWorkflowPrompt(input: {
   if (input.mode !== 'objects-swap') return workflowPrompt;
 
   // Mirror Volcengine: prefix edit intent so the job cannot be classified as
-  // plain reference generation. For multi-image swaps, restate that every
-  // @ImageN mapping must be applied (secondary subjects were commonly skipped).
+  // plain reference generation. Multi-image: reinforce role-aware mapping so
+  // secondary subjects are not skipped, without forcing every image into a
+  // full person swap (e.g. clothing/background refs).
   const parts = [`编辑视频：${workflowPrompt}`];
   if (input.imageCount > 1) {
     parts.push(
-      'Apply every @ImageN→subject mapping completely. Replace each mapped person or object with the matching reference identity (face, hair, body, clothing). Do not leave any mapped subject as the original identity from the source video.'
+      [
+        'MULTI-REFERENCE EDITING:',
+        'Apply each explicitly specified reference-to-target mapping according to its assigned role. For complete person or character replacement, preserve the assigned reference identity. For clothing, props, objects, backgrounds, or partial edits, modify only the requested elements. Do not treat every reference as a separate person or character. Do not merge unrelated identities or change subjects not explicitly assigned for replacement.',
+      ].join('\n')
     );
   }
   return parts.join('\n');

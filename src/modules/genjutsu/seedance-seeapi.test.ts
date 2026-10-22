@@ -81,7 +81,7 @@ test('SeeAPI objects swap can force BytePlus edit task type via upstream overrid
   assert.equal(payload.input.nsfw_checker, undefined);
 });
 
-test('SeeAPI multi-image objects swap restates every ImageN mapping', () => {
+test('SeeAPI multi-image objects swap uses role-aware multi-reference editing', () => {
   const payload = buildSeeapiSeedancePayload({
     model: 'seedance-2-5',
     mode: 'objects-swap',
@@ -99,10 +99,59 @@ test('SeeAPI multi-image objects swap restates every ImageN mapping', () => {
     'https://example.com/ref1.png',
     'https://example.com/ref2.png',
   ]);
-  assert.match(String(payload.input.prompt), /@Image1/);
-  assert.match(String(payload.input.prompt), /@Image2/);
-  assert.match(String(payload.input.prompt), /every @ImageN/);
-  assert.match(String(payload.input.prompt), /Do not leave any mapped subject/);
+  const prompt = String(payload.input.prompt);
+  assert.match(prompt, /@Image1/);
+  assert.match(prompt, /@Image2/);
+  assert.match(prompt, /MULTI-REFERENCE EDITING:/);
+  assert.match(
+    prompt,
+    /Apply each explicitly specified reference-to-target mapping according to its assigned role/
+  );
+  assert.match(
+    prompt,
+    /Do not treat every reference as a separate person or character/
+  );
+  assert.doesNotMatch(prompt, /every @ImageN/);
+  assert.doesNotMatch(prompt, /face, hair, body, clothing/);
+});
+
+test('SeeAPI multi-image mixed roles do not force every reference into a full person swap', () => {
+  const payload = buildSeeapiSeedancePayload({
+    model: 'seedance-2-5',
+    mode: 'objects-swap',
+    resolution: '480p',
+    prompt: [
+      'Reference 1 replaces the main character.',
+      "Reference 2 replaces the character's clothing.",
+      'Reference 3 replaces the background.',
+    ].join('\n'),
+    videoUrl: 'https://example.com/source.mp4',
+    imageUrls: [
+      'https://example.com/person.png',
+      'https://example.com/clothes.png',
+      'https://example.com/bg.png',
+    ],
+    sourceDurationSeconds: 4,
+    callbackUrl: null,
+  });
+
+  const prompt = String(payload.input.prompt);
+  assert.match(prompt, /MULTI-REFERENCE EDITING:/);
+  assert.match(
+    prompt,
+    /For clothing, props, objects, backgrounds, or partial edits, modify only the requested elements/
+  );
+  assert.match(
+    prompt,
+    /Do not treat every reference as a separate person or character/
+  );
+  assert.match(prompt, /Reference 1 replaces the main character/);
+  assert.match(prompt, /Reference 2 replaces the character's clothing/);
+  assert.match(prompt, /Reference 3 replaces the background/);
+  assert.doesNotMatch(
+    prompt,
+    /Replace each mapped person or object with the matching reference identity \(face, hair, body, clothing\)/
+  );
 });
 
 test('SeeAPI quote tracks gateway credits while preserving Seedance customer price', () => {
