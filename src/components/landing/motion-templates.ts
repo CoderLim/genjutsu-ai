@@ -189,7 +189,7 @@ export const MOTION_TEMPLATES: MotionTemplate[] = [
     poster: '/videos/say-it-right-dance-tpl-poster.jpg',
     sourceVideo: '/videos/say-it-right-dance-tpl.mp4',
     prompt:
-      'Replace the dancing girl in the pink T-shirt in @Video 1 with the person in @Image 1 — face, hair, build, and outfit. Keep the dance moves, camera path, crowd, lighting, and timing. Use only this authorized likeness.',
+      'Use @Video 1 only for dance moves, camera path, crowd, lighting, framing, and timing. Change the dancing girl in the pink T-shirt in @Video 1 to be the person from @Image 1 for the whole clip — face, facial proportions, age appearance, hair, body, and clothing must match @Image 1. Do not keep the original dancer face or identity; do not blend the two faces. Use only this authorized likeness.',
     mode: 'objects-swap',
     resolution: DEFAULT_OBJECTS_RESOLUTION,
     aspect: 'portrait',
