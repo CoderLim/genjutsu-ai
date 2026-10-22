@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import {
   A2O_LITE_AI_PRODUCT,
+  BURNING_BRIDGES_AI_PRODUCT,
   COLDPLAY_KISS_CAM_PRODUCT,
   CRAZY_FROG_PRODUCT,
   ENZO_FERNANDEZ_AI_PRODUCT,
@@ -87,6 +88,15 @@ test('gas-station-dance-ai follows the mode env router', () => {
   assert.deepEqual(target, fallback);
 });
 
+test('burning-bridges-ai follows the mode env router', () => {
+  const fallback = resolveGenjutsuProviderTarget('objects-swap');
+  const target = resolveProductProviderTarget(
+    BURNING_BRIDGES_AI_PRODUCT,
+    'objects-swap'
+  );
+  assert.deepEqual(target, fallback);
+});
+
 test('unknown product falls back to mode env router', () => {
   const fallback = resolveGenjutsuProviderTarget('objects-swap');
   const viaProduct = resolveProductProviderTarget(
@@ -117,6 +127,7 @@ test('isGenjutsuProductId allowlist', () => {
   assert.equal(isGenjutsuProductId(COLDPLAY_KISS_CAM_PRODUCT), true);
   assert.equal(isGenjutsuProductId(GANGNAM_STYLE_AI_PRODUCT), true);
   assert.equal(isGenjutsuProductId(GAS_STATION_DANCE_AI_PRODUCT), true);
+  assert.equal(isGenjutsuProductId(BURNING_BRIDGES_AI_PRODUCT), true);
   assert.equal(isGenjutsuProductId('bulin-47'), false);
   assert.equal(isGenjutsuProductId(''), false);
 });

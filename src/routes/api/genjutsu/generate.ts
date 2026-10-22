@@ -14,6 +14,18 @@ import {
   assertA2oLiteAiProviderBinding,
 } from '@/modules/a2o-lite-ai/provider';
 import {
+  assertBurningBridgesAiInputs,
+  BurningBridgesAiPreflightError,
+} from '@/modules/burning-bridges-ai/assert';
+import {
+  BURNING_BRIDGES_AI_ASPECT_RATIO,
+  BURNING_BRIDGES_AI_PRODUCT_ID,
+} from '@/modules/burning-bridges-ai/constants';
+import {
+  assertBurningBridgesAiProviderBinding,
+  BurningBridgesAiProviderBindingError,
+} from '@/modules/burning-bridges-ai/provider';
+import {
   assertColdplayKissCamInputs,
   ColdplayKissCamPreflightError,
 } from '@/modules/coldplay-kiss-cam/assert';
@@ -355,6 +367,15 @@ async function POST({ request }: { request: Request }) {
       assertEnzoFernandezAiInputs(taskOptions);
       assertEnzoFernandezAiProviderBinding(task.provider, task.model);
     }
+    if (product === BURNING_BRIDGES_AI_PRODUCT_ID) {
+      if (!task) {
+        throw new BurningBridgesAiPreflightError(
+          'Burning Bridges AI generation must start from a saved attempt'
+        );
+      }
+      assertBurningBridgesAiInputs(taskOptions);
+      assertBurningBridgesAiProviderBinding(task.provider, task.model);
+    }
     if (product === FLYING_CAR_AI_PRODUCT_ID) {
       if (!task) {
         throw new FlyingCarAiPreflightError(
@@ -394,6 +415,7 @@ async function POST({ request }: { request: Request }) {
     const target =
       (product === A2O_LITE_AI_PRODUCT_ID ||
         product === ENZO_FERNANDEZ_AI_PRODUCT_ID ||
+        product === BURNING_BRIDGES_AI_PRODUCT_ID ||
         product === FLYING_CAR_AI_PRODUCT_ID ||
         product === COLDPLAY_KISS_CAM_PRODUCT_ID ||
         product === GANGNAM_STYLE_AI_PRODUCT_ID ||
@@ -421,15 +443,17 @@ async function POST({ request }: { request: Request }) {
             ? A2O_LITE_AI_ASPECT_RATIO
             : product === ENZO_FERNANDEZ_AI_PRODUCT_ID
               ? ENZO_FERNANDEZ_AI_ASPECT_RATIO
-              : product === FLYING_CAR_AI_PRODUCT_ID
-                ? FLYING_CAR_AI_ASPECT_RATIO
-                : product === COLDPLAY_KISS_CAM_PRODUCT_ID
-                  ? COLDPLAY_KISS_CAM_ASPECT_RATIO
-                  : product === GANGNAM_STYLE_AI_PRODUCT_ID
-                    ? GANGNAM_STYLE_AI_ASPECT_RATIO
-                    : product === GAS_STATION_DANCE_AI_PRODUCT_ID
-                      ? GAS_STATION_DANCE_AI_ASPECT_RATIO
-                      : undefined;
+              : product === BURNING_BRIDGES_AI_PRODUCT_ID
+                ? BURNING_BRIDGES_AI_ASPECT_RATIO
+                : product === FLYING_CAR_AI_PRODUCT_ID
+                  ? FLYING_CAR_AI_ASPECT_RATIO
+                  : product === COLDPLAY_KISS_CAM_PRODUCT_ID
+                    ? COLDPLAY_KISS_CAM_ASPECT_RATIO
+                    : product === GANGNAM_STYLE_AI_PRODUCT_ID
+                      ? GANGNAM_STYLE_AI_ASPECT_RATIO
+                      : product === GAS_STATION_DANCE_AI_PRODUCT_ID
+                        ? GAS_STATION_DANCE_AI_ASPECT_RATIO
+                        : undefined;
 
     if (isSeedanceFamilyProvider(target.provider) && !hasStorageInput(input)) {
       throw new Error(
@@ -581,6 +605,8 @@ async function POST({ request }: { request: Request }) {
         error instanceof A2oLiteAiProviderBindingError ||
         error instanceof EnzoFernandezAiPreflightError ||
         error instanceof EnzoFernandezAiProviderBindingError ||
+        error instanceof BurningBridgesAiPreflightError ||
+        error instanceof BurningBridgesAiProviderBindingError ||
         error instanceof FlyingCarAiPreflightError ||
         error instanceof FlyingCarAiProviderBindingError ||
         error instanceof ColdplayKissCamPreflightError ||

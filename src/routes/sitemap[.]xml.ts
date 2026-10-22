@@ -28,6 +28,7 @@ const STATIC_PATHS = [
   '/bulin-47-ai',
   '/text-to-image',
   '/blog',
+  '/burning-bridges-ai',
   '/privacy-policy',
   '/terms-of-service',
   '/refund-policy',
@@ -47,6 +48,8 @@ const LIMITED_STATIC_PATH_LOCALES: Record<string, readonly string[]> = {
   '/gangnam-style-ai': [baseLocale],
   // Gas Station Dance AI SEO shell is English-only for now.
   '/gas-station-dance-ai': [baseLocale],
+  // Burning Bridges AI SEO shell is English-only for now.
+  '/burning-bridges-ai': [baseLocale],
 };
 
 function enabledContentLocales(values: readonly string[]): string[] {

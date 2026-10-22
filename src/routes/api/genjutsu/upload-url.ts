@@ -12,6 +12,17 @@ import {
   A2oLiteAiProviderBindingError,
   assertA2oLiteAiProviderBinding,
 } from '@/modules/a2o-lite-ai/provider';
+import { isAllowedBurningBridgesAiPrompt } from '@/modules/burning-bridges-ai/assert';
+import {
+  BURNING_BRIDGES_AI_ASPECT_RATIO,
+  BURNING_BRIDGES_AI_MODE,
+  BURNING_BRIDGES_AI_PRODUCT_ID,
+  BURNING_BRIDGES_AI_RESOLUTIONS,
+} from '@/modules/burning-bridges-ai/constants';
+import {
+  assertBurningBridgesAiProviderBinding,
+  BurningBridgesAiProviderBindingError,
+} from '@/modules/burning-bridges-ai/provider';
 import { isAllowedColdplayKissCamPrompt } from '@/modules/coldplay-kiss-cam/assert';
 import {
   COLDPLAY_KISS_CAM_ASPECT_RATIO,
@@ -90,6 +101,7 @@ import {
   createGenjutsuProxyUploadDescriptor,
   createGenjutsuR2UploadDescriptor,
   ensureA2oLiteAiTemplateInR2,
+  ensureBurningBridgesAiTemplateInR2,
   ensureColdplayKissCamTemplateInR2,
   ensureCrazyFrogTemplateInR2,
   ensureEnzoFernandezAiTemplateInR2,
@@ -99,6 +111,7 @@ import {
   ensureSmalltownBoyDanceTemplateInR2,
   GENJUTSU_PROXY_UPLOAD_MAX_BYTES,
   getA2oLiteAiTemplateVideoKey,
+  getBurningBridgesAiTemplateVideoKey,
   getColdplayKissCamTemplateVideoKey,
   getCrazyFrogTemplateVideoKey,
   getEnzoFernandezAiTemplateVideoKey,
@@ -156,16 +169,19 @@ async function POST({ request }: { request: Request }) {
     const isCrazyFrog = product === CRAZY_FROG_PRODUCT_ID;
     const isA2oLiteAi = product === A2O_LITE_AI_PRODUCT_ID;
     const isEnzoFernandezAi = product === ENZO_FERNANDEZ_AI_PRODUCT_ID;
+    const isBurningBridgesAi = product === BURNING_BRIDGES_AI_PRODUCT_ID;
     const isFlyingCarAi = product === FLYING_CAR_AI_PRODUCT_ID;
     const isColdplayKissCam = product === COLDPLAY_KISS_CAM_PRODUCT_ID;
     const isGangnamStyleAi = product === GANGNAM_STYLE_AI_PRODUCT_ID;
     const isGasStationDanceAi = product === GAS_STATION_DANCE_AI_PRODUCT_ID;
     const isTripleImageProduct = isGangnamStyleAi || isGasStationDanceAi;
-    const isSingleImageProduct = isEnzoFernandezAi || isFlyingCarAi;
+    const isSingleImageProduct =
+      isEnzoFernandezAi || isFlyingCarAi || isBurningBridgesAi;
     const isProductPreview =
       (isCrazyFrog ||
         isA2oLiteAi ||
         isEnzoFernandezAi ||
+        isBurningBridgesAi ||
         isFlyingCarAi ||
         isColdplayKissCam ||
         isGangnamStyleAi ||
@@ -178,6 +194,7 @@ async function POST({ request }: { request: Request }) {
         isCrazyFrog ||
         isA2oLiteAi ||
         isEnzoFernandezAi ||
+        isBurningBridgesAi ||
         isFlyingCarAi ||
         isColdplayKissCam ||
         isGangnamStyleAi ||
@@ -233,7 +250,9 @@ async function POST({ request }: { request: Request }) {
                   ? 'Flying Car AI preview must use 480p'
                   : isEnzoFernandezAi
                     ? 'Enzo Fernandez AI preview must use 480p'
-                    : 'Crazy Frog preview must use 480p',
+                    : isBurningBridgesAi
+                      ? 'Burning Bridges AI preview must use 480p'
+                      : 'Crazy Frog preview must use 480p',
         { status: 400 }
       );
     }
@@ -276,6 +295,29 @@ async function POST({ request }: { request: Request }) {
     if (isEnzoFernandezAi && !isAllowedEnzoFernandezAiPrompt(prompt)) {
       return respErr(
         'Enzo Fernandez AI prompt does not match the fixed product prompt',
+        {
+          status: 400,
+        }
+      );
+    }
+    if (isBurningBridgesAi && mode !== BURNING_BRIDGES_AI_MODE) {
+      return respErr('Burning Bridges AI only supports objects-swap', {
+        status: 400,
+      });
+    }
+    if (
+      isBurningBridgesAi &&
+      !BURNING_BRIDGES_AI_RESOLUTIONS.includes(
+        resolution as (typeof BURNING_BRIDGES_AI_RESOLUTIONS)[number]
+      )
+    ) {
+      return respErr('Burning Bridges AI only supports 480p and 720p', {
+        status: 400,
+      });
+    }
+    if (isBurningBridgesAi && !isAllowedBurningBridgesAiPrompt(prompt)) {
+      return respErr(
+        'Burning Bridges AI prompt does not match the fixed product prompt',
         {
           status: 400,
         }
@@ -398,7 +440,9 @@ async function POST({ request }: { request: Request }) {
                 ? 'Flying Car AI'
                 : isEnzoFernandezAi
                   ? 'Enzo Fernandez AI'
-                  : 'Crazy Frog';
+                  : isBurningBridgesAi
+                    ? 'Burning Bridges AI'
+                    : 'Crazy Frog';
       const previewImageCount = isSingleImageProduct
         ? 1
         : isTripleImageProduct
@@ -486,7 +530,9 @@ async function POST({ request }: { request: Request }) {
                         ? getFlyingCarAiTemplateVideoKey()
                         : isEnzoFernandezAi
                           ? getEnzoFernandezAiTemplateVideoKey()
-                          : getSmalltownBoyDanceTemplateVideoKey()
+                          : isBurningBridgesAi
+                            ? getBurningBridgesAiTemplateVideoKey()
+                            : getSmalltownBoyDanceTemplateVideoKey()
           );
         } else if (isCrazyFrog) {
           await ensureCrazyFrogTemplateInR2();
@@ -502,6 +548,8 @@ async function POST({ request }: { request: Request }) {
           await ensureFlyingCarAiTemplateInR2();
         } else if (isEnzoFernandezAi) {
           await ensureEnzoFernandezAiTemplateInR2();
+        } else if (isBurningBridgesAi) {
+          await ensureBurningBridgesAiTemplateInR2();
         } else {
           await ensureSmalltownBoyDanceTemplateInR2();
         }
@@ -523,7 +571,9 @@ async function POST({ request }: { request: Request }) {
                         ? 'Flying Car AI template is not configured in R2.'
                         : isEnzoFernandezAi
                           ? 'Enzo Fernandez AI template is not configured in R2.'
-                          : 'Smalltown Boy Dance template is not configured in R2.'),
+                          : isBurningBridgesAi
+                            ? 'Burning Bridges AI template is not configured in R2.'
+                            : 'Smalltown Boy Dance template is not configured in R2.'),
           { code: 'TEMPLATE_NOT_CONFIGURED' },
           { status: 503 }
         );
@@ -572,6 +622,9 @@ async function POST({ request }: { request: Request }) {
     if (isEnzoFernandezAi && existing) {
       assertEnzoFernandezAiProviderBinding(existing.provider, existing.model);
     }
+    if (isBurningBridgesAi && existing) {
+      assertBurningBridgesAiProviderBinding(existing.provider, existing.model);
+    }
     if (isFlyingCarAi && existing) {
       assertFlyingCarAiProviderBinding(existing.provider, existing.model);
     }
@@ -616,7 +669,9 @@ async function POST({ request }: { request: Request }) {
                 ? FLYING_CAR_AI_ASPECT_RATIO
                 : isEnzoFernandezAi
                   ? ENZO_FERNANDEZ_AI_ASPECT_RATIO
-                  : SMALLTOWN_ASPECT_RATIO;
+                  : isBurningBridgesAi
+                    ? BURNING_BRIDGES_AI_ASPECT_RATIO
+                    : SMALLTOWN_ASPECT_RATIO;
 
     if (isFixedTemplateProduct) {
       await bindGenjutsuUploadInputs({
@@ -656,7 +711,9 @@ async function POST({ request }: { request: Request }) {
                     ? FLYING_CAR_AI_ASPECT_RATIO
                     : isEnzoFernandezAi
                       ? ENZO_FERNANDEZ_AI_ASPECT_RATIO
-                      : CRAZY_FROG_ASPECT_RATIO
+                      : isBurningBridgesAi
+                        ? BURNING_BRIDGES_AI_ASPECT_RATIO
+                        : CRAZY_FROG_ASPECT_RATIO
           : undefined,
         videoKey: normalizedInputs[0].key,
         imageKeys: normalizedInputs.slice(1).map((item) => item.key),
@@ -712,6 +769,7 @@ async function POST({ request }: { request: Request }) {
     if (
       error instanceof A2oLiteAiProviderBindingError ||
       error instanceof EnzoFernandezAiProviderBindingError ||
+      error instanceof BurningBridgesAiProviderBindingError ||
       error instanceof FlyingCarAiProviderBindingError ||
       error instanceof ColdplayKissCamProviderBindingError ||
       error instanceof GangnamStyleAiProviderBindingError ||

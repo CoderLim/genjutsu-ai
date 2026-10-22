@@ -3,6 +3,10 @@ import {
   A2O_LITE_AI_TEMPLATE_POSTER_PATH,
 } from '@/modules/a2o-lite-ai/constants';
 import {
+  BURNING_BRIDGES_AI_TEMPLATE_DISPLAY_PATH,
+  BURNING_BRIDGES_AI_TEMPLATE_POSTER_PATH,
+} from '@/modules/burning-bridges-ai/constants';
+import {
   COLDPLAY_KISS_CAM_TEMPLATE_PATH,
   COLDPLAY_KISS_CAM_TEMPLATE_POSTER_PATH,
 } from '@/modules/coldplay-kiss-cam/constants';
@@ -97,6 +101,14 @@ export const MOTION_TEMPLATES: MotionTemplate[] = [
     sourceVideo: COLDPLAY_KISS_CAM_TEMPLATE_PATH,
     href: '/coldplay-kiss-cam',
     aspect: 'portrait',
+  },
+  {
+    id: 'burning-bridges-ai',
+    titleKey: 'site.templates.burning_bridges_ai',
+    poster: BURNING_BRIDGES_AI_TEMPLATE_POSTER_PATH,
+    sourceVideo: BURNING_BRIDGES_AI_TEMPLATE_DISPLAY_PATH,
+    href: '/burning-bridges-ai',
+    aspect: 'landscape',
   },
   {
     id: 'enzo-fernandez-ai',

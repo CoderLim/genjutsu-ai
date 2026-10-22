@@ -5,6 +5,7 @@ import { getGenjutsuProductTemplateVideoKey } from './storage';
 import type { GenjutsuProductId } from './types';
 import {
   A2O_LITE_AI_PRODUCT,
+  BURNING_BRIDGES_AI_PRODUCT,
   COLDPLAY_KISS_CAM_PRODUCT,
   CRAZY_FROG_PRODUCT,
   ENZO_FERNANDEZ_AI_PRODUCT,
@@ -23,6 +24,7 @@ const ALL_PRODUCTS: GenjutsuProductId[] = [
   COLDPLAY_KISS_CAM_PRODUCT,
   GANGNAM_STYLE_AI_PRODUCT,
   GAS_STATION_DANCE_AI_PRODUCT,
+  BURNING_BRIDGES_AI_PRODUCT,
 ];
 
 test('each Genjutsu product maps to a distinct template key', () => {
@@ -76,5 +78,9 @@ test('product id is reflected in its default template key path', () => {
   assert.match(
     getGenjutsuProductTemplateVideoKey(GAS_STATION_DANCE_AI_PRODUCT),
     /gas-station-dance-ai/
+  );
+  assert.match(
+    getGenjutsuProductTemplateVideoKey(BURNING_BRIDGES_AI_PRODUCT),
+    /burning-bridges-ai/
   );
 });

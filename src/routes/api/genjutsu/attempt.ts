@@ -7,6 +7,12 @@ import {
   A2O_LITE_AI_PRODUCT_ID,
   A2O_LITE_AI_RESOLUTIONS,
 } from '@/modules/a2o-lite-ai/constants';
+import { isAllowedBurningBridgesAiPrompt } from '@/modules/burning-bridges-ai/assert';
+import {
+  BURNING_BRIDGES_AI_MODE,
+  BURNING_BRIDGES_AI_PRODUCT_ID,
+  BURNING_BRIDGES_AI_RESOLUTIONS,
+} from '@/modules/burning-bridges-ai/constants';
 import { isAllowedColdplayKissCamPrompt } from '@/modules/coldplay-kiss-cam/assert';
 import {
   COLDPLAY_KISS_CAM_MODE,
@@ -150,6 +156,31 @@ async function POST({ request }: { request: Request }) {
     if (isEnzoFernandezAi && !isAllowedEnzoFernandezAiPrompt(prompt)) {
       return respErr(
         'Enzo Fernandez AI prompt does not match the fixed product prompt',
+        {
+          status: 400,
+        }
+      );
+    }
+
+    const isBurningBridgesAi = product === BURNING_BRIDGES_AI_PRODUCT_ID;
+    if (isBurningBridgesAi && mode !== BURNING_BRIDGES_AI_MODE) {
+      return respErr('Burning Bridges AI only supports objects-swap', {
+        status: 400,
+      });
+    }
+    if (
+      isBurningBridgesAi &&
+      !BURNING_BRIDGES_AI_RESOLUTIONS.includes(
+        resolution as (typeof BURNING_BRIDGES_AI_RESOLUTIONS)[number]
+      )
+    ) {
+      return respErr('Burning Bridges AI only supports 480p and 720p', {
+        status: 400,
+      });
+    }
+    if (isBurningBridgesAi && !isAllowedBurningBridgesAiPrompt(prompt)) {
+      return respErr(
+        'Burning Bridges AI prompt does not match the fixed product prompt',
         {
           status: 400,
         }

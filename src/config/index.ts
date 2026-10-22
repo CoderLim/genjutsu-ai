@@ -242,6 +242,11 @@ export const envConfigs: Record<string, string> = {
     procEnv.GAS_STATION_DANCE_AI_TEMPLATE_VIDEO_KEY ??
     'genjutsu/templates/gas-station-dance-ai-v1.mp4',
 
+  // Burning Bridges AI (server-only). Fixed R2 template; client uploads one image.
+  burning_bridges_ai_template_video_key:
+    procEnv.BURNING_BRIDGES_AI_TEMPLATE_VIDEO_KEY ??
+    'genjutsu/templates/burning-bridges-ai-v2.mp4',
+
   // Locale (public)
   locale: publicEnv('VITE_DEFAULT_LOCALE') ?? 'en',
 };

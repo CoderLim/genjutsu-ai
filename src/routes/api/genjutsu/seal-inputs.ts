@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router';
 
 import { getAuth } from '@/core/auth';
 import { A2O_LITE_AI_PRODUCT_ID } from '@/modules/a2o-lite-ai/constants';
+import { BURNING_BRIDGES_AI_PRODUCT_ID } from '@/modules/burning-bridges-ai/constants';
 import { COLDPLAY_KISS_CAM_PRODUCT_ID } from '@/modules/coldplay-kiss-cam/constants';
 import { CRAZY_FROG_PRODUCT_ID } from '@/modules/crazy-frog/constants';
 import { ENZO_FERNANDEZ_AI_PRODUCT_ID } from '@/modules/enzo-fernandez-ai/constants';
@@ -25,6 +26,7 @@ import {
   findExistingSealedGenjutsuTemplateInputs,
   genjutsuR2ObjectExists,
   getA2oLiteAiTemplateVideoKey,
+  getBurningBridgesAiTemplateVideoKey,
   getColdplayKissCamTemplateVideoKey,
   getCrazyFrogTemplateVideoKey,
   getEnzoFernandezAiTemplateVideoKey,
@@ -134,7 +136,9 @@ async function POST({ request }: { request: Request }) {
                     ? getGangnamStyleAiTemplateVideoKey()
                     : product === GAS_STATION_DANCE_AI_PRODUCT_ID
                       ? getGasStationDanceAiTemplateVideoKey()
-                      : getZombieHugTemplateVideoKey(templateAspectRatio);
+                      : product === BURNING_BRIDGES_AI_PRODUCT_ID
+                        ? getBurningBridgesAiTemplateVideoKey()
+                        : getZombieHugTemplateVideoKey(templateAspectRatio);
     const videoKey =
       typeof currentOptions?.videoKey === 'string'
         ? currentOptions.videoKey

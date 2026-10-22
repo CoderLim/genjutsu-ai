@@ -53,6 +53,12 @@ const STATIC_PAGES: { path: string; title: string; description: string }[] = [
       'Three-photo gas station dance AI video generator (dance, selfie, car exit)',
   },
   {
+    path: '/burning-bridges-ai',
+    title: 'Burning Bridges AI',
+    description:
+      'One-photo Drake party-scene Burning Bridges AI video maker (fixed template)',
+  },
+  {
     path: '/kairo-bad-times',
     title: 'Kairo Bad Times AI Video',
     description: 'One-photo Kairo Bad Times motion-template AI video generator',

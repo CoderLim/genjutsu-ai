@@ -19,7 +19,8 @@ export type GenjutsuProductId =
   | 'flying-car-ai'
   | 'coldplay-kiss-cam'
   | 'gangnam-style-ai'
-  | 'gas-station-dance-ai';
+  | 'gas-station-dance-ai'
+  | 'burning-bridges-ai';
 
 export type GenjutsuProviderTarget = {
   provider: GenjutsuProvider;
