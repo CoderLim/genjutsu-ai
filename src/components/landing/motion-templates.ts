@@ -184,6 +184,17 @@ export const MOTION_TEMPLATES: MotionTemplate[] = [
     aspect: 'landscape',
   },
   {
+    id: 'pink-tee-dance',
+    titleKey: 'site.templates.pink_tee_dance',
+    poster: '/videos/pink-tee-dance-tpl-poster.jpg',
+    sourceVideo: '/videos/pink-tee-dance-tpl.mp4',
+    prompt:
+      'Replace the dancing girl in the pink T-shirt in @Video 1 with the person in @Image 1 — face, hair, build, and outfit. Keep the dance moves, camera path, crowd, lighting, and timing. Use only this authorized likeness.',
+    mode: 'objects-swap',
+    resolution: DEFAULT_OBJECTS_RESOLUTION,
+    aspect: 'portrait',
+  },
+  {
     id: 'unforgettable-ai-car',
     titleKey: 'site.templates.unforgettable_ai_car',
     poster: '/videos/unforgettable-ai-car-tpl-poster.jpg',
