@@ -16,7 +16,6 @@ import {
 } from '@/modules/genjutsu/pricing';
 import { estimateSeedanceProviderCost } from '@/modules/genjutsu/seedance';
 import { HOTEL_LOBBY_SCENE } from '@/modules/hotel-lobby/billing';
-import { KAIRO_BAD_TIMES_SCENE } from '@/modules/kairo-bad-times/constants';
 import { displayNameForHotelLobbyPresetId } from '@/modules/hotel-lobby/presets';
 import {
   estimateH3LabCredits,
@@ -25,6 +24,7 @@ import {
   HOTEL_LOBBY_RESOLUTIONS,
   type HotelLobbyResolution,
 } from '@/modules/hotel-lobby/pricing';
+import { KAIRO_BAD_TIMES_SCENE } from '@/modules/kairo-bad-times/constants';
 import { hasPermission } from '@/modules/rbac/service';
 import { respErr, respPage } from '@/lib/resp';
 
@@ -263,7 +263,8 @@ async function GET({ request }: { request: Request }) {
           : null;
       const isKairo = row.scene === KAIRO_BAD_TIMES_SCENE;
       const hasSourceVideo =
-        (typeof options?.videoKey === 'string' && options.videoKey.length > 0) ||
+        (typeof options?.videoKey === 'string' &&
+          options.videoKey.length > 0) ||
         (isKairo && typeof options?.templateVideoKey === 'string');
       const imageKeys = Array.isArray(options?.imageKeys)
         ? options.imageKeys.filter(
@@ -407,6 +408,24 @@ async function GET({ request }: { request: Request }) {
         uploadOrigin: typeof result?.origin === 'string' ? result.origin : null,
         uploadHost:
           typeof result?.uploadHost === 'string' ? result.uploadHost : null,
+        uploadMethod:
+          typeof result?.uploadMethod === 'string' ? result.uploadMethod : null,
+        uploadFilePreparationMode:
+          typeof result?.filePreparationMode === 'string'
+            ? result.filePreparationMode
+            : null,
+        uploadFilePreparationResult:
+          typeof result?.filePreparationResult === 'string'
+            ? result.filePreparationResult
+            : null,
+        uploadFileReadError:
+          typeof result?.fileReadError === 'string'
+            ? result.fileReadError
+            : null,
+        uploadFileSizeBucket:
+          typeof result?.fileSizeBucket === 'string'
+            ? result.fileSizeBucket
+            : null,
         uploadErrorName:
           typeof result?.errorName === 'string' ? result.errorName : null,
         uploadErrorMessage:

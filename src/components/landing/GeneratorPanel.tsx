@@ -28,6 +28,7 @@ import {
 import { resolveUploadStorageIndex } from '@/lib/upload-storage-index';
 import { m } from '@/paraglide/messages.js';
 import { useCreditGate } from '@/hooks/use-credit-gate';
+import { useImageMergePrepareGuard } from '@/hooks/use-image-prepare-guard';
 import { usePublicConfig } from '@/hooks/use-public-config';
 import { useUserCredits } from '@/hooks/use-user-credits';
 import { InsufficientCreditsModal } from '@/components/credits/insufficient-credits-modal';
@@ -637,6 +638,16 @@ async function reportUploadFailure(params: {
   file?: File | null;
 }) {
   const failure = classifyUploadFailure(params.cause, { file: params.file });
+  if (!failure) {
+    // Upload path should always yield a classified error; keep reporting safe.
+    return apiPost<{ recovered: boolean }>('/api/genjutsu/attempt-failure', {
+      generationId: params.generationId,
+      fileIndex: params.fileIndex,
+      errorCode: 'UPLOAD_NETWORK_ERROR',
+      httpStatus: null,
+      diagnostics: null,
+    });
+  }
   return apiPost<{
     generationId: string;
     status: string;
@@ -688,7 +699,9 @@ function ImageUploadSlot({
   signedIn: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const mergeSeqRef = useRef(0);
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
+  const mergePrepare = useImageMergePrepareGuard();
   const [previewId, setPreviewId] = useState<string | null>(null);
   const { dragging, setDragging, onDragOver, onDragLeave } = useDragHighlight();
   const previewItem = items.find((i) => i.id === previewId) ?? null;
@@ -714,18 +727,24 @@ function ImageUploadSlot({
         f.type.startsWith('image/')
       );
       if (incoming.length === 0) return;
-      const room = IMAGE_MAX - items.length;
+      const room = IMAGE_MAX - itemsRef.current.length;
       if (room <= 0) return;
 
       const batch = incoming.slice(0, room);
-      const seq = ++mergeSeqRef.current;
-      const baseItems = items;
+      const guard = mergePrepare.begin();
 
       void (async () => {
         const accepted: MediaItem[] = [];
+        const revokeAccepted = () => {
+          for (const item of accepted) URL.revokeObjectURL(item.url);
+          accepted.length = 0;
+        };
         // Sequential prepare keeps peak memory lower on Android Chrome.
         for (const file of batch) {
-          if (mergeSeqRef.current !== seq) return;
+          if (!guard.isCurrent()) {
+            revokeAccepted();
+            return;
+          }
           if (file.size <= 0 || file.size > MAX_REFERENCE_IMAGE_BYTES) {
             toast.error(
               m['site.generator.image_size_error']({ name: file.name })
@@ -737,10 +756,16 @@ function ImageUploadSlot({
               file,
               maxBytes: MAX_REFERENCE_IMAGE_BYTES,
             });
-            if (mergeSeqRef.current !== seq) return;
+            if (!guard.isCurrent()) {
+              revokeAccepted();
+              return;
+            }
             accepted.push(createMediaItem(prepared.file));
           } catch (cause) {
-            if (mergeSeqRef.current !== seq) return;
+            if (!guard.isCurrent()) {
+              revokeAccepted();
+              return;
+            }
             toast.error(
               cause instanceof UploadFileReadError
                 ? cause.message
@@ -748,16 +773,35 @@ function ImageUploadSlot({
             );
           }
         }
-        if (mergeSeqRef.current !== seq) return;
-        if (accepted.length > 0) {
-          onChange([...baseItems, ...accepted]);
+        if (!guard.isCurrent()) {
+          revokeAccepted();
+          return;
         }
+        if (accepted.length === 0) return;
+
+        const latest = itemsRef.current;
+        const roomLeft = IMAGE_MAX - latest.length;
+        if (roomLeft <= 0) {
+          revokeAccepted();
+          return;
+        }
+        const toAdd = accepted.slice(0, roomLeft);
+        for (const item of accepted.slice(toAdd.length)) {
+          URL.revokeObjectURL(item.url);
+        }
+        if (!guard.isCurrent()) {
+          for (const item of toAdd) URL.revokeObjectURL(item.url);
+          return;
+        }
+        onChange([...latest, ...toAdd]);
       })();
     },
-    [items, onChange, signedIn]
+    [mergePrepare, onChange, signedIn]
   );
 
   const removeAt = (id: string) => {
+    // Drop in-flight merges so they cannot re-append after a delete.
+    mergePrepare.invalidate();
     const target = items.find((i) => i.id === id);
     if (target) URL.revokeObjectURL(target.url);
     onChange(items.filter((i) => i.id !== id));

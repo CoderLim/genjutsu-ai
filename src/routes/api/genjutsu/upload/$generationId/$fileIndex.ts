@@ -15,6 +15,9 @@ import {
 } from '@/modules/genjutsu/storage';
 import { enforceMinIntervalRateLimit } from '@/lib/rate-limit';
 
+/** Sample successful PUTs so healthy traffic does not flood Workers logs. */
+const SUCCESS_LOG_SAMPLE_RATE = 0.05;
+
 function errorResponse(message: string, status: number) {
   return new Response(message, {
     status,
@@ -55,23 +58,29 @@ async function PUT({
   let generationIdForLog = params.generationId || 'unknown';
   let fileIndexForLog = Number(params.fileIndex);
   if (!Number.isInteger(fileIndexForLog)) fileIndexForLog = -1;
+  let stage = 'entered';
 
-  try {
+  const fail = (
+    message: string,
+    status: number,
+    failStage: string,
+    detail?: string
+  ) => {
+    stage = failStage;
     logProxyUploadStage({
-      stage: 'entered',
+      stage: failStage,
       generationId: generationIdForLog,
       fileIndex: fileIndexForLog,
+      detail,
     });
+    return errorResponse(message, status);
+  };
 
+  try {
     const auth = getAuth();
     const session = await auth.api.getSession({ headers: request.headers });
     if (!session?.user) {
-      logProxyUploadStage({
-        stage: 'auth_failed',
-        generationId: generationIdForLog,
-        fileIndex: fileIndexForLog,
-      });
-      return errorResponse('Unauthorized', 401);
+      return fail('Unauthorized', 401, 'auth_failed');
     }
 
     let generationId: string;
@@ -79,22 +88,12 @@ async function PUT({
       generationId = assertGenerationId(params.generationId);
       generationIdForLog = generationId;
     } catch {
-      logProxyUploadStage({
-        stage: 'invalid_generation_id',
-        generationId: generationIdForLog,
-        fileIndex: fileIndexForLog,
-      });
-      return errorResponse('Invalid generation ID', 400);
+      return fail('Invalid generation ID', 400, 'invalid_generation_id');
     }
 
     const fileIndex = Number(params.fileIndex);
     if (!Number.isInteger(fileIndex) || fileIndex < 0 || fileIndex > 8) {
-      logProxyUploadStage({
-        stage: 'invalid_file_index',
-        generationId,
-        fileIndex: fileIndexForLog,
-      });
-      return errorResponse('Invalid file index', 400);
+      return fail('Invalid file index', 400, 'invalid_file_index');
     }
     fileIndexForLog = fileIndex;
 
@@ -103,22 +102,12 @@ async function PUT({
       userId: session.user.id,
     });
     if (!task || task.status !== 'initiated') {
-      logProxyUploadStage({
-        stage: 'task_not_found',
-        generationId,
-        fileIndex,
-      });
-      return errorResponse('Generation attempt not found', 404);
+      return fail('Generation attempt not found', 404, 'task_not_found');
     }
 
     const binding = getGenjutsuUploadBinding(task);
     if (!binding) {
-      logProxyUploadStage({
-        stage: 'binding_missing',
-        generationId,
-        fileIndex,
-      });
-      return errorResponse('Upload not prepared', 400);
+      return fail('Upload not prepared', 400, 'binding_missing');
     }
 
     let storageKey: string | undefined;
@@ -129,12 +118,11 @@ async function PUT({
       // Template video is server-owned; clients only upload reference images at
       // Genjutsu indices 1..N. contentTypes/lengths are image-only (0-based).
       if (fileIndex < 1) {
-        logProxyUploadStage({
-          stage: 'invalid_template_index',
-          generationId,
-          fileIndex,
-        });
-        return errorResponse('Invalid file index for template preset', 400);
+        return fail(
+          'Invalid file index for template preset',
+          400,
+          'invalid_template_index'
+        );
       }
       const imageIndex = fileIndex - 1;
       storageKey = binding.imageKeys[imageIndex];
@@ -159,22 +147,16 @@ async function PUT({
       !Number.isSafeInteger(expectedLength) ||
       expectedLength! <= 0
     ) {
-      logProxyUploadStage({
-        stage: 'binding_incomplete',
-        generationId,
-        fileIndex,
-      });
-      return errorResponse('Upload binding incomplete', 400);
+      return fail('Upload binding incomplete', 400, 'binding_incomplete');
     }
 
     if (expectedLength! > GENJUTSU_PROXY_UPLOAD_MAX_BYTES) {
-      logProxyUploadStage({
-        stage: 'too_large_for_proxy',
-        generationId,
-        fileIndex,
-        detail: `expectedLength=${expectedLength}`,
-      });
-      return errorResponse('File too large for proxy upload', 413);
+      return fail(
+        'File too large for proxy upload',
+        413,
+        'too_large_for_proxy',
+        `expectedLength=${expectedLength}`
+      );
     }
 
     try {
@@ -185,21 +167,16 @@ async function PUT({
         key: storageKey,
       });
     } catch (error: unknown) {
-      logProxyUploadStage({
-        stage: 'key_ownership_failed',
-        generationId,
-        fileIndex,
-      });
       const message =
         error instanceof Error ? error.message : 'Invalid storage key';
-      return errorResponse(message || 'Invalid storage key', 400);
+      return fail(
+        message || 'Invalid storage key',
+        400,
+        'key_ownership_failed'
+      );
     }
 
-    logProxyUploadStage({
-      stage: 'auth_ok',
-      generationId,
-      fileIndex,
-    });
+    stage = 'auth_ok';
 
     const contentType =
       request.headers
@@ -208,13 +185,12 @@ async function PUT({
         ?.trim()
         .toLowerCase() || '';
     if (contentType !== expectedType) {
-      logProxyUploadStage({
-        stage: 'content_type_mismatch',
-        generationId,
-        fileIndex,
-        detail: `got=${contentType || 'missing'} expected=${expectedType}`,
-      });
-      return errorResponse('Content-Type mismatch', 400);
+      return fail(
+        'Content-Type mismatch',
+        400,
+        'content_type_mismatch',
+        `got=${contentType || 'missing'} expected=${expectedType}`
+      );
     }
 
     const contentLengthHeader = request.headers.get('content-length');
@@ -222,35 +198,23 @@ async function PUT({
       ? Number(contentLengthHeader)
       : NaN;
     // Keep integrity check: mismatch or missing Content-Length rejects the PUT.
-    // Log explicitly so CF logs can distinguish browser CL issues from R2 fails.
     if (
       !Number.isSafeInteger(contentLength) ||
       contentLength !== expectedLength
     ) {
-      logProxyUploadStage({
-        stage: 'content_length_mismatch',
-        generationId,
-        fileIndex,
-        detail: `header=${contentLengthHeader ?? 'missing'} expected=${expectedLength}`,
-      });
-      return errorResponse('Content-Length mismatch', 400);
+      return fail(
+        'Content-Length mismatch',
+        400,
+        'content_length_mismatch',
+        `header=${contentLengthHeader ?? 'missing'} expected=${expectedLength}`
+      );
     }
 
     if (!request.body) {
-      logProxyUploadStage({
-        stage: 'missing_body',
-        generationId,
-        fileIndex,
-      });
-      return errorResponse('Missing body', 400);
+      return fail('Missing body', 400, 'missing_body');
     }
 
-    logProxyUploadStage({
-      stage: 'r2_put_start',
-      generationId,
-      fileIndex,
-      detail: `bytes=${expectedLength}`,
-    });
+    stage = 'r2_put_start';
 
     try {
       await putGenjutsuStagingObject({
@@ -261,27 +225,26 @@ async function PUT({
       });
     } catch (putError: unknown) {
       console.error('genjutsu proxy upload put failed:', putError);
-      logProxyUploadStage({
-        stage: 'r2_put_failed',
-        generationId,
-        fileIndex,
-      });
       const status = statusForGenjutsuProxyUploadError(putError);
-      return errorResponse(
+      return fail(
         putError instanceof GenjutsuR2BindingMissingError
           ? putError.message
           : putError instanceof Error
             ? putError.message || 'Upload failed'
             : 'Upload failed',
-        status
+        status,
+        'r2_put_failed'
       );
     }
 
-    logProxyUploadStage({
-      stage: 'r2_put_ok',
-      generationId,
-      fileIndex,
-    });
+    if (Math.random() < SUCCESS_LOG_SAMPLE_RATE) {
+      logProxyUploadStage({
+        stage: 'r2_put_ok',
+        generationId,
+        fileIndex,
+        detail: `bytes=${expectedLength}`,
+      });
+    }
 
     return new Response(null, {
       status: 204,
@@ -290,9 +253,10 @@ async function PUT({
   } catch (error: unknown) {
     console.error('genjutsu proxy upload failed:', error);
     logProxyUploadStage({
-      stage: 'unexpected_error',
+      stage: stage === 'entered' ? 'unexpected_error' : stage,
       generationId: generationIdForLog,
       fileIndex: fileIndexForLog,
+      detail: 'unexpected_error',
     });
     // Auth/DB/unexpected — treat as retryable server error, not client 400.
     return errorResponse(

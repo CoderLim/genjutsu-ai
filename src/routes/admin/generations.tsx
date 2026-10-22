@@ -89,6 +89,11 @@ interface Generation {
   uploadDownlinkMbps: number | null;
   uploadOrigin: string | null;
   uploadHost: string | null;
+  uploadMethod: string | null;
+  uploadFilePreparationMode: string | null;
+  uploadFilePreparationResult: string | null;
+  uploadFileReadError: string | null;
+  uploadFileSizeBucket: string | null;
   uploadErrorName: string | null;
   uploadErrorMessage: string | null;
   uploadAttempts: GenerationUploadAttempt[];
@@ -1011,6 +1016,30 @@ function GenerationsPage() {
                       <div className="text-muted-foreground mt-1 font-mono text-xs break-all">
                         host: {detail.uploadHost || '—'}
                       </div>
+                      <div className="text-muted-foreground mt-1 font-mono text-xs">
+                        {[
+                          detail.uploadMethod
+                            ? `method: ${detail.uploadMethod}`
+                            : null,
+                          detail.uploadFilePreparationMode
+                            ? `prep: ${detail.uploadFilePreparationMode}${
+                                detail.uploadFilePreparationResult
+                                  ? `/${detail.uploadFilePreparationResult}`
+                                  : ''
+                              }`
+                            : null,
+                          detail.uploadFileSizeBucket
+                            ? `size: ${detail.uploadFileSizeBucket}`
+                            : null,
+                        ]
+                          .filter(Boolean)
+                          .join(' · ') || null}
+                      </div>
+                      {detail.uploadFileReadError ? (
+                        <div className="text-muted-foreground mt-1 font-mono text-xs break-all">
+                          fileRead: {detail.uploadFileReadError}
+                        </div>
+                      ) : null}
                     </div>
 
                     <div>

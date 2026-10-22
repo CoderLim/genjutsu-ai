@@ -31,7 +31,7 @@ export const envConfigs: Record<string, string> = {
     publicEnv('VITE_HOTEL_LOBBY_EXAMPLE_UPLOAD_DATE') ?? '',
   hotel_lobby_example_duration:
     publicEnv('VITE_HOTEL_LOBBY_EXAMPLE_DURATION') ?? '',
-  // Android Chrome image materialize grayscale (client). Unset = enabled.
+  // Android Chrome image materialize grayscale (client). Unset = disabled (opt-in).
   android_chrome_materialize_uploads:
     publicEnv('VITE_ANDROID_CHROME_MATERIALIZE_UPLOADS') ?? '',
 

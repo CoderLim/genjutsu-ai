@@ -42,6 +42,7 @@ import { resolveUploadStorageIndex } from '@/lib/upload-storage-index';
 import { m } from '@/paraglide/messages.js';
 import { useCreditGate } from '@/hooks/use-credit-gate';
 import type { FixedTemplateMediaStatus } from '@/hooks/use-fixed-template-media';
+import { useSingleImagePrepareGuard } from '@/hooks/use-image-prepare-guard';
 import { useUserCredits } from '@/hooks/use-user-credits';
 import { InsufficientCreditsModal } from '@/components/credits/insufficient-credits-modal';
 import { ChevronDownIcon, CloseIcon, ImageModeIcon } from '@/components/icons';
@@ -274,6 +275,16 @@ async function reportUploadFailure(params: {
   file?: File | null;
 }) {
   const failure = classifyUploadFailure(params.cause, { file: params.file });
+  if (!failure) {
+    // Upload path should always yield a classified error; keep reporting safe.
+    return apiPost<{ recovered: boolean }>('/api/genjutsu/attempt-failure', {
+      generationId: params.generationId,
+      fileIndex: params.fileIndex,
+      errorCode: 'UPLOAD_NETWORK_ERROR',
+      httpStatus: null,
+      diagnostics: null,
+    });
+  }
   return apiPost<{ recovered: boolean }>('/api/genjutsu/attempt-failure', {
     generationId: params.generationId,
     fileIndex: params.fileIndex,
@@ -500,7 +511,7 @@ export function EnzoFernandezAiGeneratorPanel({
     };
   }, []);
 
-  const photoPrepareSeqRef = useRef(0);
+  const imagePrepare = useSingleImagePrepareGuard();
 
   const setPhotoFile = (file: File | null) => {
     if (!file) return;
@@ -514,15 +525,19 @@ export function EnzoFernandezAiGeneratorPanel({
       return;
     }
 
-    const seq = ++photoPrepareSeqRef.current;
+    const guard = imagePrepare.begin();
     void (async () => {
       try {
         const prepared = await prepareReferenceImageFile({
           file,
           maxBytes: MAX_IMAGE_BYTES,
         });
-        if (photoPrepareSeqRef.current !== seq) return;
+        if (!guard.isCurrent()) return;
         const next = createMediaItem(prepared.file);
+        if (!guard.isCurrent()) {
+          URL.revokeObjectURL(next.url);
+          return;
+        }
         setPhoto((current) => {
           if (current) URL.revokeObjectURL(current.url);
           return next;
@@ -530,7 +545,7 @@ export function EnzoFernandezAiGeneratorPanel({
         creditGate.clear();
         setJobError('');
       } catch (cause) {
-        if (photoPrepareSeqRef.current !== seq) return;
+        if (!guard.isCurrent()) return;
         toast.error(
           cause instanceof UploadFileReadError
             ? cause.message
@@ -541,6 +556,7 @@ export function EnzoFernandezAiGeneratorPanel({
   };
 
   const clearPhoto = () => {
+    imagePrepare.invalidate();
     setPhoto((current) => {
       if (current) URL.revokeObjectURL(current.url);
       return null;

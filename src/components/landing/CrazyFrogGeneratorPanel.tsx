@@ -41,6 +41,7 @@ import { resolveUploadStorageIndex } from '@/lib/upload-storage-index';
 import { m } from '@/paraglide/messages.js';
 import { useCreditGate } from '@/hooks/use-credit-gate';
 import type { FixedTemplateMediaStatus } from '@/hooks/use-fixed-template-media';
+import { useImagePrepareGuard } from '@/hooks/use-image-prepare-guard';
 import { useUserCredits } from '@/hooks/use-user-credits';
 import { InsufficientCreditsModal } from '@/components/credits/insufficient-credits-modal';
 import { ChevronDownIcon, CloseIcon, ImageModeIcon } from '@/components/icons';
@@ -308,6 +309,16 @@ async function reportUploadFailure(params: {
   file?: File | null;
 }) {
   const failure = classifyUploadFailure(params.cause, { file: params.file });
+  if (!failure) {
+    // Upload path should always yield a classified error; keep reporting safe.
+    return apiPost<{ recovered: boolean }>('/api/genjutsu/attempt-failure', {
+      generationId: params.generationId,
+      fileIndex: params.fileIndex,
+      errorCode: 'UPLOAD_NETWORK_ERROR',
+      httpStatus: null,
+      diagnostics: null,
+    });
+  }
   return apiPost<{ recovered: boolean }>('/api/genjutsu/attempt-failure', {
     generationId: params.generationId,
     fileIndex: params.fileIndex,
@@ -559,7 +570,7 @@ export function CrazyFrogGeneratorPanel() {
     };
   }, []);
 
-  const slotPrepareSeqRef = useRef({ front: 0, back: 0 });
+  const imagePrepare = useImagePrepareGuard(['front', 'back'] as const);
 
   const setSlotFile = (slot: 'front' | 'back', file: File | null) => {
     if (!file) return;
@@ -573,15 +584,19 @@ export function CrazyFrogGeneratorPanel() {
       return;
     }
 
-    const seq = ++slotPrepareSeqRef.current[slot];
+    const guard = imagePrepare.begin(slot);
     void (async () => {
       try {
         const prepared = await prepareReferenceImageFile({
           file,
           maxBytes: MAX_IMAGE_BYTES,
         });
-        if (slotPrepareSeqRef.current[slot] !== seq) return;
+        if (!guard.isCurrent()) return;
         const next = createMediaItem(prepared.file);
+        if (!guard.isCurrent()) {
+          URL.revokeObjectURL(next.url);
+          return;
+        }
         const setter = slot === 'front' ? setFrontPhoto : setBackPhoto;
         setter((current) => {
           revokeMediaUrl(current?.url);
@@ -590,7 +605,7 @@ export function CrazyFrogGeneratorPanel() {
         creditGate.clear();
         setJobError('');
       } catch (cause) {
-        if (slotPrepareSeqRef.current[slot] !== seq) return;
+        if (!guard.isCurrent()) return;
         toast.error(
           cause instanceof UploadFileReadError
             ? cause.message
@@ -601,6 +616,7 @@ export function CrazyFrogGeneratorPanel() {
   };
 
   const clearSlot = (slot: 'front' | 'back') => {
+    imagePrepare.invalidate(slot);
     const setter = slot === 'front' ? setFrontPhoto : setBackPhoto;
     setter((current) => {
       revokeMediaUrl(current?.url);

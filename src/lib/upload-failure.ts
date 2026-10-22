@@ -1,4 +1,4 @@
-import { ApiError, SignedUploadError } from '@/lib/api-client';
+import { SignedUploadError } from '@/lib/api-client';
 import {
   collectUploadDiagnostics,
   type UploadClientDiagnostics,
@@ -42,10 +42,14 @@ function mergePreparationIntoDiagnostics(
   };
 }
 
+/**
+ * Classify errors that originated from the upload / file-prepare path.
+ * Returns null for unrelated business errors (trim, template, provider, etc.).
+ */
 export function classifyUploadFailure(
   cause: unknown,
   options?: { file?: File | null }
-): ClassifiedUploadFailure {
+): ClassifiedUploadFailure | null {
   const preparation = options?.file ? getFilePreparation(options.file) : null;
 
   if (cause instanceof UploadFileReadError) {
@@ -88,6 +92,16 @@ export function classifyUploadFailure(
         diagnostics,
       };
     }
+    if (
+      cause.cause instanceof Error &&
+      cause.cause.name === 'UploadTimeoutError'
+    ) {
+      return {
+        errorCode: 'UPLOAD_NETWORK_ERROR',
+        httpStatus: null,
+        diagnostics,
+      };
+    }
     if (cause.cause instanceof UploadFileReadError) {
       return {
         errorCode: 'UPLOAD_FILE_READ_ERROR',
@@ -109,52 +123,43 @@ export function classifyUploadFailure(
     };
   }
 
-  if (
-    cause instanceof ApiError &&
-    Number.isInteger(cause.code) &&
-    cause.code >= 400 &&
-    cause.code <= 599
-  ) {
-    return {
-      errorCode: 'UPLOAD_HTTP_ERROR',
-      httpStatus: cause.code,
-      diagnostics: null,
-    };
-  }
-
-  if (cause instanceof Error && cause.name === 'AbortError') {
-    return {
-      errorCode: 'UPLOAD_ABORTED',
-      httpStatus: null,
-      diagnostics: null,
-    };
-  }
-
-  return {
-    errorCode: 'UPLOAD_NETWORK_ERROR',
-    httpStatus: null,
-    diagnostics: null,
-  };
+  // Bare ApiError / AbortError outside SignedUploadError are ambiguous
+  // (could be generate/status). Do not classify as upload.
+  return null;
 }
 
 /**
- * User-facing upload failure copy. Android Chrome network failures get a
- * concrete recovery hint; other errors keep the underlying message.
+ * User-facing message for the generate catch-all.
+ * Android upload network hint only applies to SignedUploadError network failures.
+ * Ordinary business errors keep their own message.
  */
 export function uploadFailureUserMessage(params: {
   cause: unknown;
   fallback: string;
   androidNetworkHint: string;
 }): string {
-  const failure = classifyUploadFailure(params.cause);
-  if (failure.errorCode === 'UPLOAD_NETWORK_ERROR' && isAndroidChrome()) {
-    return params.androidNetworkHint;
-  }
   if (params.cause instanceof UploadFileReadError) {
     return params.cause.message;
   }
+
+  if (params.cause instanceof SignedUploadError) {
+    const failure = classifyUploadFailure(params.cause);
+    if (failure?.errorCode === 'UPLOAD_NETWORK_ERROR' && isAndroidChrome()) {
+      return params.androidNetworkHint;
+    }
+    if (params.cause.message.trim()) return params.cause.message;
+    return params.fallback;
+  }
+
   if (params.cause instanceof Error && params.cause.message.trim()) {
     return params.cause.message;
   }
   return params.fallback;
+}
+
+/** True when the error is from the upload/file-prepare path. */
+export function isUploadPathError(cause: unknown): boolean {
+  return (
+    cause instanceof UploadFileReadError || cause instanceof SignedUploadError
+  );
 }

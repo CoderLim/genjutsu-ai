@@ -41,6 +41,7 @@ import {
 import { resolveUploadStorageIndex } from '@/lib/upload-storage-index';
 import { m } from '@/paraglide/messages.js';
 import { useCreditGate } from '@/hooks/use-credit-gate';
+import { useImagePrepareGuard } from '@/hooks/use-image-prepare-guard';
 import { useUserCredits } from '@/hooks/use-user-credits';
 import { InsufficientCreditsModal } from '@/components/credits/insufficient-credits-modal';
 import { ChevronDownIcon, CloseIcon, ImageModeIcon } from '@/components/icons';
@@ -291,6 +292,16 @@ async function reportUploadFailure(params: {
   file?: File | null;
 }) {
   const failure = classifyUploadFailure(params.cause, { file: params.file });
+  if (!failure) {
+    // Upload path should always yield a classified error; keep reporting safe.
+    return apiPost<{ recovered: boolean }>('/api/genjutsu/attempt-failure', {
+      generationId: params.generationId,
+      fileIndex: params.fileIndex,
+      errorCode: 'UPLOAD_NETWORK_ERROR',
+      httpStatus: null,
+      diagnostics: null,
+    });
+  }
   return apiPost<{ recovered: boolean }>('/api/genjutsu/attempt-failure', {
     generationId: params.generationId,
     fileIndex: params.fileIndex,
@@ -521,7 +532,11 @@ export function GasStationDanceAiGeneratorPanel({
     };
   }, []);
 
-  const slotPrepareSeqRef = useRef({ left: 0, center: 0, right: 0 });
+  const imagePrepare = useImagePrepareGuard([
+    'left',
+    'center',
+    'right',
+  ] as const);
 
   const setSlotFile = (
     slot: 'left' | 'center' | 'right',
@@ -538,15 +553,19 @@ export function GasStationDanceAiGeneratorPanel({
       return;
     }
 
-    const seq = ++slotPrepareSeqRef.current[slot];
+    const guard = imagePrepare.begin(slot);
     void (async () => {
       try {
         const prepared = await prepareReferenceImageFile({
           file,
           maxBytes: MAX_IMAGE_BYTES,
         });
-        if (slotPrepareSeqRef.current[slot] !== seq) return;
+        if (!guard.isCurrent()) return;
         const next = createMediaItem(prepared.file);
+        if (!guard.isCurrent()) {
+          URL.revokeObjectURL(next.url);
+          return;
+        }
         const setter =
           slot === 'left'
             ? setLeftPhoto
@@ -560,7 +579,7 @@ export function GasStationDanceAiGeneratorPanel({
         creditGate.clear();
         setJobError('');
       } catch (cause) {
-        if (slotPrepareSeqRef.current[slot] !== seq) return;
+        if (!guard.isCurrent()) return;
         toast.error(
           cause instanceof UploadFileReadError
             ? cause.message
@@ -571,6 +590,7 @@ export function GasStationDanceAiGeneratorPanel({
   };
 
   const clearSlot = (slot: 'left' | 'center' | 'right') => {
+    imagePrepare.invalidate(slot);
     const setter =
       slot === 'left'
         ? setLeftPhoto

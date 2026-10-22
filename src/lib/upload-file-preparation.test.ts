@@ -5,6 +5,7 @@ import {
   fileSizeBucket,
   getFilePreparation,
   isAndroidChrome,
+  isAndroidChromeMaterializeEnabled,
   materializeImageFile,
   prepareReferenceImageFile,
   shouldMaterializeReferenceImages,
@@ -24,9 +25,10 @@ test('isAndroidChrome detects Android Chrome and excludes desktop/WebView', () =
   assert.equal(isAndroidChrome(ANDROID_WEBVIEW_UA), false);
 });
 
-test('shouldMaterializeReferenceImages is gated to Android Chrome', () => {
-  assert.equal(shouldMaterializeReferenceImages(ANDROID_CHROME_UA), true);
-  assert.equal(shouldMaterializeReferenceImages(DESKTOP_CHROME_UA), false);
+test('materialize flag defaults OFF when unset', () => {
+  // In unit tests Vite env is typically unset → grayscale off.
+  assert.equal(isAndroidChromeMaterializeEnabled(), false);
+  assert.equal(shouldMaterializeReferenceImages(ANDROID_CHROME_UA), false);
 });
 
 test('fileSizeBucket buckets by size', () => {
@@ -65,13 +67,26 @@ test('prepareReferenceImageFile skips materialize on non-Android', async () => {
   assert.equal(getFilePreparation(file)?.result, 'skipped');
 });
 
-test('prepareReferenceImageFile materializes on Android Chrome', async () => {
+test('prepareReferenceImageFile skips on Android when flag default OFF', async () => {
   const file = new File([new Uint8Array([7, 7, 7])], 'b.jpg', {
     type: 'image/jpeg',
   });
   const result = await prepareReferenceImageFile({
     file,
     userAgent: ANDROID_CHROME_UA,
+  });
+  assert.equal(result.file, file);
+  assert.equal(result.meta.result, 'skipped');
+});
+
+test('prepareReferenceImageFile materializes when forceMaterialize is set', async () => {
+  const file = new File([new Uint8Array([7, 7, 7])], 'b.jpg', {
+    type: 'image/jpeg',
+  });
+  const result = await prepareReferenceImageFile({
+    file,
+    userAgent: ANDROID_CHROME_UA,
+    forceMaterialize: true,
   });
   assert.notEqual(result.file, file);
   assert.equal(result.meta.mode, 'materialized');
