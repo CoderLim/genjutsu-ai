@@ -17,6 +17,7 @@ const UPLOAD_ERROR_CODES = new Set([
   'UPLOAD_HTTP_ERROR',
   'UPLOAD_NETWORK_ERROR',
   'UPLOAD_ABORTED',
+  'UPLOAD_FILE_READ_ERROR',
 ]);
 
 function getCloudflareRequestDiagnostics(request: Request) {
@@ -114,6 +115,8 @@ async function POST({ request }: { request: Request }) {
         : 'Upload failed with an HTTP error';
     } else if (errorCode === 'UPLOAD_ABORTED') {
       error = `Upload was aborted while sending ${fileType} ${fileIndex}`;
+    } else if (errorCode === 'UPLOAD_FILE_READ_ERROR') {
+      error = `Could not read local ${fileType} ${fileIndex} before upload`;
     } else {
       error = `Network error while uploading ${fileType} ${fileIndex}`;
     }
@@ -198,6 +201,7 @@ async function POST({ request }: { request: Request }) {
       }
     }
 
+    // FILE_READ_ERROR means the browser never sent bytes — do not HEAD-recover.
     const canRecover =
       (errorCode === 'UPLOAD_NETWORK_ERROR' ||
         errorCode === 'UPLOAD_ABORTED') &&
@@ -247,7 +251,8 @@ async function POST({ request }: { request: Request }) {
       errorCode: errorCode as
         | 'UPLOAD_HTTP_ERROR'
         | 'UPLOAD_NETWORK_ERROR'
-        | 'UPLOAD_ABORTED',
+        | 'UPLOAD_ABORTED'
+        | 'UPLOAD_FILE_READ_ERROR',
       error,
       fileIndex,
       fileType,
@@ -269,6 +274,13 @@ async function POST({ request }: { request: Request }) {
       errorName: diagnostics.errorName ?? null,
       errorMessage: diagnostics.errorMessage ?? null,
       attempts: diagnostics.attempts ?? [],
+      uploadMethod: diagnostics.uploadMethod ?? null,
+      filePreparationMode: diagnostics.filePreparationMode ?? null,
+      filePreparationResult: diagnostics.filePreparationResult ?? null,
+      fileReadError: diagnostics.fileReadError ?? null,
+      fileSizeBucket: diagnostics.fileSizeBucket ?? null,
+      // This request is attempt-failure reporting, not the PUT itself.
+      reportKind: 'attempt_failure',
       cfCountry: edgeDiagnostics.cfCountry,
       cfColo: edgeDiagnostics.cfColo,
       cfAsn: edgeDiagnostics.cfAsn,

@@ -29,6 +29,10 @@ export type UploadAttemptDiagnostic = {
   httpStatus: number | null;
 };
 
+export type UploadMethod = 'fetch' | 'xhr';
+export type FilePreparationModeDiag = 'original' | 'materialized';
+export type FilePreparationResultDiag = 'success' | 'failed' | 'skipped';
+
 export type UploadClientDiagnostics = {
   attemptCount: number;
   uploadElapsedMs: number;
@@ -47,6 +51,12 @@ export type UploadClientDiagnostics = {
   errorName: string | null;
   errorMessage: string | null;
   attempts: UploadAttemptDiagnostic[];
+  /** Client PUT transport. Currently always fetch; reserved for future XHR. */
+  uploadMethod: UploadMethod | null;
+  filePreparationMode: FilePreparationModeDiag | null;
+  filePreparationResult: FilePreparationResultDiag | null;
+  fileReadError: string | null;
+  fileSizeBucket: string | null;
 };
 
 const BROWSERS = [
@@ -227,12 +237,30 @@ function collectConnectionDiagnostics() {
   };
 }
 
+const UPLOAD_METHODS = new Set(['fetch', 'xhr']);
+const FILE_PREPARATION_MODES = new Set(['original', 'materialized']);
+const FILE_PREPARATION_RESULTS = new Set(['success', 'failed', 'skipped']);
+const FILE_SIZE_BUCKETS = new Set([
+  '0-256KB',
+  '256KB-1MB',
+  '1-3MB',
+  '3-6MB',
+  '6-12MB',
+  '12MB+',
+  'unknown',
+]);
+
 export function collectUploadDiagnostics(params: {
   attemptCount: number;
   uploadElapsedMs: number;
   cause?: unknown;
   attempts?: UploadAttemptDiagnostic[];
   uploadUrl?: string;
+  uploadMethod?: UploadMethod | null;
+  filePreparationMode?: FilePreparationModeDiag | null;
+  filePreparationResult?: FilePreparationResultDiag | null;
+  fileReadError?: string | null;
+  fileSizeBucket?: string | null;
 }): UploadClientDiagnostics {
   const env =
     typeof navigator !== 'undefined'
@@ -302,6 +330,16 @@ export function collectUploadDiagnostics(params: {
     errorName,
     errorMessage,
     attempts: (params.attempts || []).slice(-MAX_UPLOAD_ATTEMPTS_RECORDED),
+    uploadMethod: params.uploadMethod ?? 'fetch',
+    filePreparationMode: params.filePreparationMode ?? null,
+    filePreparationResult: params.filePreparationResult ?? null,
+    fileReadError: params.fileReadError
+      ? truncateErrorMessage(params.fileReadError)
+      : null,
+    fileSizeBucket:
+      params.fileSizeBucket && FILE_SIZE_BUCKETS.has(params.fileSizeBucket)
+        ? params.fileSizeBucket
+        : null,
   };
 }
 
@@ -471,6 +509,40 @@ export function sanitizeUploadDiagnostics(
 
   if (typeof input.errorMessage === 'string') {
     out.errorMessage = truncateErrorMessage(input.errorMessage);
+  }
+
+  if (
+    typeof input.uploadMethod === 'string' &&
+    UPLOAD_METHODS.has(input.uploadMethod)
+  ) {
+    out.uploadMethod = input.uploadMethod as UploadMethod;
+  }
+
+  if (
+    typeof input.filePreparationMode === 'string' &&
+    FILE_PREPARATION_MODES.has(input.filePreparationMode)
+  ) {
+    out.filePreparationMode =
+      input.filePreparationMode as FilePreparationModeDiag;
+  }
+
+  if (
+    typeof input.filePreparationResult === 'string' &&
+    FILE_PREPARATION_RESULTS.has(input.filePreparationResult)
+  ) {
+    out.filePreparationResult =
+      input.filePreparationResult as FilePreparationResultDiag;
+  }
+
+  if (typeof input.fileReadError === 'string') {
+    out.fileReadError = truncateErrorMessage(input.fileReadError);
+  }
+
+  if (
+    typeof input.fileSizeBucket === 'string' &&
+    FILE_SIZE_BUCKETS.has(input.fileSizeBucket)
+  ) {
+    out.fileSizeBucket = input.fileSizeBucket;
   }
 
   const attempts = sanitizeAttemptDiagnostics(input.attempts);

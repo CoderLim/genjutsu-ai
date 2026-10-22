@@ -1705,6 +1705,8 @@
   "site.generator.submission_uncertain": "생성 요청의 접수 여부가 불확실합니다.",
   "site.generator.upload_incomplete": "업로드 URL 목록이 완전하지 않습니다",
   "site.generator.upload_url_missing": "업로드 URL이 없습니다",
+  "site.generator.image_read_error": "이미지를 읽을 수 없습니다. 휴대폰 파일 앱에서 다시 선택해 주세요.",
+  "site.generator.upload_android_network_hint": "업로드에 실패했습니다. 휴대폰 파일 앱에서 이미지를 다시 선택하거나, Wi‑Fi로 전환하거나, 다른 브라우저를 사용해 보세요. 크레딧은 차감되지 않았습니다.",
   "site.generator.video_duration_error": "원본 동영상은 {min}~{max}초여야 합니다(현재 {actual}초)",
   "site.generator.video_label": "동영상",
   "site.generator.video_lightbox": "동영상 미리보기",

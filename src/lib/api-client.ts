@@ -6,6 +6,7 @@ import {
   type UploadAttemptDiagnostic,
   type UploadClientDiagnostics,
 } from '@/lib/upload-diagnostics';
+import { getFilePreparation } from '@/lib/upload-file-preparation';
 
 // Typed client for the app's REST endpoints (src/routes/api/**).
 // Unwraps the resp.ts envelope: { code: 0 | -1, message, data? }.
@@ -205,12 +206,18 @@ export async function uploadToSignedUrl(params: {
     }
   }
 
+  const preparation = getFilePreparation(params.file);
   const diagnostics = collectUploadDiagnostics({
     attemptCount,
     uploadElapsedMs: Date.now() - startedAt,
     cause: lastCause,
     attempts,
     uploadUrl: params.url,
+    uploadMethod: 'fetch',
+    filePreparationMode: preparation?.mode ?? null,
+    filePreparationResult: preparation?.result ?? null,
+    fileReadError: preparation?.fileReadError ?? null,
+    fileSizeBucket: preparation?.fileSizeBucket ?? null,
   });
 
   if (

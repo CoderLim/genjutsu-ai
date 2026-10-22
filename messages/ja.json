@@ -1705,6 +1705,8 @@
   "site.generator.submission_uncertain": "生成の送信結果を確認できません。",
   "site.generator.upload_incomplete": "アップロード用URLの一部が取得できませんでした",
   "site.generator.upload_url_missing": "アップロード用URLがありません",
+  "site.generator.image_read_error": "画像を読み取れませんでした。端末のファイルアプリから選び直してください。",
+  "site.generator.upload_android_network_hint": "アップロードに失敗しました。端末のファイルアプリから画像を選び直す、Wi‑Fiに切り替える、または別のブラウザをお試しください。クレジットは消費されていません。",
   "site.generator.video_duration_error": "元動画は{min}～{max}秒にしてください（現在：{actual}秒）",
   "site.generator.video_label": "動画",
   "site.generator.video_lightbox": "動画プレビュー",

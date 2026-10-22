@@ -27,19 +27,19 @@ import {
 } from '@/modules/burning-bridges-ai/constants';
 import { estimateGenjutsuCreditsForProvider } from '@/modules/genjutsu/pricing';
 import type { GenjutsuProvider } from '@/modules/genjutsu/types';
-import {
-  ApiError,
-  apiGet,
-  apiPost,
-  SignedUploadError,
-  uploadToSignedUrl,
-} from '@/lib/api-client';
+import { ApiError, apiGet, apiPost, uploadToSignedUrl } from '@/lib/api-client';
 import { cn } from '@/lib/cn';
 import { trimVideoToFile } from '@/lib/trim-video';
+import { collectUploadDiagnostics } from '@/lib/upload-diagnostics';
 import {
-  collectUploadDiagnostics,
-  type UploadClientDiagnostics,
-} from '@/lib/upload-diagnostics';
+  classifyUploadFailure,
+  uploadFailureUserMessage,
+} from '@/lib/upload-failure';
+import {
+  prepareReferenceImageFile,
+  UploadFileReadError,
+} from '@/lib/upload-file-preparation';
+import { resolveUploadStorageIndex } from '@/lib/upload-storage-index';
 import { m } from '@/paraglide/messages.js';
 import { useCreditGate } from '@/hooks/use-credit-gate';
 import type { FixedTemplateMediaStatus } from '@/hooks/use-fixed-template-media';
@@ -286,42 +286,13 @@ function providerSubmitUiMessage(cause: unknown): string {
   return message;
 }
 
-function classifyUploadFailure(cause: unknown) {
-  if (cause instanceof SignedUploadError) {
-    if (cause.httpStatus != null) {
-      return {
-        errorCode: 'UPLOAD_HTTP_ERROR' as const,
-        httpStatus: cause.httpStatus,
-        diagnostics: cause.diagnostics,
-      };
-    }
-    if (cause.cause instanceof Error && cause.cause.name === 'AbortError') {
-      return {
-        errorCode: 'UPLOAD_ABORTED' as const,
-        httpStatus: null,
-        diagnostics: cause.diagnostics,
-      };
-    }
-    return {
-      errorCode: 'UPLOAD_NETWORK_ERROR' as const,
-      httpStatus: null,
-      diagnostics: cause.diagnostics,
-    };
-  }
-
-  return {
-    errorCode: 'UPLOAD_NETWORK_ERROR' as const,
-    httpStatus: null,
-    diagnostics: null as UploadClientDiagnostics | null,
-  };
-}
-
 async function reportUploadFailure(params: {
   generationId: string;
   fileIndex: number;
   cause: unknown;
+  file?: File | null;
 }) {
-  const failure = classifyUploadFailure(params.cause);
+  const failure = classifyUploadFailure(params.cause, { file: params.file });
   return apiPost<{ recovered: boolean }>('/api/genjutsu/attempt-failure', {
     generationId: params.generationId,
     fileIndex: params.fileIndex,
@@ -548,6 +519,8 @@ export function BurningBridgesAiGeneratorPanel({
     };
   }, []);
 
+  const photoPrepareSeqRef = useRef(0);
+
   const setPhotoFile = (file: File | null) => {
     if (!file) return;
     const mime = file.type.split(';', 1)[0]?.trim().toLowerCase() || '';
@@ -560,13 +533,30 @@ export function BurningBridgesAiGeneratorPanel({
       return;
     }
 
-    const next = createMediaItem(file);
-    setPhoto((current) => {
-      if (current) URL.revokeObjectURL(current.url);
-      return next;
-    });
-    creditGate.clear();
-    setJobError('');
+    const seq = ++photoPrepareSeqRef.current;
+    void (async () => {
+      try {
+        const prepared = await prepareReferenceImageFile({
+          file,
+          maxBytes: MAX_IMAGE_BYTES,
+        });
+        if (photoPrepareSeqRef.current !== seq) return;
+        const next = createMediaItem(prepared.file);
+        setPhoto((current) => {
+          if (current) URL.revokeObjectURL(current.url);
+          return next;
+        });
+        creditGate.clear();
+        setJobError('');
+      } catch (cause) {
+        if (photoPrepareSeqRef.current !== seq) return;
+        toast.error(
+          cause instanceof UploadFileReadError
+            ? cause.message
+            : m['site.generator.image_read_error']()
+        );
+      }
+    })();
   };
 
   const clearPhoto = () => {
@@ -844,6 +834,7 @@ export function BurningBridgesAiGeneratorPanel({
       for (let index = 0; index < sortedUploads.length; index += 1) {
         const upload = sortedUploads[index];
         if (!upload) throw new Error(m['site.generator.upload_url_missing']());
+        const storageIndex = resolveUploadStorageIndex(upload, index);
         try {
           const uploaded = await uploadToSignedUrl({
             url: upload.uploadUrl,
@@ -853,7 +844,7 @@ export function BurningBridgesAiGeneratorPanel({
           if (uploaded.attemptCount > 1) {
             await reportUploadRetrySucceeded({
               generationId: id,
-              fileIndex: index,
+              fileIndex: storageIndex,
               attemptCount: uploaded.attemptCount,
               uploadElapsedMs: uploaded.uploadElapsedMs,
             }).catch(() => undefined);
@@ -861,8 +852,9 @@ export function BurningBridgesAiGeneratorPanel({
         } catch (cause) {
           const report = await reportUploadFailure({
             generationId: id,
-            fileIndex: index,
+            fileIndex: storageIndex,
             cause,
+            file: media[index],
           }).catch(() => null);
           if (report?.recovered) continue;
           throw cause;
@@ -965,9 +957,11 @@ export function BurningBridgesAiGeneratorPanel({
       setPhase('idle');
       creditGate.clear();
       setJobError(
-        cause instanceof Error
-          ? cause.message
-          : m['site.generator.failed_unexpected']()
+        uploadFailureUserMessage({
+          cause,
+          fallback: m['site.generator.failed_unexpected'](),
+          androidNetworkHint: m['site.generator.upload_android_network_hint'](),
+        })
       );
     }
   };

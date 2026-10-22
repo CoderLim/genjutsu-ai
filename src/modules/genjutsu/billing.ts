@@ -600,7 +600,11 @@ export async function markGenjutsuAttemptFailedPreflight(params: {
 export async function markGenjutsuUploadFailed(params: {
   generationId: string;
   userId: string;
-  errorCode: 'UPLOAD_HTTP_ERROR' | 'UPLOAD_NETWORK_ERROR' | 'UPLOAD_ABORTED';
+  errorCode:
+    | 'UPLOAD_HTTP_ERROR'
+    | 'UPLOAD_NETWORK_ERROR'
+    | 'UPLOAD_ABORTED'
+    | 'UPLOAD_FILE_READ_ERROR';
   error: string;
   fileIndex: number;
   fileType: 'video' | 'image';
@@ -628,6 +632,13 @@ export async function markGenjutsuUploadFailed(params: {
     errorMessage: string | null;
     httpStatus: number | null;
   }> | null;
+  uploadMethod?: string | null;
+  filePreparationMode?: string | null;
+  filePreparationResult?: string | null;
+  fileReadError?: string | null;
+  fileSizeBucket?: string | null;
+  /** Distinguishes attempt-failure POST from the original PUT (never conflate). */
+  reportKind?: 'attempt_failure' | null;
   cfCountry?: string | null;
   cfColo?: string | null;
   cfAsn?: number | null;
@@ -666,6 +677,12 @@ export async function markGenjutsuUploadFailed(params: {
         errorName: params.errorName ?? null,
         errorMessage: params.errorMessage ?? null,
         attempts: params.attempts ?? [],
+        uploadMethod: params.uploadMethod ?? null,
+        filePreparationMode: params.filePreparationMode ?? null,
+        filePreparationResult: params.filePreparationResult ?? null,
+        fileReadError: params.fileReadError ?? null,
+        fileSizeBucket: params.fileSizeBucket ?? null,
+        reportKind: params.reportKind ?? 'attempt_failure',
         cfCountry: params.cfCountry ?? null,
         cfColo: params.cfColo ?? null,
         cfAsn: params.cfAsn ?? null,

@@ -14,18 +14,18 @@ import { toast } from 'sonner';
 
 import { useSession } from '@/core/auth/client';
 import { estimateGenjutsuCreditsForProvider } from '@/modules/genjutsu/pricing';
-import {
-  ApiError,
-  apiGet,
-  apiPost,
-  SignedUploadError,
-  uploadToSignedUrl,
-} from '@/lib/api-client';
+import { ApiError, apiGet, apiPost, uploadToSignedUrl } from '@/lib/api-client';
 import { cn } from '@/lib/cn';
+import { collectUploadDiagnostics } from '@/lib/upload-diagnostics';
 import {
-  collectUploadDiagnostics,
-  type UploadClientDiagnostics,
-} from '@/lib/upload-diagnostics';
+  classifyUploadFailure,
+  uploadFailureUserMessage,
+} from '@/lib/upload-failure';
+import {
+  prepareReferenceImageFile,
+  UploadFileReadError,
+} from '@/lib/upload-file-preparation';
+import { resolveUploadStorageIndex } from '@/lib/upload-storage-index';
 import { m } from '@/paraglide/messages.js';
 import { useCreditGate } from '@/hooks/use-credit-gate';
 import { usePublicConfig } from '@/hooks/use-public-config';
@@ -630,63 +630,13 @@ function providerSubmitUiMessage(cause: unknown): string {
   return message;
 }
 
-function classifyUploadFailure(cause: unknown) {
-  if (cause instanceof SignedUploadError) {
-    if (cause.httpStatus != null) {
-      return {
-        errorCode: 'UPLOAD_HTTP_ERROR' as const,
-        httpStatus: cause.httpStatus,
-        diagnostics: cause.diagnostics,
-      };
-    }
-    if (cause.cause instanceof Error && cause.cause.name === 'AbortError') {
-      return {
-        errorCode: 'UPLOAD_ABORTED' as const,
-        httpStatus: null,
-        diagnostics: cause.diagnostics,
-      };
-    }
-    return {
-      errorCode: 'UPLOAD_NETWORK_ERROR' as const,
-      httpStatus: null,
-      diagnostics: cause.diagnostics,
-    };
-  }
-
-  if (
-    cause instanceof ApiError &&
-    Number.isInteger(cause.code) &&
-    cause.code >= 400 &&
-    cause.code <= 599
-  ) {
-    return {
-      errorCode: 'UPLOAD_HTTP_ERROR' as const,
-      httpStatus: cause.code,
-      diagnostics: null as UploadClientDiagnostics | null,
-    };
-  }
-
-  if (cause instanceof Error && cause.name === 'AbortError') {
-    return {
-      errorCode: 'UPLOAD_ABORTED' as const,
-      httpStatus: null,
-      diagnostics: null as UploadClientDiagnostics | null,
-    };
-  }
-
-  return {
-    errorCode: 'UPLOAD_NETWORK_ERROR' as const,
-    httpStatus: null,
-    diagnostics: null as UploadClientDiagnostics | null,
-  };
-}
-
 async function reportUploadFailure(params: {
   generationId: string;
   fileIndex: number;
   cause: unknown;
+  file?: File | null;
 }) {
-  const failure = classifyUploadFailure(params.cause);
+  const failure = classifyUploadFailure(params.cause, { file: params.file });
   return apiPost<{
     generationId: string;
     status: string;
@@ -738,6 +688,7 @@ function ImageUploadSlot({
   signedIn: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const mergeSeqRef = useRef(0);
   const [previewId, setPreviewId] = useState<string | null>(null);
   const { dragging, setDragging, onDragOver, onDragLeave } = useDragHighlight();
   const previewItem = items.find((i) => i.id === previewId) ?? null;
@@ -766,22 +717,42 @@ function ImageUploadSlot({
       const room = IMAGE_MAX - items.length;
       if (room <= 0) return;
 
-      const accepted = incoming
-        .slice(0, room)
-        .filter((file) => {
+      const batch = incoming.slice(0, room);
+      const seq = ++mergeSeqRef.current;
+      const baseItems = items;
+
+      void (async () => {
+        const accepted: MediaItem[] = [];
+        // Sequential prepare keeps peak memory lower on Android Chrome.
+        for (const file of batch) {
+          if (mergeSeqRef.current !== seq) return;
           if (file.size <= 0 || file.size > MAX_REFERENCE_IMAGE_BYTES) {
             toast.error(
               m['site.generator.image_size_error']({ name: file.name })
             );
-            return false;
+            continue;
           }
-          return true;
-        })
-        .map((file) => createMediaItem(file));
-
-      if (accepted.length > 0) {
-        onChange([...items, ...accepted]);
-      }
+          try {
+            const prepared = await prepareReferenceImageFile({
+              file,
+              maxBytes: MAX_REFERENCE_IMAGE_BYTES,
+            });
+            if (mergeSeqRef.current !== seq) return;
+            accepted.push(createMediaItem(prepared.file));
+          } catch (cause) {
+            if (mergeSeqRef.current !== seq) return;
+            toast.error(
+              cause instanceof UploadFileReadError
+                ? cause.message
+                : m['site.generator.image_read_error']()
+            );
+          }
+        }
+        if (mergeSeqRef.current !== seq) return;
+        if (accepted.length > 0) {
+          onChange([...baseItems, ...accepted]);
+        }
+      })();
     },
     [items, onChange, signedIn]
   );
@@ -1000,6 +971,7 @@ type SignedUpload = {
   uploadHeaders: Record<string, string>;
   storageKey?: string;
   publicUrl?: string;
+  index: number;
 };
 
 type GenerationStart = {
@@ -1677,19 +1649,24 @@ export function GeneratorPanel({
         throw new Error(m['site.generator.upload_incomplete']());
       }
 
+      const sortedUploads = [...uploadBatch.uploads].sort(
+        (a, b) => a.index - b.index
+      );
       for (let index = 0; index < media.length; index += 1) {
-        const upload = uploadBatch.uploads[index];
+        const upload = sortedUploads[index] ?? uploadBatch.uploads[index];
         if (!upload) throw new Error(m['site.generator.upload_url_missing']());
+        const storageIndex = resolveUploadStorageIndex(upload, index);
+        const file = media[index].file;
         try {
           const uploaded = await uploadToSignedUrl({
             url: upload.uploadUrl,
-            file: media[index].file,
+            file,
             headers: upload.uploadHeaders,
           });
           if (uploaded.attemptCount > 1) {
             await reportUploadRetrySucceeded({
               generationId,
-              fileIndex: index,
+              fileIndex: storageIndex,
               attemptCount: uploaded.attemptCount,
               uploadElapsedMs: uploaded.uploadElapsedMs,
             }).catch(() => undefined);
@@ -1697,8 +1674,9 @@ export function GeneratorPanel({
         } catch (cause) {
           const report = await reportUploadFailure({
             generationId,
-            fileIndex: index,
+            fileIndex: storageIndex,
             cause,
+            file,
           }).catch(() => null);
           if (report?.recovered) {
             continue;
@@ -1813,9 +1791,11 @@ export function GeneratorPanel({
       setResult(null);
       creditGate.clear();
       setError(
-        cause instanceof Error
-          ? cause.message
-          : m['site.generator.failed_unexpected']()
+        uploadFailureUserMessage({
+          cause,
+          fallback: m['site.generator.failed_unexpected'](),
+          androidNetworkHint: m['site.generator.upload_android_network_hint'](),
+        })
       );
     } finally {
       revokeItem(previewClip);

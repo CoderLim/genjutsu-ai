@@ -143,6 +143,11 @@ test('sanitizeUploadDiagnostics accepts only safe structured fields', () => {
       uploadHost: 'abc.r2.cloudflarestorage.com',
       errorName: 'TypeError',
       errorMessage: 'Failed to fetch\nwith newline',
+      uploadMethod: 'fetch',
+      filePreparationMode: 'materialized',
+      filePreparationResult: 'success',
+      fileReadError: null,
+      fileSizeBucket: '1-3MB',
       attempts: [
         {
           attempt: 1,
@@ -180,6 +185,10 @@ test('sanitizeUploadDiagnostics accepts only safe structured fields', () => {
       uploadHost: 'abc.r2.cloudflarestorage.com',
       errorName: 'TypeError',
       errorMessage: 'Failed to fetch with newline',
+      uploadMethod: 'fetch',
+      filePreparationMode: 'materialized',
+      filePreparationResult: 'success',
+      fileSizeBucket: '1-3MB',
       attempts: [
         {
           attempt: 1,
