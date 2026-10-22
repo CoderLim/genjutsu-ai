@@ -165,7 +165,7 @@ export const Route = createFileRoute('/flying-car-ai')({
     const ogTitle = m['site.flying_car.og_title']({}, { locale });
     const ogDescription = m['site.flying_car.og_description']({}, { locale });
     // English-only editorial for now — don't advertise empty locale variants.
-    const { canonical, alternates } = localeLinks(PAGE_PATH, locale, ['en']);
+    const { canonical, alternates } = localeLinks(PAGE_PATH, locale);
     return {
       meta: [
         { title },

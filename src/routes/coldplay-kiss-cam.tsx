@@ -128,7 +128,7 @@ export const Route = createFileRoute('/coldplay-kiss-cam')({
     const title = m['site.kisscam.page_title']({}, { locale });
     const description = m['site.kisscam.page_description']({}, { locale });
     // English-only editorial for now — don't advertise empty locale variants.
-    const { canonical, alternates } = localeLinks(PAGE_PATH, locale, ['en']);
+    const { canonical, alternates } = localeLinks(PAGE_PATH, locale);
     return {
       meta: [
         { title },

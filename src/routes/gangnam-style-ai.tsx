@@ -163,7 +163,7 @@ export const Route = createFileRoute('/gangnam-style-ai')({
     const title = m['site.gangnam.meta_title']({}, { locale });
     const description = m['site.gangnam.meta_description']({}, { locale });
     // English-only editorial for now — don't advertise empty locale variants.
-    const { canonical, alternates } = localeLinks(PAGE_PATH, locale, ['en']);
+    const { canonical, alternates } = localeLinks(PAGE_PATH, locale);
     return {
       meta: [
         { title },

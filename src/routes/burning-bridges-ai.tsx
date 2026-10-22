@@ -197,8 +197,7 @@ export const Route = createFileRoute('/burning-bridges-ai')({
       {},
       { locale }
     );
-    // English-only editorial for now — don't advertise empty locale variants.
-    const { canonical, alternates } = localeLinks(PAGE_PATH, locale, ['en']);
+    const { canonical, alternates } = localeLinks(PAGE_PATH, locale);
     return {
       meta: [
         { title },

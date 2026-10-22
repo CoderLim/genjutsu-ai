@@ -40,16 +40,6 @@ const LIMITED_STATIC_PATH_LOCALES: Record<string, readonly string[]> = {
   '/text-to-image': [baseLocale],
   // Bulin 47's visible editorial content is not fully localized yet.
   '/bulin-47-ai': [baseLocale],
-  // Flying Car SEO copy is English-only for now.
-  '/flying-car-ai': [baseLocale],
-  // Coldplay Kiss Cam SEO copy is English-only for now.
-  '/coldplay-kiss-cam': [baseLocale],
-  // Gangnam Style AI SEO shell is English-only for now.
-  '/gangnam-style-ai': [baseLocale],
-  // Gas Station Dance AI SEO shell is English-only for now.
-  '/gas-station-dance-ai': [baseLocale],
-  // Burning Bridges AI SEO shell is English-only for now.
-  '/burning-bridges-ai': [baseLocale],
 };
 
 function enabledContentLocales(values: readonly string[]): string[] {
