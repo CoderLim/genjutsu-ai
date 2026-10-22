@@ -16,6 +16,7 @@ const STATIC_PATHS = [
   '/hotel-lobby-ai',
   '/coldplay-kiss-cam',
   '/gangnam-style-ai',
+  '/gas-station-dance-ai',
   '/a2o-lite-ai',
   '/enzo-fernandez-ai',
   '/flying-car-ai',
@@ -44,6 +45,8 @@ const LIMITED_STATIC_PATH_LOCALES: Record<string, readonly string[]> = {
   '/coldplay-kiss-cam': [baseLocale],
   // Gangnam Style AI SEO shell is English-only for now.
   '/gangnam-style-ai': [baseLocale],
+  // Gas Station Dance AI SEO shell is English-only for now.
+  '/gas-station-dance-ai': [baseLocale],
 };
 
 function enabledContentLocales(values: readonly string[]): string[] {

@@ -35,6 +35,12 @@ import {
   GANGNAM_STYLE_AI_PRODUCT_ID,
   GANGNAM_STYLE_AI_RESOLUTIONS,
 } from '@/modules/gangnam-style-ai/constants';
+import { isAllowedGasStationDanceAiPrompt } from '@/modules/gas-station-dance-ai/assert';
+import {
+  GAS_STATION_DANCE_AI_MODE,
+  GAS_STATION_DANCE_AI_PRODUCT_ID,
+  GAS_STATION_DANCE_AI_RESOLUTIONS,
+} from '@/modules/gas-station-dance-ai/constants';
 import {
   assertGenerationId,
   createGenjutsuAttempt,
@@ -216,6 +222,30 @@ async function POST({ request }: { request: Request }) {
     if (isGangnamStyleAi && !isAllowedGangnamStyleAiPrompt(prompt)) {
       return respErr(
         'Gangnam Style AI prompt does not match the fixed product prompt',
+        {
+          status: 400,
+        }
+      );
+    }
+    const isGasStationDanceAi = product === GAS_STATION_DANCE_AI_PRODUCT_ID;
+    if (isGasStationDanceAi && mode !== GAS_STATION_DANCE_AI_MODE) {
+      return respErr('Gas Station Dance AI only supports objects-swap', {
+        status: 400,
+      });
+    }
+    if (
+      isGasStationDanceAi &&
+      !GAS_STATION_DANCE_AI_RESOLUTIONS.includes(
+        resolution as (typeof GAS_STATION_DANCE_AI_RESOLUTIONS)[number]
+      )
+    ) {
+      return respErr('Gas Station Dance AI only supports 480p and 720p', {
+        status: 400,
+      });
+    }
+    if (isGasStationDanceAi && !isAllowedGasStationDanceAiPrompt(prompt)) {
+      return respErr(
+        'Gas Station Dance AI prompt does not match the fixed product prompt',
         {
           status: 400,
         }

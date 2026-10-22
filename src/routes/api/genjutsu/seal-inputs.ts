@@ -7,6 +7,7 @@ import { CRAZY_FROG_PRODUCT_ID } from '@/modules/crazy-frog/constants';
 import { ENZO_FERNANDEZ_AI_PRODUCT_ID } from '@/modules/enzo-fernandez-ai/constants';
 import { FLYING_CAR_AI_PRODUCT_ID } from '@/modules/flying-car-ai/constants';
 import { GANGNAM_STYLE_AI_PRODUCT_ID } from '@/modules/gangnam-style-ai/constants';
+import { GAS_STATION_DANCE_AI_PRODUCT_ID } from '@/modules/gas-station-dance-ai/constants';
 import {
   assertGenerationId,
   claimGenjutsuSeal,
@@ -29,6 +30,7 @@ import {
   getEnzoFernandezAiTemplateVideoKey,
   getFlyingCarAiTemplateVideoKey,
   getGangnamStyleAiTemplateVideoKey,
+  getGasStationDanceAiTemplateVideoKey,
   getGenjutsuSealedInputKey,
   getSmalltownBoyDanceTemplateVideoKey,
   getZombieHugTemplateVideoKey,
@@ -130,7 +132,9 @@ async function POST({ request }: { request: Request }) {
                   ? getColdplayKissCamTemplateVideoKey()
                   : product === GANGNAM_STYLE_AI_PRODUCT_ID
                     ? getGangnamStyleAiTemplateVideoKey()
-                    : getZombieHugTemplateVideoKey(templateAspectRatio);
+                    : product === GAS_STATION_DANCE_AI_PRODUCT_ID
+                      ? getGasStationDanceAiTemplateVideoKey()
+                      : getZombieHugTemplateVideoKey(templateAspectRatio);
     const videoKey =
       typeof currentOptions?.videoKey === 'string'
         ? currentOptions.videoKey

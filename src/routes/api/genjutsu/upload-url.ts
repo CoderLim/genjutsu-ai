@@ -61,6 +61,17 @@ import {
   assertGangnamStyleAiProviderBinding,
   GangnamStyleAiProviderBindingError,
 } from '@/modules/gangnam-style-ai/provider';
+import { isAllowedGasStationDanceAiPrompt } from '@/modules/gas-station-dance-ai/assert';
+import {
+  GAS_STATION_DANCE_AI_ASPECT_RATIO,
+  GAS_STATION_DANCE_AI_MODE,
+  GAS_STATION_DANCE_AI_PRODUCT_ID,
+  GAS_STATION_DANCE_AI_RESOLUTIONS,
+} from '@/modules/gas-station-dance-ai/constants';
+import {
+  assertGasStationDanceAiProviderBinding,
+  GasStationDanceAiProviderBindingError,
+} from '@/modules/gas-station-dance-ai/provider';
 import {
   assertGenerationId,
   bindGenjutsuUploadInputs,
@@ -84,6 +95,7 @@ import {
   ensureEnzoFernandezAiTemplateInR2,
   ensureFlyingCarAiTemplateInR2,
   ensureGangnamStyleAiTemplateInR2,
+  ensureGasStationDanceAiTemplateInR2,
   ensureSmalltownBoyDanceTemplateInR2,
   GENJUTSU_PROXY_UPLOAD_MAX_BYTES,
   getA2oLiteAiTemplateVideoKey,
@@ -92,6 +104,7 @@ import {
   getEnzoFernandezAiTemplateVideoKey,
   getFlyingCarAiTemplateVideoKey,
   getGangnamStyleAiTemplateVideoKey,
+  getGasStationDanceAiTemplateVideoKey,
   getGenjutsuInputKey,
   getSmalltownBoyDanceTemplateVideoKey,
 } from '@/modules/genjutsu/storage';
@@ -146,6 +159,8 @@ async function POST({ request }: { request: Request }) {
     const isFlyingCarAi = product === FLYING_CAR_AI_PRODUCT_ID;
     const isColdplayKissCam = product === COLDPLAY_KISS_CAM_PRODUCT_ID;
     const isGangnamStyleAi = product === GANGNAM_STYLE_AI_PRODUCT_ID;
+    const isGasStationDanceAi = product === GAS_STATION_DANCE_AI_PRODUCT_ID;
+    const isTripleImageProduct = isGangnamStyleAi || isGasStationDanceAi;
     const isSingleImageProduct = isEnzoFernandezAi || isFlyingCarAi;
     const isProductPreview =
       (isCrazyFrog ||
@@ -153,7 +168,8 @@ async function POST({ request }: { request: Request }) {
         isEnzoFernandezAi ||
         isFlyingCarAi ||
         isColdplayKissCam ||
-        isGangnamStyleAi) &&
+        isGangnamStyleAi ||
+        isGasStationDanceAi) &&
       body.preview === true;
     // Full fixed templates: server template + image-only uploads.
     // Preview: client uploads a trimmed ≤4s clip + reference image(s).
@@ -164,11 +180,12 @@ async function POST({ request }: { request: Request }) {
         isEnzoFernandezAi ||
         isFlyingCarAi ||
         isColdplayKissCam ||
-        isGangnamStyleAi) &&
+        isGangnamStyleAi ||
+        isGasStationDanceAi) &&
       !isProductPreview;
     const fixedTemplateImageCount = isSingleImageProduct
       ? FIXED_TEMPLATE_SINGLE_IMAGE_COUNT
-      : isGangnamStyleAi
+      : isTripleImageProduct
         ? FIXED_TEMPLATE_TRIPLE_IMAGE_COUNT
         : FIXED_TEMPLATE_DUAL_IMAGE_COUNT;
 
@@ -210,11 +227,13 @@ async function POST({ request }: { request: Request }) {
             ? 'Coldplay Kiss Cam preview must use 480p'
             : isGangnamStyleAi
               ? 'Gangnam Style AI preview must use 480p'
-              : isFlyingCarAi
-                ? 'Flying Car AI preview must use 480p'
-                : isEnzoFernandezAi
-                  ? 'Enzo Fernandez AI preview must use 480p'
-                  : 'Crazy Frog preview must use 480p',
+              : isGasStationDanceAi
+                ? 'Gas Station Dance AI preview must use 480p'
+                : isFlyingCarAi
+                  ? 'Flying Car AI preview must use 480p'
+                  : isEnzoFernandezAi
+                    ? 'Enzo Fernandez AI preview must use 480p'
+                    : 'Crazy Frog preview must use 480p',
         { status: 400 }
       );
     }
@@ -331,6 +350,29 @@ async function POST({ request }: { request: Request }) {
         }
       );
     }
+    if (isGasStationDanceAi && mode !== GAS_STATION_DANCE_AI_MODE) {
+      return respErr('Gas Station Dance AI only supports objects-swap', {
+        status: 400,
+      });
+    }
+    if (
+      isGasStationDanceAi &&
+      !GAS_STATION_DANCE_AI_RESOLUTIONS.includes(
+        resolution as (typeof GAS_STATION_DANCE_AI_RESOLUTIONS)[number]
+      )
+    ) {
+      return respErr('Gas Station Dance AI only supports 480p and 720p', {
+        status: 400,
+      });
+    }
+    if (isGasStationDanceAi && !isAllowedGasStationDanceAiPrompt(prompt)) {
+      return respErr(
+        'Gas Station Dance AI prompt does not match the fixed product prompt',
+        {
+          status: 400,
+        }
+      );
+    }
 
     const contentTypes = Array.isArray(body.contentTypes)
       ? body.contentTypes.filter(
@@ -350,14 +392,16 @@ async function POST({ request }: { request: Request }) {
           ? 'Coldplay Kiss Cam'
           : isGangnamStyleAi
             ? 'Gangnam Style AI'
-            : isFlyingCarAi
-              ? 'Flying Car AI'
-              : isEnzoFernandezAi
-                ? 'Enzo Fernandez AI'
-                : 'Crazy Frog';
+            : isGasStationDanceAi
+              ? 'Gas Station Dance AI'
+              : isFlyingCarAi
+                ? 'Flying Car AI'
+                : isEnzoFernandezAi
+                  ? 'Enzo Fernandez AI'
+                  : 'Crazy Frog';
       const previewImageCount = isSingleImageProduct
         ? 1
-        : isGangnamStyleAi
+        : isTripleImageProduct
           ? 3
           : 2;
       const previewUploadCount = previewImageCount + 1;
@@ -401,7 +445,7 @@ async function POST({ request }: { request: Request }) {
         return respErr(
           isCrazyFrog
             ? 'Upload exactly two reference images (lead and chaser)'
-            : isGangnamStyleAi
+            : isTripleImageProduct
               ? 'Upload exactly three reference images'
               : isA2oLiteAi || isColdplayKissCam
                 ? 'Upload exactly two reference images'
@@ -417,7 +461,7 @@ async function POST({ request }: { request: Request }) {
           return respErr(
             isSingleImageProduct
               ? 'Upload must be an image (JPG, PNG, WebP, or GIF)'
-              : isGangnamStyleAi
+              : isTripleImageProduct
                 ? 'All three uploads must be images (JPG, PNG, WebP, or GIF)'
                 : 'Both uploads must be images (JPG, PNG, WebP, or GIF)',
             { status: 400 }
@@ -436,11 +480,13 @@ async function POST({ request }: { request: Request }) {
                   ? getColdplayKissCamTemplateVideoKey()
                   : isGangnamStyleAi
                     ? getGangnamStyleAiTemplateVideoKey()
-                    : isFlyingCarAi
-                      ? getFlyingCarAiTemplateVideoKey()
-                      : isEnzoFernandezAi
-                        ? getEnzoFernandezAiTemplateVideoKey()
-                        : getSmalltownBoyDanceTemplateVideoKey()
+                    : isGasStationDanceAi
+                      ? getGasStationDanceAiTemplateVideoKey()
+                      : isFlyingCarAi
+                        ? getFlyingCarAiTemplateVideoKey()
+                        : isEnzoFernandezAi
+                          ? getEnzoFernandezAiTemplateVideoKey()
+                          : getSmalltownBoyDanceTemplateVideoKey()
           );
         } else if (isCrazyFrog) {
           await ensureCrazyFrogTemplateInR2();
@@ -450,6 +496,8 @@ async function POST({ request }: { request: Request }) {
           await ensureColdplayKissCamTemplateInR2();
         } else if (isGangnamStyleAi) {
           await ensureGangnamStyleAiTemplateInR2();
+        } else if (isGasStationDanceAi) {
+          await ensureGasStationDanceAiTemplateInR2();
         } else if (isFlyingCarAi) {
           await ensureFlyingCarAiTemplateInR2();
         } else if (isEnzoFernandezAi) {
@@ -469,11 +517,13 @@ async function POST({ request }: { request: Request }) {
                   ? 'Coldplay Kiss Cam template is not configured in R2.'
                   : isGangnamStyleAi
                     ? 'Gangnam Style AI template is not configured in R2.'
-                    : isFlyingCarAi
-                      ? 'Flying Car AI template is not configured in R2.'
-                      : isEnzoFernandezAi
-                        ? 'Enzo Fernandez AI template is not configured in R2.'
-                        : 'Smalltown Boy Dance template is not configured in R2.'),
+                    : isGasStationDanceAi
+                      ? 'Gas Station Dance AI template is not configured in R2.'
+                      : isFlyingCarAi
+                        ? 'Flying Car AI template is not configured in R2.'
+                        : isEnzoFernandezAi
+                          ? 'Enzo Fernandez AI template is not configured in R2.'
+                          : 'Smalltown Boy Dance template is not configured in R2.'),
           { code: 'TEMPLATE_NOT_CONFIGURED' },
           { status: 503 }
         );
@@ -531,6 +581,9 @@ async function POST({ request }: { request: Request }) {
     if (isGangnamStyleAi && existing) {
       assertGangnamStyleAiProviderBinding(existing.provider, existing.model);
     }
+    if (isGasStationDanceAi && existing) {
+      assertGasStationDanceAiProviderBinding(existing.provider, existing.model);
+    }
     const target = existing
       ? {
           provider: (existing.provider ||
@@ -557,11 +610,13 @@ async function POST({ request }: { request: Request }) {
           ? COLDPLAY_KISS_CAM_ASPECT_RATIO
           : isGangnamStyleAi
             ? GANGNAM_STYLE_AI_ASPECT_RATIO
-            : isFlyingCarAi
-              ? FLYING_CAR_AI_ASPECT_RATIO
-              : isEnzoFernandezAi
-                ? ENZO_FERNANDEZ_AI_ASPECT_RATIO
-                : SMALLTOWN_ASPECT_RATIO;
+            : isGasStationDanceAi
+              ? GAS_STATION_DANCE_AI_ASPECT_RATIO
+              : isFlyingCarAi
+                ? FLYING_CAR_AI_ASPECT_RATIO
+                : isEnzoFernandezAi
+                  ? ENZO_FERNANDEZ_AI_ASPECT_RATIO
+                  : SMALLTOWN_ASPECT_RATIO;
 
     if (isFixedTemplateProduct) {
       await bindGenjutsuUploadInputs({
@@ -595,11 +650,13 @@ async function POST({ request }: { request: Request }) {
               ? COLDPLAY_KISS_CAM_ASPECT_RATIO
               : isGangnamStyleAi
                 ? GANGNAM_STYLE_AI_ASPECT_RATIO
-                : isFlyingCarAi
-                  ? FLYING_CAR_AI_ASPECT_RATIO
-                  : isEnzoFernandezAi
-                    ? ENZO_FERNANDEZ_AI_ASPECT_RATIO
-                    : CRAZY_FROG_ASPECT_RATIO
+                : isGasStationDanceAi
+                  ? GAS_STATION_DANCE_AI_ASPECT_RATIO
+                  : isFlyingCarAi
+                    ? FLYING_CAR_AI_ASPECT_RATIO
+                    : isEnzoFernandezAi
+                      ? ENZO_FERNANDEZ_AI_ASPECT_RATIO
+                      : CRAZY_FROG_ASPECT_RATIO
           : undefined,
         videoKey: normalizedInputs[0].key,
         imageKeys: normalizedInputs.slice(1).map((item) => item.key),
@@ -657,7 +714,8 @@ async function POST({ request }: { request: Request }) {
       error instanceof EnzoFernandezAiProviderBindingError ||
       error instanceof FlyingCarAiProviderBindingError ||
       error instanceof ColdplayKissCamProviderBindingError ||
-      error instanceof GangnamStyleAiProviderBindingError
+      error instanceof GangnamStyleAiProviderBindingError ||
+      error instanceof GasStationDanceAiProviderBindingError
     ) {
       return respErr(error.message, { status: 400 });
     }

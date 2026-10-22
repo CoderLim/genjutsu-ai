@@ -71,6 +71,18 @@ import {
   GangnamStyleAiProviderBindingError,
 } from '@/modules/gangnam-style-ai/provider';
 import {
+  assertGasStationDanceAiInputs,
+  GasStationDanceAiPreflightError,
+} from '@/modules/gas-station-dance-ai/assert';
+import {
+  GAS_STATION_DANCE_AI_ASPECT_RATIO,
+  GAS_STATION_DANCE_AI_PRODUCT_ID,
+} from '@/modules/gas-station-dance-ai/constants';
+import {
+  assertGasStationDanceAiProviderBinding,
+  GasStationDanceAiProviderBindingError,
+} from '@/modules/gas-station-dance-ai/provider';
+import {
   assertGenerationId,
   claimGenjutsuSubmission,
   getGenjutsuTaskById,
@@ -370,12 +382,22 @@ async function POST({ request }: { request: Request }) {
       assertGangnamStyleAiInputs(taskOptions);
       assertGangnamStyleAiProviderBinding(task.provider, task.model);
     }
+    if (product === GAS_STATION_DANCE_AI_PRODUCT_ID) {
+      if (!task) {
+        throw new GasStationDanceAiPreflightError(
+          'Gas Station Dance AI generation must start from a saved attempt'
+        );
+      }
+      assertGasStationDanceAiInputs(taskOptions);
+      assertGasStationDanceAiProviderBinding(task.provider, task.model);
+    }
     const target =
       (product === A2O_LITE_AI_PRODUCT_ID ||
         product === ENZO_FERNANDEZ_AI_PRODUCT_ID ||
         product === FLYING_CAR_AI_PRODUCT_ID ||
         product === COLDPLAY_KISS_CAM_PRODUCT_ID ||
-        product === GANGNAM_STYLE_AI_PRODUCT_ID) &&
+        product === GANGNAM_STYLE_AI_PRODUCT_ID ||
+        product === GAS_STATION_DANCE_AI_PRODUCT_ID) &&
       task
         ? {
             provider: task.provider as GenjutsuProvider,
@@ -405,7 +427,9 @@ async function POST({ request }: { request: Request }) {
                   ? COLDPLAY_KISS_CAM_ASPECT_RATIO
                   : product === GANGNAM_STYLE_AI_PRODUCT_ID
                     ? GANGNAM_STYLE_AI_ASPECT_RATIO
-                    : undefined;
+                    : product === GAS_STATION_DANCE_AI_PRODUCT_ID
+                      ? GAS_STATION_DANCE_AI_ASPECT_RATIO
+                      : undefined;
 
     if (isSeedanceFamilyProvider(target.provider) && !hasStorageInput(input)) {
       throw new Error(
@@ -562,7 +586,9 @@ async function POST({ request }: { request: Request }) {
         error instanceof ColdplayKissCamPreflightError ||
         error instanceof ColdplayKissCamProviderBindingError ||
         error instanceof GangnamStyleAiPreflightError ||
-        error instanceof GangnamStyleAiProviderBindingError
+        error instanceof GangnamStyleAiProviderBindingError ||
+        error instanceof GasStationDanceAiPreflightError ||
+        error instanceof GasStationDanceAiProviderBindingError
       ) {
         await refundGenjutsuGeneration({
           generationId,

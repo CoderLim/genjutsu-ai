@@ -989,6 +989,13 @@ export function getGangnamStyleAiTemplateVideoKey() {
   );
 }
 
+export function getGasStationDanceAiTemplateVideoKey() {
+  return (
+    envConfigs.gas_station_dance_ai_template_video_key?.trim() ||
+    'genjutsu/templates/gas-station-dance-ai-v1.mp4'
+  );
+}
+
 async function ensureGenjutsuPublicTemplateInR2(params: {
   key: string;
   localRelative: string;
@@ -1096,6 +1103,14 @@ export async function ensureGangnamStyleAiTemplateInR2() {
   });
 }
 
+export async function ensureGasStationDanceAiTemplateInR2() {
+  return ensureGenjutsuPublicTemplateInR2({
+    key: getGasStationDanceAiTemplateVideoKey(),
+    localRelative: 'public/videos/long-trival-tpl.mp4',
+    label: 'Gas Station Dance AI',
+  });
+}
+
 /**
  * Logical R2 key for a Genjutsu product template (same key seal uses).
  * Exhaustive over GenjutsuProductId — unknown products must not fall through
@@ -1119,6 +1134,8 @@ export function getGenjutsuProductTemplateVideoKey(
       return getColdplayKissCamTemplateVideoKey();
     case 'gangnam-style-ai':
       return getGangnamStyleAiTemplateVideoKey();
+    case 'gas-station-dance-ai':
+      return getGasStationDanceAiTemplateVideoKey();
     default: {
       const _exhaustive: never = product;
       throw new Error(
@@ -1149,6 +1166,8 @@ export async function ensureGenjutsuProductTemplateInR2(
       return ensureColdplayKissCamTemplateInR2();
     case 'gangnam-style-ai':
       return ensureGangnamStyleAiTemplateInR2();
+    case 'gas-station-dance-ai':
+      return ensureGasStationDanceAiTemplateInR2();
     default: {
       const _exhaustive: never = product;
       throw new Error(
@@ -1240,6 +1259,7 @@ export async function sealGenjutsuTemplateR2Inputs(params: {
   const flyingCarAiKey = getFlyingCarAiTemplateVideoKey();
   const coldplayKissCamKey = getColdplayKissCamTemplateVideoKey();
   const gangnamStyleAiKey = getGangnamStyleAiTemplateVideoKey();
+  const gasStationDanceAiKey = getGasStationDanceAiTemplateVideoKey();
   const templateVideoKey =
     params.templateVideoKey === landscapeKey
       ? await ensureZombieHugTemplateInR2('16:9')
@@ -1259,7 +1279,9 @@ export async function sealGenjutsuTemplateR2Inputs(params: {
                     ? await ensureColdplayKissCamTemplateInR2()
                     : params.templateVideoKey === gangnamStyleAiKey
                       ? await ensureGangnamStyleAiTemplateInR2()
-                      : params.templateVideoKey;
+                      : params.templateVideoKey === gasStationDanceAiKey
+                        ? await ensureGasStationDanceAiTemplateInR2()
+                        : params.templateVideoKey;
 
   assertSafeObjectKey(templateVideoKey);
   if (!templateVideoKey.startsWith('genjutsu/')) {

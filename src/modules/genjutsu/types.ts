@@ -18,7 +18,8 @@ export type GenjutsuProductId =
   | 'enzo-fernandez-ai'
   | 'flying-car-ai'
   | 'coldplay-kiss-cam'
-  | 'gangnam-style-ai';
+  | 'gangnam-style-ai'
+  | 'gas-station-dance-ai';
 
 export type GenjutsuProviderTarget = {
   provider: GenjutsuProvider;

@@ -237,6 +237,11 @@ export const envConfigs: Record<string, string> = {
     procEnv.GANGNAM_STYLE_AI_TEMPLATE_VIDEO_KEY ??
     'genjutsu/templates/gangnam-style-ai-v1.mp4',
 
+  // Gas Station Dance AI (server-only). Seeds from homepage long-trival; three images.
+  gas_station_dance_ai_template_video_key:
+    procEnv.GAS_STATION_DANCE_AI_TEMPLATE_VIDEO_KEY ??
+    'genjutsu/templates/gas-station-dance-ai-v1.mp4',
+
   // Locale (public)
   locale: publicEnv('VITE_DEFAULT_LOCALE') ?? 'en',
 };
