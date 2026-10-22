@@ -36,6 +36,7 @@ import {
   ZOMBIE_HUG_DEFAULT_RESOLUTION,
   ZOMBIE_HUG_MODE,
   ZOMBIE_HUG_PROMPT,
+  ZOMBIE_HUG_PUBLIC_TEMPLATE_PATH_9X16,
 } from '@/modules/zombie-hug/prompt';
 
 type MotionTemplateBase = {
@@ -83,12 +84,9 @@ export const MOTION_TEMPLATES: MotionTemplate[] = [
     id: 'zombie-hug',
     titleKey: 'site.templates.zombie_hug',
     poster: '/readme/zombie-hug.jpg',
-    // Proxy so homepage Recreate can fetch() same-origin (signed R2 has no CORS).
-    sourceVideo: fixedTemplatePreviewPath({
-      product: 'zombie-hug',
-      aspect: '9:16',
-      delivery: 'proxy',
-    }),
+    // Homepage Use template: same public/videos path as cat-to-dog (no R2 proxy).
+    // Product page /ai-zombie-hug still seals from R2.
+    sourceVideo: ZOMBIE_HUG_PUBLIC_TEMPLATE_PATH_9X16,
     prompt: ZOMBIE_HUG_PROMPT,
     mode: ZOMBIE_HUG_MODE,
     resolution: ZOMBIE_HUG_DEFAULT_RESOLUTION,
@@ -178,10 +176,8 @@ export const MOTION_TEMPLATES: MotionTemplate[] = [
     id: 'hotel-lobby',
     titleKey: 'site.templates.hotel_lobby',
     poster: '/readme/hotel-lobby.jpg',
-    sourceVideo: fixedTemplatePreviewPath({
-      product: 'hotel-lobby',
-      delivery: 'proxy',
-    }),
+    // Homepage Use template: public static like cat-to-dog. Product page still uses R2.
+    sourceVideo: '/videos/hotel-lobby-tpl.mp4',
     prompt: buildHotelLobbyPrompt(2),
     mode: 'objects-swap',
     resolution: '720p',
@@ -312,19 +308,7 @@ UNDER NO CIRCUMSTANCES CHANGE THE CHARACTERS' IDENTITIES! THEY MUST LOOK EXACTLY
   },
 ];
 
-/**
- * Gallery <video> can use redirect delivery; Recreate fetch uses sourceVideo
- * (proxy for zombie-hug / hotel-lobby).
- */
+/** Gallery card + Use template share the same sourceVideo URL. */
 export function getMotionTemplatePreviewSrc(template: MotionTemplate): string {
-  if (template.id === 'zombie-hug') {
-    return fixedTemplatePreviewPath({
-      product: 'zombie-hug',
-      aspect: '9:16',
-    });
-  }
-  if (template.id === 'hotel-lobby') {
-    return fixedTemplatePreviewPath({ product: 'hotel-lobby' });
-  }
   return template.sourceVideo;
 }

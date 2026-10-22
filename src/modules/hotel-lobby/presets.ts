@@ -106,6 +106,7 @@ const PRESETS = {
     },
     previewUrl: '/api/genjutsu/template?product=hotel-lobby',
     posterUrl: '/readme/hotel-lobby.jpg',
+    localTemplatePath: 'public/videos/hotel-lobby-tpl.mp4',
     downloadPrefix: 'hotel-lobby',
     imageCount: { min: 1, max: 2 },
     allowCustomVideo: true,
