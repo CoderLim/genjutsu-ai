@@ -32,12 +32,6 @@ import {
   SMALLTOWN_TEMPLATE_POSTER_PATH,
 } from '@/modules/smalltown-boy-dance/constants';
 import { fixedTemplatePreviewPath } from '@/modules/templates/paths';
-import {
-  ZOMBIE_HUG_DEFAULT_RESOLUTION,
-  ZOMBIE_HUG_MODE,
-  ZOMBIE_HUG_PROMPT,
-  ZOMBIE_HUG_PUBLIC_TEMPLATE_PATH_9X16,
-} from '@/modules/zombie-hug/prompt';
 
 type MotionTemplateBase = {
   id: string;
@@ -75,7 +69,7 @@ const DEFAULT_OBJECTS_RESOLUTION = '720p' as const;
 /**
  * Homepage motion templates. Aspect follows the source clip
  * (portrait 9:16 / landscape 16:9) for gallery layout.
- * Dedicated product pages (Crazy Frog, Smalltown, Rumpel, Bulin, Kairo)
+ * Dedicated product pages (Zombie Hug, Crazy Frog, Smalltown, Rumpel, Bulin, Kairo)
  * use `href` — Recreate on the homepage Genjutsu panel would use the
  * wrong provider/product.
  */
@@ -84,13 +78,13 @@ export const MOTION_TEMPLATES: MotionTemplate[] = [
     id: 'zombie-hug',
     titleKey: 'site.templates.zombie_hug',
     poster: '/readme/zombie-hug.jpg',
-    // Homepage Use template: same public/videos path as cat-to-dog (no R2 proxy).
-    // Product page /ai-zombie-hug still seals from R2.
-    sourceVideo: ZOMBIE_HUG_PUBLIC_TEMPLATE_PATH_9X16,
-    prompt: ZOMBIE_HUG_PROMPT,
-    mode: ZOMBIE_HUG_MODE,
-    resolution: ZOMBIE_HUG_DEFAULT_RESOLUTION,
-    aspect: 'portrait',
+    // Same R2 template as /ai-zombie-hug (default 16:9).
+    sourceVideo: fixedTemplatePreviewPath({
+      product: 'zombie-hug',
+      aspect: '16:9',
+    }),
+    href: '/ai-zombie-hug',
+    aspect: 'landscape',
   },
   {
     id: 'coldplay-kiss-cam',
