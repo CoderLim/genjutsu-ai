@@ -43,7 +43,8 @@ import { SMALLTOWN_PRODUCT_ID } from '@/modules/smalltown-boy-dance/constants';
 import {
   isZombieHugAspectRatio,
   ZOMBIE_HUG_DEFAULT_ASPECT_RATIO,
-} from '@/modules/zombie-hug/prompt';
+  ZOMBIE_HUG_PRODUCT_ID,
+} from '@/modules/zombie-hug/constants';
 import { enforceMinIntervalRateLimit } from '@/lib/rate-limit';
 import { respData, respErr, respJson } from '@/lib/resp';
 
@@ -138,7 +139,10 @@ async function POST({ request }: { request: Request }) {
                       ? getGasStationDanceAiTemplateVideoKey()
                       : product === BURNING_BRIDGES_AI_PRODUCT_ID
                         ? getBurningBridgesAiTemplateVideoKey()
-                        : getZombieHugTemplateVideoKey(templateAspectRatio);
+                        : product === ZOMBIE_HUG_PRODUCT_ID
+                          ? getZombieHugTemplateVideoKey(templateAspectRatio)
+                          : // Legacy: useDefaultTemplate without product → zombie keys.
+                            getZombieHugTemplateVideoKey(templateAspectRatio);
     const videoKey =
       typeof currentOptions?.videoKey === 'string'
         ? currentOptions.videoKey

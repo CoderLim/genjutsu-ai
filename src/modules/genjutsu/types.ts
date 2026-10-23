@@ -20,7 +20,8 @@ export type GenjutsuProductId =
   | 'coldplay-kiss-cam'
   | 'gangnam-style-ai'
   | 'gas-station-dance-ai'
-  | 'burning-bridges-ai';
+  | 'burning-bridges-ai'
+  | 'zombie-hug';
 
 export type GenjutsuProviderTarget = {
   provider: GenjutsuProvider;

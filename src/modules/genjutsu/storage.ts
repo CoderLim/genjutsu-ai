@@ -1153,6 +1153,10 @@ export function getGenjutsuProductTemplateVideoKey(
       return getGasStationDanceAiTemplateVideoKey();
     case 'burning-bridges-ai':
       return getBurningBridgesAiTemplateVideoKey();
+    case 'zombie-hug':
+      // Aspect-aware callers use getZombieHugTemplateVideoKey(aspect).
+      // Default landscape key for the shared GenjutsuProductId helper.
+      return getZombieHugTemplateVideoKey();
     default: {
       const _exhaustive: never = product;
       throw new Error(
@@ -1187,6 +1191,8 @@ export async function ensureGenjutsuProductTemplateInR2(
       return ensureGasStationDanceAiTemplateInR2();
     case 'burning-bridges-ai':
       return ensureBurningBridgesAiTemplateInR2();
+    case 'zombie-hug':
+      return ensureZombieHugTemplateInR2();
     default: {
       const _exhaustive: never = product;
       throw new Error(

@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 
 import { Link } from '@/core/i18n/navigation';
+import { resolveZombieHugProviderTarget } from '@/modules/zombie-hug/provider';
 import { localeLinks, socialMeta } from '@/lib/seo';
 import { m } from '@/paraglide/messages.js';
 import { getLocale } from '@/paraglide/runtime.js';
@@ -157,6 +158,8 @@ function JsonLd({ value }: { value: Record<string, unknown> }) {
 }
 
 function AiZombieHugPage() {
+  const { creditProvider } = Route.useLoaderData();
+
   return (
     <div className="bg-background text-foreground flex min-h-screen flex-col">
       <JsonLd value={graphJsonLd()} />
@@ -180,7 +183,7 @@ function AiZombieHugPage() {
           </p>
 
           <div id="generator" className="mt-8 scroll-mt-24 text-left sm:mt-10">
-            <ZombieHugGeneratorPanel />
+            <ZombieHugGeneratorPanel creditProvider={creditProvider} />
           </div>
         </section>
       </div>
@@ -457,7 +460,8 @@ function AiZombieHugPage() {
 export const Route = createFileRoute('/ai-zombie-hug')({
   loader: () => {
     const locale = getLocale();
-    return { locale };
+    const target = resolveZombieHugProviderTarget();
+    return { locale, creditProvider: target.provider };
   },
   head: ({ loaderData }) => {
     const locale = loaderData?.locale ?? 'en';

@@ -109,6 +109,7 @@ import {
   ensureGangnamStyleAiTemplateInR2,
   ensureGasStationDanceAiTemplateInR2,
   ensureSmalltownBoyDanceTemplateInR2,
+  ensureZombieHugTemplateInR2,
   GENJUTSU_PROXY_UPLOAD_MAX_BYTES,
   getA2oLiteAiTemplateVideoKey,
   getBurningBridgesAiTemplateVideoKey,
@@ -120,6 +121,7 @@ import {
   getGasStationDanceAiTemplateVideoKey,
   getGenjutsuInputKey,
   getSmalltownBoyDanceTemplateVideoKey,
+  getZombieHugTemplateVideoKey,
 } from '@/modules/genjutsu/storage';
 import type { GenjutsuProvider } from '@/modules/genjutsu/types';
 import {
@@ -131,6 +133,18 @@ import {
   SMALLTOWN_PRODUCT_ID,
   SMALLTOWN_RESOLUTIONS,
 } from '@/modules/smalltown-boy-dance/constants';
+import { isAllowedZombieHugPrompt } from '@/modules/zombie-hug/assert';
+import {
+  isZombieHugAspectRatio,
+  ZOMBIE_HUG_MODE,
+  ZOMBIE_HUG_PRODUCT_ID,
+  ZOMBIE_HUG_RESOLUTIONS,
+  type ZombieHugAspectRatio,
+} from '@/modules/zombie-hug/constants';
+import {
+  assertZombieHugProviderBinding,
+  ZombieHugProviderBindingError,
+} from '@/modules/zombie-hug/provider';
 import { enforceMinIntervalRateLimit } from '@/lib/rate-limit';
 import { respData, respErr, respJson } from '@/lib/resp';
 
@@ -174,6 +188,7 @@ async function POST({ request }: { request: Request }) {
     const isColdplayKissCam = product === COLDPLAY_KISS_CAM_PRODUCT_ID;
     const isGangnamStyleAi = product === GANGNAM_STYLE_AI_PRODUCT_ID;
     const isGasStationDanceAi = product === GAS_STATION_DANCE_AI_PRODUCT_ID;
+    const isZombieHug = product === ZOMBIE_HUG_PRODUCT_ID;
     const isTripleImageProduct = isGangnamStyleAi || isGasStationDanceAi;
     const isSingleImageProduct =
       isEnzoFernandezAi || isFlyingCarAi || isBurningBridgesAi;
@@ -185,7 +200,8 @@ async function POST({ request }: { request: Request }) {
         isFlyingCarAi ||
         isColdplayKissCam ||
         isGangnamStyleAi ||
-        isGasStationDanceAi) &&
+        isGasStationDanceAi ||
+        isZombieHug) &&
       body.preview === true;
     // Full fixed templates: server template + image-only uploads.
     // Preview: client uploads a trimmed ≤4s clip + reference image(s).
@@ -198,8 +214,19 @@ async function POST({ request }: { request: Request }) {
         isFlyingCarAi ||
         isColdplayKissCam ||
         isGangnamStyleAi ||
-        isGasStationDanceAi) &&
+        isGasStationDanceAi ||
+        isZombieHug) &&
       !isProductPreview;
+    const zombieAspectRatio: ZombieHugAspectRatio | null = isZombieHug
+      ? isZombieHugAspectRatio(body.aspectRatio)
+        ? body.aspectRatio
+        : null
+      : null;
+    if (isZombieHug && !zombieAspectRatio) {
+      return respErr('Zombie Hug requires aspect ratio 16:9 or 9:16', {
+        status: 400,
+      });
+    }
     const fixedTemplateImageCount = isSingleImageProduct
       ? FIXED_TEMPLATE_SINGLE_IMAGE_COUNT
       : isTripleImageProduct
@@ -242,17 +269,19 @@ async function POST({ request }: { request: Request }) {
           ? 'A2O Lite AI preview must use 480p'
           : isColdplayKissCam
             ? 'Coldplay Kiss Cam preview must use 480p'
-            : isGangnamStyleAi
-              ? 'Gangnam Style AI preview must use 480p'
-              : isGasStationDanceAi
-                ? 'Gas Station Dance AI preview must use 480p'
-                : isFlyingCarAi
-                  ? 'Flying Car AI preview must use 480p'
-                  : isEnzoFernandezAi
-                    ? 'Enzo Fernandez AI preview must use 480p'
-                    : isBurningBridgesAi
-                      ? 'Burning Bridges AI preview must use 480p'
-                      : 'Crazy Frog preview must use 480p',
+            : isZombieHug
+              ? 'Zombie Hug preview must use 480p'
+              : isGangnamStyleAi
+                ? 'Gangnam Style AI preview must use 480p'
+                : isGasStationDanceAi
+                  ? 'Gas Station Dance AI preview must use 480p'
+                  : isFlyingCarAi
+                    ? 'Flying Car AI preview must use 480p'
+                    : isEnzoFernandezAi
+                      ? 'Enzo Fernandez AI preview must use 480p'
+                      : isBurningBridgesAi
+                        ? 'Burning Bridges AI preview must use 480p'
+                        : 'Crazy Frog preview must use 480p',
         { status: 400 }
       );
     }
@@ -369,6 +398,27 @@ async function POST({ request }: { request: Request }) {
         }
       );
     }
+    if (isZombieHug && mode !== ZOMBIE_HUG_MODE) {
+      return respErr('Zombie Hug only supports objects-swap', { status: 400 });
+    }
+    if (
+      isZombieHug &&
+      !ZOMBIE_HUG_RESOLUTIONS.includes(
+        resolution as (typeof ZOMBIE_HUG_RESOLUTIONS)[number]
+      )
+    ) {
+      return respErr('Zombie Hug only supports 480p and 720p', {
+        status: 400,
+      });
+    }
+    if (isZombieHug && !isAllowedZombieHugPrompt(prompt)) {
+      return respErr(
+        'Zombie Hug prompt does not match the fixed product prompt',
+        {
+          status: 400,
+        }
+      );
+    }
     if (isGangnamStyleAi && mode !== GANGNAM_STYLE_AI_MODE) {
       return respErr('Gangnam Style AI only supports objects-swap', {
         status: 400,
@@ -432,17 +482,19 @@ async function POST({ request }: { request: Request }) {
         ? 'A2O Lite AI'
         : isColdplayKissCam
           ? 'Coldplay Kiss Cam'
-          : isGangnamStyleAi
-            ? 'Gangnam Style AI'
-            : isGasStationDanceAi
-              ? 'Gas Station Dance AI'
-              : isFlyingCarAi
-                ? 'Flying Car AI'
-                : isEnzoFernandezAi
-                  ? 'Enzo Fernandez AI'
-                  : isBurningBridgesAi
-                    ? 'Burning Bridges AI'
-                    : 'Crazy Frog';
+          : isZombieHug
+            ? 'Zombie Hug'
+            : isGangnamStyleAi
+              ? 'Gangnam Style AI'
+              : isGasStationDanceAi
+                ? 'Gas Station Dance AI'
+                : isFlyingCarAi
+                  ? 'Flying Car AI'
+                  : isEnzoFernandezAi
+                    ? 'Enzo Fernandez AI'
+                    : isBurningBridgesAi
+                      ? 'Burning Bridges AI'
+                      : 'Crazy Frog';
       const previewImageCount = isSingleImageProduct
         ? 1
         : isTripleImageProduct
@@ -491,7 +543,7 @@ async function POST({ request }: { request: Request }) {
             ? 'Upload exactly two reference images (lead and chaser)'
             : isTripleImageProduct
               ? 'Upload exactly three reference images'
-              : isA2oLiteAi || isColdplayKissCam
+              : isA2oLiteAi || isColdplayKissCam || isZombieHug
                 ? 'Upload exactly two reference images'
                 : isSingleImageProduct
                   ? 'Upload exactly one reference image'
@@ -522,17 +574,19 @@ async function POST({ request }: { request: Request }) {
                 ? getA2oLiteAiTemplateVideoKey()
                 : isColdplayKissCam
                   ? getColdplayKissCamTemplateVideoKey()
-                  : isGangnamStyleAi
-                    ? getGangnamStyleAiTemplateVideoKey()
-                    : isGasStationDanceAi
-                      ? getGasStationDanceAiTemplateVideoKey()
-                      : isFlyingCarAi
-                        ? getFlyingCarAiTemplateVideoKey()
-                        : isEnzoFernandezAi
-                          ? getEnzoFernandezAiTemplateVideoKey()
-                          : isBurningBridgesAi
-                            ? getBurningBridgesAiTemplateVideoKey()
-                            : getSmalltownBoyDanceTemplateVideoKey()
+                  : isZombieHug
+                    ? getZombieHugTemplateVideoKey(zombieAspectRatio!)
+                    : isGangnamStyleAi
+                      ? getGangnamStyleAiTemplateVideoKey()
+                      : isGasStationDanceAi
+                        ? getGasStationDanceAiTemplateVideoKey()
+                        : isFlyingCarAi
+                          ? getFlyingCarAiTemplateVideoKey()
+                          : isEnzoFernandezAi
+                            ? getEnzoFernandezAiTemplateVideoKey()
+                            : isBurningBridgesAi
+                              ? getBurningBridgesAiTemplateVideoKey()
+                              : getSmalltownBoyDanceTemplateVideoKey()
           );
         } else if (isCrazyFrog) {
           await ensureCrazyFrogTemplateInR2();
@@ -540,6 +594,8 @@ async function POST({ request }: { request: Request }) {
           await ensureA2oLiteAiTemplateInR2();
         } else if (isColdplayKissCam) {
           await ensureColdplayKissCamTemplateInR2();
+        } else if (isZombieHug) {
+          await ensureZombieHugTemplateInR2(zombieAspectRatio!);
         } else if (isGangnamStyleAi) {
           await ensureGangnamStyleAiTemplateInR2();
         } else if (isGasStationDanceAi) {
@@ -563,17 +619,19 @@ async function POST({ request }: { request: Request }) {
                 ? 'A2O Lite AI template is not configured in R2.'
                 : isColdplayKissCam
                   ? 'Coldplay Kiss Cam template is not configured in R2.'
-                  : isGangnamStyleAi
-                    ? 'Gangnam Style AI template is not configured in R2.'
-                    : isGasStationDanceAi
-                      ? 'Gas Station Dance AI template is not configured in R2.'
-                      : isFlyingCarAi
-                        ? 'Flying Car AI template is not configured in R2.'
-                        : isEnzoFernandezAi
-                          ? 'Enzo Fernandez AI template is not configured in R2.'
-                          : isBurningBridgesAi
-                            ? 'Burning Bridges AI template is not configured in R2.'
-                            : 'Smalltown Boy Dance template is not configured in R2.'),
+                  : isZombieHug
+                    ? 'Zombie Hug template is not configured in R2.'
+                    : isGangnamStyleAi
+                      ? 'Gangnam Style AI template is not configured in R2.'
+                      : isGasStationDanceAi
+                        ? 'Gas Station Dance AI template is not configured in R2.'
+                        : isFlyingCarAi
+                          ? 'Flying Car AI template is not configured in R2.'
+                          : isEnzoFernandezAi
+                            ? 'Enzo Fernandez AI template is not configured in R2.'
+                            : isBurningBridgesAi
+                              ? 'Burning Bridges AI template is not configured in R2.'
+                              : 'Smalltown Boy Dance template is not configured in R2.'),
           { code: 'TEMPLATE_NOT_CONFIGURED' },
           { status: 503 }
         );
@@ -631,6 +689,9 @@ async function POST({ request }: { request: Request }) {
     if (isColdplayKissCam && existing) {
       assertColdplayKissCamProviderBinding(existing.provider, existing.model);
     }
+    if (isZombieHug && existing) {
+      assertZombieHugProviderBinding(existing.provider, existing.model);
+    }
     if (isGangnamStyleAi && existing) {
       assertGangnamStyleAiProviderBinding(existing.provider, existing.model);
     }
@@ -655,23 +716,25 @@ async function POST({ request }: { request: Request }) {
       ...target,
     });
 
-    const productAspectRatio = isCrazyFrog
-      ? CRAZY_FROG_ASPECT_RATIO
-      : isA2oLiteAi
-        ? A2O_LITE_AI_ASPECT_RATIO
-        : isColdplayKissCam
-          ? COLDPLAY_KISS_CAM_ASPECT_RATIO
-          : isGangnamStyleAi
-            ? GANGNAM_STYLE_AI_ASPECT_RATIO
-            : isGasStationDanceAi
-              ? GAS_STATION_DANCE_AI_ASPECT_RATIO
-              : isFlyingCarAi
-                ? FLYING_CAR_AI_ASPECT_RATIO
-                : isEnzoFernandezAi
-                  ? ENZO_FERNANDEZ_AI_ASPECT_RATIO
-                  : isBurningBridgesAi
-                    ? BURNING_BRIDGES_AI_ASPECT_RATIO
-                    : SMALLTOWN_ASPECT_RATIO;
+    const productAspectRatio = isZombieHug
+      ? zombieAspectRatio!
+      : isCrazyFrog
+        ? CRAZY_FROG_ASPECT_RATIO
+        : isA2oLiteAi
+          ? A2O_LITE_AI_ASPECT_RATIO
+          : isColdplayKissCam
+            ? COLDPLAY_KISS_CAM_ASPECT_RATIO
+            : isGangnamStyleAi
+              ? GANGNAM_STYLE_AI_ASPECT_RATIO
+              : isGasStationDanceAi
+                ? GAS_STATION_DANCE_AI_ASPECT_RATIO
+                : isFlyingCarAi
+                  ? FLYING_CAR_AI_ASPECT_RATIO
+                  : isEnzoFernandezAi
+                    ? ENZO_FERNANDEZ_AI_ASPECT_RATIO
+                    : isBurningBridgesAi
+                      ? BURNING_BRIDGES_AI_ASPECT_RATIO
+                      : SMALLTOWN_ASPECT_RATIO;
 
     if (isFixedTemplateProduct) {
       await bindGenjutsuUploadInputs({
@@ -699,21 +762,23 @@ async function POST({ request }: { request: Request }) {
         ...target,
         preview: isProductPreview || undefined,
         aspectRatio: isProductPreview
-          ? isA2oLiteAi
-            ? A2O_LITE_AI_ASPECT_RATIO
-            : isColdplayKissCam
-              ? COLDPLAY_KISS_CAM_ASPECT_RATIO
-              : isGangnamStyleAi
-                ? GANGNAM_STYLE_AI_ASPECT_RATIO
-                : isGasStationDanceAi
-                  ? GAS_STATION_DANCE_AI_ASPECT_RATIO
-                  : isFlyingCarAi
-                    ? FLYING_CAR_AI_ASPECT_RATIO
-                    : isEnzoFernandezAi
-                      ? ENZO_FERNANDEZ_AI_ASPECT_RATIO
-                      : isBurningBridgesAi
-                        ? BURNING_BRIDGES_AI_ASPECT_RATIO
-                        : CRAZY_FROG_ASPECT_RATIO
+          ? isZombieHug
+            ? zombieAspectRatio!
+            : isA2oLiteAi
+              ? A2O_LITE_AI_ASPECT_RATIO
+              : isColdplayKissCam
+                ? COLDPLAY_KISS_CAM_ASPECT_RATIO
+                : isGangnamStyleAi
+                  ? GANGNAM_STYLE_AI_ASPECT_RATIO
+                  : isGasStationDanceAi
+                    ? GAS_STATION_DANCE_AI_ASPECT_RATIO
+                    : isFlyingCarAi
+                      ? FLYING_CAR_AI_ASPECT_RATIO
+                      : isEnzoFernandezAi
+                        ? ENZO_FERNANDEZ_AI_ASPECT_RATIO
+                        : isBurningBridgesAi
+                          ? BURNING_BRIDGES_AI_ASPECT_RATIO
+                          : CRAZY_FROG_ASPECT_RATIO
           : undefined,
         videoKey: normalizedInputs[0].key,
         imageKeys: normalizedInputs.slice(1).map((item) => item.key),
@@ -772,6 +837,7 @@ async function POST({ request }: { request: Request }) {
       error instanceof BurningBridgesAiProviderBindingError ||
       error instanceof FlyingCarAiProviderBindingError ||
       error instanceof ColdplayKissCamProviderBindingError ||
+      error instanceof ZombieHugProviderBindingError ||
       error instanceof GangnamStyleAiProviderBindingError ||
       error instanceof GasStationDanceAiProviderBindingError
     ) {

@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
-import { checkLocalizedPages } from './e2e-i18n-smoke.mjs';
 import { spawn, spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { existsSync, rmSync } from 'node:fs';
 import { resolve } from 'node:path';
+
+import { checkLocalizedPages } from './e2e-i18n-smoke.mjs';
 
 const port = Number(process.env.GENJUTSU_E2E_PORT || 3107);
 const baseUrl = `http://127.0.0.1:${port}`;
@@ -430,12 +431,45 @@ async function main() {
     assert.deepEqual(returned, videoBytes.subarray(0, 10));
 
     console.log(
-      '\n[7/7] Zombie-hug preset: two photos + mock template → generate...'
+      '\n[7/7] Zombie-hug product: attempt → two photos + mock template → seal → generate...'
     );
+    // Keep in sync with src/modules/zombie-hug/constants.ts ZOMBIE_HUG_DEFAULT_PROMPT.
+    const zombiePrompt = [
+      'In the original source video, identify the two main characters by their roles and distinctive visual cues:',
+      '',
+      'Person A: the gun-holding survivor. Replace Person A with Reference 1.',
+      '',
+      'Person B: the second main character (the loved one). Replace Person B with Reference 2, with two states depending on the scene:',
+      '- In the earlier shots, Reference 2 should appear as an infected zombie version of the same person.',
+      '- In the later shots, Reference 2 should transition into the normal healthy human version of the same person.',
+      '- The zombie version and the human version must clearly be the same person, with consistent facial identity, hairstyle, and overall likeness.',
+      '',
+      'These cues identify the ORIGINAL characters only; they are NOT appearance instructions for the replacements.',
+      '',
+      "Replace BOTH original people completely with their assigned reference people. Reference 1 controls Person A's visible face, hair, clothing, and accessories; Reference 2 controls Person B's visible face, hair, clothing, and accessories across both the infected and restored states. Where a reference does not show an outfit detail, create a coherent appearance that matches that reference rather than copying the original person's distinctive look.",
+      '',
+      "Do not retain the original characters' faces, hairstyles, or distinctive accessories when they differ from their assigned references.",
+      '',
+      'Keep both replacements consistent through close-ups, two-person shots, occlusions, turns, camera cuts, and the cold-to-warm scene transition. Once assigned, track each person by identity and continuity. Never swap the two assignments, merge their identities, or apply one reference to both people.',
+      '',
+      'Preserve the source motion, timing, camera work, environment, and emotional beat of the standoff-to-embrace. Both original people must be visibly replaced; do not leave either person unchanged.',
+    ].join('\n');
     await sleep(1_100);
     const zombieGenerationId = `e2e-zombie-${randomUUID()}`;
-    const zombieUpload = await appPost('/api/zombie-hug/upload-url', cookie, {
+    await appPost('/api/genjutsu/attempt', cookie, {
       generationId: zombieGenerationId,
+      mode: 'objects-swap',
+      resolution: '720p',
+      prompt: zombiePrompt,
+      product: 'zombie-hug',
+    });
+    const zombieUpload = await appPost('/api/genjutsu/upload-url', cookie, {
+      generationId: zombieGenerationId,
+      mode: 'objects-swap',
+      resolution: '720p',
+      prompt: zombiePrompt,
+      product: 'zombie-hug',
+      aspectRatio: '16:9',
       contentTypes: ['image/png', 'image/png'],
       contentLengths: [imageBytes.byteLength, imageBytes.byteLength],
     });
@@ -464,7 +498,11 @@ async function main() {
       );
     }
 
-    const zombieStarted = await appPost('/api/zombie-hug/generate', cookie, {
+    await appPost('/api/genjutsu/seal-inputs', cookie, {
+      generationId: zombieGenerationId,
+    });
+
+    const zombieStarted = await appPost('/api/genjutsu/generate', cookie, {
       generationId: zombieGenerationId,
     });
     assert.equal(zombieStarted.generationId, zombieGenerationId);
@@ -489,7 +527,7 @@ async function main() {
       '   credit reserve → mock provider submit → durable result URL'
     );
     console.log(
-      '   zombie-hug: mock template seed → two-image upload → generate'
+      '   zombie-hug: genjutsu chain → mock template → two-image upload → generate'
     );
   } finally {
     stop();

@@ -60,6 +60,12 @@ import {
   SMALLTOWN_PRODUCT_ID,
   SMALLTOWN_RESOLUTIONS,
 } from '@/modules/smalltown-boy-dance/constants';
+import { isAllowedZombieHugPrompt } from '@/modules/zombie-hug/assert';
+import {
+  ZOMBIE_HUG_MODE,
+  ZOMBIE_HUG_PRODUCT_ID,
+  ZOMBIE_HUG_RESOLUTIONS,
+} from '@/modules/zombie-hug/constants';
 import { enforceMinIntervalRateLimit } from '@/lib/rate-limit';
 import { respData, respErr, respJson } from '@/lib/resp';
 
@@ -277,6 +283,28 @@ async function POST({ request }: { request: Request }) {
     if (isGasStationDanceAi && !isAllowedGasStationDanceAiPrompt(prompt)) {
       return respErr(
         'Gas Station Dance AI prompt does not match the fixed product prompt',
+        {
+          status: 400,
+        }
+      );
+    }
+    const isZombieHug = product === ZOMBIE_HUG_PRODUCT_ID;
+    if (isZombieHug && mode !== ZOMBIE_HUG_MODE) {
+      return respErr('Zombie Hug only supports objects-swap', { status: 400 });
+    }
+    if (
+      isZombieHug &&
+      !ZOMBIE_HUG_RESOLUTIONS.includes(
+        resolution as (typeof ZOMBIE_HUG_RESOLUTIONS)[number]
+      )
+    ) {
+      return respErr('Zombie Hug only supports 480p and 720p', {
+        status: 400,
+      });
+    }
+    if (isZombieHug && !isAllowedZombieHugPrompt(prompt)) {
+      return respErr(
+        'Zombie Hug prompt does not match the fixed product prompt',
         {
           status: 400,
         }

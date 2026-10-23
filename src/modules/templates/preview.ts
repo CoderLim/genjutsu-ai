@@ -27,11 +27,7 @@ export async function resolveFixedTemplatePreviewUrl(params: {
 }): Promise<string> {
   const product = params.product;
 
-  // Genjutsu product ids (incl. crazy-frog) win over hotel-lobby legacy preset ids.
-  if (isGenjutsuProductId(product)) {
-    return getGenjutsuProductTemplatePreviewUrl(product);
-  }
-
+  // Zombie Hug is a GenjutsuProductId but keeps selectable 16:9 | 9:16 templates.
   if (product === 'zombie-hug') {
     const aspectRatio: ZombieHugAspectRatio = isZombieHugAspectRatio(
       params.aspect
@@ -39,6 +35,11 @@ export async function resolveFixedTemplatePreviewUrl(params: {
       ? params.aspect
       : ZOMBIE_HUG_DEFAULT_ASPECT_RATIO;
     return getZombieHugTemplatePreviewUrl(aspectRatio);
+  }
+
+  // Genjutsu product ids (incl. crazy-frog) win over hotel-lobby legacy preset ids.
+  if (isGenjutsuProductId(product)) {
+    return getGenjutsuProductTemplatePreviewUrl(product);
   }
 
   if (product === 'kairo-bad-times') {

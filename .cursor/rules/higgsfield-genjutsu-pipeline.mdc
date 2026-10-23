@@ -27,6 +27,6 @@ Shared engine: `submitGenjutsu` / billing / seal helpers in `@/modules/genjutsu/
 - Client-editable prompt / preset metadata is fine; **pipeline parity with homepage is the priority**.
 - Non-Higgsfield providers (Kling, Fal hotel-lobby, etc.) are out of scope for this rule.
 
-## Known debt
+## Notes
 
-`/ai-zombie-hug` still uses `/api/zombie-hug/upload-url` + `/generate` (seal folded into generate). Treat as legacy; when touching zombie-hug generation, align it to the homepage chain above.
+`/ai-zombie-hug` is on the homepage Genjutsu chain (`/api/genjutsu/*`, objects-swap / Seedance family) with optional 16:9|9:16 and paid 4s preview. Do not revive `/api/zombie-hug/upload-url` or `/generate`.

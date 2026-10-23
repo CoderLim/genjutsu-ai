@@ -143,6 +143,18 @@ import {
   SMALLTOWN_ASPECT_RATIO,
   SMALLTOWN_PRODUCT_ID,
 } from '@/modules/smalltown-boy-dance/constants';
+import {
+  assertZombieHugInputs,
+  ZombieHugPreflightError,
+} from '@/modules/zombie-hug/assert';
+import {
+  isZombieHugAspectRatio,
+  ZOMBIE_HUG_PRODUCT_ID,
+} from '@/modules/zombie-hug/constants';
+import {
+  assertZombieHugProviderBinding,
+  ZombieHugProviderBindingError,
+} from '@/modules/zombie-hug/provider';
 import { enforceMinIntervalRateLimit } from '@/lib/rate-limit';
 import { respData, respErr, respJson } from '@/lib/resp';
 
@@ -412,6 +424,15 @@ async function POST({ request }: { request: Request }) {
       assertGasStationDanceAiInputs(taskOptions);
       assertGasStationDanceAiProviderBinding(task.provider, task.model);
     }
+    if (product === ZOMBIE_HUG_PRODUCT_ID) {
+      if (!task) {
+        throw new ZombieHugPreflightError(
+          'Zombie Hug generation must start from a saved attempt'
+        );
+      }
+      assertZombieHugInputs(taskOptions);
+      assertZombieHugProviderBinding(task.provider, task.model);
+    }
     const target =
       (product === A2O_LITE_AI_PRODUCT_ID ||
         product === ENZO_FERNANDEZ_AI_PRODUCT_ID ||
@@ -419,7 +440,8 @@ async function POST({ request }: { request: Request }) {
         product === FLYING_CAR_AI_PRODUCT_ID ||
         product === COLDPLAY_KISS_CAM_PRODUCT_ID ||
         product === GANGNAM_STYLE_AI_PRODUCT_ID ||
-        product === GAS_STATION_DANCE_AI_PRODUCT_ID) &&
+        product === GAS_STATION_DANCE_AI_PRODUCT_ID ||
+        product === ZOMBIE_HUG_PRODUCT_ID) &&
       task
         ? {
             provider: task.provider as GenjutsuProvider,
@@ -433,7 +455,8 @@ async function POST({ request }: { request: Request }) {
             }
           : resolveGenjutsuProviderTarget(input.mode);
     // Aspect is product-scoped (not provider-scoped) so other seedance-higgsfield
-    // callers are not forced into a product's frame.
+    // callers are not forced into a product's frame. Zombie Hug is the one
+    // product with a client-selected aspect (16:9 | 9:16).
     const aspectRatio =
       product === SMALLTOWN_PRODUCT_ID
         ? SMALLTOWN_ASPECT_RATIO
@@ -453,7 +476,10 @@ async function POST({ request }: { request: Request }) {
                       ? GANGNAM_STYLE_AI_ASPECT_RATIO
                       : product === GAS_STATION_DANCE_AI_PRODUCT_ID
                         ? GAS_STATION_DANCE_AI_ASPECT_RATIO
-                        : undefined;
+                        : product === ZOMBIE_HUG_PRODUCT_ID &&
+                            isZombieHugAspectRatio(taskOptions?.aspectRatio)
+                          ? taskOptions.aspectRatio
+                          : undefined;
 
     if (isSeedanceFamilyProvider(target.provider) && !hasStorageInput(input)) {
       throw new Error(
@@ -614,7 +640,9 @@ async function POST({ request }: { request: Request }) {
         error instanceof GangnamStyleAiPreflightError ||
         error instanceof GangnamStyleAiProviderBindingError ||
         error instanceof GasStationDanceAiPreflightError ||
-        error instanceof GasStationDanceAiProviderBindingError
+        error instanceof GasStationDanceAiProviderBindingError ||
+        error instanceof ZombieHugPreflightError ||
+        error instanceof ZombieHugProviderBindingError
       ) {
         await refundGenjutsuGeneration({
           generationId,

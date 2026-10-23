@@ -12,21 +12,37 @@ import { CircleHelp, Download } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useSession } from '@/core/auth/client';
-import { estimateGenjutsuCredits } from '@/modules/genjutsu/pricing';
+import { estimateGenjutsuCreditsForProvider } from '@/modules/genjutsu/pricing';
+import type { GenjutsuProvider } from '@/modules/genjutsu/types';
 import {
+  getZombieHugTemplateApiPath,
   getZombieHugTemplateDurationSeconds,
+  isZombieHugAspectRatio,
+  isZombieHugResolution,
   ZOMBIE_HUG_ASPECT_RATIOS,
   ZOMBIE_HUG_DEFAULT_ASPECT_RATIO,
+  ZOMBIE_HUG_DEFAULT_PROMPT,
   ZOMBIE_HUG_DEFAULT_RESOLUTION,
+  ZOMBIE_HUG_MODE,
+  ZOMBIE_HUG_PRODUCT_ID,
   ZOMBIE_HUG_RESOLUTIONS,
   type ZombieHugAspectRatio,
   type ZombieHugResolution,
-} from '@/modules/zombie-hug/prompt';
+} from '@/modules/zombie-hug/constants';
 import { ApiError, apiGet, apiPost, uploadToSignedUrl } from '@/lib/api-client';
 import { cn } from '@/lib/cn';
+import { trimVideoToFile } from '@/lib/trim-video';
+import { collectUploadDiagnostics } from '@/lib/upload-diagnostics';
+import {
+  classifyUploadFailure,
+  uploadFailureUserMessage,
+} from '@/lib/upload-failure';
+import { prepareReferenceImageFile } from '@/lib/upload-file-preparation';
+import { resolveUploadStorageIndex } from '@/lib/upload-storage-index';
 import { m } from '@/paraglide/messages.js';
 import { useCreditGate } from '@/hooks/use-credit-gate';
 import type { FixedTemplateMediaStatus } from '@/hooks/use-fixed-template-media';
+import { useImagePrepareGuard } from '@/hooks/use-image-prepare-guard';
 import { useUserCredits } from '@/hooks/use-user-credits';
 import { InsufficientCreditsModal } from '@/components/credits/insufficient-credits-modal';
 import { ChevronDownIcon, CloseIcon, ImageModeIcon } from '@/components/icons';
@@ -51,10 +67,6 @@ type SignedUpload = {
   index: number;
 };
 
-type UploadSetup = {
-  uploads: SignedUpload[];
-};
-
 type GenerationStart = {
   generationId: string;
   requestId: string | null;
@@ -67,21 +79,52 @@ type GenerationPoll = {
   providerStatus: string;
   videoUrl: string | null;
   error?: string;
+  errorCode?: string;
   reservedCredits?: number;
   refundedCredits?: number;
   requiredCredits?: number;
   balance?: number;
-  errorCode?: string;
 };
+
+/** Paid preview length — match homepage Genjutsu (Seedance editing floor). */
+const PREVIEW_DURATION_SECONDS = 4;
+
+function readLocalVideoDurationSeconds(file: File): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const video = document.createElement('video');
+    video.preload = 'metadata';
+    const cleanup = () => {
+      video.removeAttribute('src');
+      video.load();
+      URL.revokeObjectURL(url);
+    };
+    video.onloadedmetadata = () => {
+      const duration = video.duration;
+      cleanup();
+      if (!Number.isFinite(duration) || duration <= 0) {
+        reject(new Error('Could not read video duration'));
+        return;
+      }
+      resolve(duration);
+    };
+    video.onerror = () => {
+      cleanup();
+      reject(new Error('Could not read video duration'));
+    };
+    video.src = url;
+  });
+}
 
 type PersistedGeneration = {
   userId: string;
   generationId: string;
+  resolution: ZombieHugResolution;
   reservedCredits: number;
+  kind?: 'preview' | 'full';
+  aspectRatio?: ZombieHugAspectRatio;
 };
 
-const templateApiUrl = (aspectRatio: ZombieHugAspectRatio) =>
-  `/api/genjutsu/template?product=zombie-hug&aspect=${encodeURIComponent(aspectRatio)}`;
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
 
 const chipClass =
@@ -141,6 +184,7 @@ function FloatingPanel({ children }: { children: ReactNode }) {
     </div>
   );
 }
+
 const activeGenerationKey = (userId: string) =>
   `zombie_hug_active_generation:${userId}`;
 
@@ -155,6 +199,115 @@ function createMediaItem(file: File): MediaItem {
     file,
     url: URL.createObjectURL(file),
   };
+}
+
+function isLikenessRejectionMessage(message: string) {
+  return /likeness|real people|cannot be processed/i.test(message);
+}
+
+function isPhotoQualityFailureMessage(message: string) {
+  return /photos didn't work|front-facing shots/i.test(message);
+}
+
+function isProviderFailedMessage(message: string) {
+  return /generation failed\. please try again later/i.test(message);
+}
+
+function generationFailureUiMessage(
+  error?: string | null,
+  errorCode?: string | null
+) {
+  if (
+    errorCode === 'PROVIDER_LIKENESS_REJECTED' ||
+    (error && isLikenessRejectionMessage(error))
+  ) {
+    return m['genjutsu.safety.face_rejected']();
+  }
+  if (
+    errorCode === 'PROVIDER_CONTENT_SAFETY' ||
+    (error && isPhotoQualityFailureMessage(error))
+  ) {
+    return m['genjutsu.error.photo_quality']();
+  }
+  if (error && isProviderFailedMessage(error)) {
+    return m['genjutsu.error.provider_failed']();
+  }
+  if (errorCode === 'PROVIDER_FAILED') {
+    return error || m['genjutsu.error.provider_failed']();
+  }
+  return error || '';
+}
+
+function providerSubmitUiMessage(cause: unknown): string {
+  const message =
+    cause instanceof Error ? cause.message : m['site.generator.failed']();
+  const data =
+    cause instanceof ApiError && cause.data && typeof cause.data === 'object'
+      ? (cause.data as Record<string, unknown>)
+      : null;
+  const code = typeof data?.code === 'string' ? data.code : undefined;
+
+  if (
+    code === 'PROVIDER_LIKENESS_REJECTED' ||
+    isLikenessRejectionMessage(message)
+  ) {
+    return m['genjutsu.safety.face_rejected']();
+  }
+  if (
+    code === 'PROVIDER_CONTENT_SAFETY' ||
+    isPhotoQualityFailureMessage(message)
+  ) {
+    return m['genjutsu.error.photo_quality']();
+  }
+  if (isProviderFailedMessage(message)) {
+    return m['genjutsu.error.provider_failed']();
+  }
+  if (code === 'PROVIDER_FAILED') {
+    return message || m['genjutsu.error.provider_failed']();
+  }
+  return message;
+}
+
+async function reportUploadFailure(params: {
+  generationId: string;
+  fileIndex: number;
+  cause: unknown;
+  file?: File | null;
+}) {
+  const failure = classifyUploadFailure(params.cause, { file: params.file });
+  if (!failure) {
+    return apiPost<{ recovered: boolean }>('/api/genjutsu/attempt-failure', {
+      generationId: params.generationId,
+      fileIndex: params.fileIndex,
+      errorCode: 'UPLOAD_NETWORK_ERROR',
+      httpStatus: null,
+      diagnostics: null,
+    });
+  }
+  return apiPost<{ recovered: boolean }>('/api/genjutsu/attempt-failure', {
+    generationId: params.generationId,
+    fileIndex: params.fileIndex,
+    errorCode: failure.errorCode,
+    httpStatus: failure.httpStatus,
+    diagnostics: failure.diagnostics,
+  });
+}
+
+async function reportUploadRetrySucceeded(params: {
+  generationId: string;
+  fileIndex: number;
+  attemptCount: number;
+  uploadElapsedMs: number;
+}) {
+  return apiPost('/api/genjutsu/attempt-failure', {
+    generationId: params.generationId,
+    fileIndex: params.fileIndex,
+    event: 'retry_succeeded',
+    diagnostics: collectUploadDiagnostics({
+      attemptCount: params.attemptCount,
+      uploadElapsedMs: params.uploadElapsedMs,
+    }),
+  });
 }
 
 function PersonSlot({
@@ -226,7 +379,11 @@ function PersonSlot({
   );
 }
 
-export function ZombieHugGeneratorPanel() {
+export function ZombieHugGeneratorPanel({
+  creditProvider,
+}: {
+  creditProvider: GenjutsuProvider;
+}) {
   const { data: session, isPending: sessionPending } = useSession();
   const creditsQuery = useUserCredits(Boolean(session?.user));
   const creditGate = useCreditGate({
@@ -244,16 +401,18 @@ export function ZombieHugGeneratorPanel() {
   );
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [templateUrl, setTemplateUrl] = useState(() =>
-    templateApiUrl(ZOMBIE_HUG_DEFAULT_ASPECT_RATIO)
+    getZombieHugTemplateApiPath(ZOMBIE_HUG_DEFAULT_ASPECT_RATIO)
   );
   const [phase, setPhase] = useState<
-    'idle' | 'uploading' | 'starting' | 'generating' | 'saving' | 'locked'
+    'idle' | 'uploading' | 'starting' | 'generating' | 'locked'
   >('idle');
   const [generationId, setGenerationId] = useState<string | null>(null);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
+  const [resultKind, setResultKind] = useState<'preview' | 'full' | null>(null);
   const [resultAspectRatio, setResultAspectRatio] =
     useState<ZombieHugAspectRatio>(ZOMBIE_HUG_DEFAULT_ASPECT_RATIO);
   const [jobError, setJobError] = useState('');
+  const [progressPercent, setProgressPercent] = useState(0);
   const [templateStatus, setTemplateStatus] =
     useState<FixedTemplateMediaStatus>('loading');
   const templateReady = templateStatus === 'ready';
@@ -264,19 +423,70 @@ export function ZombieHugGeneratorPanel() {
   const lovedOneUrlRef = useRef<string | null>(null);
   const generationRunRef = useRef(0);
   const settingsRef = useRef<HTMLDivElement>(null);
+  const generationStartedAtRef = useRef<number | null>(null);
+  const resultPanelRef = useRef<HTMLDivElement>(null);
 
-  const estimatedCredits = useMemo(
-    () =>
-      estimateGenjutsuCredits({
-        durationSeconds: getZombieHugTemplateDurationSeconds(aspectRatio),
-        resolution,
-      }),
-    [aspectRatio, resolution]
-  );
+  const estimatedCredits = useMemo(() => {
+    return estimateGenjutsuCreditsForProvider({
+      provider: creditProvider,
+      durationSeconds: getZombieHugTemplateDurationSeconds(aspectRatio),
+      resolution,
+      aspectRatio,
+    });
+  }, [aspectRatio, creditProvider, resolution]);
+
+  const previewEstimatedCredits = useMemo(() => {
+    return estimateGenjutsuCreditsForProvider({
+      provider: creditProvider,
+      durationSeconds: PREVIEW_DURATION_SECONDS,
+      resolution: '480p',
+      aspectRatio,
+    });
+  }, [aspectRatio, creditProvider]);
+
+  const busy =
+    phase === 'uploading' ||
+    phase === 'starting' ||
+    phase === 'generating' ||
+    phase === 'locked';
 
   useEffect(() => {
-    setTemplateUrl(templateApiUrl(aspectRatio));
+    setTemplateUrl(getZombieHugTemplateApiPath(aspectRatio));
   }, [aspectRatio]);
+
+  useEffect(() => {
+    if (!busy) {
+      if (resultUrl) setProgressPercent(100);
+      else setProgressPercent(0);
+      generationStartedAtRef.current = null;
+      return;
+    }
+
+    if (generationStartedAtRef.current == null) {
+      generationStartedAtRef.current = Date.now();
+    }
+
+    const tick = () => {
+      const started = generationStartedAtRef.current ?? Date.now();
+      const elapsedSec = (Date.now() - started) / 1000;
+      const next = Math.min(
+        92,
+        Math.round(8 + 84 * (1 - Math.exp(-elapsedSec / 55)))
+      );
+      setProgressPercent(next);
+    };
+    tick();
+    const id = window.setInterval(tick, 400);
+    return () => window.clearInterval(id);
+  }, [busy, resultUrl]);
+
+  useEffect(() => {
+    if (!busy && !resultUrl) return;
+    resultPanelRef.current?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'nearest',
+    });
+  }, [busy, resultUrl, generationId]);
 
   useEffect(() => {
     if (!settingsOpen) return;
@@ -299,13 +509,6 @@ export function ZombieHugGeneratorPanel() {
     };
   }, [settingsOpen]);
 
-  const busy =
-    phase === 'uploading' ||
-    phase === 'starting' ||
-    phase === 'generating' ||
-    phase === 'saving' ||
-    phase === 'locked';
-
   useEffect(() => {
     survivorUrlRef.current = survivorImage?.url ?? null;
   }, [survivorImage]);
@@ -314,13 +517,14 @@ export function ZombieHugGeneratorPanel() {
     lovedOneUrlRef.current = lovedOneImage?.url ?? null;
   }, [lovedOneImage]);
 
-  // Unmount-only revoke. Slot setters already revoke the previous URL on replace.
   useEffect(() => {
     return () => {
       if (survivorUrlRef.current) URL.revokeObjectURL(survivorUrlRef.current);
       if (lovedOneUrlRef.current) URL.revokeObjectURL(lovedOneUrlRef.current);
     };
   }, []);
+
+  const imagePrepare = useImagePrepareGuard(['survivor', 'lovedOne'] as const);
 
   const setImageAt = (slot: 'survivor' | 'lovedOne', file: File | null) => {
     if (!file) return;
@@ -334,52 +538,57 @@ export function ZombieHugGeneratorPanel() {
       return;
     }
 
-    const next = createMediaItem(file);
-    if (slot === 'survivor') {
-      setSurvivorImage((current) => {
-        if (current) URL.revokeObjectURL(current.url);
-        return next;
-      });
-    } else {
-      setLovedOneImage((current) => {
-        if (current) URL.revokeObjectURL(current.url);
-        return next;
-      });
-    }
-    creditGate.clear();
+    const guard = imagePrepare.begin(slot);
+    void (async () => {
+      try {
+        const prepared = await prepareReferenceImageFile({
+          file,
+          maxBytes: MAX_IMAGE_BYTES,
+        });
+        if (!guard.isCurrent()) return;
+        const next = createMediaItem(prepared.file);
+        if (!guard.isCurrent()) {
+          URL.revokeObjectURL(next.url);
+          return;
+        }
+        const setter =
+          slot === 'survivor' ? setSurvivorImage : setLovedOneImage;
+        setter((current) => {
+          if (current) URL.revokeObjectURL(current.url);
+          return next;
+        });
+        creditGate.clear();
+        setJobError('');
+      } catch {
+        if (!guard.isCurrent()) return;
+        toast.error(m['site.generator.image_replace_failed']());
+      } finally {
+        guard.settle();
+      }
+    })();
   };
 
   const clearImageAt = (slot: 'survivor' | 'lovedOne') => {
-    if (slot === 'survivor') {
-      setSurvivorImage((current) => {
-        if (current) URL.revokeObjectURL(current.url);
-        return null;
-      });
-    } else {
-      setLovedOneImage((current) => {
-        if (current) URL.revokeObjectURL(current.url);
-        return null;
-      });
-    }
+    imagePrepare.invalidate(slot);
+    const setter = slot === 'survivor' ? setSurvivorImage : setLovedOneImage;
+    setter((current) => {
+      if (current) URL.revokeObjectURL(current.url);
+      return null;
+    });
   };
 
   const pollGeneration = useCallback(
     async (active: PersistedGeneration, runId: number) => {
       let delayMs = 1_500;
       let notFoundCount = 0;
-      let resumeAttempts = 0;
-      let preReservePolls = 0;
-      const MAX_RESUME_GENERATE = 5;
-      // Let an in-flight /generate finish quoting before we POST resume.
-      const RESUME_GRACE_POLLS = 2;
 
-      for (let attempt = 0; attempt < 240; attempt += 1) {
+      for (let attempt = 0; attempt < 364; attempt += 1) {
         await sleep(delayMs);
         if (generationRunRef.current !== runId) return;
 
-        let poll: GenerationPoll;
+        let polled: GenerationPoll;
         try {
-          poll = await apiGet<GenerationPoll>(
+          polled = await apiGet<GenerationPoll>(
             `/api/genjutsu/status?generationId=${encodeURIComponent(active.generationId)}`
           );
         } catch (cause) {
@@ -402,8 +611,6 @@ export function ZombieHugGeneratorPanel() {
             }
           }
 
-          // Transient status failures must not unlock Generate while a paid
-          // provider job may still be running.
           delayMs = Math.min(5_000, Math.ceil(delayMs * 1.2));
           continue;
         }
@@ -411,249 +618,83 @@ export function ZombieHugGeneratorPanel() {
         notFoundCount = 0;
 
         if (
-          typeof poll.reservedCredits === 'number' &&
-          poll.reservedCredits > 0 &&
-          poll.reservedCredits !== active.reservedCredits
+          polled.providerStatus === 'initiated' ||
+          polled.providerStatus === 'sealing' ||
+          polled.providerStatus === 'ready'
         ) {
-          active.reservedCredits = poll.reservedCredits;
+          localStorage.removeItem(activeGenerationKey(active.userId));
+          setPhase('idle');
+          creditGate.clear();
+          setJobError(
+            polled.providerStatus === 'ready'
+              ? 'Upload completed, but generation was not started. Click Generate to try again.'
+              : 'The previous upload did not finish starting a generation. Click Generate to try again.'
+          );
+          return;
+        }
+
+        if (
+          typeof polled.reservedCredits === 'number' &&
+          polled.reservedCredits > 0 &&
+          polled.reservedCredits !== active.reservedCredits
+        ) {
+          active.reservedCredits = polled.reservedCredits;
           localStorage.setItem(
             activeGenerationKey(active.userId),
             JSON.stringify(active)
           );
         }
 
-        // Pre-reserve states are NOT safe to unlock: an interrupted /generate
-        // may still be quoting/reserving. Keep this generationId and resume
-        // via the server's idempotent generate path instead of a new UUID.
-        if (
-          poll.providerStatus === 'initiated' ||
-          poll.providerStatus === 'sealing' ||
-          poll.providerStatus === 'ready'
-        ) {
-          preReservePolls += 1;
+        if (polled.providerStatus === 'submission_unknown') {
+          setPhase('locked');
+          setJobError(polled.error || m['site.generator.pending']());
+          return;
+        }
 
-          if (preReservePolls < RESUME_GRACE_POLLS) {
-            setPhase('starting');
-            setJobError(
-              poll.providerStatus === 'sealing'
-                ? 'Finishing upload seal for the previous generation…'
-                : 'Waiting to confirm whether the previous generation already started…'
-            );
-            delayMs = Math.min(5_000, Math.ceil(delayMs * 1.2));
-            continue;
-          }
+        if (polled.status === 'completed' && polled.videoUrl) {
+          if (generationRunRef.current !== runId) return;
+          localStorage.removeItem(activeGenerationKey(active.userId));
+          setResultUrl(polled.videoUrl);
+          setJobError('');
+          setPhase('idle');
+          void creditsQuery.refetch();
+          return;
+        }
 
-          if (resumeAttempts >= MAX_RESUME_GENERATE) {
-            setPhase('locked');
-            setJobError(
-              'Could not confirm whether the previous generation reserved credits. This job stays locked to avoid a duplicate charge — refresh to keep checking, or contact support.'
-            );
+        if (polled.status === 'failed') {
+          localStorage.removeItem(activeGenerationKey(active.userId));
+          setPhase('idle');
+          const insufficient = polled.providerStatus === 'insufficient_credits';
+          const requiredCredits = Number(polled.requiredCredits);
+          const balance = Number(polled.balance);
+
+          if (
+            insufficient &&
+            Number.isFinite(requiredCredits) &&
+            Number.isFinite(balance)
+          ) {
+            creditGate.open({ requiredCredits, balance });
+            setJobError('');
             return;
           }
 
-          resumeAttempts += 1;
-          setPhase('starting');
-          setJobError('Resuming the previous generation with the same job id…');
-          try {
-            const start = await apiPost<GenerationStart>(
-              '/api/zombie-hug/generate',
-              { generationId: active.generationId }
-            );
-            if (generationRunRef.current !== runId) return;
-
-            active.generationId = start.generationId;
-            active.reservedCredits = start.reservedCredits || 0;
-            localStorage.setItem(
-              activeGenerationKey(active.userId),
-              JSON.stringify(active)
-            );
-            await creditsQuery.refetch();
-
-            if (start.status === 'submission_unknown') {
-              setPhase('locked');
-              setJobError(
-                'Submission result is uncertain. Credits remain reserved; do not retry this generation.'
-              );
-              return;
-            }
-            if (start.status === 'refunded') {
-              localStorage.removeItem(activeGenerationKey(active.userId));
-              setPhase('idle');
-              setJobError('Generation could not be started');
-              toast.error('Generation could not be started');
-              return;
-            }
-
-            setPhase('generating');
-            setJobError('');
-          } catch (cause) {
-            if (generationRunRef.current !== runId) return;
-            const data =
-              cause instanceof ApiError &&
-              cause.data &&
-              typeof cause.data === 'object'
-                ? (cause.data as Record<string, unknown>)
-                : null;
-            const code = typeof data?.code === 'string' ? data.code : undefined;
-
-            if (code === 'SUBMISSION_UNKNOWN') {
-              setPhase('locked');
-              setJobError(
-                cause instanceof Error
-                  ? cause.message
-                  : 'Submission result is uncertain. Credits remain reserved; do not retry this generation.'
-              );
-              return;
-            }
-
-            // Active seal lease — keep waiting until stale reclaim is allowed.
-            if (code === 'GENERATION_SEAL_IN_PROGRESS') {
-              resumeAttempts = Math.max(0, resumeAttempts - 1);
-              setPhase('starting');
-              setJobError(
-                'Upload seal is still in progress. Waiting to reclaim the same job if it stalls…'
-              );
-              delayMs = Math.min(5_000, Math.ceil(delayMs * 1.2));
-              continue;
-            }
-
-            // TEMPLATE_NOT_CONFIGURED during resume is not by itself proof the
-            // sealing job died — verify status before unlocking Generate.
-            if (code === 'TEMPLATE_NOT_CONFIGURED') {
-              resumeAttempts = Math.max(0, resumeAttempts - 1);
-              try {
-                const verify = await apiGet<GenerationPoll>(
-                  `/api/genjutsu/status?generationId=${encodeURIComponent(active.generationId)}`
-                );
-                if (generationRunRef.current !== runId) return;
-                if (verify.providerStatus === 'failed_preflight') {
-                  localStorage.removeItem(activeGenerationKey(active.userId));
-                  setPhase('idle');
-                  setJobError(
-                    cause instanceof Error
-                      ? cause.message
-                      : m['site.zombie.failed_start']()
-                  );
-                  toast.error(
-                    cause instanceof Error
-                      ? cause.message
-                      : m['site.zombie.failed_start']()
-                  );
-                  return;
-                }
-              } catch {
-                // fall through to keep waiting
-              }
-              setPhase('starting');
-              setJobError(
-                'Template check failed while a previous seal may still be running. Keeping this job locked…'
-              );
-              delayMs = Math.min(5_000, Math.ceil(delayMs * 1.2));
-              continue;
-            }
-
-            // Only unlock when the server proves no credits were held.
-            if (
-              code === 'INSUFFICIENT_CREDITS' ||
-              code === 'GENERATION_NOT_FOUND'
-            ) {
-              localStorage.removeItem(activeGenerationKey(active.userId));
-              setPhase('idle');
-              if (code === 'INSUFFICIENT_CREDITS') {
-                const required = Number(data?.requiredCredits);
-                const balance = Number(data?.balance);
-                if (
-                  Number.isFinite(required) &&
-                  required > 0 &&
-                  Number.isFinite(balance) &&
-                  balance >= 0
-                ) {
-                  creditGate.open({ requiredCredits: required, balance });
-                  setJobError('');
-                  return;
-                }
-              }
-              setJobError(
-                cause instanceof Error
-                  ? cause.message
-                  : m['site.zombie.failed_start']()
-              );
-              toast.error(
-                cause instanceof Error
-                  ? cause.message
-                  : m['site.zombie.failed_start']()
-              );
-              return;
-            }
-
-            // Unknown / in-progress errors: keep locked and poll again.
-            setPhase('generating');
-            setJobError(
-              'Still confirming the previous generation. Waiting before allowing another submit…'
-            );
-          }
-
-          delayMs = Math.min(5_000, Math.ceil(delayMs * 1.2));
-          continue;
-        }
-
-        if (poll.providerStatus === 'submission_unknown') {
-          setPhase('locked');
+          creditGate.clear();
           setJobError(
-            poll.error ||
-              'The provider submission result is uncertain. This generation remains locked to avoid a duplicate charge.'
+            generationFailureUiMessage(polled.error, polled.errorCode) ||
+              m['site.generator.failed_status']({
+                status: polled.providerStatus,
+              })
           );
-          return;
-        }
-
-        if (poll.providerStatus === 'persisting') setPhase('saving');
-
-        if (poll.status === 'completed' && poll.videoUrl) {
-          if (generationRunRef.current !== runId) return;
-          localStorage.removeItem(activeGenerationKey(active.userId));
-          setResultUrl(poll.videoUrl);
-          setJobError('');
-          setPhase('idle');
-          await creditsQuery.refetch();
-          toast.success('Your AI zombie hug video is ready');
-          return;
-        }
-
-        if (poll.status === 'failed') {
-          localStorage.removeItem(activeGenerationKey(active.userId));
-          setPhase('idle');
-          await creditsQuery.refetch();
-
-          if (poll.providerStatus === 'insufficient_credits') {
-            const required = Number(poll.requiredCredits);
-            const balance = Number(poll.balance);
-            if (
-              Number.isFinite(required) &&
-              required > 0 &&
-              Number.isFinite(balance) &&
-              balance >= 0
-            ) {
-              creditGate.open({ requiredCredits: required, balance });
-              setJobError('');
-              return;
-            }
-          }
-
-          setJobError(poll.error || m['site.zombie.failed']());
-          toast.error(poll.error || m['site.zombie.failed']());
           return;
         }
 
         delayMs = Math.min(5_000, Math.ceil(delayMs * 1.2));
       }
 
-      // Do not return to idle: the provider job may still be running.
       setPhase('locked');
-      setJobError(
-        'Generation is still processing. This job remains reserved; refresh the page to resume checking it.'
-      );
+      setJobError(m['site.generator.still_processing']());
     },
-    [creditGate.open, creditsQuery]
+    [creditGate.clear, creditGate.open, creditsQuery]
   );
 
   useEffect(() => {
@@ -678,6 +719,14 @@ export function ZombieHugGeneratorPanel() {
       setJobError('');
       creditGate.clear();
       setGenerationId(active.generationId);
+      setResultKind(active.kind === 'preview' ? 'preview' : 'full');
+      if (isZombieHugResolution(active.resolution)) {
+        setResolution(active.resolution);
+      }
+      if (isZombieHugAspectRatio(active.aspectRatio)) {
+        setAspectRatio(active.aspectRatio);
+        setResultAspectRatio(active.aspectRatio);
+      }
       setPhase('generating');
       void pollGeneration(active, runId);
     } catch {
@@ -685,12 +734,16 @@ export function ZombieHugGeneratorPanel() {
     }
   }, [pollGeneration, session?.user?.id, phase]);
 
-  const generate = async () => {
+  const generate = async (kind: 'preview' | 'full' = 'full') => {
     if (!session?.user) {
       window.location.href = `/sign-in?callbackUrl=${encodeURIComponent('/ai-zombie-hug#generator')}`;
       return;
     }
     if (busy) return;
+    if (imagePrepare.isAnyPreparing) {
+      toast.error(m['site.generator.image_preparing']());
+      return;
+    }
     if (!templateReady) {
       toast.error(m['site.common.template_unavailable']());
       return;
@@ -700,57 +753,134 @@ export function ZombieHugGeneratorPanel() {
       return;
     }
 
-    // As on the homepage, the displayed estimate is informational only.
-    // Higgsfield's server-side quote and credit reservation are authoritative.
+    const isPreview = kind === 'preview';
+    const targetResolution: ZombieHugResolution = isPreview
+      ? '480p'
+      : resolution;
 
     setResultUrl(null);
+    setResultKind(kind);
+    setResultAspectRatio(aspectRatio);
     creditGate.clear();
     setJobError('');
     setPhase('uploading');
 
-    const id = crypto.randomUUID();
+    const id =
+      typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        ? crypto.randomUUID()
+        : `gen-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
     setGenerationId(id);
     const runId = ++generationRunRef.current;
+    const prompt = ZOMBIE_HUG_DEFAULT_PROMPT;
 
     try {
-      const files = [survivorImage.file, lovedOneImage.file];
-      const contentTypes = files.map(
-        (file) => file.type || 'application/octet-stream'
-      );
-      const contentLengths = files.map((file) => file.size);
-
-      const setup = await apiPost<UploadSetup>('/api/zombie-hug/upload-url', {
+      await apiPost('/api/genjutsu/attempt', {
         generationId: id,
-        contentTypes,
-        contentLengths,
-        resolution,
-        aspectRatio,
+        mode: ZOMBIE_HUG_MODE,
+        resolution: targetResolution,
+        prompt,
+        product: ZOMBIE_HUG_PRODUCT_ID,
       });
 
-      if (setup.uploads.length !== files.length) {
-        throw new Error('Upload setup returned an incomplete file list');
+      let media: File[];
+      if (isPreview) {
+        let clipFile: File;
+        let durationSeconds: number;
+        try {
+          clipFile = await trimVideoToFile({
+            sourceUrl: getZombieHugTemplateApiPath(aspectRatio),
+            startSeconds: 0,
+            endSeconds: PREVIEW_DURATION_SECONDS,
+            fileName: 'zombie-hug-preview.mp4',
+            accurate: true,
+          });
+          durationSeconds = await readLocalVideoDurationSeconds(clipFile);
+        } catch (cause) {
+          console.error('Zombie Hug preview preparation failed:', cause);
+          throw new Error(m['site.generator.preview_trim_failed']());
+        }
+        if (
+          durationSeconds < PREVIEW_DURATION_SECONDS - 0.01 ||
+          durationSeconds > PREVIEW_DURATION_SECONDS + 0.2
+        ) {
+          throw new Error(m['site.generator.preview_trim_failed']());
+        }
+        media = [clipFile, survivorImage.file, lovedOneImage.file];
+      } else {
+        media = [survivorImage.file, lovedOneImage.file];
+      }
+      const contentTypes = media.map(
+        (file, index) =>
+          file.type || (isPreview && index === 0 ? 'video/mp4' : 'image/jpeg')
+      );
+      const contentLengths = media.map((file) => file.size);
+
+      const uploadBatch = await apiPost<{ uploads: SignedUpload[] }>(
+        '/api/genjutsu/upload-url',
+        {
+          generationId: id,
+          mode: ZOMBIE_HUG_MODE,
+          resolution: targetResolution,
+          prompt,
+          product: ZOMBIE_HUG_PRODUCT_ID,
+          preview: isPreview || undefined,
+          aspectRatio,
+          contentTypes,
+          contentLengths,
+        }
+      );
+
+      if (uploadBatch.uploads.length !== media.length) {
+        throw new Error(m['site.generator.upload_incomplete']());
       }
 
-      const sortedUploads = [...setup.uploads].sort(
+      const sortedUploads = [...uploadBatch.uploads].sort(
         (a, b) => a.index - b.index
       );
+
       for (let index = 0; index < sortedUploads.length; index += 1) {
         const upload = sortedUploads[index];
-        await uploadToSignedUrl({
-          url: upload.uploadUrl,
-          file: files[index],
-          headers: upload.uploadHeaders,
-        });
+        if (!upload) throw new Error(m['site.generator.upload_url_missing']());
+        const storageIndex = resolveUploadStorageIndex(upload, index);
+        try {
+          const uploaded = await uploadToSignedUrl({
+            url: upload.uploadUrl,
+            file: media[index],
+            headers: upload.uploadHeaders,
+          });
+          if (uploaded.attemptCount > 1) {
+            await reportUploadRetrySucceeded({
+              generationId: id,
+              fileIndex: storageIndex,
+              attemptCount: uploaded.attemptCount,
+              uploadElapsedMs: uploaded.uploadElapsedMs,
+            }).catch(() => undefined);
+          }
+        } catch (cause) {
+          const report = await reportUploadFailure({
+            generationId: id,
+            fileIndex: storageIndex,
+            cause,
+            file: media[index],
+          }).catch(() => null);
+          if (report?.recovered) continue;
+          throw cause;
+        }
       }
 
       if (generationRunRef.current !== runId) return;
 
-      // Persist before the paid POST so a refresh can reconcile an already-paid
-      // job and never auto-starts a still-unpaid attempt from another click.
+      await apiPost('/api/genjutsu/seal-inputs', {
+        generationId: id,
+      });
+
       const active: PersistedGeneration = {
         userId: session.user.id,
         generationId: id,
+        resolution: targetResolution,
         reservedCredits: 0,
+        kind,
+        aspectRatio,
       };
       localStorage.setItem(
         activeGenerationKey(session.user.id),
@@ -758,13 +888,12 @@ export function ZombieHugGeneratorPanel() {
       );
 
       setPhase('starting');
-      setResultAspectRatio(aspectRatio);
-      const start = await apiPost<GenerationStart>('/api/zombie-hug/generate', {
+      const started = await apiPost<GenerationStart>('/api/genjutsu/generate', {
         generationId: id,
       });
 
-      active.generationId = start.generationId;
-      active.reservedCredits = start.reservedCredits || 0;
+      active.generationId = started.generationId;
+      active.reservedCredits = started.reservedCredits || 0;
       localStorage.setItem(
         activeGenerationKey(session.user.id),
         JSON.stringify(active)
@@ -772,135 +901,75 @@ export function ZombieHugGeneratorPanel() {
 
       await creditsQuery.refetch();
 
-      if (start.status === 'submission_unknown') {
+      if (started.status === 'submission_unknown') {
         setPhase('locked');
-        setJobError(
-          'Submission result is uncertain. Credits remain reserved; do not retry this generation.'
-        );
+        setJobError(m['site.generator.submission_uncertain']());
         return;
-      }
-
-      if (start.status === 'refunded') {
-        localStorage.removeItem(activeGenerationKey(session.user.id));
-        setPhase('idle');
-        throw new Error('Generation could not be started');
       }
 
       setPhase('generating');
       await pollGeneration(active, runId);
-    } catch (error) {
+    } catch (cause) {
       if (generationRunRef.current !== runId) return;
 
-      const data =
-        error instanceof ApiError &&
-        error.data &&
-        typeof error.data === 'object'
-          ? (error.data as Record<string, unknown>)
+      const apiData =
+        cause instanceof ApiError &&
+        cause.data &&
+        typeof cause.data === 'object'
+          ? (cause.data as Record<string, unknown>)
           : null;
-      const code = typeof data?.code === 'string' ? data.code : undefined;
+      const insufficient = apiData?.code === 'INSUFFICIENT_CREDITS';
+      const submissionUnknown = apiData?.code === 'SUBMISSION_UNKNOWN';
 
-      // Only these codes prove credits were not held (or the attempt never
-      // existed). TEMPLATE_NOT_CONFIGURED is handled below after a status
-      // check — sealing jobs must not unlock Generate on a bare template 503.
-      const safeToClear =
-        code === 'INSUFFICIENT_CREDITS' || code === 'GENERATION_NOT_FOUND';
-
-      if (code === 'SUBMISSION_UNKNOWN') {
-        setPhase('locked');
-        setJobError(
-          error instanceof Error
-            ? error.message
-            : 'Submission result is uncertain. Credits remain reserved; do not retry this generation.'
-        );
-        return;
-      }
-
-      if (code === 'TEMPLATE_NOT_CONFIGURED') {
-        try {
-          const verify = await apiGet<GenerationPoll>(
-            `/api/genjutsu/status?generationId=${encodeURIComponent(id)}`
-          );
-          if (generationRunRef.current !== runId) return;
-          if (verify.providerStatus === 'failed_preflight') {
-            localStorage.removeItem(activeGenerationKey(session.user.id));
-            setPhase('idle');
-            toast.error(
-              error instanceof Error
-                ? error.message
-                : 'Zombie hug template is not configured in storage. Contact support.'
-            );
-            return;
-          }
-          if (
-            verify.providerStatus === 'initiated' ||
-            verify.providerStatus === 'sealing' ||
-            verify.providerStatus === 'ready'
-          ) {
-            setPhase('generating');
-            setJobError(
-              'Template check failed while sealing may still be in progress. Checking the existing job…'
-            );
-            const raw = localStorage.getItem(
-              activeGenerationKey(session.user.id)
-            );
-            if (raw) {
-              const active = JSON.parse(raw) as PersistedGeneration;
-              if (active.generationId === id) {
-                await pollGeneration(active, runId);
-                return;
-              }
-            }
-          }
-        } catch {
-          // fall through to keep/reconcile via persisted job
-        }
-      }
-
-      if (error instanceof ApiError && safeToClear) {
+      if (cause instanceof ApiError && !submissionUnknown) {
         localStorage.removeItem(activeGenerationKey(session.user.id));
         setPhase('idle');
 
-        if (code === 'INSUFFICIENT_CREDITS') {
-          const required = Number(data?.requiredCredits);
-          const balance = Number(data?.balance);
-          if (
-            Number.isFinite(required) &&
-            required > 0 &&
-            Number.isFinite(balance) &&
-            balance >= 0
-          ) {
-            creditGate.open({ requiredCredits: required, balance });
+        if (insufficient) {
+          const requiredCredits = Number(apiData?.requiredCredits);
+          const balance = Number(apiData?.balance);
+          if (Number.isFinite(requiredCredits) && Number.isFinite(balance)) {
+            creditGate.open({ requiredCredits, balance });
+            setJobError('');
             return;
           }
         }
 
-        toast.error(error.message || m['site.zombie.failed_start']());
-        setJobError(error.message || m['site.zombie.failed_start']());
+        creditGate.clear();
+        const uiMessage = providerSubmitUiMessage(cause);
+        toast.error(uiMessage);
+        setJobError(uiMessage);
         return;
       }
 
-      // Network / unknown ApiError after persist: paid path may have started.
       const raw = localStorage.getItem(activeGenerationKey(session.user.id));
       if (raw) {
         try {
           const active = JSON.parse(raw) as PersistedGeneration;
-          if (active.generationId === id) {
-            setPhase('generating');
-            setJobError(
-              'Connection interrupted while starting. Checking the existing job before allowing another submission…'
-            );
-            await pollGeneration(active, runId);
-            return;
-          }
+          creditGate.clear();
+          setPhase('generating');
+          setJobError(
+            submissionUnknown
+              ? cause instanceof Error
+                ? cause.message
+                : m['site.generator.submission_uncertain']()
+              : m['site.generator.connection_lost']()
+          );
+          void pollGeneration(active, runId);
+          return;
         } catch {
-          // fall through
+          localStorage.removeItem(activeGenerationKey(session.user.id));
         }
       }
 
-      localStorage.removeItem(activeGenerationKey(session.user.id));
       setPhase('idle');
-      toast.error(
-        error instanceof Error ? error.message : m['site.zombie.failed_start']()
+      creditGate.clear();
+      setJobError(
+        uploadFailureUserMessage({
+          cause,
+          fallback: m['site.generator.failed_unexpected'](),
+          androidNetworkHint: m['site.generator.upload_android_network_hint'](),
+        })
       );
     }
   };
@@ -909,6 +978,7 @@ export function ZombieHugGeneratorPanel() {
     Boolean(survivorImage && lovedOneImage) &&
     templateReady &&
     !busy &&
+    !imagePrepare.isAnyPreparing &&
     !sessionPending;
 
   return (
@@ -953,7 +1023,7 @@ export function ZombieHugGeneratorPanel() {
 
         <div className="border-t border-white/8 p-4 sm:p-5">
           {jobError ? (
-            <div className="mb-4 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white/60">
+            <div className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
               {jobError}
             </div>
           ) : null}
@@ -1025,92 +1095,182 @@ export function ZombieHugGeneratorPanel() {
               ) : null}
             </div>
 
-            <div className="ml-auto flex w-full items-center justify-end gap-2 sm:w-auto">
-              {estimatedCredits != null ? (
-                <div className="flex shrink-0 items-center gap-1 text-[12px] text-white/50 tabular-nums">
-                  <span>
-                    {m['genjutsu.estimate.credits']({
-                      count: estimatedCredits.toLocaleString(),
-                    })}
+            <div className="ml-auto flex w-full flex-wrap items-end justify-end gap-x-3 gap-y-2 sm:w-auto">
+              <div className="flex items-center gap-2">
+                <div className="flex flex-col items-end gap-0.5 text-[11px] text-white/55 tabular-nums">
+                  <span className="text-[10px] whitespace-nowrap text-white/45">
+                    {m['site.generator.preview_spec']()}
                   </span>
-                  <TooltipProvider delay={200}>
-                    <Tooltip>
-                      <TooltipTrigger
-                        type="button"
-                        className="inline-flex size-4 items-center justify-center rounded-full text-current/70 transition-colors hover:text-current"
-                        aria-label={m['genjutsu.estimate.help_aria']()}
-                      >
-                        <CircleHelp className="size-3.5" aria-hidden />
-                      </TooltipTrigger>
-                      <TooltipContent
-                        side="top"
-                        align="end"
-                        className="max-w-[240px] text-left leading-snug"
-                      >
-                        {m['genjutsu.estimate.tooltip']()}
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
+                  <span>
+                    {previewEstimatedCredits != null
+                      ? m['genjutsu.estimate.credits']({
+                          count: previewEstimatedCredits.toLocaleString(),
+                        })
+                      : '—'}
+                  </span>
                 </div>
-              ) : null}
-              <button
-                type="button"
-                disabled={!canGenerate}
-                onClick={() => void generate()}
-                className={cn(
-                  'relative inline-flex h-8 flex-1 items-center justify-center rounded-lg px-3.5 text-sm font-semibold tracking-wide shadow-none transition-all duration-200 active:scale-95 sm:w-auto sm:flex-none',
-                  canGenerate
-                    ? 'bg-[rgb(204,144,92)] text-[rgb(247,246,243)] hover:brightness-105'
-                    : 'bg-[rgba(126,128,132,0.28)] text-[rgb(237,234,222)]/38'
-                )}
-              >
-                {busy
-                  ? m['site.common.generating']()
-                  : m['site.generator.generate']()}
-              </button>
+                <button
+                  type="button"
+                  disabled={!canGenerate}
+                  onClick={() => void generate('preview')}
+                  className={cn(
+                    'inline-flex h-8 items-center justify-center rounded-lg border px-3 text-sm font-semibold transition-all duration-200 active:scale-95',
+                    canGenerate
+                      ? 'cursor-pointer border-[rgba(204,144,92,0.65)] text-[rgb(237,234,222)] hover:bg-white/10'
+                      : 'cursor-not-allowed border-white/10 text-[rgb(237,234,222)]/38'
+                  )}
+                  title={m['site.generator.preview_help']()}
+                >
+                  {m['site.generator.preview']()}
+                </button>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="flex shrink-0 flex-col items-end gap-0.5 text-[11px] text-white/50 tabular-nums">
+                  <span className="text-[10px] whitespace-nowrap text-white/45">
+                    {m['site.generator.full_video']()}
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    {estimatedCredits != null
+                      ? m['genjutsu.estimate.credits']({
+                          count: estimatedCredits.toLocaleString(),
+                        })
+                      : '—'}
+                    <TooltipProvider delay={200}>
+                      <Tooltip>
+                        <TooltipTrigger
+                          type="button"
+                          className="inline-flex size-4 items-center justify-center rounded-full text-current/70 transition-colors hover:text-current"
+                          aria-label={m['genjutsu.estimate.help_aria']()}
+                        >
+                          <CircleHelp className="size-3.5" aria-hidden />
+                        </TooltipTrigger>
+                        <TooltipContent
+                          side="top"
+                          align="end"
+                          className="max-w-[240px] text-left leading-snug"
+                        >
+                          {m['genjutsu.estimate.tooltip']()}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  disabled={!canGenerate}
+                  onClick={() => void generate('full')}
+                  className={cn(
+                    'relative inline-flex h-8 items-center justify-center rounded-lg px-3.5 text-sm font-semibold tracking-wide shadow-none transition-all duration-200 active:scale-95',
+                    canGenerate
+                      ? 'bg-[rgb(204,144,92)] text-[rgb(247,246,243)] hover:brightness-105'
+                      : 'bg-[rgba(126,128,132,0.28)] text-[rgb(237,234,222)]/38'
+                  )}
+                >
+                  {busy
+                    ? m['site.common.generating']()
+                    : m['site.generator.generate']()}
+                </button>
+              </div>
             </div>
           </div>
+
+          {!session?.user && !sessionPending ? (
+            <p className="mt-3 text-xs text-white/40">
+              {m['site.common.signin_generate']()}
+            </p>
+          ) : null}
         </div>
       </div>
 
-      {resultUrl ? (
-        <div className="mt-5 overflow-hidden rounded-[24px] border border-white/10 bg-[rgba(18,20,24,0.94)] p-3 shadow-2xl sm:p-4">
-          <div className="mb-3 flex items-center justify-between gap-3 px-1">
-            <div>
+      {busy || resultUrl ? (
+        <div
+          ref={resultPanelRef}
+          id="generation-result"
+          className="mt-5 scroll-mt-24 overflow-hidden rounded-[24px] border border-white/10 bg-[rgba(18,20,24,0.94)] shadow-2xl"
+        >
+          <div className="flex items-center justify-between gap-3 border-b border-white/8 px-4 py-3 sm:px-5">
+            <div className="min-w-0">
               <p className="text-sm font-semibold text-white/90">
-                {m['site.common.your_video']()}
+                {resultUrl && !busy
+                  ? m['site.common.your_video']()
+                  : m['site.generator.generating']()}
               </p>
-              <p className="mt-0.5 text-xs text-white/38">
-                {m['site.zombie.provider_label']()}
+              <p className="mt-0.5 truncate text-xs text-white/40">
+                {resultUrl && !busy
+                  ? resultKind === 'preview'
+                    ? m['site.generator.preview_result']()
+                    : m['site.zombie.provider_label']()
+                  : phase === 'uploading' || phase === 'starting'
+                    ? m['site.generator.starting']()
+                    : m['site.generator.progress']({
+                        resolution:
+                          resultKind === 'preview' ? '480p' : resolution,
+                      })}
               </p>
             </div>
-            <a
-              href={
-                generationId
-                  ? `/api/genjutsu/result/${encodeURIComponent(generationId)}?download=1`
-                  : resultUrl
-              }
-              download={
-                generationId
-                  ? `ai-zombie-hug-${generationId.slice(0, 8)}.mp4`
-                  : undefined
-              }
-              className="inline-flex h-9 items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 text-xs font-medium text-white/70 transition hover:bg-white/10 hover:text-white"
-            >
-              <Download className="size-3.5" />
-              {m['site.common.download']()}
-            </a>
-          </div>
-          <video
-            src={resultUrl}
-            controls
-            autoPlay
-            playsInline
-            className={cn(
-              'mx-auto max-h-[720px] w-full max-w-full rounded-2xl bg-black object-contain',
-              resultAspectRatio === '9:16' ? 'aspect-[9/16]' : 'aspect-video'
+            {resultUrl && !busy ? (
+              <a
+                href={
+                  generationId
+                    ? `/api/genjutsu/result/${encodeURIComponent(generationId)}?download=1`
+                    : resultUrl
+                }
+                download={
+                  generationId
+                    ? `ai-zombie-hug-${resultKind === 'preview' ? 'preview-' : ''}${generationId.slice(0, 8)}.mp4`
+                    : undefined
+                }
+                className="inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 text-xs font-medium text-white/70 transition hover:bg-white/10 hover:text-white"
+              >
+                <Download className="size-3.5" />
+                {m['site.common.download']()}
+              </a>
+            ) : (
+              <span className="shrink-0 text-xs font-medium text-white/45 tabular-nums">
+                {progressPercent}%
+              </span>
             )}
-          />
+          </div>
+
+          {busy ? (
+            <div className="space-y-4 px-4 py-8 sm:px-5 sm:py-10">
+              <div className="mx-auto flex max-w-md flex-col items-center gap-3">
+                <span className="size-9 animate-spin rounded-full border-2 border-[rgb(204,144,92)] border-t-transparent" />
+                <p className="text-center text-sm text-white/55">
+                  {m['site.generator.progress']({
+                    resolution: resultKind === 'preview' ? '480p' : resolution,
+                  })}
+                </p>
+              </div>
+              <div
+                className="mx-auto h-1.5 w-full max-w-md overflow-hidden rounded-full bg-white/10"
+                role="progressbar"
+                aria-valuenow={progressPercent}
+                aria-valuemin={0}
+                aria-valuemax={100}
+              >
+                <div
+                  className="h-full rounded-full bg-[rgb(204,144,92)] transition-[width] duration-500 ease-out"
+                  style={{ width: `${progressPercent}%` }}
+                />
+              </div>
+            </div>
+          ) : resultUrl ? (
+            <div className="bg-black/35 p-3 sm:p-4">
+              <video
+                src={resultUrl}
+                controls
+                autoPlay
+                playsInline
+                className={cn(
+                  'mx-auto max-h-[720px] w-full max-w-full rounded-2xl bg-black object-contain',
+                  resultAspectRatio === '9:16'
+                    ? 'aspect-[9/16]'
+                    : 'aspect-video'
+                )}
+              />
+            </div>
+          ) : null}
         </div>
       ) : null}
 
