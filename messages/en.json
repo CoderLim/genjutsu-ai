@@ -1166,7 +1166,7 @@
   "site.prompts.open": "Open the generator",
   "site.prompts.meta_title": "Genjutsu Prompt Ideas — Scene, Style & Object Restyles",
   "site.prompts.meta_description": "Ready-to-use Genjutsu prompts for restyling scenes, styles, products, and props without changing who or what is in the shot.",
-  "site.home.meta_title": "Genjutsu AI Video Generator — Video Restyling",
+  "site.home.meta_title": "Genjutsu AI Video Generator — Object Swap & Motion Transfer",
   "site.home.meta_description": "Genjutsu AI restyles any video without changing who or what is in it. Transfer motion into a new scene, style, or objects — upload a clip, write a prompt, get your new video in minutes.",
   "site.footer.about": "About",
   "site.footer.tools": "Tools",
