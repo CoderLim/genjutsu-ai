@@ -59,8 +59,6 @@ export const KAIRO_BAD_TIMES_KEEP_ORIGINAL_SOUND = true;
 export const KAIRO_BAD_TIMES_LOCAL_TEMPLATE_PATH =
   'public/videos/kairo-bad-times-tpl.mp4';
 
-/** Paid short-preview clip (first N seconds of the master). */
-export const KAIRO_BAD_TIMES_SHORT_PREVIEW_SECONDS = 4;
 export const KAIRO_BAD_TIMES_LOCAL_PREVIEW_TEMPLATE_PATH =
   'public/videos/kairo-bad-times-tpl-preview.mp4';
 

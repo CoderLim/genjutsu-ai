@@ -17,7 +17,6 @@ import {
   GANGNAM_STYLE_AI_DEFAULT_PROMPT,
   GANGNAM_STYLE_AI_DEFAULT_RESOLUTION,
   GANGNAM_STYLE_AI_MODE,
-  GANGNAM_STYLE_AI_PREVIEW_CLIP_PATH,
   GANGNAM_STYLE_AI_PRODUCT_ID,
   GANGNAM_STYLE_AI_RESOLUTIONS,
   GANGNAM_STYLE_AI_TEMPLATE_DISPLAY_PATH,
@@ -85,42 +84,11 @@ type GenerationPoll = {
   balance?: number;
 };
 
-/** Paid preview length — match homepage Genjutsu (Seedance editing floor). */
-const PREVIEW_DURATION_SECONDS = 4;
-
-function readLocalVideoDurationSeconds(file: File): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(file);
-    const video = document.createElement('video');
-    video.preload = 'metadata';
-    const cleanup = () => {
-      video.removeAttribute('src');
-      video.load();
-      URL.revokeObjectURL(url);
-    };
-    video.onloadedmetadata = () => {
-      const duration = video.duration;
-      cleanup();
-      if (!Number.isFinite(duration) || duration <= 0) {
-        reject(new Error('Could not read video duration'));
-        return;
-      }
-      resolve(duration);
-    };
-    video.onerror = () => {
-      cleanup();
-      reject(new Error('Could not read video duration'));
-    };
-    video.src = url;
-  });
-}
-
 type PersistedGeneration = {
   userId: string;
   generationId: string;
   resolution: GangnamStyleAiResolution;
   reservedCredits: number;
-  kind?: 'preview' | 'full';
 };
 
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
@@ -188,24 +156,6 @@ const activeGenerationKey = (userId: string) =>
 
 const sleep = (ms: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, ms));
-
-/** Fetch the pre-baked 4s Preview clip (no client ffmpeg). */
-async function loadGangnamPreviewClipFile(): Promise<File> {
-  const response = await fetch(GANGNAM_STYLE_AI_PREVIEW_CLIP_PATH, {
-    cache: 'force-cache',
-  });
-  if (!response.ok) {
-    throw new Error(`Preview clip HTTP ${response.status}`);
-  }
-  const blob = await response.blob();
-  if (blob.size <= 0) {
-    throw new Error('Preview clip was empty');
-  }
-  return new File([blob], 'gangnam-style-ai-preview.mp4', {
-    type: blob.type || 'video/mp4',
-    lastModified: Date.now(),
-  });
-}
 
 function createMediaItem(file: File): MediaItem {
   return {
@@ -412,7 +362,6 @@ export function GangnamStyleAiGeneratorPanel({
   >('idle');
   const [generationId, setGenerationId] = useState<string | null>(null);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
-  const [resultKind, setResultKind] = useState<'preview' | 'full' | null>(null);
   const [jobError, setJobError] = useState('');
   const [progressPercent, setProgressPercent] = useState(0);
   const creditGate = useCreditGate({
@@ -439,15 +388,6 @@ export function GangnamStyleAiGeneratorPanel({
       aspectRatio: GANGNAM_STYLE_AI_ASPECT_RATIO,
     });
   }, [creditProvider, resolution]);
-
-  const previewEstimatedCredits = useMemo(() => {
-    return estimateGenjutsuCreditsForProvider({
-      provider: creditProvider,
-      durationSeconds: PREVIEW_DURATION_SECONDS,
-      resolution: '480p',
-      aspectRatio: GANGNAM_STYLE_AI_ASPECT_RATIO,
-    });
-  }, [creditProvider]);
 
   const busy =
     phase === 'uploading' ||
@@ -745,7 +685,6 @@ export function GangnamStyleAiGeneratorPanel({
       setJobError('');
       creditGate.clear();
       setGenerationId(active.generationId);
-      setResultKind(active.kind === 'preview' ? 'preview' : 'full');
       if (active.resolution === '480p' || active.resolution === '720p') {
         setResolution(active.resolution);
       }
@@ -756,7 +695,7 @@ export function GangnamStyleAiGeneratorPanel({
     }
   }, [pollGeneration, session?.user?.id, phase]);
 
-  const generate = async (kind: 'preview' | 'full' = 'full') => {
+  const generate = async () => {
     if (!session?.user) {
       window.location.href = `/sign-in?callbackUrl=${encodeURIComponent('/gangnam-style-ai#generator')}`;
       return;
@@ -771,13 +710,9 @@ export function GangnamStyleAiGeneratorPanel({
       return;
     }
 
-    const isPreview = kind === 'preview';
-    const targetResolution: GangnamStyleAiResolution = isPreview
-      ? '480p'
-      : resolution;
+    const targetResolution = resolution;
 
     setResultUrl(null);
-    setResultKind(kind);
     creditGate.clear();
     setJobError('');
     setPhase('uploading');
@@ -791,31 +726,8 @@ export function GangnamStyleAiGeneratorPanel({
     const prompt = GANGNAM_STYLE_AI_DEFAULT_PROMPT;
 
     try {
-      // Preview uses a pre-baked 4s clip (full template is too heavy for
-      // browser ffmpeg.wasm). Prepare media before attempt so failures do
-      // not leave an orphan initiated task.
-      let media: File[];
-      if (isPreview) {
-        let clipFile: File;
-        let durationSeconds: number;
-        try {
-          clipFile = await loadGangnamPreviewClipFile();
-          durationSeconds = await readLocalVideoDurationSeconds(clipFile);
-        } catch (cause) {
-          console.error('Gangnam Style AI preview preparation failed:', cause);
-          throw new Error(m['site.generator.preview_trim_failed']());
-        }
-        if (
-          durationSeconds < PREVIEW_DURATION_SECONDS - 0.01 ||
-          durationSeconds > PREVIEW_DURATION_SECONDS + 0.2
-        ) {
-          throw new Error(m['site.generator.preview_trim_failed']());
-        }
-        media = [clipFile, leftPhoto.file, centerPhoto.file, rightPhoto.file];
-      } else {
-        // Server seals the fixed R2 template; client only uploads three photos.
-        media = [leftPhoto.file, centerPhoto.file, rightPhoto.file];
-      }
+      // Server seals the fixed R2 template; client only uploads references.
+      const media: File[] = [leftPhoto.file, centerPhoto.file, rightPhoto.file];
 
       await apiPost('/api/genjutsu/attempt', {
         generationId: id,
@@ -825,10 +737,7 @@ export function GangnamStyleAiGeneratorPanel({
         product: GANGNAM_STYLE_AI_PRODUCT_ID,
       });
 
-      const contentTypes = media.map(
-        (file, index) =>
-          file.type || (isPreview && index === 0 ? 'video/mp4' : 'image/jpeg')
-      );
+      const contentTypes = media.map((file) => file.type || 'image/jpeg');
       const contentLengths = media.map((file) => file.size);
 
       const uploadBatch = await apiPost<{ uploads: SignedUpload[] }>(
@@ -839,7 +748,6 @@ export function GangnamStyleAiGeneratorPanel({
           resolution: targetResolution,
           prompt,
           product: GANGNAM_STYLE_AI_PRODUCT_ID,
-          preview: isPreview || undefined,
           contentTypes,
           contentLengths,
         }
@@ -894,7 +802,6 @@ export function GangnamStyleAiGeneratorPanel({
         generationId: id,
         resolution: targetResolution,
         reservedCredits: 0,
-        kind,
       };
       localStorage.setItem(
         activeGenerationKey(session.user.id),
@@ -1113,82 +1020,49 @@ export function GangnamStyleAiGeneratorPanel({
               ) : null}
             </div>
 
-            <div className="ml-auto flex w-full flex-wrap items-end justify-end gap-x-3 gap-y-2 sm:w-auto">
-              <div className="flex items-center gap-2">
-                <div className="flex flex-col items-end gap-0.5 text-[11px] text-white/55 tabular-nums">
-                  <span className="text-[10px] whitespace-nowrap text-white/45">
-                    {m['site.generator.preview_spec']()}
-                  </span>
+            <div className="ml-auto flex w-full items-center justify-end gap-2 sm:w-auto">
+              {estimatedCredits != null ? (
+                <div className="flex shrink-0 items-center gap-1 text-[12px] text-white/50 tabular-nums">
                   <span>
-                    {previewEstimatedCredits != null
-                      ? m['genjutsu.estimate.credits']({
-                          count: previewEstimatedCredits.toLocaleString(),
-                        })
-                      : '—'}
+                    {m['genjutsu.estimate.credits']({
+                      count: estimatedCredits.toLocaleString(),
+                    })}
                   </span>
+                  <TooltipProvider delay={200}>
+                    <Tooltip>
+                      <TooltipTrigger
+                        type="button"
+                        className="inline-flex size-4 items-center justify-center rounded-full text-current/70 transition-colors hover:text-current"
+                        aria-label={m['genjutsu.estimate.help_aria']()}
+                      >
+                        <CircleHelp className="size-3.5" aria-hidden />
+                      </TooltipTrigger>
+                      <TooltipContent
+                        side="top"
+                        align="end"
+                        className="max-w-[240px] text-left leading-snug"
+                      >
+                        {m['genjutsu.estimate.tooltip']()}
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </div>
-                <button
-                  type="button"
-                  disabled={!canGenerate}
-                  onClick={() => void generate('preview')}
-                  className={cn(
-                    'inline-flex h-8 items-center justify-center rounded-lg border px-3 text-sm font-semibold transition-all duration-200 active:scale-95',
-                    canGenerate
-                      ? 'cursor-pointer border-[rgba(204,144,92,0.65)] text-[rgb(237,234,222)] hover:bg-white/10'
-                      : 'cursor-not-allowed border-white/10 text-[rgb(237,234,222)]/38'
-                  )}
-                  title={m['site.generator.preview_help']()}
-                >
-                  {m['site.generator.preview']()}
-                </button>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="flex shrink-0 flex-col items-end gap-0.5 text-[11px] text-white/50 tabular-nums">
-                  <span className="text-[10px] whitespace-nowrap text-white/45">
-                    {m['site.generator.full_video']()}
-                  </span>
-                  <span className="inline-flex items-center gap-1">
-                    {estimatedCredits != null
-                      ? m['genjutsu.estimate.credits']({
-                          count: estimatedCredits.toLocaleString(),
-                        })
-                      : '—'}
-                    <TooltipProvider delay={200}>
-                      <Tooltip>
-                        <TooltipTrigger
-                          type="button"
-                          className="inline-flex size-4 items-center justify-center rounded-full text-current/70 transition-colors hover:text-current"
-                          aria-label={m['genjutsu.estimate.help_aria']()}
-                        >
-                          <CircleHelp className="size-3.5" aria-hidden />
-                        </TooltipTrigger>
-                        <TooltipContent
-                          side="top"
-                          align="end"
-                          className="max-w-[240px] text-left leading-snug"
-                        >
-                          {m['genjutsu.estimate.tooltip']()}
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  disabled={!canGenerate}
-                  onClick={() => void generate('full')}
-                  className={cn(
-                    'relative inline-flex h-8 items-center justify-center rounded-lg px-3.5 text-sm font-semibold tracking-wide shadow-none transition-all duration-200 active:scale-95',
-                    canGenerate
-                      ? 'bg-[rgb(204,144,92)] text-[rgb(247,246,243)] hover:brightness-105'
-                      : 'bg-[rgba(126,128,132,0.28)] text-[rgb(237,234,222)]/38'
-                  )}
-                >
-                  {busy
-                    ? m['site.common.generating']()
-                    : m['site.generator.generate']()}
-                </button>
-              </div>
+              ) : null}
+              <button
+                type="button"
+                disabled={!canGenerate}
+                onClick={() => void generate()}
+                className={cn(
+                  'relative inline-flex h-8 flex-1 items-center justify-center rounded-lg px-3.5 text-sm font-semibold tracking-wide shadow-none transition-all duration-200 active:scale-95 sm:w-auto sm:flex-none',
+                  canGenerate
+                    ? 'bg-[rgb(204,144,92)] text-[rgb(247,246,243)] hover:brightness-105'
+                    : 'bg-[rgba(126,128,132,0.28)] text-[rgb(237,234,222)]/38'
+                )}
+              >
+                {busy
+                  ? m['site.common.generating']()
+                  : m['site.generator.generate']()}
+              </button>
             </div>
           </div>
 
@@ -1215,14 +1089,11 @@ export function GangnamStyleAiGeneratorPanel({
               </p>
               <p className="mt-0.5 truncate text-xs text-white/40">
                 {resultUrl && !busy
-                  ? resultKind === 'preview'
-                    ? m['site.generator.preview_result']()
-                    : m['site.gangnam.provider_label']()
+                  ? m['site.gangnam.provider_label']()
                   : phase === 'uploading' || phase === 'starting'
                     ? m['site.generator.starting']()
                     : m['site.generator.progress']({
-                        resolution:
-                          resultKind === 'preview' ? '480p' : resolution,
+                        resolution: resolution,
                       })}
               </p>
             </div>
@@ -1235,7 +1106,7 @@ export function GangnamStyleAiGeneratorPanel({
                 }
                 download={
                   generationId
-                    ? `gangnam-style-ai-${resultKind === 'preview' ? 'preview-' : ''}${generationId.slice(0, 8)}.mp4`
+                    ? `gangnam-style-ai-${generationId.slice(0, 8)}.mp4`
                     : undefined
                 }
                 className="inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 text-xs font-medium text-white/70 transition hover:bg-white/10 hover:text-white"
@@ -1256,7 +1127,7 @@ export function GangnamStyleAiGeneratorPanel({
                 <span className="size-9 animate-spin rounded-full border-2 border-[rgb(204,144,92)] border-t-transparent" />
                 <p className="text-center text-sm text-white/55">
                   {m['site.generator.progress']({
-                    resolution: resultKind === 'preview' ? '480p' : resolution,
+                    resolution: resolution,
                   })}
                 </p>
               </div>

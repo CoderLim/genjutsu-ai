@@ -7,13 +7,7 @@ import {
   type ChangeEvent,
   type RefObject,
 } from 'react';
-import {
-  CircleHelp,
-  Download,
-  LoaderCircle,
-  Play,
-  RotateCcw,
-} from 'lucide-react';
+import { CircleHelp, Download, LoaderCircle, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useSession } from '@/core/auth/client';
@@ -103,8 +97,6 @@ const MAX_VIDEO_BYTES = 80 * 1024 * 1024;
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
 const MIN_REFERENCE_VIDEO_SECONDS = 3;
 const MAX_REFERENCE_VIDEO_SECONDS = 15;
-/** Paid preview length — Kling min is 3s; match homepage Genjutsu preview. */
-const PREVIEW_DURATION_SECONDS = 4;
 
 export type HotelLobbyPanelPresetId = HotelLobbyPresetId;
 
@@ -347,7 +339,6 @@ export function HotelLobbyGeneratorPanel({
   >('idle');
   const [providerStatus, setProviderStatus] = useState('');
   const [resultUrl, setResultUrl] = useState<string | null>(null);
-  const [resultKind, setResultKind] = useState<'preview' | 'full' | null>(null);
   const [generationId, setGenerationId] = useState<string | null>(null);
   const [progressPercent, setProgressPercent] = useState(0);
 
@@ -438,24 +429,6 @@ export function HotelLobbyGeneratorPanel({
     presetMeta?.estimatedCredits,
   ]);
 
-  const previewEstimatedCredits = useMemo(() => {
-    if (sourceDuration == null) return null;
-    const previewSeconds = Math.min(
-      clampReferenceDuration(sourceDuration),
-      PREVIEW_DURATION_SECONDS
-    );
-    if (previewSeconds < MIN_REFERENCE_VIDEO_SECONDS) return null;
-    try {
-      return estimateHotelLobbyCredits({
-        duration: previewSeconds,
-        imageCount: estimateImageCount,
-        maxImages,
-      });
-    } catch {
-      return null;
-    }
-  }, [sourceDuration, estimateImageCount, maxImages]);
-
   const inputsReady =
     Boolean(video) &&
     sourceDuration != null &&
@@ -469,14 +442,12 @@ export function HotelLobbyGeneratorPanel({
       r2Available: r2TemplateAvailable,
       mediaStatus: templateMediaStatus,
     });
-  // Preview and Full share the same fixed-template readiness gate.
-  const canPreview =
+  const canGenerate =
     presetEnabled &&
     inputsReady &&
     !busy &&
     !sessionPending &&
     fixedTemplateReady;
-  const canGenerateFull = canPreview;
 
   useEffect(() => {
     mountedRef.current = true;
@@ -900,9 +871,8 @@ export function HotelLobbyGeneratorPanel({
     throw new Error(m['site.hotel.running']());
   };
 
-  const generate = async (kind: 'preview' | 'full' = 'full') => {
+  const generate = async () => {
     creditGate.clear();
-    const isPreview = kind === 'preview';
 
     if (!session?.user) {
       redirectToSignIn();
@@ -952,9 +922,7 @@ export function HotelLobbyGeneratorPanel({
       return;
     }
 
-    const requiredCredits = isPreview
-      ? previewEstimatedCredits
-      : estimatedCredits;
+    const requiredCredits = estimatedCredits;
     if (!requiredCredits) {
       toast.error(m['site.hotel.reading_duration']());
       return;
@@ -967,20 +935,16 @@ export function HotelLobbyGeneratorPanel({
     }
 
     setResultUrl(null);
-    setResultKind(null);
     setProviderStatus('');
     setPhase('uploading');
 
     const id = crypto.randomUUID();
     setGenerationId(id);
 
-    // Full fixed-template jobs seal the server R2 template.
-    // Preview always uploads a trimmed ≤4s clip (including fixed presets).
     const useFullTemplate =
-      !isPreview &&
-      (!allowCustomVideo ||
-        (video.kind === 'template' &&
-          isFullSourceClip(trimStart, trimEnd, sourceDuration)));
+      !allowCustomVideo ||
+      (video.kind === 'template' &&
+        isFullSourceClip(trimStart, trimEnd, sourceDuration));
 
     try {
       let referenceVideoFile: File | null = null;
@@ -992,27 +956,7 @@ export function HotelLobbyGeneratorPanel({
             ? hotelLobbyTemplateProxyUrl(presetId)
             : video.url;
 
-        if (isPreview) {
-          const previewEnd = Math.min(
-            sourceDuration,
-            Math.max(MIN_REFERENCE_VIDEO_SECONDS, PREVIEW_DURATION_SECONDS)
-          );
-          if (
-            video.kind === 'upload' &&
-            trimStart <= 0.05 &&
-            sourceDuration <= PREVIEW_DURATION_SECONDS + 0.05
-          ) {
-            referenceVideoFile = video.file;
-            uploadDurationSeconds = clampReferenceDuration(sourceDuration);
-          } else {
-            referenceVideoFile = await trimVideoToFile({
-              sourceUrl,
-              startSeconds: 0,
-              endSeconds: previewEnd,
-            });
-            uploadDurationSeconds = clampReferenceDuration(previewEnd);
-          }
-        } else if (
+        if (
           video.kind === 'upload' &&
           isFullSourceClip(trimStart, trimEnd, sourceDuration)
         ) {
@@ -1030,11 +974,7 @@ export function HotelLobbyGeneratorPanel({
           referenceVideoFile.size <= 0 ||
           referenceVideoFile.size > MAX_VIDEO_BYTES
         ) {
-          throw new Error(
-            isPreview
-              ? m['site.generator.preview_trim_failed']()
-              : 'Could not prepare the reference clip'
-          );
+          throw new Error('Could not prepare the reference clip');
         }
       }
 
@@ -1054,7 +994,6 @@ export function HotelLobbyGeneratorPanel({
         generationId: id,
         presetId,
         useDefaultTemplate,
-        preview: isPreview,
         contentTypes,
         contentLengths,
       });
@@ -1085,7 +1024,6 @@ export function HotelLobbyGeneratorPanel({
           generationId: id,
           presetId,
           useDefaultTemplate,
-          preview: isPreview,
           videoKey: videoUpload?.storageKey,
           imageKeys: imageUploads.map((item) => item.storageKey),
           contentTypes,
@@ -1107,7 +1045,6 @@ export function HotelLobbyGeneratorPanel({
         );
       }
 
-      setResultKind(kind);
       setPhase('generating');
       await pollUntilComplete(id);
     } catch (error) {
@@ -1427,52 +1364,7 @@ export function HotelLobbyGeneratorPanel({
           ) : null}
           <div className="ml-auto flex w-full flex-wrap items-end justify-end gap-x-3 gap-y-2 sm:w-auto">
             <div className="flex items-center gap-2">
-              <div className="flex flex-col items-end gap-0.5 text-[11px] text-white/55 tabular-nums">
-                <span className="text-[10px] whitespace-nowrap text-white/45">
-                  {m['site.hotel.preview_spec']()}
-                </span>
-                <span>
-                  {previewEstimatedCredits != null
-                    ? m['genjutsu.estimate.credits']({
-                        count: previewEstimatedCredits.toLocaleString(),
-                      })
-                    : '—'}
-                </span>
-              </div>
-              <button
-                type="button"
-                disabled={!canPreview || Boolean(session?.user && busy)}
-                onClick={() => {
-                  if (!session?.user) {
-                    redirectToSignIn();
-                    return;
-                  }
-                  void generate('preview');
-                }}
-                title={m['site.hotel.preview_help']()}
-                className={cn(
-                  'inline-flex h-8 items-center justify-center rounded-lg border px-3 text-sm font-semibold transition-all duration-200 active:scale-95',
-                  canPreview && !busy
-                    ? 'cursor-pointer border-[rgba(204,144,92,0.65)] text-[rgb(237,234,222)] hover:bg-white/10'
-                    : 'cursor-not-allowed border-white/10 text-[rgb(237,234,222)]/38'
-                )}
-              >
-                {busy ? (
-                  <LoaderCircle className="size-3.5 animate-spin" />
-                ) : (
-                  m['site.generator.preview']()
-                )}
-              </button>
-            </div>
-            <div
-              className="hidden h-8 w-px shrink-0 self-end bg-white/15 sm:block"
-              aria-hidden
-            />
-            <div className="flex items-center gap-2">
               <div className="flex shrink-0 flex-col items-end gap-0.5 text-[11px] text-white/50 tabular-nums">
-                <span className="text-[10px] whitespace-nowrap text-white/45">
-                  {m['site.generator.full_video']()}
-                </span>
                 <span className="inline-flex items-center gap-1">
                   {estimatedCredits != null
                     ? m['genjutsu.estimate.credits']({
@@ -1501,17 +1393,17 @@ export function HotelLobbyGeneratorPanel({
               </div>
               <button
                 type="button"
-                disabled={!canGenerateFull || Boolean(session?.user && busy)}
+                disabled={!canGenerate || Boolean(session?.user && busy)}
                 onClick={() => {
                   if (!session?.user) {
                     redirectToSignIn();
                     return;
                   }
-                  void generate('full');
+                  void generate();
                 }}
                 className={cn(
                   'relative inline-flex h-8 items-center justify-center gap-1.5 rounded-lg px-3.5 text-sm font-semibold tracking-wide shadow-none transition-all duration-200 active:scale-95',
-                  canGenerateFull && !busy
+                  canGenerate && !busy
                     ? 'cursor-pointer bg-[rgb(204,144,92)] text-[rgb(247,246,243)] hover:brightness-105'
                     : 'cursor-not-allowed bg-[rgba(126,128,132,0.28)] text-[rgb(237,234,222)]/38'
                 )}
@@ -1545,9 +1437,7 @@ export function HotelLobbyGeneratorPanel({
             <div className="min-w-0">
               <p className="text-sm font-semibold text-white/90">
                 {resultUrl && !jobBusy
-                  ? resultKind === 'preview'
-                    ? m['site.generator.preview_result']()
-                    : m['site.common.your_video']()
+                  ? m['site.common.your_video']()
                   : m['site.generator.generating']()}
               </p>
               <p className="mt-0.5 truncate text-xs text-white/40">
@@ -1564,22 +1454,6 @@ export function HotelLobbyGeneratorPanel({
             </div>
             {resultUrl && !jobBusy ? (
               <div className="flex shrink-0 flex-wrap items-center gap-2">
-                {resultKind === 'preview' ? (
-                  <button
-                    type="button"
-                    disabled={!canGenerateFull || busy}
-                    onClick={() => void generate('full')}
-                    className={cn(
-                      'inline-flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-semibold transition',
-                      canGenerateFull && !busy
-                        ? 'bg-[rgb(204,144,92)] text-[rgb(247,246,243)] hover:brightness-105'
-                        : 'cursor-not-allowed bg-white/10 text-white/40'
-                    )}
-                  >
-                    <Play className="size-3.5 fill-current" />
-                    {m['site.generator.generate_full']()}
-                  </button>
-                ) : null}
                 <a
                   href={
                     generationId
@@ -1588,7 +1462,7 @@ export function HotelLobbyGeneratorPanel({
                   }
                   download={
                     generationId
-                      ? `${downloadPrefix}-${resultKind === 'preview' ? 'preview-' : ''}${generationId.slice(0, 8)}.mp4`
+                      ? `${downloadPrefix}-${generationId.slice(0, 8)}.mp4`
                       : undefined
                   }
                   className="inline-flex h-9 items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 text-xs font-medium text-white/70 transition hover:bg-white/10 hover:text-white"

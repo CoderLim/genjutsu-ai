@@ -44,7 +44,6 @@ export function isAllowedFlyingCarAiPrompt(value: unknown): value is string {
  * reference image (the subject that replaces the car), fixed prompt + 3:4 aspect.
  *
  * Preview: same prompt/aspect/product, but client uploads a trimmed ≤4s
- * template clip at 480p plus the one image — `preview: true`,
  * `useDefaultTemplate` must be false.
  */
 export function assertFlyingCarAiInputs(options: TaskOptions | null) {
@@ -88,47 +87,8 @@ export function assertFlyingCarAiInputs(options: TaskOptions | null) {
   const contentLengths = Array.isArray(options.contentLengths)
     ? options.contentLengths
     : [];
-  const isPreview = options.preview === true;
-
-  if (isPreview) {
-    if (options.useDefaultTemplate === true) {
-      throw new FlyingCarAiPreflightError(
-        'Flying Car AI preview must upload a trimmed template clip'
-      );
-    }
-    if (typeof options.videoKey !== 'string' || !options.videoKey) {
-      throw new FlyingCarAiPreflightError(
-        'Flying Car AI preview is missing the trimmed template video'
-      );
-    }
-    if (options.resolution != null && options.resolution !== '480p') {
-      throw new FlyingCarAiPreflightError(
-        'Flying Car AI preview must use 480p resolution'
-      );
-    }
-    if (imageKeys.length !== 1) {
-      throw new FlyingCarAiPreflightError(
-        'Flying Car AI preview requires exactly one reference image'
-      );
-    }
-    if (contentTypes.length !== 2 || contentLengths.length !== 2) {
-      throw new FlyingCarAiPreflightError(
-        'Flying Car AI preview expects one trimmed video plus one reference image'
-      );
-    }
-    const videoType = contentTypes[0];
-    if (typeof videoType !== 'string' || !videoType.startsWith('video/')) {
-      throw new FlyingCarAiPreflightError(
-        'Flying Car AI preview source must be a video'
-      );
-    }
-    const imageType = contentTypes[1];
-    if (typeof imageType !== 'string' || !imageType.startsWith('image/')) {
-      throw new FlyingCarAiPreflightError(
-        'Flying Car AI reference must be an image'
-      );
-    }
-    return;
+  if (options.preview === true) {
+    throw new FlyingCarAiPreflightError('Paid preview is no longer supported');
   }
 
   if (options.useDefaultTemplate !== true) {

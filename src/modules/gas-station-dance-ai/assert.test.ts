@@ -34,17 +34,15 @@ test('accepts the fixed Gas Station Dance AI template binding', () => {
   assert.doesNotThrow(() => assertGasStationDanceAiInputs(validOptions));
 });
 
-test('accepts a 480p trimmed preview clip plus three images', () => {
-  assert.doesNotThrow(() =>
-    assertGasStationDanceAiInputs({
-      ...validOptions,
-      preview: true,
-      useDefaultTemplate: false,
-      resolution: '480p',
-      videoKey: 'genjutsu/u/g/source.mp4',
-      contentTypes: ['video/mp4', 'image/jpeg', 'image/jpeg', 'image/jpeg'],
-      contentLengths: [400000, 1000, 1200, 1100],
-    })
+test('rejects paid preview', () => {
+  assert.throws(
+    () =>
+      assertGasStationDanceAiInputs({
+        ...validOptions,
+        preview: true,
+        useDefaultTemplate: false,
+      }),
+    /Paid preview is no longer supported/
   );
 });
 
@@ -94,21 +92,6 @@ test('rejects wrong aspect, resolution, and image count', () => {
         imageKeys: ['a.jpg', 'b.jpg'],
         contentTypes: ['image/jpeg', 'image/jpeg'],
         contentLengths: [1000, 1200],
-      }),
-    GasStationDanceAiPreflightError
-  );
-});
-
-test('rejects preview that still uses the default template', () => {
-  assert.throws(
-    () =>
-      assertGasStationDanceAiInputs({
-        ...validOptions,
-        preview: true,
-        useDefaultTemplate: true,
-        videoKey: 'genjutsu/u/g/source.mp4',
-        contentTypes: ['video/mp4', 'image/jpeg', 'image/jpeg', 'image/jpeg'],
-        contentLengths: [400000, 1000, 1200, 1100],
       }),
     GasStationDanceAiPreflightError
   );

@@ -17,13 +17,6 @@ export const GAS_STATION_DANCE_AI_TEMPLATE_DISPLAY_PATH =
   '/videos/long-trival-tpl.mp4';
 export const GAS_STATION_DANCE_AI_TEMPLATE_POSTER_PATH =
   '/videos/long-trival-tpl-poster.jpg';
-/**
- * Pre-trimmed 4s @480p-friendly clip for paid Preview uploads.
- * Avoids client ffmpeg.wasm re-encode of the full ~17.6s template.
- */
-export const GAS_STATION_DANCE_AI_PREVIEW_CLIP_PATH =
-  '/videos/gas-station-dance-ai-preview-4s.mp4';
-
 /** ffprobe duration of public/videos/long-trival-tpl.mp4 */
 export const GAS_STATION_DANCE_AI_TEMPLATE_DURATION_SECONDS = 17.6;
 

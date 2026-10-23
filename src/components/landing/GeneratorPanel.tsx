@@ -195,7 +195,6 @@ const MAX_REFERENCE_IMAGE_BYTES = 12 * 1024 * 1024;
 // Keep the upload gate on that editing floor and match the UI "4–30s" hint.
 const MIN_SOURCE_VIDEO_SECONDS = 4;
 const MAX_SOURCE_VIDEO_SECONDS = 30;
-const PREVIEW_DURATION_SECONDS = MIN_SOURCE_VIDEO_SECONDS;
 
 function revokeItem(item: MediaItem | null) {
   if (item) URL.revokeObjectURL(item.url);
@@ -1011,8 +1010,6 @@ type GenerationResult = {
   previewUrl: string;
   imageCount: number;
   createdAt: number;
-  /** A preview uses a trimmed source clip, not the full reference video. */
-  kind?: 'preview' | 'full';
   reservedCredits?: number;
 };
 
@@ -1062,12 +1059,10 @@ function ResultPanel({
   status,
   result,
   onDismiss,
-  onGenerateFull,
 }: {
   status: GenerationStatus;
   result: GenerationResult | null;
   onDismiss: () => void;
-  onGenerateFull: () => void;
 }) {
   if (status === 'idle') return null;
 
@@ -1086,9 +1081,7 @@ function ResultPanel({
           <p className="text-sm font-medium text-[rgb(237,234,222)]">
             {status === 'generating'
               ? m['site.generator.generating']()
-              : result?.kind === 'preview'
-                ? m['site.generator.preview_result']()
-                : m['site.generator.result']()}
+              : m['site.generator.result']()}
           </p>
           {result ? (
             <p className="mt-0.5 truncate text-[11px] text-white/45">
@@ -1144,20 +1137,11 @@ function ResultPanel({
         <div className="flex flex-wrap items-center gap-2 border-t border-white/8 px-4 py-3">
           <a
             href={result.previewUrl}
-            download={`genjutsu-${result.kind === 'preview' ? 'preview-' : ''}${result.mode}-${result.resolution}.mp4`}
+            download={`genjutsu-${result.mode}-${result.resolution}.mp4`}
             className="inline-flex h-8 items-center rounded-lg bg-[rgb(204,144,92)] px-3 text-sm font-semibold text-[rgb(247,246,243)] hover:brightness-105"
           >
             {m['site.generator.download']()}
           </a>
-          {result.kind === 'preview' ? (
-            <button
-              type="button"
-              onClick={onGenerateFull}
-              className="inline-flex h-8 items-center rounded-lg border border-[rgba(204,144,92,0.6)] px-3 text-sm font-semibold text-[rgb(237,234,222)] transition-colors hover:bg-white/10"
-            >
-              {m['site.generator.generate_full']()}
-            </button>
-          ) : null}
           <span className="text-[11px] text-white/40">
             {m['site.generator.generated_by']()}
           </span>
@@ -1578,36 +1562,12 @@ export function GeneratorPanel({
     }
   }, [pricingProvider, resolution, video?.durationSeconds]);
 
-  const previewEstimatedCredits = useMemo(() => {
-    const durationSeconds = video?.durationSeconds;
-    if (
-      !pricingProvider ||
-      typeof durationSeconds !== 'number' ||
-      !Number.isFinite(durationSeconds) ||
-      durationSeconds < MIN_SOURCE_VIDEO_SECONDS
-    ) {
-      return null;
-    }
-    try {
-      return estimateGenjutsuCreditsForProvider({
-        provider: pricingProvider,
-        durationSeconds: Math.min(durationSeconds, PREVIEW_DURATION_SECONDS),
-        resolution: '480p',
-      });
-    } catch {
-      return null;
-    }
-  }, [pricingProvider, video?.durationSeconds]);
-
-  const handleGenerate = async (kind: 'preview' | 'full' = 'full') => {
+  const handleGenerate = async () => {
     if (!video || images.length === 0 || status === 'generating') return;
     if (imagesPreparing) {
       toast.error(m['site.generator.image_preparing']());
       return;
     }
-
-    const targetResolution: Resolution =
-      kind === 'preview' ? '480p' : resolution;
 
     if (!session?.user) {
       redirectToSignIn();
@@ -1626,9 +1586,8 @@ export function GeneratorPanel({
     const draft: GenerationResult = {
       id: generationId,
       mode,
-      resolution: targetResolution,
+      resolution,
       prompt: prompt.trim(),
-      kind,
       previewUrl: '',
       imageCount: images.length,
       createdAt: Date.now(),
@@ -1645,45 +1604,12 @@ export function GeneratorPanel({
         ?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     });
 
-    let previewClip: MediaItem | null = null;
     try {
-      if (
-        kind === 'preview' &&
-        typeof video.durationSeconds === 'number' &&
-        video.durationSeconds > PREVIEW_DURATION_SECONDS
-      ) {
-        // Higgsfield bills the submitted video's duration. A 480p request
-        // with the original full-length input would not be a short preview.
-        const { trimVideoToFile } = await import('@/lib/trim-video');
-        let clipFile: File;
-        let durationSeconds: number;
-        try {
-          clipFile = await trimVideoToFile({
-            sourceUrl: video.url,
-            startSeconds: 0,
-            endSeconds: PREVIEW_DURATION_SECONDS,
-            fileName: 'genjutsu-preview.mp4',
-            accurate: true,
-          });
-          durationSeconds = await readLocalVideoDurationSeconds(clipFile);
-        } catch (cause) {
-          console.error('Genjutsu preview preparation failed:', cause);
-          throw new Error(m['site.generator.preview_trim_failed']());
-        }
-        if (
-          durationSeconds < PREVIEW_DURATION_SECONDS - 0.01 ||
-          durationSeconds > PREVIEW_DURATION_SECONDS + 0.2
-        ) {
-          throw new Error(m['site.generator.preview_trim_failed']());
-        }
-        previewClip = { ...createMediaItem(clipFile), durationSeconds };
-      }
-
-      const media = [previewClip ?? video, ...images];
+      const media = [video, ...images];
       await apiPost('/api/genjutsu/attempt', {
         generationId,
         mode,
-        resolution: targetResolution,
+        resolution,
         prompt: prompt.trim(),
       });
       const contentTypes = media.map(
@@ -1696,7 +1622,7 @@ export function GeneratorPanel({
         {
           generationId,
           mode,
-          resolution: targetResolution,
+          resolution,
           prompt: prompt.trim(),
           contentTypes,
           contentLengths,
@@ -1855,8 +1781,6 @@ export function GeneratorPanel({
           androidNetworkHint: m['site.generator.upload_android_network_hint'](),
         })
       );
-    } finally {
-      revokeItem(previewClip);
     }
   };
 
@@ -1943,42 +1867,7 @@ export function GeneratorPanel({
 
           <div className="ml-auto flex w-full flex-wrap items-end justify-end gap-x-3 gap-y-2 sm:w-auto">
             <div className="flex items-center gap-2">
-              <div className="flex flex-col items-end gap-0.5 text-[11px] text-white/55 tabular-nums">
-                <span className="text-[10px] whitespace-nowrap text-white/45">
-                  {m['site.generator.preview_spec']()}
-                </span>
-                <span>
-                  {previewEstimatedCredits != null
-                    ? m['genjutsu.estimate.credits']({
-                        count: previewEstimatedCredits.toLocaleString(),
-                      })
-                    : '—'}
-                </span>
-              </div>
-              <button
-                type="button"
-                disabled={!canGenerate}
-                onClick={() => void handleGenerate('preview')}
-                className={cn(
-                  'inline-flex h-8 items-center justify-center rounded-lg border px-3 text-sm font-semibold transition-all duration-200 active:scale-95',
-                  canGenerate
-                    ? 'cursor-pointer border-[rgba(204,144,92,0.65)] text-[rgb(237,234,222)] hover:bg-white/10'
-                    : 'cursor-not-allowed border-white/10 text-[rgb(237,234,222)]/38'
-                )}
-                title={m['site.generator.preview_help']()}
-              >
-                {m['site.generator.preview']()}
-              </button>
-            </div>
-            <div
-              className="hidden h-8 w-px shrink-0 self-end bg-white/15 sm:block"
-              aria-hidden
-            />
-            <div className="flex items-center gap-2">
               <div className="flex shrink-0 flex-col items-end gap-0.5 text-[11px] text-white/50 tabular-nums">
-                <span className="text-[10px] whitespace-nowrap text-white/45">
-                  {m['site.generator.full_video']()}
-                </span>
                 <span className="inline-flex items-center gap-1">
                   {estimatedCredits != null
                     ? m['genjutsu.estimate.credits']({
@@ -2010,7 +1899,7 @@ export function GeneratorPanel({
               <button
                 type="button"
                 disabled={!canGenerate}
-                onClick={() => void handleGenerate('full')}
+                onClick={() => void handleGenerate()}
                 className={cn(
                   'relative inline-flex h-8 items-center justify-center rounded-lg bg-[rgb(204,144,92)] px-3.5 text-sm font-semibold tracking-wide shadow-none transition-all duration-200 active:scale-95',
                   canGenerate
@@ -2034,7 +1923,6 @@ export function GeneratorPanel({
           setStatus('idle');
           setResult(null);
         }}
-        onGenerateFull={() => void handleGenerate('full')}
       />
 
       {error ? (

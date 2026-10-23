@@ -74,49 +74,8 @@ export function assertZombieHugInputs(options: TaskOptions | null) {
   const contentLengths = Array.isArray(options.contentLengths)
     ? options.contentLengths
     : [];
-  const isPreview = options.preview === true;
-
-  if (isPreview) {
-    if (options.useDefaultTemplate === true) {
-      throw new ZombieHugPreflightError(
-        'Zombie Hug preview must upload a trimmed template clip'
-      );
-    }
-    if (typeof options.videoKey !== 'string' || !options.videoKey) {
-      throw new ZombieHugPreflightError(
-        'Zombie Hug preview is missing the trimmed template video'
-      );
-    }
-    if (options.resolution != null && options.resolution !== '480p') {
-      throw new ZombieHugPreflightError(
-        'Zombie Hug preview must use 480p resolution'
-      );
-    }
-    if (imageKeys.length !== 2) {
-      throw new ZombieHugPreflightError(
-        'Zombie Hug preview requires exactly two reference images'
-      );
-    }
-    if (contentTypes.length !== 3 || contentLengths.length !== 3) {
-      throw new ZombieHugPreflightError(
-        'Zombie Hug preview expects one trimmed video plus two reference images'
-      );
-    }
-    const videoType = contentTypes[0];
-    if (typeof videoType !== 'string' || !videoType.startsWith('video/')) {
-      throw new ZombieHugPreflightError(
-        'Zombie Hug preview source must be a video'
-      );
-    }
-    for (let i = 1; i < 3; i += 1) {
-      const type = contentTypes[i];
-      if (typeof type !== 'string' || !type.startsWith('image/')) {
-        throw new ZombieHugPreflightError(
-          'Zombie Hug references must be images'
-        );
-      }
-    }
-    return;
+  if (options.preview === true) {
+    throw new ZombieHugPreflightError('Paid preview is no longer supported');
   }
 
   if (options.useDefaultTemplate !== true) {

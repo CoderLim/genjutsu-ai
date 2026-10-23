@@ -68,26 +68,18 @@ async function POST({ request }: { request: Request }) {
 
     const preset = resolveHotelLobbyPreset(body.presetId);
     const useDefaultTemplate = body.useDefaultTemplate === true;
-    const isPreview = body.preview === true;
-
-    if (isPreview && useDefaultTemplate) {
-      return respErr('Preview requires a short trimmed reference clip', {
-        status: 400,
-      });
+    if (body.preview === true) {
+      return respErr('Paid preview is no longer supported', { status: 400 });
     }
 
     if (!preset.allowCustomVideo) {
-      if (!useDefaultTemplate && !isPreview) {
+      if (!useDefaultTemplate) {
         return respErr(
           `${preset.displayName} only supports the fixed reference template`,
           { status: 400 }
         );
       }
-      if (
-        !isPreview &&
-        typeof body.videoKey === 'string' &&
-        body.videoKey.length > 0
-      ) {
+      if (typeof body.videoKey === 'string' && body.videoKey.length > 0) {
         return respErr(
           `${preset.displayName} does not accept a custom reference video`,
           { status: 400 }
@@ -175,12 +167,6 @@ async function POST({ request }: { request: Request }) {
               : undefined,
           }
     );
-    // Paid preview = first ~4s only (Kling min is 3s).
-    if (isPreview && duration > 4) {
-      return respErr('Preview clips must be 4 seconds or shorter', {
-        status: 400,
-      });
-    }
     // Kling O3 rejects out-of-range pixels; fail before credit reservation.
     await probeHotelLobbyVideoDimensions(providerInput.videoUrl);
 

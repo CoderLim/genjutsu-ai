@@ -76,49 +76,8 @@ export function assertA2oLiteAiInputs(options: TaskOptions | null) {
   const contentLengths = Array.isArray(options.contentLengths)
     ? options.contentLengths
     : [];
-  const isPreview = options.preview === true;
-
-  if (isPreview) {
-    if (options.useDefaultTemplate === true) {
-      throw new A2oLiteAiPreflightError(
-        'A2O Lite AI preview must upload a trimmed template clip'
-      );
-    }
-    if (typeof options.videoKey !== 'string' || !options.videoKey) {
-      throw new A2oLiteAiPreflightError(
-        'A2O Lite AI preview is missing the trimmed template video'
-      );
-    }
-    if (options.resolution != null && options.resolution !== '480p') {
-      throw new A2oLiteAiPreflightError(
-        'A2O Lite AI preview must use 480p resolution'
-      );
-    }
-    if (imageKeys.length !== 2) {
-      throw new A2oLiteAiPreflightError(
-        'A2O Lite AI preview requires exactly two reference images'
-      );
-    }
-    if (contentTypes.length !== 3 || contentLengths.length !== 3) {
-      throw new A2oLiteAiPreflightError(
-        'A2O Lite AI preview expects one trimmed video plus two reference images'
-      );
-    }
-    const videoType = contentTypes[0];
-    if (typeof videoType !== 'string' || !videoType.startsWith('video/')) {
-      throw new A2oLiteAiPreflightError(
-        'A2O Lite AI preview source must be a video'
-      );
-    }
-    for (let i = 1; i < 3; i += 1) {
-      const type = contentTypes[i];
-      if (typeof type !== 'string' || !type.startsWith('image/')) {
-        throw new A2oLiteAiPreflightError(
-          'A2O Lite AI references must be images'
-        );
-      }
-    }
-    return;
+  if (options.preview === true) {
+    throw new A2oLiteAiPreflightError('Paid preview is no longer supported');
   }
 
   if (options.useDefaultTemplate !== true) {

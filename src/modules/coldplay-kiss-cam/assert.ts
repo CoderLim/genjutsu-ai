@@ -80,49 +80,10 @@ export function assertColdplayKissCamInputs(options: TaskOptions | null) {
   const contentLengths = Array.isArray(options.contentLengths)
     ? options.contentLengths
     : [];
-  const isPreview = options.preview === true;
-
-  if (isPreview) {
-    if (options.useDefaultTemplate === true) {
-      throw new ColdplayKissCamPreflightError(
-        'Coldplay Kiss Cam preview must upload a trimmed template clip'
-      );
-    }
-    if (typeof options.videoKey !== 'string' || !options.videoKey) {
-      throw new ColdplayKissCamPreflightError(
-        'Coldplay Kiss Cam preview is missing the trimmed template video'
-      );
-    }
-    if (options.resolution != null && options.resolution !== '480p') {
-      throw new ColdplayKissCamPreflightError(
-        'Coldplay Kiss Cam preview must use 480p resolution'
-      );
-    }
-    if (imageKeys.length !== 2) {
-      throw new ColdplayKissCamPreflightError(
-        'Coldplay Kiss Cam preview requires exactly two reference images'
-      );
-    }
-    if (contentTypes.length !== 3 || contentLengths.length !== 3) {
-      throw new ColdplayKissCamPreflightError(
-        'Coldplay Kiss Cam preview expects one trimmed video plus two reference images'
-      );
-    }
-    const videoType = contentTypes[0];
-    if (typeof videoType !== 'string' || !videoType.startsWith('video/')) {
-      throw new ColdplayKissCamPreflightError(
-        'Coldplay Kiss Cam preview source must be a video'
-      );
-    }
-    for (let i = 1; i < 3; i += 1) {
-      const type = contentTypes[i];
-      if (typeof type !== 'string' || !type.startsWith('image/')) {
-        throw new ColdplayKissCamPreflightError(
-          'Coldplay Kiss Cam references must be images'
-        );
-      }
-    }
-    return;
+  if (options.preview === true) {
+    throw new ColdplayKissCamPreflightError(
+      'Paid preview is no longer supported'
+    );
   }
 
   if (options.useDefaultTemplate !== true) {

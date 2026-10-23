@@ -32,21 +32,15 @@ test('accepts either 16:9 or 9:16 aspect ratio', () => {
   );
 });
 
-test('accepts a 480p trimmed preview clip plus two images', () => {
-  assert.doesNotThrow(() =>
-    assertZombieHugInputs({
-      ...validOptions,
-      preview: true,
-      useDefaultTemplate: false,
-      resolution: '480p',
-      videoKey: 'genjutsu/u/g/source.mp4',
-      imageKeys: [
-        'genjutsu/u/g/reference-01.jpg',
-        'genjutsu/u/g/reference-02.jpg',
-      ],
-      contentTypes: ['video/mp4', 'image/jpeg', 'image/jpeg'],
-      contentLengths: [400000, 1000, 1200],
-    })
+test('rejects paid preview', () => {
+  assert.throws(
+    () =>
+      assertZombieHugInputs({
+        ...validOptions,
+        preview: true,
+        useDefaultTemplate: false,
+      }),
+    /Paid preview is no longer supported/
   );
 });
 
