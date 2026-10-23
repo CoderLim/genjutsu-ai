@@ -50,7 +50,7 @@ const FAQ_ITEMS = [
   {
     question: 'How long is the video?',
     answer:
-      'The clips that travel are 15–24 seconds, vertical 9:16, with the cut landing exactly where the zombie reaches you. This preset is about 24 seconds.',
+      'The clips that travel are around 15 seconds, vertical 9:16, with the cut landing exactly where the zombie reaches you. This preset is about 15 seconds.',
   },
   {
     question: 'Is it okay to turn real people into zombies with AI?',

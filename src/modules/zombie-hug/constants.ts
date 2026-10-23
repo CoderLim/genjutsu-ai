@@ -30,9 +30,9 @@ export function getZombieHugTemplateApiPath(
 }
 
 /** Landscape template length used for list-rate credit estimates. */
-export const ZOMBIE_HUG_TEMPLATE_DURATION_SECONDS = 24;
+export const ZOMBIE_HUG_TEMPLATE_DURATION_SECONDS = 15;
 /** Portrait template (`zombie-hug-tpl-9x16.mp4`) length. */
-export const ZOMBIE_HUG_TEMPLATE_DURATION_SECONDS_9X16 = 20;
+export const ZOMBIE_HUG_TEMPLATE_DURATION_SECONDS_9X16 = 15;
 
 export function getZombieHugTemplateDurationSeconds(
   aspectRatio: ZombieHugAspectRatio = ZOMBIE_HUG_DEFAULT_ASPECT_RATIO
