@@ -65,34 +65,50 @@ export function isZombieHugAspectRatio(
  * Reference 1/2 onto the active provider's image tokens.
  */
 export const ZOMBIE_HUG_DEFAULT_PROMPT = [
-  'In the original source video, identify the two main characters by their roles and distinctive visual cues:',
+  'FULL CHARACTER REPLACEMENT — apply to EVERY shot, including the final embrace.',
   '',
-  'Person A: the gun-holding survivor. Replace Person A with Reference 1.',
+  'ROLE MAPPING (the same two people across the whole story):',
+  '- Character A = Reference 1: the gun-holding survivor in the cold scene; the survivor hugging their loved one in the final warm scene.',
+  '- Character B = Reference 2: the infected loved one (zombie) in the cold scene; the SAME loved one, restored to a healthy human, in the final warm embrace.',
+  'These are TWO identities, not four. Follow narrative roles across cuts, even if the original video uses different-looking actors or clothing. Never map by original face similarity alone.',
   '',
-  'Person B: the second main character (the loved one). Replace Person B with Reference 2, with two states depending on the scene:',
-  '- In the earlier shots, Reference 2 should appear as an infected zombie version of the same person.',
-  '- In the later shots, Reference 2 should transition into the normal healthy human version of the same person.',
-  '- The zombie version and the human version must clearly be the same person, with consistent facial identity, hairstyle, and overall likeness.',
+  'COLD / ZOMBIE SCENE:',
+  "Replace the survivor's entire visible identity with Reference 1. Replace the zombie's underlying human identity completely with Reference 2, not merely its clothing or skin. Keep Reference 2's recognizable facial structure and hairstyle, with zombie makeup (pale skin, clouded eyes, distressed details) applied as an overlay. Do not retain the original zombie actor's face.",
   '',
-  'These cues identify the ORIGINAL characters only; they are NOT appearance instructions for the replacements.',
+  'FINAL WARM / HUGGING SCENE:',
+  'Both people embracing must be replaced separately: survivor = Reference 1; restored loved one = Reference 2. Show Reference 2 as a normal healthy human without zombie effects. Do not leave either original hugging person unchanged. Do not swap or merge the two reference identities.',
   '',
-  "Replace BOTH original people completely with their assigned reference people. Reference 1 controls Person A's visible face, hair, clothing, and accessories; Reference 2 controls Person B's visible face, hair, clothing, and accessories across both the infected and restored states. Where a reference does not show an outfit detail, create a coherent appearance that matches that reference rather than copying the original person's distinctive look.",
-  '',
-  "Do not retain the original characters' faces, hairstyles, or distinctive accessories when they differ from their assigned references.",
-  '',
-  'Keep both replacements consistent through close-ups, two-person shots, occlusions, turns, camera cuts, and the cold-to-warm scene transition. Once assigned, track each person by identity and continuity. Never swap the two assignments, merge their identities, or apply one reference to both people.',
-  '',
-  'Preserve the source motion, timing, camera work, environment, and emotional beat of the standoff-to-embrace. Both original people must be visibly replaced; do not leave either person unchanged.',
+  "Preserve source actions, expressions, motion, timing, camera, framing, hard cuts, backgrounds, and the natural physical contact of the hug. Match each reference's face, hair, body traits, clothing and distinctive details, adapting naturally to lighting, perspective, and scene-specific makeup. Maintain identity through close-ups, turns, occlusions and reappearances.",
 ].join('\n');
 
 /** @deprecated Prefer ZOMBIE_HUG_DEFAULT_PROMPT — kept for existing imports. */
 export const ZOMBIE_HUG_PROMPT = ZOMBIE_HUG_DEFAULT_PROMPT;
 
 /**
- * Higgsfield-era prompts (with `@Image` tokens) remain accepted so in-flight
- * attempts can still seal/generate after the Seedance rewrite.
+ * Prior product prompts remain accepted so in-flight attempts can still
+ * seal/generate after a prompt rewrite.
  */
 export const LEGACY_ZOMBIE_HUG_PROMPTS = [
+  [
+    'In the original source video, identify the two main characters by their roles and distinctive visual cues:',
+    '',
+    'Person A: the gun-holding survivor. Replace Person A with Reference 1.',
+    '',
+    'Person B: the second main character (the loved one). Replace Person B with Reference 2, with two states depending on the scene:',
+    '- In the earlier shots, Reference 2 should appear as an infected zombie version of the same person.',
+    '- In the later shots, Reference 2 should transition into the normal healthy human version of the same person.',
+    '- The zombie version and the human version must clearly be the same person, with consistent facial identity, hairstyle, and overall likeness.',
+    '',
+    'These cues identify the ORIGINAL characters only; they are NOT appearance instructions for the replacements.',
+    '',
+    "Replace BOTH original people completely with their assigned reference people. Reference 1 controls Person A's visible face, hair, clothing, and accessories; Reference 2 controls Person B's visible face, hair, clothing, and accessories across both the infected and restored states. Where a reference does not show an outfit detail, create a coherent appearance that matches that reference rather than copying the original person's distinctive look.",
+    '',
+    "Do not retain the original characters' faces, hairstyles, or distinctive accessories when they differ from their assigned references.",
+    '',
+    'Keep both replacements consistent through close-ups, two-person shots, occlusions, turns, camera cuts, and the cold-to-warm scene transition. Once assigned, track each person by identity and continuity. Never swap the two assignments, merge their identities, or apply one reference to both people.',
+    '',
+    'Preserve the source motion, timing, camera work, environment, and emotional beat of the standoff-to-embrace. Both original people must be visibly replaced; do not leave either person unchanged.',
+  ].join('\n'),
   `Replace the gun-holding character in all relevant shots with the person from @Image 1.
 Replace the second main character with the person from @Image 2, but with two different states depending on the scene:
 

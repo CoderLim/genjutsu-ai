@@ -116,7 +116,9 @@ test('product prompt uses logical references and maps them per provider tokens',
     imageCount: 2,
   });
   assert.match(higgsfield, /TASK INSTRUCTION:/);
-  assert.match(higgsfield, /Replace Person A with Reference 1/);
+  assert.match(higgsfield, /Character A = Reference 1/);
+  assert.match(higgsfield, /Character B = Reference 2/);
+  assert.match(higgsfield, /FINAL WARM \/ HUGGING SCENE/);
   assert.match(higgsfield, /Reference 1 = @Image1/);
   assert.match(higgsfield, /Reference 2 = @Image2/);
 
@@ -131,7 +133,7 @@ test('product prompt uses logical references and maps them per provider tokens',
   });
   assert.match(wavespeed, /Reference 1 = @Image 1/);
   assert.match(wavespeed, /Reference 2 = @Image 2/);
-  assert.match(wavespeed, /Replace Person A with Reference 1/);
+  assert.match(wavespeed, /Character A = Reference 1/);
 
   const volcengine = buildSeedanceWorkflowPrompt({
     mode: 'objects-swap',
