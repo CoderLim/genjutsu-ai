@@ -19,7 +19,7 @@ const PAGE_PATH = '/coldplay-kiss-cam';
 const TEMPLATE_VIDEO = '/videos/coldplay-kiss-cam-tpl.mp4';
 const TEMPLATE_POSTER = '/videos/coldplay-kiss-cam-tpl-poster.jpg';
 const TEMPLATE_DURATION = 'PT10S';
-const TEMPLATE_UPLOAD_DATE = '2026-10-20';
+const TEMPLATE_UPLOAD_DATE = '2026-10-25';
 
 function faqJsonLd() {
   return {
@@ -46,8 +46,8 @@ function videoJsonLd() {
     thumbnailUrl: absoluteUrl(TEMPLATE_POSTER),
     uploadDate: TEMPLATE_UPLOAD_DATE,
     duration: TEMPLATE_DURATION,
-    width: 488,
-    height: 854,
+    width: 720,
+    height: 1280,
   };
 }
 

@@ -978,7 +978,7 @@ export function getFlyingCarAiTemplateVideoKey() {
 export function getColdplayKissCamTemplateVideoKey() {
   return (
     envConfigs.coldplay_kiss_cam_template_video_key?.trim() ||
-    'genjutsu/templates/coldplay-kiss-cam-v1.mp4'
+    'genjutsu/templates/coldplay-kiss-cam-v3.mp4'
   );
 }
 

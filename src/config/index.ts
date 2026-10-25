@@ -233,7 +233,7 @@ export const envConfigs: Record<string, string> = {
   // Coldplay Kiss Cam (server-only). Fixed R2 template; client uploads two images.
   coldplay_kiss_cam_template_video_key:
     procEnv.COLDPLAY_KISS_CAM_TEMPLATE_VIDEO_KEY ??
-    'genjutsu/templates/coldplay-kiss-cam-v1.mp4',
+    'genjutsu/templates/coldplay-kiss-cam-v3.mp4',
 
   // Gangnam Style AI (server-only). Fixed R2 template; client uploads three images.
   gangnam_style_ai_template_video_key:
