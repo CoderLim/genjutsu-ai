@@ -27,6 +27,24 @@ test('accepts server-template binding with two images', () => {
   assert.doesNotThrow(() => assertSmalltownBoyDanceInputs(validOptions));
 });
 
+test('accepts a 480p trimmed preview clip plus two images', () => {
+  assert.doesNotThrow(() =>
+    assertSmalltownBoyDanceInputs({
+      ...validOptions,
+      preview: true,
+      useDefaultTemplate: false,
+      resolution: '480p',
+      videoKey: 'genjutsu/u/g/source.mp4',
+      imageKeys: [
+        'genjutsu/u/g/reference-01.jpg',
+        'genjutsu/u/g/reference-02.jpg',
+      ],
+      contentTypes: ['video/mp4', 'image/jpeg', 'image/jpeg'],
+      contentLengths: [400000, 1000, 1200],
+    })
+  );
+});
+
 test('rejects client-uploaded video path (no useDefaultTemplate)', () => {
   assert.throws(
     () =>

@@ -209,22 +209,34 @@ async function POST({ request }: { request: Request }) {
       isFlyingCarAi ||
       isBurningBridgesAi ||
       isSayItRightAi;
-    if (body.preview === true) {
-      return respErr('Paid preview is no longer supported', { status: 400 });
-    }
-    // Fixed templates: server template + image-only uploads.
+    const isProductPreview =
+      (isCrazyFrog ||
+        isA2oLiteAi ||
+        isEnzoFernandezAi ||
+        isBurningBridgesAi ||
+        isSayItRightAi ||
+        isFlyingCarAi ||
+        isColdplayKissCam ||
+        isGangnamStyleAi ||
+        isGasStationDanceAi ||
+        isZombieHug ||
+        isSmalltown) &&
+      body.preview === true;
+    // Full fixed templates: server template + image-only uploads.
+    // Preview: client uploads a trimmed ≤4s clip + reference image(s).
     const isFixedTemplateProduct =
-      isSmalltown ||
-      isCrazyFrog ||
-      isA2oLiteAi ||
-      isEnzoFernandezAi ||
-      isBurningBridgesAi ||
-      isSayItRightAi ||
-      isFlyingCarAi ||
-      isColdplayKissCam ||
-      isGangnamStyleAi ||
-      isGasStationDanceAi ||
-      isZombieHug;
+      (isSmalltown ||
+        isCrazyFrog ||
+        isA2oLiteAi ||
+        isEnzoFernandezAi ||
+        isBurningBridgesAi ||
+        isSayItRightAi ||
+        isFlyingCarAi ||
+        isColdplayKissCam ||
+        isGangnamStyleAi ||
+        isGasStationDanceAi ||
+        isZombieHug) &&
+      !isProductPreview;
     const zombieAspectRatio: ZombieHugAspectRatio | null = isZombieHug
       ? isZombieHugAspectRatio(body.aspectRatio)
         ? body.aspectRatio
@@ -270,6 +282,32 @@ async function POST({ request }: { request: Request }) {
       return respErr('Crazy Frog only supports 480p and 720p', {
         status: 400,
       });
+    }
+    if (isProductPreview && resolution !== '480p') {
+      return respErr(
+        isA2oLiteAi
+          ? 'A2O Lite AI preview must use 480p'
+          : isColdplayKissCam
+            ? 'Coldplay Kiss Cam preview must use 480p'
+            : isZombieHug
+              ? 'Zombie Hug preview must use 480p'
+              : isGangnamStyleAi
+                ? 'Gangnam Style AI preview must use 480p'
+                : isGasStationDanceAi
+                  ? 'Gas Station Dance AI preview must use 480p'
+                  : isFlyingCarAi
+                    ? 'Flying Car AI preview must use 480p'
+                    : isEnzoFernandezAi
+                      ? 'Enzo Fernandez AI preview must use 480p'
+                      : isBurningBridgesAi
+                        ? 'Burning Bridges AI preview must use 480p'
+                        : isSayItRightAi
+                          ? 'Say It Right AI preview must use 480p'
+                          : isSmalltown
+                            ? 'Smalltown Boy Dance preview must use 480p'
+                            : 'Crazy Frog preview must use 480p',
+        { status: 400 }
+      );
     }
     if (isA2oLiteAi && mode !== A2O_LITE_AI_MODE) {
       return respErr('A2O Lite AI only supports objects-swap', { status: 400 });
@@ -486,7 +524,67 @@ async function POST({ request }: { request: Request }) {
       ? body.contentLengths.map((value: unknown) => Number(value))
       : [];
 
-    if (isFixedTemplateProduct) {
+    if (isProductPreview) {
+      const productLabel = isA2oLiteAi
+        ? 'A2O Lite AI'
+        : isColdplayKissCam
+          ? 'Coldplay Kiss Cam'
+          : isZombieHug
+            ? 'Zombie Hug'
+            : isGangnamStyleAi
+              ? 'Gangnam Style AI'
+              : isGasStationDanceAi
+                ? 'Gas Station Dance AI'
+                : isFlyingCarAi
+                  ? 'Flying Car AI'
+                  : isEnzoFernandezAi
+                    ? 'Enzo Fernandez AI'
+                    : isBurningBridgesAi
+                      ? 'Burning Bridges AI'
+                      : isSayItRightAi
+                        ? 'Say It Right AI'
+                        : isSmalltown
+                          ? 'Smalltown Boy Dance'
+                          : 'Crazy Frog';
+      const previewImageCount = isSingleImageProduct
+        ? 1
+        : isTripleImageProduct
+          ? 3
+          : 2;
+      const previewUploadCount = previewImageCount + 1;
+      if (
+        contentTypes.length !== previewUploadCount ||
+        contentLengths.length !== previewUploadCount
+      ) {
+        return respErr(
+          `${productLabel} preview requires one trimmed video plus ${
+            previewImageCount === 1
+              ? 'one reference image'
+              : previewImageCount === 3
+                ? 'three reference images'
+                : 'two reference images'
+          }`,
+          { status: 400 }
+        );
+      }
+      const videoMime =
+        contentTypes[0]?.split(';', 1)[0]?.trim().toLowerCase() || '';
+      if (!videoMime.startsWith('video/')) {
+        return respErr(`${productLabel} preview first upload must be a video`, {
+          status: 400,
+        });
+      }
+      for (let i = 1; i < previewUploadCount; i += 1) {
+        const mime =
+          contentTypes[i]?.split(';', 1)[0]?.trim().toLowerCase() || '';
+        if (!mime.startsWith('image/')) {
+          return respErr(
+            `${productLabel} preview references must be images (JPG, PNG, WebP, or GIF)`,
+            { status: 400 }
+          );
+        }
+      }
+    } else if (isFixedTemplateProduct) {
       if (
         contentTypes.length !== fixedTemplateImageCount ||
         contentLengths.length !== fixedTemplateImageCount
@@ -724,6 +822,30 @@ async function POST({ request }: { request: Request }) {
         prompt,
         product,
         ...target,
+        preview: isProductPreview || undefined,
+        aspectRatio: isProductPreview
+          ? isZombieHug
+            ? zombieAspectRatio!
+            : isA2oLiteAi
+              ? A2O_LITE_AI_ASPECT_RATIO
+              : isColdplayKissCam
+                ? COLDPLAY_KISS_CAM_ASPECT_RATIO
+                : isGangnamStyleAi
+                  ? GANGNAM_STYLE_AI_ASPECT_RATIO
+                  : isGasStationDanceAi
+                    ? GAS_STATION_DANCE_AI_ASPECT_RATIO
+                    : isFlyingCarAi
+                      ? FLYING_CAR_AI_ASPECT_RATIO
+                      : isEnzoFernandezAi
+                        ? ENZO_FERNANDEZ_AI_ASPECT_RATIO
+                        : isBurningBridgesAi
+                          ? BURNING_BRIDGES_AI_ASPECT_RATIO
+                          : isSayItRightAi
+                            ? SAY_IT_RIGHT_AI_ASPECT_RATIO
+                            : isSmalltown
+                              ? SMALLTOWN_ASPECT_RATIO
+                              : CRAZY_FROG_ASPECT_RATIO
+          : undefined,
         videoKey: normalizedInputs[0].key,
         imageKeys: normalizedInputs.slice(1).map((item) => item.key),
         contentTypes: normalizedInputs.map((item) => item.contentType),

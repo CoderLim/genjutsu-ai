@@ -78,10 +78,49 @@ export function assertGangnamStyleAiInputs(options: TaskOptions | null) {
   const contentLengths = Array.isArray(options.contentLengths)
     ? options.contentLengths
     : [];
-  if (options.preview === true) {
-    throw new GangnamStyleAiPreflightError(
-      'Paid preview is no longer supported'
-    );
+  const isPreview = options.preview === true;
+
+  if (isPreview) {
+    if (options.useDefaultTemplate === true) {
+      throw new GangnamStyleAiPreflightError(
+        'Gangnam Style AI preview must upload a trimmed template clip'
+      );
+    }
+    if (typeof options.videoKey !== 'string' || !options.videoKey) {
+      throw new GangnamStyleAiPreflightError(
+        'Gangnam Style AI preview is missing the trimmed template video'
+      );
+    }
+    if (options.resolution != null && options.resolution !== '480p') {
+      throw new GangnamStyleAiPreflightError(
+        'Gangnam Style AI preview must use 480p resolution'
+      );
+    }
+    if (imageKeys.length !== 3) {
+      throw new GangnamStyleAiPreflightError(
+        'Gangnam Style AI preview requires exactly three reference images'
+      );
+    }
+    if (contentTypes.length !== 4 || contentLengths.length !== 4) {
+      throw new GangnamStyleAiPreflightError(
+        'Gangnam Style AI preview expects one trimmed video plus three reference images'
+      );
+    }
+    const videoType = contentTypes[0];
+    if (typeof videoType !== 'string' || !videoType.startsWith('video/')) {
+      throw new GangnamStyleAiPreflightError(
+        'Gangnam Style AI preview source must be a video'
+      );
+    }
+    for (let i = 1; i < 4; i += 1) {
+      const type = contentTypes[i];
+      if (typeof type !== 'string' || !type.startsWith('image/')) {
+        throw new GangnamStyleAiPreflightError(
+          'Gangnam Style AI references must be images'
+        );
+      }
+    }
+    return;
   }
 
   if (options.useDefaultTemplate !== true) {

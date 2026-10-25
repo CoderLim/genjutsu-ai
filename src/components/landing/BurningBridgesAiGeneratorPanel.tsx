@@ -17,6 +17,7 @@ import {
   BURNING_BRIDGES_AI_DEFAULT_PROMPT,
   BURNING_BRIDGES_AI_DEFAULT_RESOLUTION,
   BURNING_BRIDGES_AI_MODE,
+  BURNING_BRIDGES_AI_PREVIEW_CLIP_PATH,
   BURNING_BRIDGES_AI_PRODUCT_ID,
   BURNING_BRIDGES_AI_RESOLUTIONS,
   BURNING_BRIDGES_AI_TEMPLATE_DISPLAY_PATH,
@@ -28,6 +29,7 @@ import { estimateGenjutsuCreditsForProvider } from '@/modules/genjutsu/pricing';
 import type { GenjutsuProvider } from '@/modules/genjutsu/types';
 import { ApiError, apiGet, apiPost, uploadToSignedUrl } from '@/lib/api-client';
 import { cn } from '@/lib/cn';
+import { trimVideoToFile } from '@/lib/trim-video';
 import { collectUploadDiagnostics } from '@/lib/upload-diagnostics';
 import {
   classifyUploadFailure,
@@ -42,6 +44,7 @@ import { m } from '@/paraglide/messages.js';
 import { useCreditGate } from '@/hooks/use-credit-gate';
 import type { FixedTemplateMediaStatus } from '@/hooks/use-fixed-template-media';
 import { useSingleImagePrepareGuard } from '@/hooks/use-image-prepare-guard';
+import { useShowPaidPreview } from '@/hooks/use-show-paid-preview';
 import { useUserCredits } from '@/hooks/use-user-credits';
 import { InsufficientCreditsModal } from '@/components/credits/insufficient-credits-modal';
 import { ChevronDownIcon, CloseIcon, ImageModeIcon } from '@/components/icons';
@@ -85,11 +88,42 @@ type GenerationPoll = {
   balance?: number;
 };
 
+/** Paid preview length — match homepage Genjutsu (Seedance editing floor). */
+const PREVIEW_DURATION_SECONDS = 4;
+
+function readLocalVideoDurationSeconds(file: File): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const video = document.createElement('video');
+    video.preload = 'metadata';
+    const cleanup = () => {
+      video.removeAttribute('src');
+      video.load();
+      URL.revokeObjectURL(url);
+    };
+    video.onloadedmetadata = () => {
+      const duration = video.duration;
+      cleanup();
+      if (!Number.isFinite(duration) || duration <= 0) {
+        reject(new Error('Could not read video duration'));
+        return;
+      }
+      resolve(duration);
+    };
+    video.onerror = () => {
+      cleanup();
+      reject(new Error('Could not read video duration'));
+    };
+    video.src = url;
+  });
+}
+
 type PersistedGeneration = {
   userId: string;
   generationId: string;
   resolution: BurningBridgesAiResolution;
   reservedCredits: number;
+  kind?: 'preview' | 'full';
 };
 
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
@@ -157,6 +191,24 @@ const activeGenerationKey = (userId: string) =>
 
 const sleep = (ms: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+/** Fetch the pre-baked 4s Preview clip (no client ffmpeg). */
+async function loadBurningBridgesPreviewClipFile(): Promise<File> {
+  const response = await fetch(BURNING_BRIDGES_AI_PREVIEW_CLIP_PATH, {
+    cache: 'force-cache',
+  });
+  if (!response.ok) {
+    throw new Error(`Preview clip HTTP ${response.status}`);
+  }
+  const blob = await response.blob();
+  if (blob.size <= 0) {
+    throw new Error('Preview clip was empty');
+  }
+  return new File([blob], 'burning-bridges-ai-preview.mp4', {
+    type: blob.type || 'video/mp4',
+    lastModified: Date.now(),
+  });
+}
 
 function createMediaItem(file: File): MediaItem {
   return {
@@ -370,6 +422,7 @@ export function BurningBridgesAiGeneratorPanel({
   >('idle');
   const [generationId, setGenerationId] = useState<string | null>(null);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
+  const [resultKind, setResultKind] = useState<'preview' | 'full' | null>(null);
   const [jobError, setJobError] = useState('');
   const [progressPercent, setProgressPercent] = useState(0);
   const [templateStatus, setTemplateStatus] =
@@ -378,6 +431,7 @@ export function BurningBridgesAiGeneratorPanel({
     balance: creditsQuery.data?.balance,
     email: session?.user?.email,
   });
+  const showPaidPreview = useShowPaidPreview();
   const templateReady = templateStatus === 'ready';
 
   const photoInputRef = useRef<HTMLInputElement>(null);
@@ -395,6 +449,15 @@ export function BurningBridgesAiGeneratorPanel({
       aspectRatio: BURNING_BRIDGES_AI_ASPECT_RATIO,
     });
   }, [creditProvider, resolution]);
+
+  const previewEstimatedCredits = useMemo(() => {
+    return estimateGenjutsuCreditsForProvider({
+      provider: creditProvider,
+      durationSeconds: PREVIEW_DURATION_SECONDS,
+      resolution: '480p',
+      aspectRatio: BURNING_BRIDGES_AI_ASPECT_RATIO,
+    });
+  }, [creditProvider]);
 
   const busy =
     phase === 'uploading' ||
@@ -663,6 +726,7 @@ export function BurningBridgesAiGeneratorPanel({
       setJobError('');
       creditGate.clear();
       setGenerationId(active.generationId);
+      setResultKind(active.kind === 'preview' ? 'preview' : 'full');
       if (active.resolution === '480p' || active.resolution === '720p') {
         setResolution(active.resolution);
       }
@@ -673,7 +737,7 @@ export function BurningBridgesAiGeneratorPanel({
     }
   }, [pollGeneration, session?.user?.id, phase]);
 
-  const generate = async () => {
+  const generate = async (kind: 'preview' | 'full' = 'full') => {
     if (!session?.user) {
       window.location.href = `/sign-in?callbackUrl=${encodeURIComponent('/burning-bridges-ai#generator')}`;
       return;
@@ -692,9 +756,13 @@ export function BurningBridgesAiGeneratorPanel({
       return;
     }
 
-    const targetResolution = resolution;
+    const isPreview = kind === 'preview';
+    const targetResolution: BurningBridgesAiResolution = isPreview
+      ? '480p'
+      : resolution;
 
     setResultUrl(null);
+    setResultKind(kind);
     creditGate.clear();
     setJobError('');
     setPhase('uploading');
@@ -716,9 +784,49 @@ export function BurningBridgesAiGeneratorPanel({
         product: BURNING_BRIDGES_AI_PRODUCT_ID,
       });
 
-      // Server seals the fixed R2 template; client only uploads references.
-      const media: File[] = [photo.file];
-      const contentTypes = media.map((file) => file.type || 'image/jpeg');
+      let media: File[];
+      if (isPreview) {
+        let clipFile: File;
+        try {
+          clipFile = await loadBurningBridgesPreviewClipFile();
+        } catch (cause) {
+          console.error(
+            'Burning Bridges AI preview clip fetch failed, falling back to trim:',
+            cause
+          );
+          try {
+            clipFile = await trimVideoToFile({
+              sourceUrl: BURNING_BRIDGES_AI_TEMPLATE_DISPLAY_PATH,
+              startSeconds: 0,
+              endSeconds: PREVIEW_DURATION_SECONDS,
+              fileName: 'burning-bridges-ai-preview.mp4',
+              accurate: true,
+            });
+            const durationSeconds =
+              await readLocalVideoDurationSeconds(clipFile);
+            if (
+              durationSeconds < PREVIEW_DURATION_SECONDS - 0.01 ||
+              durationSeconds > PREVIEW_DURATION_SECONDS + 0.2
+            ) {
+              throw new Error('trim duration out of range');
+            }
+          } catch (trimCause) {
+            console.error(
+              'Burning Bridges AI preview preparation failed:',
+              trimCause
+            );
+            throw new Error(m['site.generator.preview_trim_failed']());
+          }
+        }
+        media = [clipFile, photo.file];
+      } else {
+        // Server seals the fixed R2 template; client only uploads the photo.
+        media = [photo.file];
+      }
+      const contentTypes = media.map(
+        (file, index) =>
+          file.type || (isPreview && index === 0 ? 'video/mp4' : 'image/jpeg')
+      );
       const contentLengths = media.map((file) => file.size);
 
       const uploadBatch = await apiPost<{ uploads: SignedUpload[] }>(
@@ -729,6 +837,7 @@ export function BurningBridgesAiGeneratorPanel({
           resolution: targetResolution,
           prompt,
           product: BURNING_BRIDGES_AI_PRODUCT_ID,
+          preview: isPreview || undefined,
           contentTypes,
           contentLengths,
         }
@@ -783,6 +892,7 @@ export function BurningBridgesAiGeneratorPanel({
         generationId: id,
         resolution: targetResolution,
         reservedCredits: 0,
+        kind,
       };
       localStorage.setItem(
         activeGenerationKey(session.user.id),
@@ -971,49 +1081,90 @@ export function BurningBridgesAiGeneratorPanel({
               ) : null}
             </div>
 
-            <div className="ml-auto flex w-full items-center justify-end gap-2 sm:w-auto">
-              {estimatedCredits != null ? (
-                <div className="flex shrink-0 items-center gap-1 text-[12px] text-white/50 tabular-nums">
-                  <span>
-                    {m['genjutsu.estimate.credits']({
-                      count: estimatedCredits.toLocaleString(),
-                    })}
-                  </span>
-                  <TooltipProvider delay={200}>
-                    <Tooltip>
-                      <TooltipTrigger
-                        type="button"
-                        className="inline-flex size-4 items-center justify-center rounded-full text-current/70 transition-colors hover:text-current"
-                        aria-label={m['genjutsu.estimate.help_aria']()}
-                      >
-                        <CircleHelp className="size-3.5" aria-hidden />
-                      </TooltipTrigger>
-                      <TooltipContent
-                        side="top"
-                        align="end"
-                        className="max-w-[240px] text-left leading-snug"
-                      >
-                        {m['genjutsu.estimate.tooltip']()}
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                </div>
+            <div className="ml-auto flex w-full flex-wrap items-end justify-end gap-x-3 gap-y-2 sm:w-auto">
+              {showPaidPreview ? (
+                <>
+                  <div className="flex items-center gap-2">
+                    <div className="flex flex-col items-end gap-0.5 text-[11px] text-white/55 tabular-nums">
+                      <span className="text-[10px] whitespace-nowrap text-white/45">
+                        {m['site.generator.preview_spec']()}
+                      </span>
+                      <span>
+                        {previewEstimatedCredits != null
+                          ? m['genjutsu.estimate.credits']({
+                              count: previewEstimatedCredits.toLocaleString(),
+                            })
+                          : '—'}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={!canGenerate}
+                      onClick={() => void generate('preview')}
+                      className={cn(
+                        'inline-flex h-8 items-center justify-center rounded-lg border px-3 text-sm font-semibold transition-all duration-200 active:scale-95',
+                        canGenerate
+                          ? 'cursor-pointer border-[rgba(204,144,92,0.65)] text-[rgb(237,234,222)] hover:bg-white/10'
+                          : 'cursor-not-allowed border-white/10 text-[rgb(237,234,222)]/38'
+                      )}
+                      title={m['site.generator.preview_help']()}
+                    >
+                      {m['site.generator.preview']()}
+                    </button>
+                  </div>
+                  <div
+                    className="hidden h-8 w-px shrink-0 self-end bg-white/15 sm:block"
+                    aria-hidden
+                  />
+                </>
               ) : null}
-              <button
-                type="button"
-                disabled={!canGenerate}
-                onClick={() => void generate()}
-                className={cn(
-                  'relative inline-flex h-8 flex-1 items-center justify-center rounded-lg px-3.5 text-sm font-semibold tracking-wide shadow-none transition-all duration-200 active:scale-95 sm:w-auto sm:flex-none',
-                  canGenerate
-                    ? 'bg-[rgb(204,144,92)] text-[rgb(247,246,243)] hover:brightness-105'
-                    : 'bg-[rgba(126,128,132,0.28)] text-[rgb(237,234,222)]/38'
-                )}
-              >
-                {busy
-                  ? m['site.common.generating']()
-                  : m['site.generator.generate']()}
-              </button>
+              <div className="flex items-center gap-2">
+                <div className="flex shrink-0 flex-col items-end gap-0.5 text-[11px] text-white/50 tabular-nums">
+                  <span className="text-[10px] whitespace-nowrap text-white/45">
+                    {m['site.generator.full_video']()}
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    {estimatedCredits != null
+                      ? m['genjutsu.estimate.credits']({
+                          count: estimatedCredits.toLocaleString(),
+                        })
+                      : '—'}
+                    <TooltipProvider delay={200}>
+                      <Tooltip>
+                        <TooltipTrigger
+                          type="button"
+                          className="inline-flex size-4 items-center justify-center rounded-full text-current/70 transition-colors hover:text-current"
+                          aria-label={m['genjutsu.estimate.help_aria']()}
+                        >
+                          <CircleHelp className="size-3.5" aria-hidden />
+                        </TooltipTrigger>
+                        <TooltipContent
+                          side="top"
+                          align="end"
+                          className="max-w-[240px] text-left leading-snug"
+                        >
+                          {m['genjutsu.estimate.tooltip']()}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  disabled={!canGenerate}
+                  onClick={() => void generate('full')}
+                  className={cn(
+                    'relative inline-flex h-8 items-center justify-center rounded-lg px-3.5 text-sm font-semibold tracking-wide shadow-none transition-all duration-200 active:scale-95',
+                    canGenerate
+                      ? 'bg-[rgb(204,144,92)] text-[rgb(247,246,243)] hover:brightness-105'
+                      : 'bg-[rgba(126,128,132,0.28)] text-[rgb(237,234,222)]/38'
+                  )}
+                >
+                  {busy
+                    ? m['site.common.generating']()
+                    : m['site.generator.generate']()}
+                </button>
+              </div>
             </div>
           </div>
 
@@ -1040,11 +1191,14 @@ export function BurningBridgesAiGeneratorPanel({
               </p>
               <p className="mt-0.5 truncate text-xs text-white/40">
                 {resultUrl && !busy
-                  ? m['site.burningbridges.provider_label']()
+                  ? resultKind === 'preview'
+                    ? m['site.generator.preview_result']()
+                    : m['site.burningbridges.provider_label']()
                   : phase === 'uploading' || phase === 'starting'
                     ? m['site.generator.starting']()
                     : m['site.generator.progress']({
-                        resolution: resolution,
+                        resolution:
+                          resultKind === 'preview' ? '480p' : resolution,
                       })}
               </p>
             </div>
@@ -1057,7 +1211,7 @@ export function BurningBridgesAiGeneratorPanel({
                 }
                 download={
                   generationId
-                    ? `burning-bridges-ai-${generationId.slice(0, 8)}.mp4`
+                    ? `burning-bridges-ai-${resultKind === 'preview' ? 'preview-' : ''}${generationId.slice(0, 8)}.mp4`
                     : undefined
                 }
                 className="inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 text-xs font-medium text-white/70 transition hover:bg-white/10 hover:text-white"
@@ -1078,7 +1232,7 @@ export function BurningBridgesAiGeneratorPanel({
                 <span className="size-9 animate-spin rounded-full border-2 border-[rgb(204,144,92)] border-t-transparent" />
                 <p className="text-center text-sm text-white/55">
                   {m['site.generator.progress']({
-                    resolution: resolution,
+                    resolution: resultKind === 'preview' ? '480p' : resolution,
                   })}
                 </p>
               </div>

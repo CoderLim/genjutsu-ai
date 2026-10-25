@@ -30,15 +30,21 @@ test('accepts the fixed Coldplay Kiss Cam template binding', () => {
   assert.doesNotThrow(() => assertColdplayKissCamInputs(validOptions));
 });
 
-test('rejects paid preview', () => {
-  assert.throws(
-    () =>
-      assertColdplayKissCamInputs({
-        ...validOptions,
-        preview: true,
-        useDefaultTemplate: false,
-      }),
-    /Paid preview is no longer supported/
+test('accepts a 480p trimmed preview clip plus two images', () => {
+  assert.doesNotThrow(() =>
+    assertColdplayKissCamInputs({
+      ...validOptions,
+      preview: true,
+      useDefaultTemplate: false,
+      resolution: '480p',
+      videoKey: 'genjutsu/u/g/source.mp4',
+      imageKeys: [
+        'genjutsu/u/g/reference-01.jpg',
+        'genjutsu/u/g/reference-02.jpg',
+      ],
+      contentTypes: ['video/mp4', 'image/jpeg', 'image/jpeg'],
+      contentLengths: [400000, 1000, 1200],
+    })
   );
 });
 

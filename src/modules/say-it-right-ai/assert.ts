@@ -42,6 +42,8 @@ export function isAllowedSayItRightAiPrompt(value: unknown): value is string {
  *
  * Full run: fixed server R2 template (`useDefaultTemplate`), exactly one
  * reference image (the pink-T lead to replace), fixed prompt + 9:16 aspect.
+ * Preview (`?showpreview=1`): client uploads a trimmed ≤4s template clip at
+ * 480p plus the one image — `preview: true`, `useDefaultTemplate` omitted.
  */
 export function assertSayItRightAiInputs(options: TaskOptions | null) {
   if (!options || options.product !== SAY_IT_RIGHT_AI_PRODUCT_ID) {
@@ -84,8 +86,47 @@ export function assertSayItRightAiInputs(options: TaskOptions | null) {
   const contentLengths = Array.isArray(options.contentLengths)
     ? options.contentLengths
     : [];
-  if (options.preview === true) {
-    throw new SayItRightAiPreflightError('Paid preview is no longer supported');
+  const isPreview = options.preview === true;
+
+  if (isPreview) {
+    if (options.useDefaultTemplate === true) {
+      throw new SayItRightAiPreflightError(
+        'Say It Right AI preview must upload a trimmed template clip'
+      );
+    }
+    if (typeof options.videoKey !== 'string' || !options.videoKey) {
+      throw new SayItRightAiPreflightError(
+        'Say It Right AI preview is missing the trimmed template video'
+      );
+    }
+    if (options.resolution != null && options.resolution !== '480p') {
+      throw new SayItRightAiPreflightError(
+        'Say It Right AI preview must use 480p resolution'
+      );
+    }
+    if (imageKeys.length !== 1) {
+      throw new SayItRightAiPreflightError(
+        'Say It Right AI preview requires exactly one reference image'
+      );
+    }
+    if (contentTypes.length !== 2 || contentLengths.length !== 2) {
+      throw new SayItRightAiPreflightError(
+        'Say It Right AI preview expects one trimmed video plus one reference image'
+      );
+    }
+    const videoType = contentTypes[0];
+    if (typeof videoType !== 'string' || !videoType.startsWith('video/')) {
+      throw new SayItRightAiPreflightError(
+        'Say It Right AI preview source must be a video'
+      );
+    }
+    const imageType = contentTypes[1];
+    if (typeof imageType !== 'string' || !imageType.startsWith('image/')) {
+      throw new SayItRightAiPreflightError(
+        'Say It Right AI reference must be an image'
+      );
+    }
+    return;
   }
 
   if (options.useDefaultTemplate !== true) {
