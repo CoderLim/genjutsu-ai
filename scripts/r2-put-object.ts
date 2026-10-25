@@ -148,7 +148,7 @@ async function main() {
         'Content-Type': contentType,
         'Content-Length': String(body.byteLength),
       },
-      body,
+      body: body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength) as ArrayBuffer,
     })
   );
 
