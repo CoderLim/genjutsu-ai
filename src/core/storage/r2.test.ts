@@ -43,6 +43,16 @@ test('R2Provider getPublicUrl prefers publicDomain without requiring endpoint', 
   );
 });
 
+test('R2Provider CDN URLs encode Unicode and spaces without changing object keys', () => {
+  const provider = createProvider({ publicDomain: 'https://cdn.example.com/' });
+  const logical = '历史素材/My Photo 测试.png';
+  const expected = 'https://cdn.example.com/uploads/' +
+    encodeURIComponent('历史素材') + '/' + encodeURIComponent('My Photo 测试.png');
+  assert.equal(provider.getPublicUrl({ key: logical }), expected);
+  assert.equal(provider.getPublicUrl({ key: 'uploads/' + logical }), expected);
+  assert.equal(expected.includes('uploads/uploads/'), false);
+});
+
 test('R2Provider builds default endpoint from accountId when endpoint omitted', () => {
   const provider = createProvider({ endpoint: undefined, accountId: 'xyz' });
   assert.equal(
