@@ -85,7 +85,10 @@ jobs:
           if [ -z "${CLOUDFLARE_API_KEY:-}" ] && [ -n "${CF_API_KEY_FALLBACK:-}" ] && [ -n "${CLOUDFLARE_EMAIL:-}" ]; then
             export CLOUDFLARE_API_KEY="$CF_API_KEY_FALLBACK"
           fi
-          # App S3 keys live under r2_upload_path=uploads/
+          # These are physical Bucket + Object Key paths (not logical storageKey).
+          # If the production r2_upload_path changes, update and verify both paths
+          # here before manually dispatching this workflow.
+          # Current production expectation: r2_upload_path=uploads
           TARGET='genjutsu-ai/uploads/genjutsu/templates/a2o-lite-ai-v2.mp4'
           BACKUP='genjutsu-ai/uploads/genjutsu/templates/a2o-lite-ai-v2-before-sync.mp4'
           SOURCE='public/videos/a2o-lite-ai-tpl.mp4'
