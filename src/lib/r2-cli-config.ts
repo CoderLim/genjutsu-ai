@@ -86,7 +86,7 @@ function resolveFromFields(params: {
       throw new Error(
         `R2 CLI env config is incomplete (missing: ${missing.join(', ')}). ` +
           'Set R2_BUCKET_NAME, R2_ACCESS_KEY, R2_SECRET_KEY, and R2_ENDPOINT or R2_ACCOUNT_ID. ' +
-          'Do not mix with Admin DB values when any R2_* env var is set.'
+          'Do not mix with Admin DB values when any R2 connection env var is set.'
       );
     }
     throw new Error(
