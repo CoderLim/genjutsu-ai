@@ -12,6 +12,7 @@
 
 import { AwsClient } from 'aws4fetch';
 
+import { resolveR2Endpoint } from '../src/lib/r2-endpoint';
 import { getAllConfigs } from '../src/modules/config/service';
 
 function buildCorsXml() {
@@ -50,14 +51,22 @@ async function main() {
   const dryRun = process.argv.includes('--dry-run');
   const configs = await getAllConfigs();
 
-  const endpoint = configs.r2_endpoint?.trim().replace(/\/$/, '');
+  let endpoint = '';
+  try {
+    endpoint = resolveR2Endpoint({
+      endpoint: configs.r2_endpoint,
+      accountId: configs.r2_account_id,
+    });
+  } catch {
+    // Preserve the current missing-config guidance below.
+  }
   const bucket = configs.r2_bucket_name?.trim();
   const accessKeyId = configs.r2_access_key?.trim();
   const secretAccessKey = configs.r2_secret_key?.trim();
 
   if (!endpoint || !bucket || !accessKeyId || !secretAccessKey) {
     console.error(
-      'R2 is not fully configured (need r2_endpoint, r2_bucket_name, r2_access_key, r2_secret_key).'
+      'R2 is not fully configured (need r2_endpoint or r2_account_id, r2_bucket_name, r2_access_key, r2_secret_key).'
     );
     console.error(
       'Set them in Admin → Settings → Storage, or paste this policy in the R2 dashboard:\n'
