@@ -16,6 +16,13 @@ export const BURNING_BRIDGES_AI_TEMPLATE_DISPLAY_PATH =
   '/videos/burning-bridges-tpl.mp4';
 export const BURNING_BRIDGES_AI_TEMPLATE_POSTER_PATH =
   '/videos/burning-bridges-tpl-poster.jpg';
+/**
+ * Pre-trimmed 4s clip for paid Preview uploads.
+ * Avoids client ffmpeg.wasm re-encode of the full ~29s template when available.
+ */
+export const BURNING_BRIDGES_AI_PREVIEW_CLIP_PATH =
+  '/videos/burning-bridges-ai-preview-4s.mp4';
+
 /** ffprobe duration of public/videos/burning-bridges-tpl.mp4 (IG reel DeGTG5zyU2S). */
 export const BURNING_BRIDGES_AI_TEMPLATE_DURATION_SECONDS = 29.046712;
 

@@ -16,6 +16,12 @@ export const GANGNAM_STYLE_AI_TEMPLATE_DISPLAY_PATH =
   '/videos/gangnam-style-ai-tpl.mp4';
 export const GANGNAM_STYLE_AI_TEMPLATE_POSTER_PATH =
   '/videos/gangnam-style-ai-tpl-poster.jpg';
+/**
+ * Pre-trimmed 4s clip for paid Preview uploads.
+ * Avoids client ffmpeg.wasm re-encode of the full ~19s template when available.
+ */
+export const GANGNAM_STYLE_AI_PREVIEW_CLIP_PATH =
+  '/videos/gangnam-style-ai-preview-4s.mp4';
 /** ffprobe duration of public/videos/gangnam-style-ai-tpl.mp4 */
 export const GANGNAM_STYLE_AI_TEMPLATE_DURATION_SECONDS = 19.176825;
 

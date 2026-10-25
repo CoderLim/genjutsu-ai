@@ -27,6 +27,7 @@ import {
 } from '@/modules/smalltown-boy-dance/constants';
 import { ApiError, apiGet, apiPost, uploadToSignedUrl } from '@/lib/api-client';
 import { cn } from '@/lib/cn';
+import { trimVideoToFile } from '@/lib/trim-video';
 import { collectUploadDiagnostics } from '@/lib/upload-diagnostics';
 import {
   classifyUploadFailure,
@@ -41,6 +42,7 @@ import { m } from '@/paraglide/messages.js';
 import { useCreditGate } from '@/hooks/use-credit-gate';
 import type { FixedTemplateMediaStatus } from '@/hooks/use-fixed-template-media';
 import { useImagePrepareGuard } from '@/hooks/use-image-prepare-guard';
+import { useShowPaidPreview } from '@/hooks/use-show-paid-preview';
 import { useUserCredits } from '@/hooks/use-user-credits';
 import { InsufficientCreditsModal } from '@/components/credits/insufficient-credits-modal';
 import { ChevronDownIcon, CloseIcon, ImageModeIcon } from '@/components/icons';
@@ -84,11 +86,42 @@ type GenerationPoll = {
   balance?: number;
 };
 
+/** Paid preview length — match homepage Genjutsu (Seedance editing floor). */
+const PREVIEW_DURATION_SECONDS = 4;
+
+function readLocalVideoDurationSeconds(file: File): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const video = document.createElement('video');
+    video.preload = 'metadata';
+    const cleanup = () => {
+      video.removeAttribute('src');
+      video.load();
+      URL.revokeObjectURL(url);
+    };
+    video.onloadedmetadata = () => {
+      const duration = video.duration;
+      cleanup();
+      if (!Number.isFinite(duration) || duration <= 0) {
+        reject(new Error('Could not read video duration'));
+        return;
+      }
+      resolve(duration);
+    };
+    video.onerror = () => {
+      cleanup();
+      reject(new Error('Could not read video duration'));
+    };
+    video.src = url;
+  });
+}
+
 type PersistedGeneration = {
   userId: string;
   generationId: string;
   resolution: SmalltownResolution;
   reservedCredits: number;
+  kind?: 'preview' | 'full';
 };
 
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
@@ -357,6 +390,7 @@ export function SmalltownBoyDanceGeneratorPanel() {
   >('idle');
   const [generationId, setGenerationId] = useState<string | null>(null);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
+  const [resultKind, setResultKind] = useState<'preview' | 'full' | null>(null);
   const [jobError, setJobError] = useState('');
   const [progressPercent, setProgressPercent] = useState(0);
   const [templateStatus, setTemplateStatus] =
@@ -365,6 +399,7 @@ export function SmalltownBoyDanceGeneratorPanel() {
     balance: creditsQuery.data?.balance,
     email: session?.user?.email,
   });
+  const showPaidPreview = useShowPaidPreview();
   const templateReady = templateStatus === 'ready';
 
   const frontInputRef = useRef<HTMLInputElement>(null);
@@ -385,6 +420,15 @@ export function SmalltownBoyDanceGeneratorPanel() {
       aspectRatio: SMALLTOWN_ASPECT_RATIO,
     });
   }, [resolution]);
+
+  const previewEstimatedCredits = useMemo(() => {
+    return estimateGenjutsuCreditsForProvider({
+      provider: 'seedance-higgsfield',
+      durationSeconds: PREVIEW_DURATION_SECONDS,
+      resolution: '480p',
+      aspectRatio: SMALLTOWN_ASPECT_RATIO,
+    });
+  }, []);
 
   const busy =
     phase === 'uploading' ||
@@ -596,6 +640,7 @@ export function SmalltownBoyDanceGeneratorPanel() {
           if (generationRunRef.current !== runId) return;
           localStorage.removeItem(activeGenerationKey(active.userId));
           setResultUrl(polled.videoUrl);
+          setResultKind(active.kind === 'preview' ? 'preview' : 'full');
           setJobError('');
           setPhase('idle');
           void creditsQuery.refetch();
@@ -660,6 +705,7 @@ export function SmalltownBoyDanceGeneratorPanel() {
       setJobError('');
       creditGate.clear();
       setGenerationId(active.generationId);
+      setResultKind(active.kind === 'preview' ? 'preview' : 'full');
       if (active.resolution === '480p' || active.resolution === '720p') {
         setResolution(active.resolution);
       }
@@ -670,7 +716,7 @@ export function SmalltownBoyDanceGeneratorPanel() {
     }
   }, [pollGeneration, session?.user?.id, phase]);
 
-  const generate = async () => {
+  const generate = async (kind: 'preview' | 'full' = 'full') => {
     if (!session?.user) {
       window.location.href = `/sign-in?callbackUrl=${encodeURIComponent('/smalltown-boy-dance#generator')}`;
       return;
@@ -689,7 +735,13 @@ export function SmalltownBoyDanceGeneratorPanel() {
       return;
     }
 
+    const isPreview = kind === 'preview';
+    const targetResolution: SmalltownResolution = isPreview
+      ? '480p'
+      : resolution;
+
     setResultUrl(null);
+    setResultKind(kind);
     creditGate.clear();
     setJobError('');
     setPhase('uploading');
@@ -706,14 +758,46 @@ export function SmalltownBoyDanceGeneratorPanel() {
       await apiPost('/api/genjutsu/attempt', {
         generationId: id,
         mode: SMALLTOWN_MODE,
-        resolution,
+        resolution: targetResolution,
         prompt,
         product: SMALLTOWN_PRODUCT_ID,
       });
 
-      // Server seals the fixed R2 template; client only uploads front + back.
-      const media = [frontPhoto.file, backPhoto.file];
-      const contentTypes = media.map((file) => file.type || 'image/jpeg');
+      let media: File[];
+      if (isPreview) {
+        let clipFile: File;
+        let durationSeconds: number;
+        try {
+          clipFile = await trimVideoToFile({
+            sourceUrl: SMALLTOWN_TEMPLATE_PATH,
+            startSeconds: 0,
+            endSeconds: PREVIEW_DURATION_SECONDS,
+            fileName: 'smalltown-boy-dance-preview.mp4',
+            accurate: true,
+          });
+          durationSeconds = await readLocalVideoDurationSeconds(clipFile);
+        } catch (cause) {
+          console.error(
+            'Smalltown Boy Dance preview preparation failed:',
+            cause
+          );
+          throw new Error(m['site.generator.preview_trim_failed']());
+        }
+        if (
+          durationSeconds < PREVIEW_DURATION_SECONDS - 0.01 ||
+          durationSeconds > PREVIEW_DURATION_SECONDS + 0.2
+        ) {
+          throw new Error(m['site.generator.preview_trim_failed']());
+        }
+        media = [clipFile, frontPhoto.file, backPhoto.file];
+      } else {
+        // Server seals the fixed R2 template; client only uploads front + back.
+        media = [frontPhoto.file, backPhoto.file];
+      }
+      const contentTypes = media.map(
+        (file, index) =>
+          file.type || (isPreview && index === 0 ? 'video/mp4' : 'image/jpeg')
+      );
       const contentLengths = media.map((file) => file.size);
 
       const uploadBatch = await apiPost<{ uploads: SignedUpload[] }>(
@@ -721,9 +805,10 @@ export function SmalltownBoyDanceGeneratorPanel() {
         {
           generationId: id,
           mode: SMALLTOWN_MODE,
-          resolution,
+          resolution: targetResolution,
           prompt,
           product: SMALLTOWN_PRODUCT_ID,
+          preview: isPreview || undefined,
           contentTypes,
           contentLengths,
         }
@@ -776,8 +861,9 @@ export function SmalltownBoyDanceGeneratorPanel() {
       const active: PersistedGeneration = {
         userId: session.user.id,
         generationId: id,
-        resolution,
+        resolution: targetResolution,
         reservedCredits: 0,
+        kind,
       };
       localStorage.setItem(
         activeGenerationKey(session.user.id),
@@ -981,49 +1067,90 @@ export function SmalltownBoyDanceGeneratorPanel() {
               ) : null}
             </div>
 
-            <div className="ml-auto flex w-full items-center justify-end gap-2 sm:w-auto">
-              {estimatedCredits != null ? (
-                <div className="flex shrink-0 items-center gap-1 text-[12px] text-white/50 tabular-nums">
-                  <span>
-                    {m['genjutsu.estimate.credits']({
-                      count: estimatedCredits.toLocaleString(),
-                    })}
-                  </span>
-                  <TooltipProvider delay={200}>
-                    <Tooltip>
-                      <TooltipTrigger
-                        type="button"
-                        className="inline-flex size-4 items-center justify-center rounded-full text-current/70 transition-colors hover:text-current"
-                        aria-label={m['genjutsu.estimate.help_aria']()}
-                      >
-                        <CircleHelp className="size-3.5" aria-hidden />
-                      </TooltipTrigger>
-                      <TooltipContent
-                        side="top"
-                        align="end"
-                        className="max-w-[240px] text-left leading-snug"
-                      >
-                        {m['genjutsu.estimate.tooltip']()}
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                </div>
+            <div className="ml-auto flex w-full flex-wrap items-end justify-end gap-x-3 gap-y-2 sm:w-auto">
+              {showPaidPreview ? (
+                <>
+                  <div className="flex items-center gap-2">
+                    <div className="flex flex-col items-end gap-0.5 text-[11px] text-white/55 tabular-nums">
+                      <span className="text-[10px] whitespace-nowrap text-white/45">
+                        {m['site.generator.preview_spec']()}
+                      </span>
+                      <span>
+                        {previewEstimatedCredits != null
+                          ? m['genjutsu.estimate.credits']({
+                              count: previewEstimatedCredits.toLocaleString(),
+                            })
+                          : '—'}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={!canGenerate}
+                      onClick={() => void generate('preview')}
+                      className={cn(
+                        'inline-flex h-8 items-center justify-center rounded-lg border px-3 text-sm font-semibold transition-all duration-200 active:scale-95',
+                        canGenerate
+                          ? 'cursor-pointer border-[rgba(204,144,92,0.65)] text-[rgb(237,234,222)] hover:bg-white/10'
+                          : 'cursor-not-allowed border-white/10 text-[rgb(237,234,222)]/38'
+                      )}
+                      title={m['site.generator.preview_help']()}
+                    >
+                      {m['site.generator.preview']()}
+                    </button>
+                  </div>
+                  <div
+                    className="hidden h-8 w-px shrink-0 self-end bg-white/15 sm:block"
+                    aria-hidden
+                  />
+                </>
               ) : null}
-              <button
-                type="button"
-                disabled={!canGenerate}
-                onClick={() => void generate()}
-                className={cn(
-                  'relative inline-flex h-8 flex-1 items-center justify-center rounded-lg px-3.5 text-sm font-semibold tracking-wide shadow-none transition-all duration-200 active:scale-95 sm:w-auto sm:flex-none',
-                  canGenerate
-                    ? 'bg-[rgb(204,144,92)] text-[rgb(247,246,243)] hover:brightness-105'
-                    : 'bg-[rgba(126,128,132,0.28)] text-[rgb(237,234,222)]/38'
-                )}
-              >
-                {busy
-                  ? m['site.common.generating']()
-                  : m['site.generator.generate']()}
-              </button>
+              <div className="flex items-center gap-2">
+                <div className="flex shrink-0 flex-col items-end gap-0.5 text-[11px] text-white/50 tabular-nums">
+                  <span className="text-[10px] whitespace-nowrap text-white/45">
+                    {m['site.generator.full_video']()}
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    {estimatedCredits != null
+                      ? m['genjutsu.estimate.credits']({
+                          count: estimatedCredits.toLocaleString(),
+                        })
+                      : '—'}
+                    <TooltipProvider delay={200}>
+                      <Tooltip>
+                        <TooltipTrigger
+                          type="button"
+                          className="inline-flex size-4 items-center justify-center rounded-full text-current/70 transition-colors hover:text-current"
+                          aria-label={m['genjutsu.estimate.help_aria']()}
+                        >
+                          <CircleHelp className="size-3.5" aria-hidden />
+                        </TooltipTrigger>
+                        <TooltipContent
+                          side="top"
+                          align="end"
+                          className="max-w-[240px] text-left leading-snug"
+                        >
+                          {m['genjutsu.estimate.tooltip']()}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  disabled={!canGenerate}
+                  onClick={() => void generate('full')}
+                  className={cn(
+                    'relative inline-flex h-8 items-center justify-center rounded-lg px-3.5 text-sm font-semibold tracking-wide shadow-none transition-all duration-200 active:scale-95',
+                    canGenerate
+                      ? 'bg-[rgb(204,144,92)] text-[rgb(247,246,243)] hover:brightness-105'
+                      : 'bg-[rgba(126,128,132,0.28)] text-[rgb(237,234,222)]/38'
+                  )}
+                >
+                  {busy
+                    ? m['site.common.generating']()
+                    : m['site.generator.generate']()}
+                </button>
+              </div>
             </div>
           </div>
 
@@ -1045,7 +1172,9 @@ export function SmalltownBoyDanceGeneratorPanel() {
             <div className="min-w-0">
               <p className="text-sm font-semibold text-white/90">
                 {resultUrl && !busy
-                  ? m['site.common.your_video']()
+                  ? resultKind === 'preview'
+                    ? m['site.generator.preview_result']()
+                    : m['site.common.your_video']()
                   : m['site.generator.generating']()}
               </p>
               <p className="mt-0.5 truncate text-xs text-white/40">

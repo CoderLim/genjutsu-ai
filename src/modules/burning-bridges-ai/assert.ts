@@ -46,6 +46,7 @@ export function isAllowedBurningBridgesAiPrompt(
  * reference image (the lead to replace), fixed prompt + 16:9 aspect.
  *
  * Preview: same prompt/aspect/product, but client uploads a trimmed ≤4s
+ * template clip at 480p plus the one image — `preview: true`,
  * `useDefaultTemplate` must be false.
  */
 export function assertBurningBridgesAiInputs(options: TaskOptions | null) {
@@ -89,10 +90,47 @@ export function assertBurningBridgesAiInputs(options: TaskOptions | null) {
   const contentLengths = Array.isArray(options.contentLengths)
     ? options.contentLengths
     : [];
-  if (options.preview === true) {
-    throw new BurningBridgesAiPreflightError(
-      'Paid preview is no longer supported'
-    );
+  const isPreview = options.preview === true;
+
+  if (isPreview) {
+    if (options.useDefaultTemplate === true) {
+      throw new BurningBridgesAiPreflightError(
+        'Burning Bridges AI preview must upload a trimmed template clip'
+      );
+    }
+    if (typeof options.videoKey !== 'string' || !options.videoKey) {
+      throw new BurningBridgesAiPreflightError(
+        'Burning Bridges AI preview is missing the trimmed template video'
+      );
+    }
+    if (options.resolution != null && options.resolution !== '480p') {
+      throw new BurningBridgesAiPreflightError(
+        'Burning Bridges AI preview must use 480p resolution'
+      );
+    }
+    if (imageKeys.length !== 1) {
+      throw new BurningBridgesAiPreflightError(
+        'Burning Bridges AI preview requires exactly one reference image'
+      );
+    }
+    if (contentTypes.length !== 2 || contentLengths.length !== 2) {
+      throw new BurningBridgesAiPreflightError(
+        'Burning Bridges AI preview expects one trimmed video plus one reference image'
+      );
+    }
+    const videoType = contentTypes[0];
+    if (typeof videoType !== 'string' || !videoType.startsWith('video/')) {
+      throw new BurningBridgesAiPreflightError(
+        'Burning Bridges AI preview source must be a video'
+      );
+    }
+    const imageType = contentTypes[1];
+    if (typeof imageType !== 'string' || !imageType.startsWith('image/')) {
+      throw new BurningBridgesAiPreflightError(
+        'Burning Bridges AI reference must be an image'
+      );
+    }
+    return;
   }
 
   if (options.useDefaultTemplate !== true) {

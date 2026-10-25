@@ -27,23 +27,22 @@ type TaskOptions = {
   useDefaultTemplate?: unknown;
   aspectRatio?: unknown;
   resolution?: unknown;
+  preview?: unknown;
+  videoKey?: unknown;
 };
 
 /**
  * Server-side product lock: fixed server R2 template (useDefaultTemplate),
  * exactly two reference images (front then back), fixed prompt + 3:4 aspect.
  * Template identity comes from the trusted R2 key — not client size/name.
+ *
+ * Preview (`?showpreview=1`): client uploads a trimmed ≤4s template clip at
+ * 480p plus the two images — `preview: true`, `useDefaultTemplate` omitted.
  */
 export function assertSmalltownBoyDanceInputs(options: TaskOptions | null) {
   if (!options || options.product !== SMALLTOWN_PRODUCT_ID) {
     throw new SmalltownBoyDancePreflightError(
       'Smalltown Boy Dance generation is missing its product binding'
-    );
-  }
-
-  if (options.useDefaultTemplate !== true) {
-    throw new SmalltownBoyDancePreflightError(
-      'Smalltown Boy Dance must use the server-controlled template'
     );
   }
 
@@ -72,18 +71,69 @@ export function assertSmalltownBoyDanceInputs(options: TaskOptions | null) {
   }
 
   const imageKeys = Array.isArray(options.imageKeys) ? options.imageKeys : [];
-  if (imageKeys.length !== 2) {
-    throw new SmalltownBoyDancePreflightError(
-      'Smalltown Boy Dance requires exactly two reference images (front and back)'
-    );
-  }
-
   const contentTypes = Array.isArray(options.contentTypes)
     ? options.contentTypes
     : [];
   const contentLengths = Array.isArray(options.contentLengths)
     ? options.contentLengths
     : [];
+  const isPreview = options.preview === true;
+
+  if (isPreview) {
+    if (options.useDefaultTemplate === true) {
+      throw new SmalltownBoyDancePreflightError(
+        'Smalltown Boy Dance preview must upload a trimmed template clip'
+      );
+    }
+    if (typeof options.videoKey !== 'string' || !options.videoKey) {
+      throw new SmalltownBoyDancePreflightError(
+        'Smalltown Boy Dance preview is missing the trimmed template video'
+      );
+    }
+    if (options.resolution != null && options.resolution !== '480p') {
+      throw new SmalltownBoyDancePreflightError(
+        'Smalltown Boy Dance preview must use 480p resolution'
+      );
+    }
+    if (imageKeys.length !== 2) {
+      throw new SmalltownBoyDancePreflightError(
+        'Smalltown Boy Dance preview requires exactly two reference images (front and back)'
+      );
+    }
+    // Index 0 = trimmed video; 1–2 = front + back images.
+    if (contentTypes.length !== 3 || contentLengths.length !== 3) {
+      throw new SmalltownBoyDancePreflightError(
+        'Smalltown Boy Dance preview expects one trimmed video plus two reference images'
+      );
+    }
+    const videoType = contentTypes[0];
+    if (typeof videoType !== 'string' || !videoType.startsWith('video/')) {
+      throw new SmalltownBoyDancePreflightError(
+        'Smalltown Boy Dance preview source must be a video'
+      );
+    }
+    for (let i = 1; i < 3; i += 1) {
+      const type = contentTypes[i];
+      if (typeof type !== 'string' || !type.startsWith('image/')) {
+        throw new SmalltownBoyDancePreflightError(
+          'Smalltown Boy Dance references must be images'
+        );
+      }
+    }
+    return;
+  }
+
+  if (options.useDefaultTemplate !== true) {
+    throw new SmalltownBoyDancePreflightError(
+      'Smalltown Boy Dance must use the server-controlled template'
+    );
+  }
+
+  if (imageKeys.length !== 2) {
+    throw new SmalltownBoyDancePreflightError(
+      'Smalltown Boy Dance requires exactly two reference images (front and back)'
+    );
+  }
 
   if (contentTypes.length !== 2 || contentLengths.length !== 2) {
     throw new SmalltownBoyDancePreflightError(
