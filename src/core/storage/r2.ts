@@ -1,3 +1,7 @@
+import { resolveR2Endpoint } from '@/lib/r2-endpoint';
+import { resolveR2ObjectKey, trimR2PathSlashes } from '@/lib/r2-object-key';
+import { buildR2S3ObjectUrl } from '@/lib/r2-signing-config';
+
 import type {
   StorageConfigs,
   StorageDownloadUploadOptions,
@@ -34,38 +38,41 @@ export class R2Provider implements StorageProvider {
   }
 
   private getUploadPath() {
-    let uploadPath = this.configs.uploadPath || 'uploads';
-    if (uploadPath.startsWith('/')) {
-      uploadPath = uploadPath.slice(1);
-    }
-    if (uploadPath.endsWith('/')) {
-      uploadPath = uploadPath.slice(0, -1);
-    }
-    return uploadPath;
+    return trimR2PathSlashes(this.configs.uploadPath || 'uploads');
   }
 
   private getEndpoint() {
-    return (
-      this.configs.endpoint ||
-      `https://${this.configs.accountId}.r2.cloudflarestorage.com`
+    return resolveR2Endpoint({
+      endpoint: this.configs.endpoint,
+      accountId: this.configs.accountId,
+    });
+  }
+
+  private getObjectUrl(key: string, bucket: string) {
+    return buildR2S3ObjectUrl(
+      { endpoint: this.getEndpoint(), bucket, uploadPath: this.getUploadPath() },
+      key
     );
   }
 
   getPublicUrl = (options: { key: string; bucket?: string }) => {
     const uploadBucket = options.bucket || this.configs.bucket;
-    const uploadPath = this.getUploadPath();
-    const url = `${this.getEndpoint()}/${uploadBucket}/${uploadPath}/${options.key}`;
-    return this.configs.publicDomain
-      ? `${this.configs.publicDomain}/${uploadPath}/${options.key}`
-      : url;
+    const objectKey = resolveR2ObjectKey(this.getUploadPath(), options.key);
+    // CDN public URLs have no bucket component and should not require a S3 endpoint.
+    if (this.configs.publicDomain) {
+      return `${this.configs.publicDomain.replace(/\/+$/, '')}/${objectKey
+        .split('/')
+        .map((segment) => encodeURIComponent(segment))
+        .join('/')}`;
+    }
+    return this.getObjectUrl(options.key, uploadBucket);
   };
 
   exists = async (options: { key: string; bucket?: string }) => {
     try {
       const uploadBucket = options.bucket || this.configs.bucket;
       if (!uploadBucket) return false;
-      const uploadPath = this.getUploadPath();
-      const url = `${this.getEndpoint()}/${uploadBucket}/${uploadPath}/${options.key}`;
+      const url = this.getObjectUrl(options.key, uploadBucket);
 
       const { AwsClient } = await import('aws4fetch');
       const client = new AwsClient({
@@ -108,7 +115,7 @@ export class R2Provider implements StorageProvider {
 
       // R2 endpoint format: https://<accountId>.r2.cloudflarestorage.com
       // Use custom endpoint if provided, otherwise use default
-      const url = `${this.getEndpoint()}/${uploadBucket}/${uploadPath}/${options.key}`;
+      const url = this.getObjectUrl(options.key, uploadBucket);
 
       const { AwsClient } = await import('aws4fetch');
 
