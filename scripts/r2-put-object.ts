@@ -6,7 +6,7 @@
  * App reads uploads/hotel-lobby/templates/x.mp4.
  *
  * Config (atomic source — never mix env + Admin credentials):
- *   1. If any R2_* env is set → require a complete env set:
+ *   1. If any R2 connection env is set → require a complete env set:
  *        R2_BUCKET_NAME, R2_ACCESS_KEY, R2_SECRET_KEY,
  *        R2_ENDPOINT or R2_ACCOUNT_ID, optional R2_UPLOAD_PATH
  *   2. Else → Admin/DB via getAllConfigs() (r2_* keys)
@@ -17,6 +17,7 @@
  *
  * Options:
  *   --dry-run   print resolved key only, do not upload
+ *   --force     explicitly allow overwriting an existing object
  *   --content-type=video/mp4   override Content-Type (default from extension)
  */
 
@@ -29,6 +30,8 @@ import {
   resolveR2CliConfig,
 } from '../src/lib/r2-cli-config';
 import { resolveR2ObjectKey } from '../src/lib/r2-object-key';
+import { checkR2PutHeadStatus } from '../src/lib/r2-put-guard';
+import { buildR2S3ObjectUrl } from '../src/lib/r2-signing-config';
 import { getAllConfigs } from '../src/modules/config/service';
 
 const CONTENT_TYPES: Record<string, string> = {
@@ -48,11 +51,16 @@ function parseArgs(argv: string[]) {
     file?: string;
     contentType?: string;
     dryRun: boolean;
-  } = { dryRun: false };
+    force: boolean;
+  } = { dryRun: false, force: false };
 
   for (const arg of argv) {
     if (arg === '--dry-run') {
       out.dryRun = true;
+      continue;
+    }
+    if (arg === '--force') {
+      out.force = true;
       continue;
     }
     const match = /^--([^=]+)=(.*)$/.exec(arg);
@@ -98,7 +106,7 @@ async function main() {
   if (!args.key || !args.file) {
     console.error(
       'Usage: pnpm r2:put --key=hotel-lobby/templates/default-v2.mp4 \\\n' +
-        '  --file=public/videos/hotel-lobby-tpl.mp4 [--dry-run]'
+        '  --file=public/videos/hotel-lobby-tpl.mp4 [--dry-run] [--force]'
     );
     process.exit(1);
   }
@@ -128,12 +136,7 @@ async function main() {
     return;
   }
 
-  const body = await readFile(absoluteFile);
-  const url = `${config.endpoint}/${config.bucket}/${objectKey
-    .split('/')
-    .map((segment) => encodeURIComponent(segment))
-    .join('/')}`;
-
+  const url = buildR2S3ObjectUrl(config, args.key);
   const client = new AwsClient({
     accessKeyId: config.accessKeyId,
     secretAccessKey: config.secretAccessKey,
@@ -141,6 +144,15 @@ async function main() {
     service: 's3',
   });
 
+  // A safe CLI must not turn a typo or an existing template key into an overwrite.
+  // HEAD failures (including 403) are not evidence that an object is absent.
+  const head = await client.fetch(new Request(url, { method: 'HEAD' }));
+  const disposition = checkR2PutHeadStatus(head.status, args.force);
+  if (disposition === 'existing') {
+    console.log('Explicit --force: overwriting an existing R2 object.');
+  }
+
+  const body = await readFile(absoluteFile);
   const response = await client.fetch(
     new Request(url, {
       method: 'PUT',
