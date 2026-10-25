@@ -12,7 +12,7 @@ export function trimR2PathSlashes(value: string): string {
  */
 export function assertSafeR2ObjectKey(key: string): void {
   if (
-    !key ||
+    !key.trim() ||
     key.startsWith('/') ||
     key.endsWith('/') ||
     key.includes('//') ||
@@ -30,7 +30,7 @@ export function assertSafeR2ObjectKey(key: string): void {
 /** Idempotent for already-prefixed keys, including multi-segment prefixes. */
 export function resolveR2ObjectKey(uploadPath: string, key: string): string {
   const prefix = trimR2PathSlashes(uploadPath.trim());
-  const objectKey = key.trim();
+  const objectKey = key;
   assertSafeR2ObjectKey(objectKey);
   if (prefix) assertSafeR2ObjectKey(prefix);
 
