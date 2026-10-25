@@ -1003,6 +1003,13 @@ export function getBurningBridgesAiTemplateVideoKey() {
   );
 }
 
+export function getSayItRightAiTemplateVideoKey() {
+  return (
+    envConfigs.say_it_right_ai_template_video_key?.trim() ||
+    'genjutsu/templates/say-it-right-ai-v1.mp4'
+  );
+}
+
 async function ensureGenjutsuPublicTemplateInR2(params: {
   key: string;
   localRelative: string;
@@ -1126,6 +1133,14 @@ export async function ensureBurningBridgesAiTemplateInR2() {
   });
 }
 
+export async function ensureSayItRightAiTemplateInR2() {
+  return ensureGenjutsuPublicTemplateInR2({
+    key: getSayItRightAiTemplateVideoKey(),
+    localRelative: 'public/videos/say-it-right-dance-tpl.mp4',
+    label: 'Say It Right AI',
+  });
+}
+
 /**
  * Logical R2 key for a Genjutsu product template (same key seal uses).
  * Exhaustive over GenjutsuProductId — unknown products must not fall through
@@ -1153,6 +1168,8 @@ export function getGenjutsuProductTemplateVideoKey(
       return getGasStationDanceAiTemplateVideoKey();
     case 'burning-bridges-ai':
       return getBurningBridgesAiTemplateVideoKey();
+    case 'say-it-right-ai':
+      return getSayItRightAiTemplateVideoKey();
     case 'zombie-hug':
       // Aspect-aware callers use getZombieHugTemplateVideoKey(aspect).
       // Default landscape key for the shared GenjutsuProductId helper.
@@ -1191,6 +1208,8 @@ export async function ensureGenjutsuProductTemplateInR2(
       return ensureGasStationDanceAiTemplateInR2();
     case 'burning-bridges-ai':
       return ensureBurningBridgesAiTemplateInR2();
+    case 'say-it-right-ai':
+      return ensureSayItRightAiTemplateInR2();
     case 'zombie-hug':
       return ensureZombieHugTemplateInR2();
     default: {

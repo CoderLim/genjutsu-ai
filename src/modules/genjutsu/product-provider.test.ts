@@ -13,6 +13,7 @@ import {
   isGenjutsuProductId,
   resolveGenjutsuProviderTarget,
   resolveProductProviderTarget,
+  SAY_IT_RIGHT_AI_PRODUCT,
   SMALLTOWN_BOY_DANCE_PRODUCT,
   ZOMBIE_HUG_PRODUCT,
 } from './workflow';
@@ -98,6 +99,15 @@ test('burning-bridges-ai follows the mode env router', () => {
   assert.deepEqual(target, fallback);
 });
 
+test('say-it-right-ai follows the mode env router', () => {
+  const fallback = resolveGenjutsuProviderTarget('objects-swap');
+  const target = resolveProductProviderTarget(
+    SAY_IT_RIGHT_AI_PRODUCT,
+    'objects-swap'
+  );
+  assert.deepEqual(target, fallback);
+});
+
 test('zombie-hug follows the mode env router', () => {
   const fallback = resolveGenjutsuProviderTarget('objects-swap');
   const target = resolveProductProviderTarget(
@@ -138,6 +148,7 @@ test('isGenjutsuProductId allowlist', () => {
   assert.equal(isGenjutsuProductId(GANGNAM_STYLE_AI_PRODUCT), true);
   assert.equal(isGenjutsuProductId(GAS_STATION_DANCE_AI_PRODUCT), true);
   assert.equal(isGenjutsuProductId(BURNING_BRIDGES_AI_PRODUCT), true);
+  assert.equal(isGenjutsuProductId(SAY_IT_RIGHT_AI_PRODUCT), true);
   assert.equal(isGenjutsuProductId(ZOMBIE_HUG_PRODUCT), true);
   assert.equal(isGenjutsuProductId('bulin-47'), false);
   assert.equal(isGenjutsuProductId(''), false);

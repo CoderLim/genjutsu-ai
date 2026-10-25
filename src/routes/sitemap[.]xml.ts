@@ -28,6 +28,7 @@ const STATIC_PATHS = [
   '/bulin-47-ai',
   '/blog',
   '/burning-bridges-ai',
+  '/say-it-right-ai',
   '/privacy-policy',
   '/terms-of-service',
   '/refund-policy',

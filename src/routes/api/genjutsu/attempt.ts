@@ -56,6 +56,12 @@ import {
   isGenjutsuProductId,
   resolveProductProviderTarget,
 } from '@/modules/genjutsu/workflow';
+import { isAllowedSayItRightAiPrompt } from '@/modules/say-it-right-ai/assert';
+import {
+  SAY_IT_RIGHT_AI_MODE,
+  SAY_IT_RIGHT_AI_PRODUCT_ID,
+  SAY_IT_RIGHT_AI_RESOLUTIONS,
+} from '@/modules/say-it-right-ai/constants';
 import {
   SMALLTOWN_PRODUCT_ID,
   SMALLTOWN_RESOLUTIONS,
@@ -187,6 +193,30 @@ async function POST({ request }: { request: Request }) {
     if (isBurningBridgesAi && !isAllowedBurningBridgesAiPrompt(prompt)) {
       return respErr(
         'Burning Bridges AI prompt does not match the fixed product prompt',
+        {
+          status: 400,
+        }
+      );
+    }
+    const isSayItRightAi = product === SAY_IT_RIGHT_AI_PRODUCT_ID;
+    if (isSayItRightAi && mode !== SAY_IT_RIGHT_AI_MODE) {
+      return respErr('Say It Right AI only supports objects-swap', {
+        status: 400,
+      });
+    }
+    if (
+      isSayItRightAi &&
+      !SAY_IT_RIGHT_AI_RESOLUTIONS.includes(
+        resolution as (typeof SAY_IT_RIGHT_AI_RESOLUTIONS)[number]
+      )
+    ) {
+      return respErr('Say It Right AI only supports 480p and 720p', {
+        status: 400,
+      });
+    }
+    if (isSayItRightAi && !isAllowedSayItRightAiPrompt(prompt)) {
+      return respErr(
+        'Say It Right AI prompt does not match the fixed product prompt',
         {
           status: 400,
         }

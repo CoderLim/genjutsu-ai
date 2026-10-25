@@ -182,6 +182,7 @@ export const MOTION_TEMPLATES: MotionTemplate[] = [
     titleKey: 'site.templates.say_it_right_dance',
     poster: '/videos/say-it-right-dance-tpl-poster.jpg',
     sourceVideo: '/videos/say-it-right-dance-tpl.mp4',
+    href: '/say-it-right-ai',
     prompt: [
       'Replace the entire foreground dancer wearing a bright pink T-shirt and purple backpack in the source video with the person from Reference 1.',
       '',

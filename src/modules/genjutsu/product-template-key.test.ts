@@ -12,6 +12,7 @@ import {
   FLYING_CAR_AI_PRODUCT,
   GANGNAM_STYLE_AI_PRODUCT,
   GAS_STATION_DANCE_AI_PRODUCT,
+  SAY_IT_RIGHT_AI_PRODUCT,
   SMALLTOWN_BOY_DANCE_PRODUCT,
   ZOMBIE_HUG_PRODUCT,
 } from './workflow';
@@ -26,6 +27,7 @@ const ALL_PRODUCTS: GenjutsuProductId[] = [
   GANGNAM_STYLE_AI_PRODUCT,
   GAS_STATION_DANCE_AI_PRODUCT,
   BURNING_BRIDGES_AI_PRODUCT,
+  SAY_IT_RIGHT_AI_PRODUCT,
   ZOMBIE_HUG_PRODUCT,
 ];
 
@@ -84,6 +86,10 @@ test('product id is reflected in its default template key path', () => {
   assert.match(
     getGenjutsuProductTemplateVideoKey(BURNING_BRIDGES_AI_PRODUCT),
     /burning-bridges-ai/
+  );
+  assert.match(
+    getGenjutsuProductTemplateVideoKey(SAY_IT_RIGHT_AI_PRODUCT),
+    /say-it-right-ai/
   );
   assert.match(
     getGenjutsuProductTemplateVideoKey(ZOMBIE_HUG_PRODUCT),

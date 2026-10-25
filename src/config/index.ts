@@ -250,6 +250,11 @@ export const envConfigs: Record<string, string> = {
     procEnv.BURNING_BRIDGES_AI_TEMPLATE_VIDEO_KEY ??
     'genjutsu/templates/burning-bridges-ai-v2.mp4',
 
+  // Say It Right AI (server-only). Seeds from homepage say-it-right-dance; one image.
+  say_it_right_ai_template_video_key:
+    procEnv.SAY_IT_RIGHT_AI_TEMPLATE_VIDEO_KEY ??
+    'genjutsu/templates/say-it-right-ai-v1.mp4',
+
   // Locale (public)
   locale: publicEnv('VITE_DEFAULT_LOCALE') ?? 'en',
 };

@@ -108,6 +108,7 @@ import {
   ensureFlyingCarAiTemplateInR2,
   ensureGangnamStyleAiTemplateInR2,
   ensureGasStationDanceAiTemplateInR2,
+  ensureSayItRightAiTemplateInR2,
   ensureSmalltownBoyDanceTemplateInR2,
   ensureZombieHugTemplateInR2,
   GENJUTSU_PROXY_UPLOAD_MAX_BYTES,
@@ -120,6 +121,7 @@ import {
   getGangnamStyleAiTemplateVideoKey,
   getGasStationDanceAiTemplateVideoKey,
   getGenjutsuInputKey,
+  getSayItRightAiTemplateVideoKey,
   getSmalltownBoyDanceTemplateVideoKey,
   getZombieHugTemplateVideoKey,
 } from '@/modules/genjutsu/storage';
@@ -128,6 +130,17 @@ import {
   isGenjutsuProductId,
   resolveProductProviderTarget,
 } from '@/modules/genjutsu/workflow';
+import { isAllowedSayItRightAiPrompt } from '@/modules/say-it-right-ai/assert';
+import {
+  SAY_IT_RIGHT_AI_ASPECT_RATIO,
+  SAY_IT_RIGHT_AI_MODE,
+  SAY_IT_RIGHT_AI_PRODUCT_ID,
+  SAY_IT_RIGHT_AI_RESOLUTIONS,
+} from '@/modules/say-it-right-ai/constants';
+import {
+  assertSayItRightAiProviderBinding,
+  SayItRightAiProviderBindingError,
+} from '@/modules/say-it-right-ai/provider';
 import {
   SMALLTOWN_ASPECT_RATIO,
   SMALLTOWN_PRODUCT_ID,
@@ -184,6 +197,7 @@ async function POST({ request }: { request: Request }) {
     const isA2oLiteAi = product === A2O_LITE_AI_PRODUCT_ID;
     const isEnzoFernandezAi = product === ENZO_FERNANDEZ_AI_PRODUCT_ID;
     const isBurningBridgesAi = product === BURNING_BRIDGES_AI_PRODUCT_ID;
+    const isSayItRightAi = product === SAY_IT_RIGHT_AI_PRODUCT_ID;
     const isFlyingCarAi = product === FLYING_CAR_AI_PRODUCT_ID;
     const isColdplayKissCam = product === COLDPLAY_KISS_CAM_PRODUCT_ID;
     const isGangnamStyleAi = product === GANGNAM_STYLE_AI_PRODUCT_ID;
@@ -191,7 +205,10 @@ async function POST({ request }: { request: Request }) {
     const isZombieHug = product === ZOMBIE_HUG_PRODUCT_ID;
     const isTripleImageProduct = isGangnamStyleAi || isGasStationDanceAi;
     const isSingleImageProduct =
-      isEnzoFernandezAi || isFlyingCarAi || isBurningBridgesAi;
+      isEnzoFernandezAi ||
+      isFlyingCarAi ||
+      isBurningBridgesAi ||
+      isSayItRightAi;
     if (body.preview === true) {
       return respErr('Paid preview is no longer supported', { status: 400 });
     }
@@ -202,6 +219,7 @@ async function POST({ request }: { request: Request }) {
       isA2oLiteAi ||
       isEnzoFernandezAi ||
       isBurningBridgesAi ||
+      isSayItRightAi ||
       isFlyingCarAi ||
       isColdplayKissCam ||
       isGangnamStyleAi ||
@@ -315,6 +333,29 @@ async function POST({ request }: { request: Request }) {
     if (isBurningBridgesAi && !isAllowedBurningBridgesAiPrompt(prompt)) {
       return respErr(
         'Burning Bridges AI prompt does not match the fixed product prompt',
+        {
+          status: 400,
+        }
+      );
+    }
+    if (isSayItRightAi && mode !== SAY_IT_RIGHT_AI_MODE) {
+      return respErr('Say It Right AI only supports objects-swap', {
+        status: 400,
+      });
+    }
+    if (
+      isSayItRightAi &&
+      !SAY_IT_RIGHT_AI_RESOLUTIONS.includes(
+        resolution as (typeof SAY_IT_RIGHT_AI_RESOLUTIONS)[number]
+      )
+    ) {
+      return respErr('Say It Right AI only supports 480p and 720p', {
+        status: 400,
+      });
+    }
+    if (isSayItRightAi && !isAllowedSayItRightAiPrompt(prompt)) {
+      return respErr(
+        'Say It Right AI prompt does not match the fixed product prompt',
         {
           status: 400,
         }
@@ -498,7 +539,9 @@ async function POST({ request }: { request: Request }) {
                             ? getEnzoFernandezAiTemplateVideoKey()
                             : isBurningBridgesAi
                               ? getBurningBridgesAiTemplateVideoKey()
-                              : getSmalltownBoyDanceTemplateVideoKey()
+                              : isSayItRightAi
+                                ? getSayItRightAiTemplateVideoKey()
+                                : getSmalltownBoyDanceTemplateVideoKey()
           );
         } else if (isCrazyFrog) {
           await ensureCrazyFrogTemplateInR2();
@@ -518,6 +561,8 @@ async function POST({ request }: { request: Request }) {
           await ensureEnzoFernandezAiTemplateInR2();
         } else if (isBurningBridgesAi) {
           await ensureBurningBridgesAiTemplateInR2();
+        } else if (isSayItRightAi) {
+          await ensureSayItRightAiTemplateInR2();
         } else {
           await ensureSmalltownBoyDanceTemplateInR2();
         }
@@ -543,7 +588,9 @@ async function POST({ request }: { request: Request }) {
                             ? 'Enzo Fernandez AI template is not configured in R2.'
                             : isBurningBridgesAi
                               ? 'Burning Bridges AI template is not configured in R2.'
-                              : 'Smalltown Boy Dance template is not configured in R2.'),
+                              : isSayItRightAi
+                                ? 'Say It Right AI template is not configured in R2.'
+                                : 'Smalltown Boy Dance template is not configured in R2.'),
           { code: 'TEMPLATE_NOT_CONFIGURED' },
           { status: 503 }
         );
@@ -594,6 +641,9 @@ async function POST({ request }: { request: Request }) {
     }
     if (isBurningBridgesAi && existing) {
       assertBurningBridgesAiProviderBinding(existing.provider, existing.model);
+    }
+    if (isSayItRightAi && existing) {
+      assertSayItRightAiProviderBinding(existing.provider, existing.model);
     }
     if (isFlyingCarAi && existing) {
       assertFlyingCarAiProviderBinding(existing.provider, existing.model);
@@ -646,7 +696,9 @@ async function POST({ request }: { request: Request }) {
                     ? ENZO_FERNANDEZ_AI_ASPECT_RATIO
                     : isBurningBridgesAi
                       ? BURNING_BRIDGES_AI_ASPECT_RATIO
-                      : SMALLTOWN_ASPECT_RATIO;
+                      : isSayItRightAi
+                        ? SAY_IT_RIGHT_AI_ASPECT_RATIO
+                        : SMALLTOWN_ASPECT_RATIO;
 
     if (isFixedTemplateProduct) {
       await bindGenjutsuUploadInputs({
@@ -727,6 +779,7 @@ async function POST({ request }: { request: Request }) {
       error instanceof A2oLiteAiProviderBindingError ||
       error instanceof EnzoFernandezAiProviderBindingError ||
       error instanceof BurningBridgesAiProviderBindingError ||
+      error instanceof SayItRightAiProviderBindingError ||
       error instanceof FlyingCarAiProviderBindingError ||
       error instanceof ColdplayKissCamProviderBindingError ||
       error instanceof ZombieHugProviderBindingError ||

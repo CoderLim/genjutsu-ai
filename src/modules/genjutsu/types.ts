@@ -21,6 +21,7 @@ export type GenjutsuProductId =
   | 'gangnam-style-ai'
   | 'gas-station-dance-ai'
   | 'burning-bridges-ai'
+  | 'say-it-right-ai'
   | 'zombie-hug';
 
 export type GenjutsuProviderTarget = {

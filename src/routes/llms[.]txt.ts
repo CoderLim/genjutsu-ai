@@ -59,6 +59,12 @@ const STATIC_PAGES: { path: string; title: string; description: string }[] = [
       'One-photo Drake party-scene Burning Bridges AI video maker (fixed template)',
   },
   {
+    path: '/say-it-right-ai',
+    title: 'Say It Right AI',
+    description:
+      'One-photo Say It Right trio dance AI video maker (fixed template, 9:16)',
+  },
+  {
     path: '/kairo-bad-times',
     title: 'Kairo Bad Times AI Video',
     description: 'One-photo Kairo Bad Times motion-template AI video generator',
