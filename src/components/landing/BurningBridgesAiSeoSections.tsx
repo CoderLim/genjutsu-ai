@@ -147,12 +147,12 @@ const FAQ_KEYS = [
 /** Max 3 on-page internal links — tool CTA + two descriptive trend anchors. */
 const RELATED_LINKS = [
   {
-    label: () => m['site.burningbridges.seo.related_crazy'](),
-    href: '/crazy-frog-ai',
+    label: () => m['site.burningbridges.seo.related_sayitright'](),
+    href: '/say-it-right-ai',
   },
   {
-    label: () => m['site.burningbridges.seo.related_gas'](),
-    href: '/gas-station-dance-ai',
+    label: () => m['site.burningbridges.seo.related_crazy'](),
+    href: '/crazy-frog-ai',
   },
 ] as const;
 

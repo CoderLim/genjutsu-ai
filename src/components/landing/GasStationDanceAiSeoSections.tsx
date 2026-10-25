@@ -72,6 +72,10 @@ const FAQ_KEYS = [
 
 const RELATED_TEMPLATES = [
   {
+    label: () => m['site.gasstation.seo.related_sayitright'](),
+    href: '/say-it-right-ai',
+  },
+  {
     label: () => m['site.gasstation.seo.related_gangnam'](),
     href: '/gangnam-style-ai',
   },

@@ -185,7 +185,7 @@ export const Route = createFileRoute('/say-it-right-ai')({
         {
           property: 'og:image:alt',
           content:
-            'Say It Right AI trio dance — lead dancer in pink T-shirt and purple backpack',
+            'Say It Right AI street-party dance — lead dancer in pink T-shirt and purple backpack',
         },
       ],
       links: [{ rel: 'canonical', href: canonical }, ...alternates],
