@@ -270,6 +270,18 @@ test('Genjutsu proxy upload descriptor is same-origin and sized', () => {
   );
 });
 
+test('Genjutsu Workers binding key is idempotent and respects custom prefixes', () => {
+  const logical = 'genjutsu/inputs/u/g/source.mp4';
+  assert.equal(
+    buildGenjutsuR2ObjectKey('uploads', 'uploads/' + logical),
+    buildGenjutsuR2ObjectKey('uploads', logical)
+  );
+  assert.equal(
+    buildGenjutsuR2ObjectKey('assets/uploads', logical),
+    'assets/uploads/' + logical
+  );
+});
+
 test('Genjutsu R2 object keys include the configured upload path', () => {
   assert.equal(
     buildGenjutsuR2ObjectKey('uploads', 'genjutsu/inputs/u/g/source.mp4'),
