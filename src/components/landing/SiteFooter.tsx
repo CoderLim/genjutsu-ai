@@ -242,6 +242,21 @@ export function SiteFooter() {
                 className="h-[27px] w-auto"
               />
             </a>
+            <a
+              href="https://deeplaunch.io"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <img
+                src="https://deeplaunch.io/badge/badge_dark.svg"
+                alt="Featured on DeepLaunch.io"
+                width={200}
+                height={54}
+                loading="lazy"
+                decoding="async"
+                className="h-[27px] w-auto"
+              />
+            </a>
           </div>
         </footer>
       </div>
