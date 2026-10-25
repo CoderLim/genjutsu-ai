@@ -3,9 +3,9 @@
  *
  * Sources are atomic — never mix bucket/endpoint/credentials across env and
  * Admin DB configs. Priority:
- *   1. If any R2_* connection env var is set → use env only
- *   2. Else → use Admin/config map only
- *   3. Incomplete source → throw with a clear message (no silent empty config)
+ *   1. If any R2 connection identity/credential env var is set → use env only
+ *   2. R2_UPLOAD_PATH alone does not select env (and will not override Admin)
+ *   3. Otherwise use Admin/config map; incomplete selected source always fails
  */
 
 import { resolveR2Endpoint } from './r2-endpoint';
@@ -37,7 +37,6 @@ const ENV_CONNECTION_KEYS = [
   'R2_BUCKET_NAME',
   'R2_ACCESS_KEY',
   'R2_SECRET_KEY',
-  'R2_UPLOAD_PATH',
 ] as const;
 
 function trim(value: string | undefined | null): string {
@@ -47,6 +46,8 @@ function trim(value: string | undefined | null): string {
 export function hasR2CliEnvConfig(
   env: Record<string, string | undefined> = process.env
 ) {
+  // A standalone path hint is not a credential set. Never mix it with
+  // Admin connection settings, including the Admin upload prefix.
   return ENV_CONNECTION_KEYS.some((key) => trim(env[key]).length > 0);
 }
 
