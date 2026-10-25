@@ -2,7 +2,7 @@
 /**
  * Environment-aware script wrapper
  *
- * Loads env file then executes the given command.
+ * Loads env file then executes the given command as an argv array (no shell).
  *
  * Usage:
  *   tsx scripts/with-env.ts <command> [args...]
@@ -11,9 +11,19 @@
  *
  * Priority: ENV_FILE > .env.{NODE_ENV} > .env.local > .env
  */
-import { execSync } from 'child_process';
-import { existsSync, readFileSync } from 'fs';
-import { resolve } from 'path';
+import { spawnSync } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
+import { delimiter, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+/** Ensure local package bins (tsx, drizzle-kit) resolve without a shell. */
+function envWithLocalBin(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const binDir = resolve(process.cwd(), 'node_modules', '.bin');
+  const pathKey = process.platform === 'win32' ? 'Path' : 'PATH';
+  const current = env[pathKey] ?? '';
+  if (current.split(delimiter).includes(binDir)) return env;
+  return { ...env, [pathKey]: `${binDir}${delimiter}${current}` };
+}
 
 function loadEnv(filePath: string) {
   if (!existsSync(filePath)) return false;
@@ -39,39 +49,81 @@ function loadEnv(filePath: string) {
   return true;
 }
 
-// Determine which env files to load
-const nodeEnv = process.env.NODE_ENV || 'development';
-const envFile = process.env.ENV_FILE;
+/**
+ * Run a command with argv array (no shell). Returns the child exit status.
+ * Exported for unit tests.
+ */
+export function runArgvCommand(
+  argv: string[],
+  options?: {
+    cwd?: string;
+    env?: NodeJS.ProcessEnv;
+    stdio?: 'inherit' | 'pipe';
+  }
+): number {
+  if (argv.length === 0) {
+    console.error('❌ No command provided');
+    return 1;
+  }
 
-const filesToTry = envFile
-  ? [envFile]
-  : [`.env.${nodeEnv}.local`, `.env.${nodeEnv}`, '.env.local', '.env'];
+  const [command, ...args] = argv;
+  console.log(`▶️  ${[command, ...args].join(' ')}\n`);
 
-let loaded = false;
-for (const file of filesToTry) {
-  const fullPath = resolve(file);
-  if (loadEnv(fullPath)) {
-    console.log(`📄 Loaded: ${file}`);
-    loaded = true;
+  const result = spawnSync(command, args, {
+    stdio: options?.stdio ?? 'inherit',
+    cwd: options?.cwd ?? process.cwd(),
+    env: envWithLocalBin(options?.env ?? process.env),
+    shell: false,
+  });
+
+  if (result.error) {
+    console.error(`❌ Failed to start command: ${result.error.message}`);
+    return 1;
+  }
+  if (result.signal) {
+    return 1;
+  }
+  return result.status ?? 1;
+}
+
+function loadEnvFiles() {
+  const nodeEnv = process.env.NODE_ENV || 'development';
+  const envFile = process.env.ENV_FILE;
+
+  const filesToTry = envFile
+    ? [envFile]
+    : [`.env.${nodeEnv}.local`, `.env.${nodeEnv}`, '.env.local', '.env'];
+
+  let loaded = false;
+  for (const file of filesToTry) {
+    const fullPath = resolve(file);
+    if (loadEnv(fullPath)) {
+      console.log(`📄 Loaded: ${file}`);
+      loaded = true;
+    }
+  }
+
+  if (!loaded) {
+    console.log('⚠️  No env file found, using process environment');
   }
 }
 
-if (!loaded) {
-  console.log('⚠️  No env file found, using process environment');
+function isDirectRun() {
+  const entry = process.argv[1];
+  if (!entry) return false;
+  try {
+    return (
+      resolve(entry) === fileURLToPath(import.meta.url) ||
+      entry.endsWith('with-env.ts') ||
+      entry.endsWith('with-env.js') ||
+      entry.endsWith('with-env.mjs')
+    );
+  } catch {
+    return entry.endsWith('with-env.ts') || entry.endsWith('with-env.js');
+  }
 }
 
-// Get command
-const args = process.argv.slice(2);
-if (args.length === 0) {
-  console.error('❌ No command provided');
-  process.exit(1);
-}
-
-const command = args.join(' ');
-console.log(`▶️  ${command}\n`);
-
-try {
-  execSync(command, { stdio: 'inherit', cwd: process.cwd(), env: process.env });
-} catch {
-  process.exit(1);
+if (isDirectRun()) {
+  loadEnvFiles();
+  process.exit(runArgvCommand(process.argv.slice(2)));
 }

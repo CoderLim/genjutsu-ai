@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { buildR2CopySourceHeader, buildR2S3ObjectUrl } from '@/lib/r2-signing-config';
+
 import {
   assertGenjutsuInputKeysOwned,
   assertGenjutsuObjectMetadata,
@@ -268,6 +270,48 @@ test('Genjutsu proxy upload descriptor is same-origin and sized', () => {
       }),
     /Proxy upload supports/
   );
+});
+
+test('Genjutsu Workers binding key is idempotent and respects custom prefixes', () => {
+  const logical = 'genjutsu/inputs/u/g/source.mp4';
+  assert.equal(
+    buildGenjutsuR2ObjectKey('uploads', 'uploads/' + logical),
+    buildGenjutsuR2ObjectKey('uploads', logical)
+  );
+  assert.equal(
+    buildGenjutsuR2ObjectKey('assets/uploads', logical),
+    'assets/uploads/' + logical
+  );
+});
+
+test('Genjutsu Workers binding physical key matches signed S3 and Copy Source', async () => {
+  const logical = 'genjutsu/inputs/user-123/gen-456789/source.mp4';
+  const bucket = {
+    async put(key: string) {
+      assert.equal(key, 'assets/uploads/' + logical);
+    },
+  };
+  const result = await putGenjutsuStagingObjectViaBinding({
+    bucket,
+    uploadPath: 'assets/uploads',
+    key: logical,
+    body: new Uint8Array([1, 2]),
+    contentType: 'video/mp4',
+  });
+
+  const config = {
+    endpoint: 'https://r2.example.com',
+    bucket: 'genjutsu-ai',
+    uploadPath: 'assets/uploads',
+  };
+  const s3Url = new URL(buildR2S3ObjectUrl(config, logical));
+  const s3PhysicalKey = decodeURIComponent(
+    s3Url.pathname.slice(('/' + config.bucket + '/').length)
+  );
+  const copySource = decodeURIComponent(buildR2CopySourceHeader(config, logical));
+
+  assert.equal(result.objectKey, s3PhysicalKey);
+  assert.equal(copySource, `/${config.bucket}/${result.objectKey}`);
 });
 
 test('Genjutsu R2 object keys include the configured upload path', () => {
