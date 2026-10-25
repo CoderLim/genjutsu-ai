@@ -69,10 +69,32 @@ test('resolveR2CliConfig fails clearly when admin is empty', () => {
   );
 });
 
-test('hasR2CliEnvConfig detects any connection env var', () => {
+test('hasR2CliEnvConfig ignores uploadPath-only but detects partial connection settings', () => {
   assert.equal(hasR2CliEnvConfig({}), false);
-  assert.equal(hasR2CliEnvConfig({ R2_UPLOAD_PATH: 'uploads' }), true);
+  assert.equal(hasR2CliEnvConfig({ R2_UPLOAD_PATH: 'uploads' }), false);
   assert.equal(hasR2CliEnvConfig({ R2_BUCKET_NAME: 'b' }), true);
+  assert.equal(hasR2CliEnvConfig({ R2_ACCESS_KEY: 'ak' }), true);
+  assert.equal(hasR2CliEnvConfig({ R2_ENDPOINT: 'https://r2.example.com' }), true);
+});
+
+test('path-only env does not override or mix with Admin settings', () => {
+  const config = resolveR2CliConfig({
+    env: { R2_UPLOAD_PATH: 'assets/from-env' },
+    admin: adminComplete,
+  });
+  assert.equal(config.source, 'admin');
+  assert.equal(config.bucket, 'admin-bucket');
+  assert.equal(config.uploadPath, 'uploads');
+});
+
+test('incomplete credential env fails without falling back to Admin', () => {
+  assert.throws(
+    () => resolveR2CliConfig({
+      env: { R2_ACCESS_KEY: 'partial-ak', R2_UPLOAD_PATH: 'uploads' },
+      admin: adminComplete,
+    }),
+    /R2 CLI env config is incomplete/
+  );
 });
 
 test('resolveR2CliConfig never includes secrets in error messages', () => {
