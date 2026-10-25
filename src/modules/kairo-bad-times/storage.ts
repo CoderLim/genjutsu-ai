@@ -1,5 +1,12 @@
 import { AwsClient } from 'aws4fetch';
 
+import {
+  buildR2CopySourceHeader,
+  buildR2S3ObjectUrl,
+  resolveR2SigningConfigFromMap,
+  type R2SigningConfig,
+} from '@/lib/r2-signing-config';
+
 import { envConfigs } from '@/config';
 import { getAllConfigs } from '@/modules/config/service';
 import { getStorage } from '@/modules/storage/service';
@@ -45,23 +52,11 @@ const IMAGE_CONTENT_TYPES: Record<string, string> = {
   'image/heif': 'heif',
 };
 
-type R2SigningConfig = {
-  endpoint: string;
-  bucket: string;
-  uploadPath: string;
-  accessKeyId: string;
-  secretAccessKey: string;
-};
-
 type ObjectMetadata = {
   contentLength: number;
   contentType: string;
   etag?: string;
 };
-
-function trimSlashes(value: string) {
-  return value.replace(/^\/+|\/+$/g, '');
-}
 
 function safeSegment(value: string) {
   return value.replace(/[^A-Za-z0-9_-]/g, '_');
@@ -100,35 +95,8 @@ function isCloudflareWorkersRuntime() {
   return Boolean(env);
 }
 
-function encodePath(value: string) {
-  return value
-    .split('/')
-    .filter(Boolean)
-    .map((segment) => encodeURIComponent(segment))
-    .join('/');
-}
-
 async function getR2SigningConfig(): Promise<R2SigningConfig> {
-  const configs = await getAllConfigs();
-  const endpoint = configs.r2_endpoint?.trim().replace(/\/$/, '');
-  const bucket = configs.r2_bucket_name?.trim();
-  const accessKeyId = configs.r2_access_key?.trim();
-  const secretAccessKey = configs.r2_secret_key?.trim();
-  const uploadPath = trimSlashes(configs.r2_upload_path?.trim() || 'uploads');
-
-  if (!endpoint || !bucket || !accessKeyId || !secretAccessKey) {
-    throw new Error(
-      'R2 storage is not fully configured. Set endpoint, bucket, access key, and secret key in Admin → Storage.'
-    );
-  }
-
-  return {
-    endpoint,
-    bucket,
-    uploadPath,
-    accessKeyId,
-    secretAccessKey,
-  };
+  return resolveR2SigningConfigFromMap(await getAllConfigs());
 }
 
 function createR2Client(config: R2SigningConfig) {
@@ -142,10 +110,7 @@ function createR2Client(config: R2SigningConfig) {
 
 function buildR2ObjectUrl(config: R2SigningConfig, key: string) {
   assertKairoBadTimesKeyPrefix(key);
-  const objectPath = encodePath(
-    [config.bucket, config.uploadPath, key].filter(Boolean).join('/')
-  );
-  return `${config.endpoint}/${objectPath}`;
+  return buildR2S3ObjectUrl(config, key);
 }
 
 async function signR2Object(params: {
@@ -323,13 +288,8 @@ async function copyR2Object(params: {
   assertKairoBadTimesKeyPrefix(params.sourceKey);
   assertKairoBadTimesKeyPrefix(params.destinationKey);
 
-  const sourcePath = encodePath(
-    [config.bucket, config.uploadPath, params.sourceKey]
-      .filter(Boolean)
-      .join('/')
-  );
   const headers = new Headers({
-    'x-amz-copy-source': `/${sourcePath}`,
+    'x-amz-copy-source': buildR2CopySourceHeader(config, params.sourceKey),
     'x-amz-metadata-directive': 'COPY',
   });
   if (params.sourceEtag) {
