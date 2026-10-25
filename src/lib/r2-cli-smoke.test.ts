@@ -24,7 +24,8 @@ test('r2:put dry-run preserves spaces in argv and does not upload', () => {
     { cwd: process.cwd(), env: safeEnv, encoding: 'utf8' }
   );
   assert.equal(result.status, 0, result.stderr || result.stdout);
-  assert.match(result.stdout, /Object key:\\s+uploads\\/genjutsu\\/templates\\/a2o-lite-ai-v2.mp4/);
+  assert.ok(result.stdout.includes('Object key:'));
+  assert.ok(result.stdout.includes('uploads/genjutsu/templates/a2o-lite-ai-v2.mp4'));
   assert.match(result.stdout, /file with spaces.mp4/);
   assert.match(result.stdout, /Dry run — skipped upload/);
 });
@@ -37,7 +38,7 @@ test('with-env preserves argument boundaries and child status codes', () => {
   ];
   const success = spawnSync(process.execPath, argv, { cwd: process.cwd(), env: safeEnv, encoding: 'utf8' });
   assert.equal(success.status, 0, success.stderr || success.stdout);
-  assert.match(success.stdout, /\\["file with spaces.mp4"\\]/);
+  assert.ok(success.stdout.includes('["file with spaces.mp4"]'));
   const failure = spawnSync(
     process.execPath,
     ['--import', 'tsx', 'scripts/with-env.ts', process.execPath, '-e', 'process.exit(23)'],
