@@ -749,7 +749,10 @@ export async function putGenjutsuStagingObject(params: {
     new Request(buildR2ObjectUrl(config, params.key), {
       method: 'PUT',
       headers,
-      body: bytes,
+      body: bytes.buffer.slice(
+        bytes.byteOffset,
+        bytes.byteOffset + bytes.byteLength
+      ) as ArrayBuffer,
     })
   );
 
