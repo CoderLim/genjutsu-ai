@@ -219,10 +219,11 @@ function TinyDeskAiPage() {
                 <p className="mb-2.5 text-[11px] font-medium tracking-[0.14em] text-white/40 uppercase">
                   {m['site.tinydesk.example_input_label']()}
                 </p>
-                <ul className="grid grid-cols-5 gap-2">
-                  {TINY_DESK_INPUT_SHOWCASE_PHOTOS.map((src, photoIndex) => (
-                    <li key={src}>
+                <div className="grid grid-cols-3 gap-2">
+                  {TINY_DESK_INPUT_SHOWCASE_PHOTOS.slice(0, 3).map(
+                    (src, photoIndex) => (
                       <img
+                        key={src}
                         src={src}
                         alt={m['site.tinydesk.example_input_alt']({
                           n: String(photoIndex + 1),
@@ -231,9 +232,25 @@ function TinyDeskAiPage() {
                         loading="lazy"
                         decoding="async"
                       />
-                    </li>
-                  ))}
-                </ul>
+                    )
+                  )}
+                </div>
+                <div className="mx-auto mt-2 grid w-[calc(66.666%+0.25rem)] grid-cols-2 gap-2">
+                  {TINY_DESK_INPUT_SHOWCASE_PHOTOS.slice(3).map(
+                    (src, photoIndex) => (
+                      <img
+                        key={src}
+                        src={src}
+                        alt={m['site.tinydesk.example_input_alt']({
+                          n: String(photoIndex + 4),
+                        })}
+                        className="aspect-[3/4] w-full rounded-xl border border-white/10 bg-black/40 object-cover"
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    )
+                  )}
+                </div>
               </div>
               <div className="overflow-hidden rounded-[18px] border border-white/10 bg-black/35 p-2">
                 <p className="mb-2 px-1 text-[11px] font-medium tracking-[0.14em] text-white/40 uppercase">
