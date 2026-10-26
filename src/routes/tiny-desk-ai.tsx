@@ -15,9 +15,26 @@ import {
 import { SeoJsonLd } from '@/components/seo-json-ld';
 
 const PAGE_PATH = '/tiny-desk-ai';
-const OG_IMAGE = '/videos/demos/tiny-desk-ai-demo-poster.jpg';
-const DEMO_VIDEO = '/videos/demos/tiny-desk-ai-demo.mp4';
-const DEMO_POSTER = '/videos/demos/tiny-desk-ai-demo-poster.jpg';
+const TINY_DESK_EXAMPLE_CASES = [
+  {
+    id: 'case-01',
+    src: '/videos/demos/tiny-desk-ai-case-01.mp4',
+    poster: '/videos/demos/tiny-desk-ai-case-01-poster.jpg',
+  },
+  {
+    id: 'case-02',
+    src: '/videos/demos/tiny-desk-ai-case-02.mp4',
+    poster: '/videos/demos/tiny-desk-ai-case-02-poster.jpg',
+  },
+  {
+    id: 'case-03',
+    src: '/videos/demos/tiny-desk-ai-case-03.mp4',
+    poster: '/videos/demos/tiny-desk-ai-case-03-poster.jpg',
+  },
+] as const;
+const OG_IMAGE = TINY_DESK_EXAMPLE_CASES[0].poster;
+const DEMO_VIDEO = TINY_DESK_EXAMPLE_CASES[0].src;
+const DEMO_POSTER = TINY_DESK_EXAMPLE_CASES[0].poster;
 /** English-only for now — advertise en + x-default only. */
 const SEO_LOCALES = ['en'] as const;
 
@@ -162,24 +179,28 @@ function TinyDeskAiPage() {
 
           <section
             id="example"
-            className="mx-auto max-w-3xl scroll-mt-24 px-4 pb-14 md:px-5 md:pb-16"
+            className="mx-auto max-w-5xl scroll-mt-24 px-4 pb-14 md:px-5 md:pb-16"
           >
             <h2 className="text-xs font-semibold tracking-[0.18em] text-[rgb(204,144,92)] uppercase">
               {m['site.tinydesk.example_title']()}
             </h2>
-            <div className="mt-4 overflow-hidden rounded-[20px] border border-white/10 bg-black/25 p-2.5">
-              <video
-                src={DEMO_VIDEO}
-                poster={DEMO_POSTER}
-                title={m['site.tinydesk.example_video_alt']()}
-                controls
-                playsInline
-                loop
-                muted
-                autoPlay
-                preload="metadata"
-                className="aspect-[9/16] max-h-[520px] w-full rounded-xl bg-black object-contain"
-              />
+            <div className="mt-4 grid items-start gap-3 sm:grid-cols-3">
+              {TINY_DESK_EXAMPLE_CASES.map((clip, index) => (
+                <div
+                  key={clip.id}
+                  className="overflow-hidden rounded-[20px] border border-white/10 bg-black/25 p-2.5"
+                >
+                  <video
+                    src={clip.src}
+                    poster={clip.poster}
+                    title={`${m['site.tinydesk.example_title']()} ${index + 1}`}
+                    controls
+                    playsInline
+                    preload="metadata"
+                    className="aspect-[9/16] max-h-[480px] w-full rounded-xl bg-black object-contain"
+                  />
+                </div>
+              ))}
             </div>
             <p className="mt-3 text-center text-xs text-white/34">
               {m['site.tinydesk.example_caption']()}
