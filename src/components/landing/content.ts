@@ -654,6 +654,10 @@ export const FOOTER_COLUMNS: FooterColumn[] = [
         href: '/say-it-right-ai',
       },
       {
+        label: 'Tiny Desk AI',
+        href: '/tiny-desk-ai',
+      },
+      {
         label: 'Coldplay Kiss Cam',
         href: '/coldplay-kiss-cam',
       },
