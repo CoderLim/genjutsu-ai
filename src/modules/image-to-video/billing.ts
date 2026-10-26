@@ -7,6 +7,7 @@ import { rowsAffectedFromUpdate } from '@/lib/fal-query-error-cas';
 import { getUuid } from '@/lib/hash';
 
 import {
+  IMAGE_TO_VIDEO_COMPLETING_CLAIM_TTL_MS,
   IMAGE_TO_VIDEO_MODEL,
   IMAGE_TO_VIDEO_PROVIDER,
   IMAGE_TO_VIDEO_SCENE,
@@ -177,6 +178,43 @@ export async function ensureImageToVideoInitiatedTask(params: {
   return getImageToVideoTaskById(params);
 }
 
+export type ImageToVideoMatchSnapshot = {
+  prompt: string;
+  duration: number;
+  resolution: ImageToVideoResolution;
+  aspectRatio: ImageToVideoAspectRatio;
+  generateAudio: boolean;
+  sealedImageKey: string;
+  stagingImageKey: string;
+  presetId: ImageToVideoPresetId;
+  presetVersion: number;
+  variant: ImageToVideoVariant;
+};
+
+export function assertImageToVideoTaskMatches(
+  task: { prompt?: string | null; options?: string | null; status?: string },
+  params: ImageToVideoMatchSnapshot
+) {
+  const options = parseJson(task.options);
+  const same =
+    (task.prompt || '') === params.prompt &&
+    options?.sealedImageKey === params.sealedImageKey &&
+    options?.stagingImageKey === params.stagingImageKey &&
+    options?.presetId === params.presetId &&
+    options?.presetVersion === params.presetVersion &&
+    options?.variant === params.variant &&
+    options?.duration === params.duration &&
+    options?.resolution === params.resolution &&
+    options?.aspectRatio === params.aspectRatio &&
+    Boolean(options?.generateAudio) === Boolean(params.generateAudio);
+
+  if (!same) {
+    throw new ImageToVideoGenerationConflictError(
+      'This generation ID is already bound to different inputs'
+    );
+  }
+}
+
 export async function reserveImageToVideoGeneration(params: {
   generationId: string;
   userId: string;
@@ -206,17 +244,18 @@ export async function reserveImageToVideoGeneration(params: {
     existing.status !== 'initiated' &&
     existing.status !== 'ready'
   ) {
-    const options = parseJson(existing.options);
-    if (
-      options?.sealedImageKey !== params.sealedImageKey ||
-      options?.presetId !== params.presetId ||
-      options?.variant !== params.variant ||
-      (existing.prompt || '') !== params.prompt
-    ) {
-      throw new ImageToVideoGenerationConflictError(
-        'This generation ID is already bound to different inputs'
-      );
-    }
+    assertImageToVideoTaskMatches(existing, {
+      prompt: params.prompt,
+      duration: params.duration,
+      resolution: params.resolution,
+      aspectRatio: params.aspectRatio,
+      generateAudio: params.generateAudio,
+      sealedImageKey: params.sealedImageKey,
+      stagingImageKey: params.stagingImageKey,
+      presetId: params.presetId,
+      presetVersion: params.presetVersion,
+      variant: params.variant,
+    });
     return existing;
   }
 
@@ -465,13 +504,19 @@ export async function promoteStaleImageToVideoSubmitting(params: {
 export async function claimImageToVideoCompletion(params: {
   generationId: string;
   userId: string;
+  nowMs?: number;
+  ttlMs?: number;
 }): Promise<'claimed' | 'already_completing' | 'unavailable'> {
   const claim = getUuid();
-  const result = await db()
+  const claimedAt = new Date(params.nowMs ?? Date.now()).toISOString();
+  const fromSubmitted = await db()
     .update(aiTask)
     .set({
       status: 'completing',
-      taskResult: JSON.stringify({ completionClaim: claim }),
+      taskResult: JSON.stringify({
+        completionClaim: claim,
+        completingClaimedAt: claimedAt,
+      }),
     })
     .where(
       and(
@@ -482,11 +527,44 @@ export async function claimImageToVideoCompletion(params: {
       )
     );
 
-  if (rowsAffectedFromUpdate(result) > 0) return 'claimed';
+  if (rowsAffectedFromUpdate(fromSubmitted) > 0) return 'claimed';
 
   const current = await getImageToVideoTaskById(params);
-  if (current?.status === 'completing') return 'already_completing';
-  return 'unavailable';
+  if (!current) return 'unavailable';
+  if (current.status === 'completed') return 'unavailable';
+  if (current.status !== 'completing') return 'unavailable';
+
+  const priorClaimedAt = readCompletingClaimedAt(current.taskResult);
+  const priorMs = priorClaimedAt ? Date.parse(priorClaimedAt) : NaN;
+  const now = params.nowMs ?? Date.now();
+  const ttl = params.ttlMs ?? IMAGE_TO_VIDEO_COMPLETING_CLAIM_TTL_MS;
+  const leaseExpired = !Number.isFinite(priorMs) || now - priorMs >= ttl;
+
+  if (leaseExpired) {
+    // Atomic reclaim: refresh lease so a hung Worker does not block persist.
+    const reclaimed = await db()
+      .update(aiTask)
+      .set({
+        status: 'completing',
+        taskResult: JSON.stringify({
+          completionClaim: claim,
+          completingClaimedAt: new Date(now).toISOString(),
+          completionReclaimedAt: new Date(now).toISOString(),
+        }),
+      })
+      .where(
+        and(
+          eq(aiTask.id, params.generationId),
+          eq(aiTask.userId, params.userId),
+          eq(aiTask.scene, IMAGE_TO_VIDEO_SCENE),
+          eq(aiTask.status, 'completing')
+        )
+      );
+    if (rowsAffectedFromUpdate(reclaimed) > 0) return 'claimed';
+  }
+
+  // Fresh lease held by another worker — still OK to run idempotent persist.
+  return 'already_completing';
 }
 
 export async function finalizeImageToVideoGeneration(params: {
@@ -495,6 +573,10 @@ export async function finalizeImageToVideoGeneration(params: {
   providerStatus: string;
   videoKey: string;
 }) {
+  if (!params.videoKey) {
+    throw new Error('Cannot finalize image-to-video without a video key');
+  }
+
   await db()
     .update(aiTask)
     .set({
@@ -594,5 +676,14 @@ export function readSubmittingClaimedAt(
   const parsed = parseJson(taskResult);
   return typeof parsed?.submittingClaimedAt === 'string'
     ? parsed.submittingClaimedAt
+    : null;
+}
+
+export function readCompletingClaimedAt(
+  taskResult: string | null | undefined
+): string | null {
+  const parsed = parseJson(taskResult);
+  return typeof parsed?.completingClaimedAt === 'string'
+    ? parsed.completingClaimedAt
     : null;
 }

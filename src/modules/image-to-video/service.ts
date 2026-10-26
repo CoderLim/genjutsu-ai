@@ -2,7 +2,6 @@ import {
   assertWavespeedConfigured,
   getWavespeedPredictionStatus,
   submitWavespeedPrediction,
-  WavespeedHttpError,
 } from '@/core/ai/wavespeed';
 
 import {
@@ -42,35 +41,14 @@ export async function submitImageToVideo(params: {
   generateAudio: boolean;
 }) {
   await assertWavespeedConfigured();
-
-  try {
-    return await submitWavespeedPrediction(IMAGE_TO_VIDEO_MODEL, {
-      image: params.imageUrl,
-      prompt: params.prompt,
-      duration: params.duration,
-      resolution: params.resolution,
-      aspect_ratio: params.aspectRatio,
-      generate_audio: params.generateAudio,
-    });
-  } catch (error) {
-    if (error instanceof WavespeedHttpError) {
-      const ambiguous =
-        error.status >= 500 ||
-        error.status === 408 ||
-        error.status === 429 ||
-        error.status === 0;
-      const err = new Error(error.message) as Error & {
-        ambiguous?: boolean;
-        status?: number;
-        code?: string;
-      };
-      err.ambiguous = ambiguous;
-      err.status = error.status;
-      err.code = error.code;
-      throw err;
-    }
-    throw error;
-  }
+  return submitWavespeedPrediction(IMAGE_TO_VIDEO_MODEL, {
+    image: params.imageUrl,
+    prompt: params.prompt,
+    duration: params.duration,
+    resolution: params.resolution,
+    aspect_ratio: params.aspectRatio,
+    generate_audio: params.generateAudio,
+  });
 }
 
 export async function reconcileImageToVideoGeneration(task: {
@@ -119,47 +97,51 @@ export async function reconcileImageToVideoGeneration(task: {
   }
 
   if (task.status === 'submission_unknown') {
-    // If we somehow have a requestId, poll only — never resubmit.
-    if (task.taskId) {
-      try {
-        const provider = await getWavespeedPredictionStatus(task.taskId);
-        if (provider.status === 'completed' && provider.videoUrl) {
-          // Continue into completion path below by treating as submitted.
-          task = { ...task, status: 'submitted' };
-        } else if (provider.status === 'failed') {
-          return {
-            status: 'failed',
-            providerStatus: provider.providerStatus,
-            videoUrl: null,
-            error:
-              provider.error ||
-              'Upstream generation failed. Contact support about reserved credits.',
-          };
-        } else {
-          return {
-            status: 'processing',
-            providerStatus: 'submission_unknown',
-            videoUrl: null,
-            reservedCredits,
-            error:
-              'Submission was interrupted; recovering from upstream. Do not retry.',
-          };
-        }
-      } catch {
+    // Never auto-resubmit. With a requestId, poll upstream only; without one,
+    // keep credits held for ops — do not surface as a refundable "failed".
+    if (!task.taskId) {
+      return {
+        status: 'failed',
+        providerStatus: 'submission_unknown',
+        videoUrl: null,
+        error:
+          parsed.result?.error ||
+          'Submission result is uncertain. Please contact support before retrying.',
+        reservedCredits,
+      };
+    }
+
+    try {
+      const provider = await getWavespeedPredictionStatus(task.taskId);
+      if (provider.status === 'completed' && provider.videoUrl) {
+        // Promote into the normal completion path (claim → R2 → finalize).
+        task = { ...task, status: 'submitted' };
+      } else if (provider.status === 'failed') {
         return {
           status: 'failed',
           providerStatus: 'submission_unknown',
           videoUrl: null,
           error:
-            parsed.result?.error ||
-            'Submission result is uncertain. Please contact support before retrying.',
+            provider.error ||
+            'Upstream generation failed. Credits remain reserved; contact support before retrying.',
+          reservedCredits,
+        };
+      } else {
+        return {
+          status: 'processing',
+          providerStatus: 'submission_unknown',
+          videoUrl: null,
+          reservedCredits,
+          error:
+            'Submission was interrupted; recovering from upstream. Do not retry.',
         };
       }
-    } else {
+    } catch {
       return {
-        status: 'failed',
+        status: 'processing',
         providerStatus: 'submission_unknown',
         videoUrl: null,
+        reservedCredits,
         error:
           parsed.result?.error ||
           'Submission result is uncertain. Please contact support before retrying.',
@@ -229,7 +211,7 @@ export async function reconcileImageToVideoGeneration(task: {
 
   if (provider.status === 'completed' && provider.videoUrl) {
     try {
-      if (task.status === 'submitted') {
+      if (task.status === 'submitted' || task.status === 'completing') {
         const ownership = await claimImageToVideoCompletion({
           generationId,
           userId,
@@ -240,10 +222,34 @@ export async function reconcileImageToVideoGeneration(task: {
             userId,
           });
           if (current?.status === 'completed') {
+            const completedParsed = parseImageToVideoTask(current);
+            if (!completedParsed.result?.videoKey) {
+              console.error(
+                '[ops] image-to-video completed_without_videoKey credits_held',
+                { generationId, userId }
+              );
+              return {
+                status: 'processing',
+                providerStatus: 'completing',
+                videoUrl: null,
+                reservedCredits,
+                error: 'Result incomplete; contact support.',
+              };
+            }
             return {
               status: 'completed',
               providerStatus: provider.providerStatus,
               videoUrl: stableResultUrl(generationId),
+              reservedCredits,
+            };
+          }
+          if (current?.status === 'submission_unknown') {
+            return {
+              status: 'failed',
+              providerStatus: 'submission_unknown',
+              videoUrl: null,
+              error:
+                'Submission result is uncertain. Please contact support before retrying.',
               reservedCredits,
             };
           }
@@ -254,6 +260,7 @@ export async function reconcileImageToVideoGeneration(task: {
             reservedCredits,
           };
         }
+        // claimed | already_completing — both may run idempotent R2 persist.
       }
 
       const persisted = await persistImageToVideoResultToR2({
@@ -261,19 +268,42 @@ export async function reconcileImageToVideoGeneration(task: {
         generationId,
         sourceUrl: provider.videoUrl,
       });
+      if (!persisted.videoKey) {
+        throw new Error('Persist returned empty video key');
+      }
 
-      await finalizeImageToVideoGeneration({
+      const finalized = await finalizeImageToVideoGeneration({
         generationId,
         userId,
         providerStatus: provider.providerStatus,
         videoKey: persisted.videoKey,
       });
 
+      if (finalized?.status === 'completed') {
+        return {
+          status: 'completed',
+          providerStatus: provider.providerStatus,
+          videoUrl: stableResultUrl(generationId),
+          reservedCredits,
+        };
+      }
+
+      const current = await getImageToVideoTaskById({ generationId, userId });
+      if (current?.status === 'completed') {
+        return {
+          status: 'completed',
+          providerStatus: provider.providerStatus,
+          videoUrl: stableResultUrl(generationId),
+          reservedCredits,
+        };
+      }
+
       return {
-        status: 'completed',
-        providerStatus: provider.providerStatus,
-        videoUrl: stableResultUrl(generationId),
+        status: 'processing',
+        providerStatus: current?.status || 'completing',
+        videoUrl: null,
         reservedCredits,
+        error: 'Saving result; please keep polling.',
       };
     } catch (error: any) {
       console.error('[ops] image-to-video result persist failed', {
@@ -281,6 +311,7 @@ export async function reconcileImageToVideoGeneration(task: {
         userId,
         error: error?.message,
       });
+      // Never refund on R2/persist failure — upstream already succeeded.
       return {
         status: 'processing',
         providerStatus: 'completing',

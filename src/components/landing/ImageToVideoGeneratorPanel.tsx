@@ -225,10 +225,16 @@ export function ImageToVideoGeneratorPanel(props: {
   const [demoStatus, setDemoStatus] =
     useState<FixedTemplateMediaStatus>('loading');
 
-  const busy = phase !== 'idle' && phase !== 'locked';
+  const busy =
+    phase === 'uploading' || phase === 'starting' || phase === 'generating';
+  const locked = phase === 'locked';
   // Demo video is preview-only — generate does not require it.
+  // Locked (submission_unknown / unresolved paid job) must not allow a new Generate.
   const canGenerate =
-    Boolean(photo) && !busy && !imagePrepare.isPreparing && !sessionPending;
+    Boolean(photo) &&
+    phase === 'idle' &&
+    !imagePrepare.isPreparing &&
+    !sessionPending;
 
   const estimatedCredits =
     meta?.estimatedCredits ??
@@ -357,6 +363,7 @@ export function ImageToVideoGeneratorPanel(props: {
         notFoundCount = 0;
 
         if (polled.providerStatus === 'submission_unknown') {
+          // Keep localStorage so refresh can resume ops-facing recovery.
           setPhase('locked');
           setJobError(
             polled.error || m['site.generator.submission_uncertain']()
@@ -375,6 +382,20 @@ export function ImageToVideoGeneratorPanel(props: {
         }
 
         if (polled.status === 'failed') {
+          // Credits still held under uncertain submission — do not drop recovery.
+          if (
+            polled.providerStatus === 'submission_unknown' ||
+            (typeof polled.reservedCredits === 'number' &&
+              polled.reservedCredits > 0 &&
+              !polled.refundedCredits)
+          ) {
+            setPhase('locked');
+            setJobError(
+              polled.error || m['site.generator.submission_uncertain']()
+            );
+            return;
+          }
+
           localStorage.removeItem(activeGenerationKey(active.userId));
           setPhase('idle');
           const requiredCredits = Number(polled.requiredCredits);
@@ -436,8 +457,16 @@ export function ImageToVideoGeneratorPanel(props: {
       window.location.href = `/sign-in?callbackUrl=${encodeURIComponent('/day-of-the-dead-ai-video#generator')}`;
       return;
     }
-    if (busy || imagePrepare.isPreparing || !photo) {
-      if (!photo) toast.error(m['site.dotd.upload_required']());
+    if (
+      locked ||
+      busy ||
+      imagePrepare.isPreparing ||
+      !photo ||
+      phase !== 'idle'
+    ) {
+      if (!photo && phase === 'idle') {
+        toast.error(m['site.dotd.upload_required']());
+      }
       return;
     }
 
@@ -466,8 +495,8 @@ export function ImageToVideoGeneratorPanel(props: {
       if (!upload) throw new Error('No upload URL returned');
 
       await uploadToSignedUrl({
-        uploadUrl: upload.uploadUrl,
-        uploadHeaders: upload.uploadHeaders,
+        url: upload.uploadUrl,
+        headers: upload.uploadHeaders,
         file: photo.file,
       });
 
@@ -521,6 +550,21 @@ export function ImageToVideoGeneratorPanel(props: {
       }
 
       if (submissionUnknown) {
+        // Persist recovery handle even when generate returns before poll starts.
+        try {
+          localStorage.setItem(
+            activeGenerationKey(session.user.id),
+            JSON.stringify({
+              userId: session.user.id,
+              generationId: id,
+              reservedCredits: 0,
+              presetId,
+              variant,
+            } satisfies PersistedGeneration)
+          );
+        } catch {
+          // ignore quota / private mode
+        }
         setPhase('locked');
         setJobError(
           cause instanceof Error
@@ -582,7 +626,7 @@ export function ImageToVideoGeneratorPanel(props: {
                 <SegmentButton
                   key={v}
                   selected={variant === v}
-                  disabled={busy}
+                  disabled={busy || locked}
                   onClick={() => setVariant(v)}
                 >
                   {v === 'pet'
@@ -605,7 +649,7 @@ export function ImageToVideoGeneratorPanel(props: {
               <PhotoSlot
                 item={photo}
                 inputRef={photoInputRef}
-                disabled={busy}
+                disabled={busy || locked}
                 label={m['site.dotd.photo']()}
                 hint={m['site.dotd.photo_hint']()}
                 aspectClass={isLandscape ? 'aspect-video' : 'aspect-[3/4]'}

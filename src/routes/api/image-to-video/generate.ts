@@ -1,8 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router';
 
+import { classifyWavespeedSubmitFailure } from '@/core/ai/wavespeed';
 import { getAuth } from '@/core/auth';
 import { assertImageToVideoGenerationId } from '@/modules/image-to-video/assert';
 import {
+  assertImageToVideoTaskMatches,
   claimImageToVideoSubmission,
   getImageToVideoTaskById,
   ImageToVideoGenerationConflictError,
@@ -39,7 +41,12 @@ import {
 import { enforceMinIntervalRateLimit } from '@/lib/rate-limit';
 import { respData, respErr, respJson } from '@/lib/resp';
 
-function taskResponse(task: any) {
+function taskResponse(task: {
+  id: string;
+  taskId?: string | null;
+  status: string;
+  costCredits?: number | null;
+}) {
   return {
     generationId: task.id,
     requestId: task.taskId || null,
@@ -55,18 +62,16 @@ async function POST({ request }: { request: Request }) {
   });
   if (limited) return limited;
 
-  let generationId: string | null = null;
-  let userId: string | null = null;
   let orphanSealedKey: string | null = null;
 
   try {
     const auth = getAuth();
     const session = await auth.api.getSession({ headers: request.headers });
     if (!session?.user) return respErr('Unauthorized', { status: 401 });
-    userId = session.user.id;
+    const userId = session.user.id;
 
     const body = await request.json().catch(() => ({}));
-    generationId = assertImageToVideoGenerationId(body.generationId);
+    const generationId = assertImageToVideoGenerationId(body.generationId);
 
     const preset = resolveImageToVideoPreset(body.presetId);
     const variant = resolveImageToVideoVariant(preset, body.variant);
@@ -104,18 +109,48 @@ async function POST({ request }: { request: Request }) {
       ? body.aspectRatio
       : preset.defaultAspectRatio || IMAGE_TO_VIDEO_DEFAULT_ASPECT_RATIO;
 
+    const prompt = preset.promptFor(variant);
+
     const existing = await getImageToVideoTaskById({
       generationId,
       userId,
     });
+
+    // In-flight after claim / terminal: return existing (idempotent) or conflict.
+    // `reserved` is intentionally excluded so a crash between reserve and claim
+    // can still claim + submit on retry without double-charging.
     if (
       existing &&
       (existing.status === 'submitted' ||
         existing.status === 'completing' ||
         existing.status === 'completed' ||
         existing.status === 'submitting' ||
-        existing.status === 'submission_unknown')
+        existing.status === 'submission_unknown' ||
+        existing.status === 'refunding' ||
+        existing.status === 'refunded')
     ) {
+      const options = parseImageToVideoTask(existing).options;
+      if (
+        typeof options?.sealedImageKey !== 'string' ||
+        !options.sealedImageKey
+      ) {
+        throw new ImageToVideoGenerationConflictError(
+          'This generation ID is already bound to different inputs'
+        );
+      }
+      // Client staging key + generation params must match the reserved binding.
+      assertImageToVideoTaskMatches(existing, {
+        prompt,
+        duration,
+        resolution,
+        aspectRatio,
+        generateAudio: preset.generateAudio,
+        sealedImageKey: options.sealedImageKey,
+        stagingImageKey: imageKey,
+        presetId: preset.id,
+        presetVersion: preset.version,
+        variant,
+      });
       return respData(taskResponse(existing));
     }
 
@@ -136,14 +171,10 @@ async function POST({ request }: { request: Request }) {
     });
     if (!sealed.reused) orphanSealedKey = sealed.sealedImageKey;
 
-    const prompt = preset.promptFor(variant);
     const quote = estimateImageToVideoProviderCost({ duration, resolution });
     const credits = estimateImageToVideoCredits({ duration, resolution });
 
-    const task = await reserveImageToVideoGeneration({
-      generationId,
-      userId,
-      userEmail: session.user.email,
+    const matchSnapshot = {
       prompt,
       duration,
       resolution,
@@ -151,11 +182,18 @@ async function POST({ request }: { request: Request }) {
       generateAudio: preset.generateAudio,
       sealedImageKey: sealed.sealedImageKey,
       stagingImageKey: imageKey,
-      providerCostUsd: quote.providerCostUsd,
-      credits,
       presetId: preset.id,
       presetVersion: preset.version,
       variant,
+    };
+
+    const task = await reserveImageToVideoGeneration({
+      generationId,
+      userId,
+      userEmail: session.user.email,
+      ...matchSnapshot,
+      providerCostUsd: quote.providerCostUsd,
+      credits,
       displayName: preset.displayName,
       creditDescription: preset.creditDescription,
     });
@@ -174,8 +212,24 @@ async function POST({ request }: { request: Request }) {
       return respData(taskResponse(current || task));
     }
 
-    const imageUrl = await createImageToVideoR2ReadUrl(sealed.sealedImageKey);
+    // Pre-submit: signed URL failure means we never contacted WaveSpeed → refund.
+    let imageUrl: string;
+    try {
+      imageUrl = await createImageToVideoR2ReadUrl(sealed.sealedImageKey);
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Failed to prepare sealed image URL';
+      await refundImageToVideoGeneration({
+        generationId,
+        userId,
+        error: message,
+      });
+      return respErr(message, { status: 502 });
+    }
 
+    let requestId: string | null = null;
     try {
       const submitted = await submitImageToVideo({
         imageUrl,
@@ -185,43 +239,113 @@ async function POST({ request }: { request: Request }) {
         aspectRatio,
         generateAudio: preset.generateAudio,
       });
+      requestId = submitted.requestId;
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : 'Upstream submit failed';
 
-      const updated = await markImageToVideoSubmitted({
-        generationId,
-        userId,
-        requestId: submitted.requestId,
-      });
-      return respData(taskResponse(updated || task));
-    } catch (error: any) {
-      const ambiguous = Boolean(error?.ambiguous);
-      const message = error?.message || 'Upstream submit failed';
-
-      if (ambiguous) {
-        console.error('[ops] image-to-video submission_unknown credits_held', {
+      // Only definite 4xx / config rejections are safe to refund.
+      if (classifyWavespeedSubmitFailure(error) === 'refund') {
+        await refundImageToVideoGeneration({
           generationId,
           userId,
-          model: IMAGE_TO_VIDEO_MODEL,
-          error: message,
-        });
-        await markImageToVideoSubmissionUnknown({
-          generationId,
-          userId,
+          providerStatus: 'submit_failed',
           error: message,
         });
         return respJson(
           -1,
-          'Submission result is uncertain. Credits remain reserved; do not retry. Contact support if this persists.',
-          { code: 'SUBMISSION_UNKNOWN', generationId },
+          'Generation could not start. Credits were refunded.',
+          { code: 'PROVIDER_SUBMIT_FAILED', generationId },
           { status: 502 }
         );
       }
 
-      await refundImageToVideoGeneration({
+      console.error('[ops] image-to-video submission_unknown credits_held', {
+        generationId,
+        userId,
+        model: IMAGE_TO_VIDEO_MODEL,
+        error: message,
+        hasRequestId: false,
+      });
+      await markImageToVideoSubmissionUnknown({
         generationId,
         userId,
         error: message,
       });
-      return respErr(message, { status: 502 });
+      return respJson(
+        -1,
+        'Submission result is uncertain. Credits remain reserved; do not retry. Contact support if this persists.',
+        { code: 'SUBMISSION_UNKNOWN', generationId },
+        { status: 502 }
+      );
+    }
+
+    if (!requestId) {
+      console.error(
+        '[ops] image-to-video submission_unknown missing_request_id',
+        {
+          generationId,
+          userId,
+        }
+      );
+      await markImageToVideoSubmissionUnknown({
+        generationId,
+        userId,
+        error: 'Upstream submit returned without a request id',
+      });
+      return respJson(
+        -1,
+        'Submission result is uncertain. Credits remain reserved; do not retry. Contact support if this persists.',
+        { code: 'SUBMISSION_UNKNOWN', generationId },
+        { status: 502 }
+      );
+    }
+
+    const boundRequestId = requestId;
+
+    // Bind is a separate boundary: WaveSpeed already accepted the job.
+    try {
+      const updated = await markImageToVideoSubmitted({
+        generationId,
+        userId,
+        requestId: boundRequestId,
+      });
+      return respData(
+        taskResponse(
+          updated || {
+            ...task,
+            taskId: boundRequestId,
+            status: 'submitted',
+          }
+        )
+      );
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Failed to bind WaveSpeed request id';
+
+      console.error('[ops] image-to-video bind_failed requestId_held', {
+        generationId,
+        userId,
+        requestId: boundRequestId,
+        error: message,
+        hasRequestId: true,
+      });
+
+      await markImageToVideoSubmissionUnknown({
+        generationId,
+        userId,
+        requestId: boundRequestId,
+        error: `bind_failed: ${message}`,
+      });
+
+      return respJson(
+        -1,
+        'Generation was accepted by the provider but could not be bound locally. Credits remain reserved; do not retry this generation.',
+        { code: 'SUBMISSION_UNKNOWN', generationId, requestId: boundRequestId },
+        { status: 502 }
+      );
     }
   } catch (error: any) {
     if (orphanSealedKey) {
@@ -240,10 +364,15 @@ async function POST({ request }: { request: Request }) {
         { status: 402 }
       );
     }
-    if (
-      error instanceof ImageToVideoPreflightError ||
-      error instanceof ImageToVideoGenerationConflictError
-    ) {
+    if (error instanceof ImageToVideoGenerationConflictError) {
+      return respJson(
+        -1,
+        error.message,
+        { code: 'GENERATION_CONFLICT' },
+        { status: 409 }
+      );
+    }
+    if (error instanceof ImageToVideoPreflightError) {
       return respErr(error.message, { status: 400 });
     }
     return respErr(error?.message || 'Failed to start generation', {

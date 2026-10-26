@@ -30,6 +30,12 @@ export const IMAGE_TO_VIDEO_DEFAULT_ASPECT_RATIO: ImageToVideoAspectRatio =
 /** Stale submitting claim → submission_unknown (Worker kill / hang). */
 export const IMAGE_TO_VIDEO_SUBMITTING_CLAIM_TTL_MS = 3 * 60 * 1000;
 
+/**
+ * Stale completing lease → another status poll may reclaim and finish R2 persist.
+ * Persist itself is idempotent on a fixed result key.
+ */
+export const IMAGE_TO_VIDEO_COMPLETING_CLAIM_TTL_MS = 3 * 60 * 1000;
+
 export const IMAGE_TO_VIDEO_MAX_IMAGE_BYTES = 12 * 1024 * 1024;
 
 export function isImageToVideoResolution(

@@ -15,6 +15,48 @@ export class WavespeedHttpError extends Error {
   }
 }
 
+/** Retryable / ambiguous WaveSpeed HTTP statuses (do not auto-refund). */
+export function isTransientWavespeedHttpStatus(status: number) {
+  return status === 0 || status === 408 || status === 429 || status >= 500;
+}
+
+/**
+ * Submit-time HTTP codes that clearly mean WaveSpeed rejected the request
+ * (safe to refund). Excludes 408/429 and all 5xx (uncertain whether accepted).
+ */
+export function isDefiniteWavespeedSubmitRejection(status: number) {
+  return (
+    Number.isInteger(status) &&
+    status >= 400 &&
+    status < 500 &&
+    !isTransientWavespeedHttpStatus(status)
+  );
+}
+
+/**
+ * Classify a submit failure for credit handling.
+ * Network / abort / unknown errors are always uncertain — the upstream may
+ * already have accepted the job even when the client never saw a response.
+ */
+export function classifyWavespeedSubmitFailure(
+  error: unknown
+): 'refund' | 'uncertain' {
+  if (error instanceof WavespeedHttpError) {
+    // Misconfiguration never reached the provider.
+    if (
+      error.code === 'WAVESPEED_NOT_CONFIGURED' ||
+      error.code === 'WAVESPEED_INVALID_BASE_URL' ||
+      error.code === 'WAVESPEED_INVALID_MODEL'
+    ) {
+      return 'refund';
+    }
+    return isDefiniteWavespeedSubmitRejection(error.status)
+      ? 'refund'
+      : 'uncertain';
+  }
+  return 'uncertain';
+}
+
 async function getWavespeedApiKey() {
   const value =
     (await getConfig('wavespeed_api_key'))?.trim() ||
