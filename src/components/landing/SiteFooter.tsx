@@ -257,6 +257,19 @@ export function SiteFooter() {
                 className="h-[27px] w-auto"
               />
             </a>
+            <a
+              href="https://agentlocker.ai/agent/genjutsu-ai-2"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <img
+                src="https://agentlocker.ai/static/img/badges/agentlocker-badge-dark.png"
+                alt="Listed on AgentLocker — Genjutsu AI"
+                loading="lazy"
+                decoding="async"
+                className="h-[27px] w-auto"
+              />
+            </a>
           </div>
         </footer>
       </div>
