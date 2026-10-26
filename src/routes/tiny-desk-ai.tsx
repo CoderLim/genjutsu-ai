@@ -15,42 +15,34 @@ import {
 import { SeoJsonLd } from '@/components/seo-json-ld';
 
 const PAGE_PATH = '/tiny-desk-ai';
-
-/** Display order matches the generator cast grid: Back L · Lead · Back R · Harmony · Sax */
-const TINY_DESK_EXAMPLE_PHOTO_ROLES = [
-  'backingLeft',
-  'lead',
-  'backingRight',
-  'harmony',
-  'sax',
-] as const;
-
-function tinyDeskExamplePhotos(caseId: 'case-01' | 'case-02' | 'case-03') {
-  return TINY_DESK_EXAMPLE_PHOTO_ROLES.map(
-    (role) => `/images/demos/tiny-desk-ai/${caseId}-${role}.jpg`
-  );
-}
-
 const TINY_DESK_EXAMPLE_CASES = [
   {
-    id: 'case-01' as const,
+    id: 'case-01',
     src: '/videos/demos/tiny-desk-ai-case-01.mp4',
     poster: '/videos/demos/tiny-desk-ai-case-01-poster.jpg',
-    photos: tinyDeskExamplePhotos('case-01'),
   },
   {
-    id: 'case-02' as const,
+    id: 'case-02',
     src: '/videos/demos/tiny-desk-ai-case-02.mp4',
     poster: '/videos/demos/tiny-desk-ai-case-02-poster.jpg',
-    photos: tinyDeskExamplePhotos('case-02'),
   },
   {
-    id: 'case-03' as const,
+    id: 'case-03',
     src: '/videos/demos/tiny-desk-ai-case-03.mp4',
     poster: '/videos/demos/tiny-desk-ai-case-03-poster.jpg',
-    photos: tinyDeskExamplePhotos('case-03'),
   },
 ] as const;
+
+/** Cast order matches the generator grid: Back L · Lead · Back R · Harmony · Sax. */
+const TINY_DESK_INPUT_SHOWCASE_PHOTOS = [
+  '/images/demos/tiny-desk-ai/input-backingLeft.jpg',
+  '/images/demos/tiny-desk-ai/input-lead.jpg',
+  '/images/demos/tiny-desk-ai/input-backingRight.jpg',
+  '/images/demos/tiny-desk-ai/input-harmony.jpg',
+  '/images/demos/tiny-desk-ai/input-sax.jpg',
+] as const;
+
+const TINY_DESK_INPUT_SHOWCASE_VIDEO = TINY_DESK_EXAMPLE_CASES[0];
 const OG_IMAGE = TINY_DESK_EXAMPLE_CASES[0].poster;
 const DEMO_VIDEO = TINY_DESK_EXAMPLE_CASES[0].src;
 const DEMO_POSTER = TINY_DESK_EXAMPLE_CASES[0].poster;
@@ -218,25 +210,47 @@ function TinyDeskAiPage() {
                     preload="metadata"
                     className="aspect-[9/16] max-h-[480px] w-full rounded-xl bg-black object-contain"
                   />
-                  <ul className="mt-2.5 grid grid-cols-5 gap-1.5">
-                    {clip.photos.map((src, photoIndex) => (
-                      <li key={src}>
-                        <img
-                          src={src}
-                          alt={m['site.tinydesk.example_cast_alt']({
-                            n: String(photoIndex + 1),
-                            case: String(index + 1),
-                          })}
-                          className="aspect-square w-full rounded-lg border border-white/10 bg-black/40 object-cover"
-                          loading="lazy"
-                          decoding="async"
-                        />
-                      </li>
-                    ))}
-                  </ul>
                 </div>
               ))}
             </div>
+
+            <div className="mt-5 grid items-center gap-4 rounded-[20px] border border-white/10 bg-black/25 p-3 sm:gap-5 sm:p-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
+              <div>
+                <p className="mb-2.5 text-[11px] font-medium tracking-[0.14em] text-white/40 uppercase">
+                  {m['site.tinydesk.example_input_label']()}
+                </p>
+                <ul className="grid grid-cols-5 gap-2">
+                  {TINY_DESK_INPUT_SHOWCASE_PHOTOS.map((src, photoIndex) => (
+                    <li key={src}>
+                      <img
+                        src={src}
+                        alt={m['site.tinydesk.example_input_alt']({
+                          n: String(photoIndex + 1),
+                        })}
+                        className="aspect-[3/4] w-full rounded-xl border border-white/10 bg-black/40 object-cover"
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div className="overflow-hidden rounded-[18px] border border-white/10 bg-black/35 p-2">
+                <p className="mb-2 px-1 text-[11px] font-medium tracking-[0.14em] text-white/40 uppercase">
+                  {m['site.tinydesk.example_result_label']()}
+                </p>
+                <video
+                  src={TINY_DESK_INPUT_SHOWCASE_VIDEO.src}
+                  poster={TINY_DESK_INPUT_SHOWCASE_VIDEO.poster}
+                  title={m['site.tinydesk.example_result_title']()}
+                  controls
+                  playsInline
+                  preload="metadata"
+                  className="aspect-[9/16] max-h-[420px] w-full rounded-xl bg-black object-contain"
+                />
+              </div>
+            </div>
+
             <p className="mt-3 text-center text-xs text-white/34">
               {m['site.tinydesk.example_caption']()}
             </p>
