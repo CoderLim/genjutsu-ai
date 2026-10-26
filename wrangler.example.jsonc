@@ -45,4 +45,14 @@
       "bucket_name": "genjutsu-ai",
     },
   ],
+  // Optional unattended image-to-video recovery (NOT enabled by default).
+  // 1. Set secret CRON_SECRET via `wrangler secret put CRON_SECRET`
+  // 2. Uncomment triggers and point at your production host:
+  // "triggers": {
+  //   "crons": ["*/5 * * * *"]
+  // }
+  // Pair with a Worker scheduled handler or external ping to
+  // POST /api/cron/image-to-video/reconcile with Authorization: Bearer <CRON_SECRET>.
+  // Code supports reconcile; without this deploy config, recovery still needs
+  // client polling or POST /api/admin/image-to-video/reconcile.
 }

@@ -66,6 +66,10 @@ const EXPLORE_LINKS = [
     label: () => m['site.a2o.seo.more_zombie'](),
     href: '/ai-zombie-hug',
   },
+  {
+    label: () => 'Day of the Dead AI Video',
+    href: '/day-of-the-dead-ai-video',
+  },
   { label: () => m['site.a2o.seo.more_home'](), href: '/' },
   { label: () => m['site.a2o.seo.more_pricing'](), href: '/pricing' },
 ] as const;

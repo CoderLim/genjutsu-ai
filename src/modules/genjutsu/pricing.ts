@@ -1,4 +1,15 @@
+import {
+  AI_CREDITS_PER_USD,
+  AI_PROVIDER_COST_MULTIPLIER,
+  calculateProviderCredits,
+} from '@/lib/ai-credits';
+
 import { estimateHiggsfieldSeedanceTokenCost } from './seedance-higgsfield';
+
+/** @deprecated Prefer AI_CREDITS_PER_USD from @/lib/ai-credits */
+export { AI_CREDITS_PER_USD as GENJUTSU_CREDITS_PER_USD };
+/** @deprecated Prefer AI_PROVIDER_COST_MULTIPLIER from @/lib/ai-credits */
+export { AI_PROVIDER_COST_MULTIPLIER as GENJUTSU_PROVIDER_COST_MULTIPLIER };
 
 export type GenjutsuBillableResolution = '480p' | '720p' | '1080p';
 
@@ -68,9 +79,6 @@ export function getSmallestSufficientCreditPack(params: {
  * We convert its USD estimate into our own credits here; the browser never
  * supplies the price or number of credits to charge.
  */
-export const GENJUTSU_CREDITS_PER_USD = 100;
-export const GENJUTSU_PROVIDER_COST_MULTIPLIER = 1.7;
-
 /**
  * Public Higgsfield Genjutsu list rates as of 2026-09-30.
  *
@@ -134,18 +142,7 @@ export const GENJUTSU_CREDIT_PACKS: readonly GenjutsuCreditPack[] = [
 ] as const;
 
 export function calculateGenjutsuCredits(providerCostUsd: number) {
-  if (!Number.isFinite(providerCostUsd) || providerCostUsd <= 0) {
-    throw new Error('providerCostUsd must be a positive finite number');
-  }
-
-  return Math.max(
-    1,
-    Math.ceil(
-      providerCostUsd *
-        GENJUTSU_CREDITS_PER_USD *
-        GENJUTSU_PROVIDER_COST_MULTIPLIER
-    )
-  );
+  return calculateProviderCredits(providerCostUsd);
 }
 
 export function estimateGenjutsuListCost(input: {

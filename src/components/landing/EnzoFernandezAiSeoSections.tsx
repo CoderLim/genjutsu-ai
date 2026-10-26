@@ -73,6 +73,10 @@ const EXPLORE_LINKS = [
     href: '/ai-zombie-hug',
   },
   {
+    label: () => 'Day of the Dead AI Video',
+    href: '/day-of-the-dead-ai-video',
+  },
+  {
     label: () => m['site.enzo.seo.more_hotel'](),
     href: '/hotel-lobby-ai',
   },

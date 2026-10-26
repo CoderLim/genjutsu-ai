@@ -47,6 +47,9 @@ export const envConfigs: Record<string, string> = {
   auth_url: procEnv.AUTH_URL ?? publicEnv('VITE_APP_URL') ?? '',
   auth_secret: procEnv.AUTH_SECRET ?? '',
 
+  // Optional: Bearer secret for /api/cron/* (unset = cron routes return 503)
+  cron_secret: procEnv.CRON_SECRET ?? '',
+
   // Payment - Stripe
   stripe_secret_key: procEnv.STRIPE_SECRET_KEY ?? '',
   stripe_publishable_key: procEnv.STRIPE_PUBLISHABLE_KEY ?? '',

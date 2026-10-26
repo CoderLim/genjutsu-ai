@@ -61,6 +61,10 @@ const RELATED_TEMPLATES = [
     label: () => m['site.kisscam.seo.related_crazy'](),
     href: '/crazy-frog-ai',
   },
+  {
+    label: () => 'Day of the Dead AI Video',
+    href: '/day-of-the-dead-ai-video',
+  },
 ] as const;
 
 export function getColdplayKissCamFaqItems() {

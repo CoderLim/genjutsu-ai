@@ -693,6 +693,10 @@ export const FOOTER_COLUMNS: FooterColumn[] = [
         label: 'AI Zombie Hug',
         href: '/ai-zombie-hug',
       },
+      {
+        label: 'Day of the Dead AI Video',
+        href: '/day-of-the-dead-ai-video',
+      },
     ],
   },
   {

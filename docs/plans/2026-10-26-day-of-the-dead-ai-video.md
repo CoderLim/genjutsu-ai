@@ -43,7 +43,7 @@ flowchart TB
 - **Upstream model (engine constant, not ENV):** `bytedance/seedance-2.0/image-to-video-turbo` in I2V constants (like hotel-lobby locks Kling O3). No `SEEDANCE_WAVESPEED_I2V_TURBO_MODEL`; do not follow `GENJUTSU_*_PROVIDER`. Credentials only: `WAVESPEED_API_KEY` / base URL. Persist `provider`+`model`+`presetId` (+ variant) on the task at create.
 - **Scene:** single listable scene `image-to-video` (name TBD in code). Product identity = `options.presetId` (+ `variant` / `subject` for person|pet). Admin/history filter by scene; display name from preset.
 - **Inputs:** one photo; left-side video on landings is **demo only** (not sealed into the job).
-- **Defaults (v1 engine / DotD preset):** `duration: 5`, `resolution: '720p'`, `aspect_ratio: '9:16'`, `generate_audio: true`.
+- **Defaults (v1 engine / DotD preset):** `duration: 5`, `resolution: '720p'`, `aspect_ratio: '16:9'`, `generate_audio: true`.
 - **Credits:** WaveSpeed I2V rates → `src/lib/ai-credits` markup. 720p **$0.14/s**, 1080p **$0.16/s**.
 - **Prompts:** server-locked per preset; DotD has **person | pet** variants (see § Locked prompts). Client cannot free-edit.
 - **Locales:** `en`, `ja`, `ko`, `es`, `pt-BR`, `fr`, `de` (no `zh`). Full `site.dotd.*` in every locale file.
