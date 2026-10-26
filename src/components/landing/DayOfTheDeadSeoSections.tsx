@@ -39,18 +39,35 @@ export const DOTD_FAQ_ITEMS = [
   },
 ] as const;
 
-/** FAQ subset for FAQPage JSON-LD (must match visible answers character-wise where shared). */
-export const DOTD_FAQ_JSON_LD_ITEMS = [
-  DOTD_FAQ_ITEMS[0],
-  DOTD_FAQ_ITEMS[1],
-  DOTD_FAQ_ITEMS[2],
+/** FAQPage JSON-LD — same objects as visible FAQ (character-identical). */
+export const DOTD_FAQ_JSON_LD_ITEMS = DOTD_FAQ_ITEMS;
+
+export const DOTD_HOWTO_STEPS = [
   {
-    question: 'When should I post a Day of the Dead AI video?',
-    answer:
-      'Day of the Dead is November 1–2. Search interest peaks in the last week of October and falls off in November, so publish before October 31.',
+    name: '1. Pick your photo — yourself, or your pet',
+    text: 'One face, front-facing, eyes open, even light, at least 512 px on the short side. For a pet: one animal, head toward the camera, eyes visible, filling a decent part of the frame. One subject per generation — group shots do not work.',
   },
-  DOTD_FAQ_ITEMS[6],
+  {
+    name: '2. Choose person or pet',
+    text: 'This page locks a holiday scene for each subject type. Pick Person or Pet so the makeup, ofrenda, and light match what you uploaded.',
+  },
+  {
+    name: '3. Generate in 16:9',
+    text: 'Export landscape 16:9. This page generates about a 5-second clip at 720p by default (1080p when available).',
+  },
+  {
+    name: '4. Add music you have the rights to',
+    text: "Use your own track or a licensed one. Do not pull the audio off someone else's video — that is the fastest way to get it taken down on TikTok or Reels.",
+  },
 ] as const;
+
+export const DOTD_DEMO_VIDEO = {
+  src: '/videos/day-of-the-dead-ai-video-demo.mp4',
+  poster: '/videos/day-of-the-dead-ai-video-demo-poster.jpg',
+  /** Approximate demo length (ISO 8601). */
+  duration: 'PT8S',
+  uploadDate: '2026-10-26',
+} as const;
 
 const PROMPT_IDEAS = [
   {
@@ -95,6 +112,14 @@ const COMPARE_ROWS = [
   ['Result', 'Same subject, holiday scene', 'Full control, full effort'],
 ] as const;
 
+const RELATED_LINKS = [
+  { label: 'AI Zombie Hug', href: '/ai-zombie-hug' },
+  { label: 'Crazy Frog AI', href: '/crazy-frog-ai' },
+  { label: 'Coldplay Kiss Cam', href: '/coldplay-kiss-cam' },
+  { label: 'Hotel Lobby AI', href: '/hotel-lobby-ai' },
+  { label: 'Pricing', href: '/pricing' },
+] as const;
+
 export function DayOfTheDeadSeoSections() {
   return (
     <div className="mx-auto max-w-3xl space-y-16 px-4 pb-20 text-left md:px-5">
@@ -122,45 +147,14 @@ export function DayOfTheDeadSeoSections() {
           How to make a Day of the Dead AI video
         </h2>
         <div className="space-y-5">
-          <div>
-            <h3 className="text-lg font-medium text-white/85">
-              1. Pick your photo — yourself, or your pet
-            </h3>
-            <p className="mt-2 text-base leading-7 text-white/58">
-              One face, front-facing, eyes open, even light, at least 512 px on
-              the short side. For a pet: one animal, head toward the camera,
-              eyes visible, filling a decent part of the frame. One subject per
-              generation — group shots don&apos;t work.
-            </p>
-          </div>
-          <div>
-            <h3 className="text-lg font-medium text-white/85">
-              2. Choose person or pet
-            </h3>
-            <p className="mt-2 text-base leading-7 text-white/58">
-              This page locks a holiday scene for each subject type. Pick Person
-              or Pet so the makeup, ofrenda, and light match what you uploaded.
-            </p>
-          </div>
-          <div>
-            <h3 className="text-lg font-medium text-white/85">
-              3. Generate in 16:9
-            </h3>
-            <p className="mt-2 text-base leading-7 text-white/58">
-              A single beat reads better than a long one. Export landscape 16:9,
-              about 8–15 seconds, 1080p when you can.
-            </p>
-          </div>
-          <div>
-            <h3 className="text-lg font-medium text-white/85">
-              4. Add music you have the rights to
-            </h3>
-            <p className="mt-2 text-base leading-7 text-white/58">
-              Use your own track or a licensed one. Don&apos;t pull the audio
-              off someone else&apos;s video — that&apos;s the fastest way to get
-              it taken down on TikTok or Reels.
-            </p>
-          </div>
+          {DOTD_HOWTO_STEPS.map((step) => (
+            <div key={step.name}>
+              <h3 className="text-lg font-medium text-white/85">{step.name}</h3>
+              <p className="mt-2 text-base leading-7 text-white/58">
+                {step.text}
+              </p>
+            </div>
+          ))}
         </div>
         <p className="text-sm font-medium text-[rgb(220,155,99)]">
           <a href="#generator" className="underline-offset-4 hover:underline">
@@ -174,9 +168,9 @@ export function DayOfTheDeadSeoSections() {
           Prompt ideas that work
         </h2>
         <p className="text-base leading-7 text-white/58">
-          The generator on this page uses a locked holiday prompt. These ideas
-          describe the look if you rebuild the scene elsewhere — change the
-          details to match your photo.
+          This page&apos;s generator uses a locked holiday prompt — you do not
+          edit it here. The ideas below are reference looks if you rebuild the
+          scene in another tool; change the details to match your photo.
         </p>
         <ul className="list-disc space-y-3 pl-5 text-base leading-7 text-white/58">
           {PROMPT_IDEAS.map((item) => (
@@ -260,9 +254,9 @@ export function DayOfTheDeadSeoSections() {
         <p className="text-base leading-7 text-white/58">
           Sube una foto tuya de frente, o una foto de tu mascota, elige persona
           o mascota en el generador, y genera en formato horizontal 16:9. El
-          clip se genera en un minuto. Los cuatro pasos completos están arriba,
-          en inglés. Solo se aceptan fotos propias o de tu mascota — no de otras
-          personas sin permiso por escrito.
+          clip dura unos 5 segundos y se genera en un minuto. Los cuatro pasos
+          completos están arriba, en inglés. Solo se aceptan fotos propias o de
+          tu mascota — no de otras personas sin permiso por escrito.
         </p>
       </section>
 
@@ -296,7 +290,9 @@ export function DayOfTheDeadSeoSections() {
             No celebrities, public figures, or anyone else&apos;s likeness.
           </li>
           <li>No nudity, no sexual content, no violence, no hate content.</li>
-          <li>Every clip is watermarked as AI-generated.</li>
+          <li>
+            Label the video as AI-generated where TikTok, Reels, or Shorts ask.
+          </li>
         </ul>
         <p className="text-base leading-7 text-white/58">
           Uploads that break these rules are rejected and refunded. Full rules
@@ -338,6 +334,24 @@ export function DayOfTheDeadSeoSections() {
             </p>
           </div>
         ))}
+      </section>
+
+      <section className="space-y-4">
+        <h2 className="text-2xl font-semibold tracking-tight text-white/92 sm:text-3xl">
+          More Genjutsu trends
+        </h2>
+        <ul className="list-disc space-y-2 pl-5 text-base leading-7 text-white/58">
+          {RELATED_LINKS.map((item) => (
+            <li key={item.href}>
+              <Link
+                href={item.href}
+                className="text-[rgb(220,155,99)] underline-offset-4 hover:underline"
+              >
+                {item.label}
+              </Link>
+            </li>
+          ))}
+        </ul>
       </section>
 
       <section className="space-y-4 border-t border-white/10 pt-12">

@@ -24,6 +24,7 @@ const STATIC_PATHS = [
   '/kairo-bad-times',
   '/smalltown-boy-dance',
   '/ai-zombie-hug',
+  '/day-of-the-dead-ai-video',
   '/ai-rumpelstiltskin',
   '/bulin-47-ai',
   '/blog',

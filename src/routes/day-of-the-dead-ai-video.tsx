@@ -6,7 +6,9 @@ import { m } from '@/paraglide/messages.js';
 import { getLocale } from '@/paraglide/runtime.js';
 import {
   DayOfTheDeadSeoSections,
+  DOTD_DEMO_VIDEO,
   DOTD_FAQ_JSON_LD_ITEMS,
+  DOTD_HOWTO_STEPS,
 } from '@/components/landing/DayOfTheDeadSeoSections';
 import { ImageToVideoGeneratorPanel } from '@/components/landing/ImageToVideoGeneratorPanel';
 import { SiteFooter } from '@/components/landing/SiteFooter';
@@ -14,7 +16,7 @@ import { SiteHeader } from '@/components/landing/SiteHeader';
 import { SeoJsonLd } from '@/components/seo-json-ld';
 
 const PAGE_PATH = '/day-of-the-dead-ai-video';
-const OG_IMAGE = '/videos/day-of-the-dead-ai-video-demo-poster.jpg';
+const OG_IMAGE = DOTD_DEMO_VIDEO.poster;
 
 function faqJsonLd() {
   return {
@@ -28,6 +30,52 @@ function faqJsonLd() {
         text: item.answer,
       },
     })),
+  };
+}
+
+function howToJsonLd() {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'HowTo',
+    name: 'How to make a Day of the Dead AI video',
+    totalTime: 'PT2M',
+    step: DOTD_HOWTO_STEPS.map((step) => ({
+      '@type': 'HowToStep',
+      name: step.name,
+      text: step.text,
+    })),
+  };
+}
+
+function softwareApplicationJsonLd() {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'SoftwareApplication',
+    name: 'Day of the Dead AI Video Generator',
+    applicationCategory: 'MultimediaApplication',
+    operatingSystem: 'Web',
+    offers: {
+      '@type': 'Offer',
+      price: '0',
+      priceCurrency: 'USD',
+      description: 'Free to try; generation uses credits',
+    },
+    url: absoluteUrl(PAGE_PATH),
+    description: m['site.dotd.page_description'](),
+  };
+}
+
+function videoJsonLd() {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'VideoObject',
+    name: 'Day of the Dead AI video demo',
+    description:
+      'Example Day of the Dead (Día de los Muertos) AI video made from one photo — sugar-skull makeup, marigolds, candlelight.',
+    contentUrl: absoluteUrl(DOTD_DEMO_VIDEO.src),
+    thumbnailUrl: absoluteUrl(DOTD_DEMO_VIDEO.poster),
+    uploadDate: DOTD_DEMO_VIDEO.uploadDate,
+    duration: DOTD_DEMO_VIDEO.duration,
   };
 }
 
@@ -56,11 +104,14 @@ function DayOfTheDeadAiVideoPage() {
   const canonical = absoluteUrl(PAGE_PATH);
 
   return (
-    <div className="min-h-screen bg-[hsl(28_25%_9%)] text-[rgb(237,234,222)]">
+    <div className="flex min-h-screen flex-col">
       <SeoJsonLd value={faqJsonLd()} />
+      <SeoJsonLd value={howToJsonLd()} />
+      <SeoJsonLd value={softwareApplicationJsonLd()} />
+      <SeoJsonLd value={videoJsonLd()} />
       <SeoJsonLd value={breadcrumbJsonLd(canonical)} />
 
-      <div className="relative overflow-hidden">
+      <div className="relative flex-1 overflow-hidden bg-[hsl(28_25%_9%)] text-[rgb(237,234,222)]">
         <div className="pointer-events-none absolute inset-0" aria-hidden>
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_18%,rgba(154,91,55,0.22),transparent_38%),linear-gradient(to_bottom,rgba(13,10,9,0.5),hsl(28_25%_9%)_78%)]" />
           <div className="absolute top-24 left-1/2 h-[420px] w-[900px] -translate-x-1/2 rounded-full bg-[rgba(204,144,92,0.055)] blur-3xl" />
@@ -104,7 +155,9 @@ function DayOfTheDeadAiVideoPage() {
 
           <DayOfTheDeadSeoSections />
         </main>
+      </div>
 
+      <div className="bg-background text-foreground">
         <SiteFooter />
       </div>
     </div>

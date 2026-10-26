@@ -81,6 +81,12 @@ const STATIC_PAGES: { path: string; title: string; description: string }[] = [
     description: 'Motion-transfer Zombie Hug AI video generator',
   },
   {
+    path: '/day-of-the-dead-ai-video',
+    title: 'Day of the Dead AI Video',
+    description:
+      'One-photo Day of the Dead (Día de los Muertos) sugar-skull AI video generator',
+  },
+  {
     path: '/ai-rumpelstiltskin',
     title: 'Rumpelstiltskin AI Video',
     description: 'One-photo Rumpelstiltskin tiptoe AI video generator',
