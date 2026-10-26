@@ -15,21 +15,40 @@ import {
 import { SeoJsonLd } from '@/components/seo-json-ld';
 
 const PAGE_PATH = '/tiny-desk-ai';
+
+/** Display order matches the generator cast grid: Back L · Lead · Back R · Harmony · Sax */
+const TINY_DESK_EXAMPLE_PHOTO_ROLES = [
+  'backingLeft',
+  'lead',
+  'backingRight',
+  'harmony',
+  'sax',
+] as const;
+
+function tinyDeskExamplePhotos(caseId: 'case-01' | 'case-02' | 'case-03') {
+  return TINY_DESK_EXAMPLE_PHOTO_ROLES.map(
+    (role) => `/images/demos/tiny-desk-ai/${caseId}-${role}.jpg`
+  );
+}
+
 const TINY_DESK_EXAMPLE_CASES = [
   {
-    id: 'case-01',
+    id: 'case-01' as const,
     src: '/videos/demos/tiny-desk-ai-case-01.mp4',
     poster: '/videos/demos/tiny-desk-ai-case-01-poster.jpg',
+    photos: tinyDeskExamplePhotos('case-01'),
   },
   {
-    id: 'case-02',
+    id: 'case-02' as const,
     src: '/videos/demos/tiny-desk-ai-case-02.mp4',
     poster: '/videos/demos/tiny-desk-ai-case-02-poster.jpg',
+    photos: tinyDeskExamplePhotos('case-02'),
   },
   {
-    id: 'case-03',
+    id: 'case-03' as const,
     src: '/videos/demos/tiny-desk-ai-case-03.mp4',
     poster: '/videos/demos/tiny-desk-ai-case-03-poster.jpg',
+    photos: tinyDeskExamplePhotos('case-03'),
   },
 ] as const;
 const OG_IMAGE = TINY_DESK_EXAMPLE_CASES[0].poster;
@@ -199,6 +218,22 @@ function TinyDeskAiPage() {
                     preload="metadata"
                     className="aspect-[9/16] max-h-[480px] w-full rounded-xl bg-black object-contain"
                   />
+                  <ul className="mt-2.5 grid grid-cols-5 gap-1.5">
+                    {clip.photos.map((src, photoIndex) => (
+                      <li key={src}>
+                        <img
+                          src={src}
+                          alt={m['site.tinydesk.example_cast_alt']({
+                            n: String(photoIndex + 1),
+                            case: String(index + 1),
+                          })}
+                          className="aspect-square w-full rounded-lg border border-white/10 bg-black/40 object-cover"
+                          loading="lazy"
+                          decoding="async"
+                        />
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               ))}
             </div>
