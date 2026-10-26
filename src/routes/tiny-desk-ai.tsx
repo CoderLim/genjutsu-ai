@@ -8,7 +8,7 @@ import { SiteFooter } from '@/components/landing/SiteFooter';
 import { SiteHeader } from '@/components/landing/SiteHeader';
 import { TinyDeskAiGeneratorPanel } from '@/components/landing/TinyDeskAiGeneratorPanel';
 import {
-  getTinyDeskAiFaqItems,
+  getTinyDeskAiFaqSchemaItems,
   getTinyDeskAiHowToSteps,
   TinyDeskAiSeoSections,
 } from '@/components/landing/TinyDeskAiSeoSections';
@@ -42,7 +42,7 @@ function faqJsonLd() {
   return {
     '@context': 'https://schema.org',
     '@type': 'FAQPage',
-    mainEntity: getTinyDeskAiFaqItems().map((item) => ({
+    mainEntity: getTinyDeskAiFaqSchemaItems().map((item) => ({
       '@type': 'Question',
       name: item.question,
       acceptedAnswer: {
@@ -76,7 +76,7 @@ function videoJsonLd(canonical: string) {
     thumbnailUrl: [absoluteUrl(DEMO_POSTER)],
     contentUrl: absoluteUrl(DEMO_VIDEO),
     uploadDate: '2026-10-26',
-    duration: 'PT8S',
+    duration: 'PT19S',
     encodingFormat: 'video/mp4',
     mainEntityOfPage: canonical,
   };

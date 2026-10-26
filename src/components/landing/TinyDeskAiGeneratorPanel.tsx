@@ -11,7 +11,11 @@ import { CircleHelp, Download } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useSession } from '@/core/auth/client';
-import { estimateGenjutsuCreditsForProvider } from '@/modules/genjutsu/pricing';
+import {
+  estimateGenjutsuCreditsForProvider,
+  GENJUTSU_CREDIT_PACKS,
+  getUsdPerCredit,
+} from '@/modules/genjutsu/pricing';
 import type { GenjutsuProvider } from '@/modules/genjutsu/types';
 import {
   buildTinyDeskAiPrompt,
@@ -451,6 +455,8 @@ export function TinyDeskAiGeneratorPanel({
   const settingsRef = useRef<HTMLDivElement>(null);
   const generationStartedAtRef = useRef<number | null>(null);
   const resultPanelRef = useRef<HTMLDivElement>(null);
+
+  const starterUsdPerCredit = getUsdPerCredit(GENJUTSU_CREDIT_PACKS[0]!);
 
   const estimatedCredits = useMemo(() => {
     return estimateGenjutsuCreditsForProvider({
@@ -1184,6 +1190,13 @@ export function TinyDeskAiGeneratorPanel({
                             })
                           : '—'}
                       </span>
+                      {previewEstimatedCredits != null ? (
+                        <span className="text-[10px] text-white/40">
+                          {m['genjutsu.estimate.approx_usd']({
+                            amount: `$${(previewEstimatedCredits * starterUsdPerCredit).toFixed(2)}`,
+                          })}
+                        </span>
+                      ) : null}
                     </div>
                     <button
                       type="button"
@@ -1231,11 +1244,18 @@ export function TinyDeskAiGeneratorPanel({
                           align="end"
                           className="max-w-[240px] text-left leading-snug"
                         >
-                          {m['genjutsu.estimate.tooltip']()}
+                          {m['genjutsu.estimate.tooltip_with_usd']()}
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
                   </span>
+                  {estimatedCredits != null ? (
+                    <span className="text-[10px] text-white/40">
+                      {m['genjutsu.estimate.approx_usd']({
+                        amount: `$${(estimatedCredits * starterUsdPerCredit).toFixed(2)}`,
+                      })}
+                    </span>
+                  ) : null}
                 </div>
                 <button
                   type="button"

@@ -18,6 +18,21 @@ const HOW_STEPS = [
   },
 ] as const;
 
+const GLANCE_ITEMS = [
+  {
+    title: () => m['site.tinydesk.seo.glance_upload_title'](),
+    body: () => m['site.tinydesk.seo.glance_upload_body'](),
+  },
+  {
+    title: () => m['site.tinydesk.seo.glance_output_title'](),
+    body: () => m['site.tinydesk.seo.glance_output_body'](),
+  },
+  {
+    title: () => m['site.tinydesk.seo.glance_price_title'](),
+    body: () => m['site.tinydesk.seo.glance_price_body'](),
+  },
+] as const;
+
 const OUTSTANDING_POINTS = [
   () => m['site.tinydesk.seo.outstanding_p1'](),
   () => m['site.tinydesk.seo.outstanding_p2'](),
@@ -42,6 +57,16 @@ const FAQ_KEYS = [
   { q: 'site.tinydesk.seo.faq6_q', a: 'site.tinydesk.seo.faq6_a' },
   { q: 'site.tinydesk.seo.faq7_q', a: 'site.tinydesk.seo.faq7_a' },
   { q: 'site.tinydesk.seo.faq8_q', a: 'site.tinydesk.seo.faq8_a' },
+  { q: 'site.tinydesk.seo.faq9_q', a: 'site.tinydesk.seo.faq9_a' },
+  { q: 'site.tinydesk.seo.faq10_q', a: 'site.tinydesk.seo.faq10_a' },
+] as const;
+
+/** FAQPage JSON-LD — keep to a short product subset. */
+const FAQ_SCHEMA_KEYS = [
+  FAQ_KEYS[5],
+  FAQ_KEYS[8],
+  FAQ_KEYS[9],
+  FAQ_KEYS[0],
 ] as const;
 
 const RELATED_LINKS = [
@@ -61,6 +86,13 @@ const RELATED_LINKS = [
 
 export function getTinyDeskAiFaqItems() {
   return FAQ_KEYS.map((item) => ({
+    question: m[item.q](),
+    answer: m[item.a](),
+  }));
+}
+
+export function getTinyDeskAiFaqSchemaItems() {
+  return FAQ_SCHEMA_KEYS.map((item) => ({
     question: m[item.q](),
     answer: m[item.a](),
   }));
@@ -114,7 +146,26 @@ export function TinyDeskAiSeoSections() {
         <p>{m['site.tinydesk.seo.what_p2']()}</p>
       </Section>
 
-      <Section id="how-to" title={m['site.tinydesk.seo.howto_title']()}>
+      <Section id="glance" title={m['site.tinydesk.seo.glance_title']()}>
+        <div className="space-y-6">
+          {GLANCE_ITEMS.map((item) => (
+            <div key={item.title()}>
+              <h3 className="text-lg font-semibold text-white/88">
+                {item.title()}
+              </h3>
+              <p className="mt-2 text-sm leading-7 text-white/45 sm:text-base">
+                {item.body()}
+              </p>
+            </div>
+          ))}
+        </div>
+      </Section>
+
+      <Section
+        id="how-to"
+        title={m['site.tinydesk.seo.howto_title']()}
+        tone="band"
+      >
         <ol className="mt-2 space-y-6">
           {HOW_STEPS.map((step, index) => (
             <li key={step.title()} className="list-none">
@@ -132,7 +183,7 @@ export function TinyDeskAiSeoSections() {
         </ol>
       </Section>
 
-      <Section title={m['site.tinydesk.seo.outstanding_title']()} tone="band">
+      <Section title={m['site.tinydesk.seo.outstanding_title']()}>
         <p>{m['site.tinydesk.seo.outstanding_intro']()}</p>
         <ul className="mt-4 list-disc space-y-2 pl-5">
           {OUTSTANDING_POINTS.map((point, index) => (
