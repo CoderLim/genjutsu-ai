@@ -23,6 +23,12 @@ import {
   assertHotelLobbySealedInputKeysOwned,
   createHotelLobbyR2ReadUrl,
 } from '@/modules/hotel-lobby/storage';
+import { getImageToVideoTaskByGenerationId } from '@/modules/image-to-video/billing';
+import { IMAGE_TO_VIDEO_SCENE } from '@/modules/image-to-video/constants';
+import {
+  assertImageToVideoSealedImageKeyOwned,
+  createImageToVideoR2ReadUrl,
+} from '@/modules/image-to-video/storage';
 import { getKairoBadTimesTaskByGenerationId } from '@/modules/kairo-bad-times/billing';
 import { KAIRO_BAD_TIMES_SCENE } from '@/modules/kairo-bad-times/constants';
 import {
@@ -102,10 +108,44 @@ async function GET({
     hotelTask || genjutsuTask
       ? null
       : await getKairoBadTimesTaskByGenerationId(params.generationId);
-  const task = hotelTask ?? genjutsuTask ?? kairoTask;
+  const i2vTask =
+    hotelTask || genjutsuTask || kairoTask
+      ? null
+      : await getImageToVideoTaskByGenerationId(params.generationId);
+  const task = hotelTask ?? genjutsuTask ?? kairoTask ?? i2vTask;
   if (!task) return errorResponse('Generation not found', 404);
 
   const options = parseOptions(task.options);
+  const { searchParams } = new URL(request.url);
+  const rawIndex = searchParams.get('index');
+  const index = rawIndex == null ? Number.NaN : Number(rawIndex);
+  const proxy = searchParams.get('proxy') === '1';
+
+  // Image-to-video: sealed photo only (no template video). index 0 = image.
+  if (task.scene === IMAGE_TO_VIDEO_SCENE) {
+    const sealedKey =
+      typeof options?.sealedImageKey === 'string'
+        ? options.sealedImageKey
+        : Array.isArray(options?.imageKeys) &&
+            typeof options.imageKeys[0] === 'string'
+          ? options.imageKeys[0]
+          : null;
+    if (!sealedKey) return errorResponse('Generation input not found', 404);
+    if (!Number.isInteger(index) || index !== 0) {
+      return errorResponse('Invalid media index', 400);
+    }
+    try {
+      assertImageToVideoSealedImageKeyOwned({
+        userId: task.userId,
+        generationId: task.id,
+        imageKey: sealedKey,
+      });
+    } catch {
+      return errorResponse('Generation input not found', 404);
+    }
+    return deliverMedia(await createImageToVideoR2ReadUrl(sealedKey), proxy);
+  }
+
   const videoKey =
     typeof options?.videoKey === 'string'
       ? options.videoKey
@@ -124,13 +164,9 @@ async function GET({
 
   if (!videoKey) return errorResponse('Generation input not found', 404);
 
-  const { searchParams } = new URL(request.url);
-  const rawIndex = searchParams.get('index');
-  const index = rawIndex == null ? Number.NaN : Number(rawIndex);
   if (!Number.isInteger(index) || index < 0 || index > imageKeys.length) {
     return errorResponse('Invalid media index', 400);
   }
-  const proxy = searchParams.get('proxy') === '1';
 
   if (task.scene === KAIRO_BAD_TIMES_SCENE) {
     if (
