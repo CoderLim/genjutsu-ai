@@ -68,6 +68,10 @@ export const TINY_DESK_AI_SLOT_DISPLAY_IDS = [
   'sax',
 ] as const satisfies readonly TinyDeskAiSlotId[];
 
+/**
+ * Visual IDs for ORIGINAL performers only — used to locate who to replace.
+ * Do not treat these cues as the desired post-swap appearance.
+ */
 const ROLE_CUES = [
   'Person A (lead singer): brown hair, black suit, thin black necktie, seated center at the red keyboard with a microphone in front — the middle person between the two backing singers in the wide band shots',
   'Person B (backing left): Black man, shaved head, navy suit, blue patterned tie — standing behind and to the left of the lead in the wide band shots',
@@ -76,34 +80,75 @@ const ROLE_CUES = [
   'Person E (saxophone): Black man with glasses and a red-and-black striped scarf — saxophone solo close-up',
 ] as const;
 
+const PERSON_LETTERS = ['A', 'B', 'C', 'D', 'E'] as const;
+
+/** Matches `defaultReferenceTokens` in genjutsu workflow (`@Image1` …). */
+function imageToken(index: number): string {
+  return `@Image${index + 1}`;
+}
+
+const IDENTITY_CONSISTENCY_RULES = [
+  'Each reference image defines one distinct replacement identity.',
+  'Maintain a strict one-to-one mapping between each original performer and their assigned reference across the entire video.',
+  'Never swap, merge, blend, or transfer identities between performers.',
+  'Preserve each replacement identity across wide shots, close-ups, profile views, camera cuts, lighting changes, and partial occlusions.',
+  "A change in camera angle or shot scale must not change the performer's assigned identity.",
+  'Person A (center keyboard lead) and Person D (silver-haired close-up vocalist) are different people — never confuse them across cuts.',
+].join('\n');
+
+/**
+ * Desk-scene performance constraints. Outer OBJECT_SWAP / REFERENCE IDENTITY
+ * already cover generic non-target + motion preservation — keep this focused.
+ */
+const TINY_DESK_PERFORMANCE_RULES = [
+  'Preserve the original singing performance, lip movements, head turns, gestures, and instrument-playing actions.',
+  'Maintain realistic hand and body interactions with microphones, the keyboard, and saxophone.',
+  'Preserve the original camera movements, cuts, shot sequence, framing, timing, and performance rhythm.',
+  'Keep the desk, office shelves, instruments, microphones, background, and lighting unchanged.',
+  'Maintain natural occlusion, spatial depth, shadows, and reflections.',
+].join('\n');
+
+const UNASSIGNED_PROTECTION_RULES = [
+  'Keep all performers without assigned reference images unchanged.',
+  'Do not alter their faces, hair, clothing, identities, or appearances.',
+  'Never apply a reference image to an unspecified performer.',
+].join('\n');
+
 function buildPromptForImageCount(count: number): string {
   const n = Math.min(
     TINY_DESK_AI_MAX_IMAGES,
     Math.max(TINY_DESK_AI_MIN_IMAGES, Math.floor(count))
   );
-  const replaceLines = ROLE_CUES.slice(0, n).map(
-    (cue, index) =>
-      `${cue}. Replace Person ${'ABCDE'[index]} completely with Reference ${index + 1} wherever they appear — face, hair, body, and clothing.`
-  );
+  const replaceBlocks = ROLE_CUES.slice(0, n).flatMap((cue, index) => {
+    const letter = PERSON_LETTERS[index]!;
+    const image = imageToken(index);
+    return [
+      cue + '.',
+      `Replace Person ${letter} with ${image}.`,
+      `Use ${image} as the exclusive identity and appearance reference for Person ${letter}.`,
+      '',
+    ];
+  });
+
   const keepLines =
     n < TINY_DESK_AI_MAX_IMAGES
       ? [
-          '',
           'Do NOT replace anyone else:',
           ...ROLE_CUES.slice(n).map((cue) => `- ${cue}.`),
-        ]
-      : [
           '',
-          'Replace ALL FIVE original performers with their assigned references. Keep each assignment consistent across wide shots, close-ups, and cuts. Never swap the center lead with the silver-haired close-up singer.',
-        ];
+          UNASSIGNED_PROTECTION_RULES,
+          '',
+        ]
+      : [];
 
   return [
     'In the original Tiny Desk / Outstanding source video, identify these performers by distinctive visual cues (cues describe the ORIGINAL people only, not the replacements):',
     '',
-    ...replaceLines,
+    ...replaceBlocks,
     ...keepLines,
+    IDENTITY_CONSISTENCY_RULES,
     '',
-    'Preserve the Tiny Desk office shelves, desk edge, microphones, instruments, lighting, camera cuts, framing, motion, and timing throughout the clip.',
+    TINY_DESK_PERFORMANCE_RULES,
   ].join('\n');
 }
 
