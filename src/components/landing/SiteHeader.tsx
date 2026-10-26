@@ -26,7 +26,7 @@ import {
 const NAV_LINKS = [
   { label: m['site.header.feature'], href: '/#feature' },
   { label: m['site.header.how'], href: '/#how-it-works' },
-  { label: m['site.header.pricing'], href: '/#pricing' },
+  { label: m['site.header.pricing'], href: '/pricing' },
   { label: m['site.header.blog'], href: '/blog' },
 ] as const;
 
