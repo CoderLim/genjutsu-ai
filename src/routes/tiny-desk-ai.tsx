@@ -59,6 +59,7 @@ function videoJsonLd(canonical: string) {
     thumbnailUrl: [absoluteUrl(DEMO_POSTER)],
     contentUrl: absoluteUrl(DEMO_VIDEO),
     uploadDate: '2026-10-26',
+    duration: 'PT8S',
     encodingFormat: 'video/mp4',
     mainEntityOfPage: canonical,
   };
@@ -73,13 +74,34 @@ function softwareApplicationJsonLd(canonical: string) {
     operatingSystem: 'Web',
     offers: {
       '@type': 'Offer',
-      price: '0',
       priceCurrency: 'USD',
-      description: 'Free to try; generation uses Genjutsu AI credits',
+      description:
+        'Generation uses Genjutsu AI credits; cost is shown before you confirm',
     },
     url: canonical,
     description: m['site.tinydesk.page_description'](),
     image: absoluteUrl(OG_IMAGE),
+  };
+}
+
+function breadcrumbJsonLd(canonical: string) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      {
+        '@type': 'ListItem',
+        position: 1,
+        name: 'Home',
+        item: absoluteUrl('/'),
+      },
+      {
+        '@type': 'ListItem',
+        position: 2,
+        name: 'Tiny Desk AI',
+        item: canonical,
+      },
+    ],
   };
 }
 
@@ -93,6 +115,7 @@ function TinyDeskAiPage() {
       <SeoJsonLd value={howToJsonLd()} />
       <SeoJsonLd value={videoJsonLd(canonical)} />
       <SeoJsonLd value={softwareApplicationJsonLd(canonical)} />
+      <SeoJsonLd value={breadcrumbJsonLd(canonical)} />
 
       <div className="relative overflow-hidden">
         <div className="pointer-events-none absolute inset-0" aria-hidden>
