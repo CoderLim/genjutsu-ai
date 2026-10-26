@@ -3,7 +3,16 @@
  * CI validates these IDs against the route's English FAQ, HowTo and rules.
  */
 export const RUMPEL_SEO_IDS = {
-  faq: ['origin', 'dance', 'generate', 'audio', 'year'],
+  faq: [
+    'origin',
+    'dance',
+    'generate',
+    'audio',
+    'year',
+    'song',
+    'halloween',
+    'spelling',
+  ],
   steps: ['image', 'template', 'render'],
   locks: ['character', 'set', 'beats', 'grade', 'audio'],
   rules: ['original', 'accurate_label', 'consent', 'music', 'disclosure'],
@@ -50,6 +59,18 @@ const copies: Record<string, RumpelSeoCopy> = {
       year: [
         '¿Por qué aparece 1987 si no es de ese año?',
         'Es parte de la broma, pero también genera confusión. El título pretende hacer parecer que es una película perdida. Si creas tu versión, inventa un título y señala que está hecho con IA.',
+      ],
+      song: [
+        '¿Qué canción suena en el vídeo Tiptoeing in My Jordans?',
+        '«Tip Toe Wing In My Jawwdinz» de Riff Raff (2013). Usa el sonido oficial en TikTok o Instagram Reels: ambas plataformas tienen el audio con licencia.',
+      ],
+      halloween: [
+        '¿Existe una versión de Halloween del vídeo de puntillas?',
+        'Sí. Añade un sombrero de bruja puntiagudo, cambia el granero por calabazas talladas, hojas de otoño y niebla ligera, y mantén el ritmo original: 4 segundos de avance, 4 de silencio y 4 de salida.',
+      ],
+      spelling: [
+        '¿Se escribe «tiptoeing» o «tip toeing» in my Jordans?',
+        "Ambas. La tendencia empezó como «Tip Toein' in My Jordans» y Google trata las variantes como una sola consulta: tiptoeing, tip toeing, tip toein', tiptoing.",
       ],
     },
     steps: {
@@ -154,6 +175,18 @@ const copies: Record<string, RumpelSeoCopy> = {
         'Por que o vídeo diz 1987 se não é daquele ano?',
         'É uma piada, mas também desinformação. O título faz parecer um filme perdido. Crie um título fictício para sua versão e identifique o vídeo como IA.',
       ],
+      song: [
+        'Qual é a música do vídeo Tiptoeing in My Jordans?',
+        '«Tip Toe Wing In My Jawwdinz» de Riff Raff (2013). Use o som oficial no TikTok ou no Instagram Reels — as duas plataformas têm o áudio licenciado.',
+      ],
+      halloween: [
+        'Existe uma versão de Halloween do vídeo na ponta dos pés?',
+        'Sim. Acrescente um chapéu de bruxa pontudo, troque o celeiro por abóboras esculpidas, folhas de outono e névoa leve, e mantenha o ritmo original: 4 segundos de aproximação, 4 de silêncio e 4 de saída.',
+      ],
+      spelling: [
+        'É «tiptoeing» ou «tip toeing» in my Jordans?',
+        "Os dois. A tendência começou como «Tip Toein' in My Jordans» e o Google trata as variações como uma só consulta: tiptoeing, tip toeing, tip toein', tiptoing.",
+      ],
     },
     steps: {
       image: [
@@ -256,6 +289,18 @@ const copies: Record<string, RumpelSeoCopy> = {
       year: [
         'Pourquoi l’année 1987 apparaît-elle si la vidéo est récente ?',
         'C’est une plaisanterie, mais aussi une information trompeuse. La légende vise à faire croire à un film perdu. Pour votre version, inventez un titre et précisez qu’elle est générée par IA.',
+      ],
+      song: [
+        'Quelle chanson accompagne la vidéo Tiptoeing in My Jordans ?',
+        '« Tip Toe Wing In My Jawwdinz » de Riff Raff (2013). Utilisez le son officiel dans TikTok ou Instagram Reels — les deux plateformes proposent l’audio sous licence.',
+      ],
+      halloween: [
+        'Existe-t-il une version Halloween de la vidéo sur la pointe des pieds ?',
+        'Oui. Ajoutez un chapeau de sorcière pointu, remplacez le décor de grange par des citrouilles sculptées, des feuilles d’automne et un léger brouillard, et gardez le rythme d’origine : 4 secondes d’approche, 4 de silence, 4 de sortie.',
+      ],
+      spelling: [
+        'S’écrit-il « tiptoeing » ou « tip toeing » in my Jordans ?',
+        "Les deux. La tendance a commencé sous « Tip Toein' in My Jordans » et Google traite les variantes comme une seule requête : tiptoeing, tip toeing, tip toein', tiptoing.",
       ],
     },
     steps: {
@@ -360,6 +405,18 @@ const copies: Record<string, RumpelSeoCopy> = {
         'Warum steht 1987 im Video, obwohl es nicht von damals ist?',
         'Das ist der Witz, aber auch irreführend. Der Titel soll wie ein verschollener Film wirken. Erfinde für deine Version einen Titel und kennzeichne sie als KI-generiert.',
       ],
+      song: [
+        'Welcher Song läuft im Tiptoeing-in-My-Jordans-Video?',
+        '„Tip Toe Wing In My Jawwdinz“ von Riff Raff (2013). Nutze den offiziellen Sound in TikTok oder Instagram Reels — beide Plattformen haben die lizenzierte Audioversion.',
+      ],
+      halloween: [
+        'Gibt es eine Halloween-Version des Zehenspitzen-Videos?',
+        'Ja. Setze einen spitzen Hexenhut auf, tausche die Scheunen-Dekoration gegen geschnitzte Kürbisse, Herbstlaub und leichten Nebel und behalte das Original-Timing: 4 Sekunden Anschleichen, 4 Sekunden Shush, 4 Sekunden Abgang.',
+      ],
+      spelling: [
+        'Heißt es „tiptoeing“ oder „tip toeing“ in my Jordans?',
+        "Beides. Der Trend begann als „Tip Toein' in My Jordans“, und Google behandelt die Varianten als eine Suche: tiptoeing, tip toeing, tip toein', tiptoing.",
+      ],
     },
     steps: {
       image: [
@@ -460,6 +517,18 @@ const copies: Record<string, RumpelSeoCopy> = {
         '1987年と書いてあるのに、なぜその年ではないの？',
         'ジョークの一部ですが、誤解を招きます。タイトルは失われた映画に見せかけるためです。自分のバージョンでは架空のタイトルを考え、AIであることを明記してください。',
       ],
+      song: [
+        'Tiptoeing in My Jordans動画の曲は何？',
+        'Riff Raffの「Tip Toe Wing In My Jawwdinz」（2013）。TikTokやInstagram Reelsでは公式サウンドを使ってください。どちらもライセンス済み音源を提供しています。',
+      ],
+      halloween: [
+        'つま先立ち動画のハロウィン版はありますか？',
+        'あります。とんがり魔女帽を足し、納屋の装飾をかぼちゃ・落ち葉・薄い霧に替え、元の4秒忍び寄る・4秒シーッ・4秒退場のタイミングを保ちます。',
+      ],
+      spelling: [
+        '「tiptoeing」と「tip toeing」in my Jordans、どちらが正しい？',
+        "どちらも使われます。トレンドは「Tip Toein' in My Jordans」から始まり、Googleは tiptoeing、tip toeing、tip toein'、tiptoing を同一クエリとして扱います。",
+      ],
     },
     steps: {
       image: [
@@ -558,6 +627,18 @@ const copies: Record<string, RumpelSeoCopy> = {
       year: [
         '그때 작품이 아닌데 왜 1987년이라고 하나요?',
         '농담의 일부이지만 오해를 부르기도 합니다. 제목은 잃어버린 영화처럼 보이게 하려는 것입니다. 자신의 버전에서는 가상의 제목을 만들고 AI임을 표시하세요.',
+      ],
+      song: [
+        'Tiptoeing in My Jordans 영상의 노래는 무엇인가요?',
+        'Riff Raff의 「Tip Toe Wing In My Jawwdinz」(2013). TikTok이나 Instagram Reels에서는 공식 사운드를 쓰세요. 두 플랫폼 모두 라이선스된 오디오를 제공합니다.',
+      ],
+      halloween: [
+        '발끝걸음 영상의 할로윈 버전이 있나요?',
+        '있습니다. 뾰족한 마녀 모자를 더하고, 헛간 장식을 조각 호박·가을 낙엽·옅은 안개로 바꾸며, 원래의 4초 살금·4초 쉿·4초 퇴장 타이밍을 유지하세요.',
+      ],
+      spelling: [
+        '「tiptoeing」과 「tip toeing」in my Jordans, 어느 쪽이 맞나요?',
+        "둘 다입니다. 트렌드는 「Tip Toein' in My Jordans」로 시작했고, Google은 tiptoeing, tip toeing, tip toein', tiptoing을 하나의 검색어로 취급합니다.",
       ],
     },
     steps: {
