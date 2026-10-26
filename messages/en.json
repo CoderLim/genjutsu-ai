@@ -1015,6 +1015,7 @@
   "site.templates.apply_failed": "Could not load this template. Try again.",
   "site.templates.apply_busy": "Wait for the current generation to finish before switching templates.",
   "site.templates.zombie_hug": "Zombie Hug",
+  "site.templates.day_of_the_dead": "Day of the Dead",
   "site.templates.crazy_frog": "Crazy Frog",
   "site.templates.smalltown_boy_dance": "Smalltown Boy Dance",
   "site.templates.kairo_bad_times": "Bad Times",

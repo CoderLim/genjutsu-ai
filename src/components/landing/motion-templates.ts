@@ -69,7 +69,7 @@ const DEFAULT_OBJECTS_RESOLUTION = '720p' as const;
 /**
  * Homepage motion templates. Aspect follows the source clip
  * (portrait 9:16 / landscape 16:9) for gallery layout.
- * Dedicated product pages (Zombie Hug, Crazy Frog, Smalltown, Rumpel, Bulin, Kairo)
+ * Dedicated product pages (Zombie Hug, Day of the Dead, Crazy Frog, …)
  * use `href` — Recreate on the homepage Genjutsu panel would use the
  * wrong provider/product.
  */
@@ -84,6 +84,14 @@ export const MOTION_TEMPLATES: MotionTemplate[] = [
       aspect: '16:9',
     }),
     href: '/ai-zombie-hug',
+    aspect: 'landscape',
+  },
+  {
+    id: 'day-of-the-dead',
+    titleKey: 'site.templates.day_of_the_dead',
+    poster: '/videos/day-of-the-dead-ai-video-demo-poster.jpg',
+    sourceVideo: '/videos/day-of-the-dead-ai-video-demo.mp4',
+    href: '/day-of-the-dead-ai-video',
     aspect: 'landscape',
   },
   {
