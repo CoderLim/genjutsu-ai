@@ -6,7 +6,12 @@ import { getLocalPosts, mergePosts } from '@/content/posts';
 
 const STATIC_PAGES: { path: string; title: string; description: string }[] = [
   { path: '', title: 'Home', description: 'Landing page' },
-  { path: '/pricing', title: 'Pricing', description: 'Pricing plans' },
+  {
+    path: '/pricing',
+    title: 'Pricing',
+    description:
+      'One-time Genjutsu credit packs. Credit costs vary by AI video tool, duration, resolution, and settings; see required credits before you generate.',
+  },
   {
     path: '/hotel-lobby-ai',
     title: 'Hotel Lobby AI Video Generator',

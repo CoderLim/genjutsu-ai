@@ -137,11 +137,7 @@ export function PricingSection() {
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="text-primary size-4" />
-                  {m['site.hero.motion']()}
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="text-primary size-4" />
-                  {m['site.hero.objects']()}
+                  {m['site.pricing.across_tools']()}
                 </li>
               </ul>
 
@@ -163,6 +159,9 @@ export function PricingSection() {
         </div>
 
         <p className="text-muted-foreground mx-auto mt-6 max-w-2xl text-center text-sm leading-relaxed">
+          {m['site.pricing.packs_vary_note']()}
+        </p>
+        <p className="text-muted-foreground mx-auto mt-2 max-w-2xl text-center text-sm leading-relaxed">
           {m['site.pricing.note']()}
         </p>
       </div>
