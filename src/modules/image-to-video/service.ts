@@ -2,13 +2,16 @@ import {
   assertWavespeedConfigured,
   getWavespeedPredictionStatus,
   submitWavespeedPrediction,
+  type WavespeedNormalizedTask,
 } from '@/core/ai/wavespeed';
 
 import {
   claimImageToVideoCompletion,
   finalizeImageToVideoGeneration,
   getImageToVideoTaskById,
+  listImageToVideoTasksNeedingReconcile,
   parseImageToVideoTask,
+  promoteImageToVideoSubmissionUnknownToSubmitted,
   promoteStaleImageToVideoSubmitting,
   refundImageToVideoGeneration,
 } from './billing';
@@ -26,6 +29,28 @@ export type ImageToVideoReconcileResult = {
   errorCode?: string;
   reservedCredits?: number;
   refundedCredits?: number;
+};
+
+export type ImageToVideoReconcileDeps = {
+  getProviderStatus: (requestId: string) => Promise<WavespeedNormalizedTask>;
+  promoteUnknownToSubmitted: typeof promoteImageToVideoSubmissionUnknownToSubmitted;
+  claimCompletion: typeof claimImageToVideoCompletion;
+  getTaskById: typeof getImageToVideoTaskById;
+  persistResult: typeof persistImageToVideoResultToR2;
+  finalize: typeof finalizeImageToVideoGeneration;
+  refund: typeof refundImageToVideoGeneration;
+  promoteStaleSubmitting: typeof promoteStaleImageToVideoSubmitting;
+};
+
+const defaultReconcileDeps: ImageToVideoReconcileDeps = {
+  getProviderStatus: getWavespeedPredictionStatus,
+  promoteUnknownToSubmitted: promoteImageToVideoSubmissionUnknownToSubmitted,
+  claimCompletion: claimImageToVideoCompletion,
+  getTaskById: getImageToVideoTaskById,
+  persistResult: persistImageToVideoResultToR2,
+  finalize: finalizeImageToVideoGeneration,
+  refund: refundImageToVideoGeneration,
+  promoteStaleSubmitting: promoteStaleImageToVideoSubmitting,
 };
 
 function stableResultUrl(generationId: string) {
@@ -51,22 +76,25 @@ export async function submitImageToVideo(params: {
   });
 }
 
-export async function reconcileImageToVideoGeneration(task: {
-  id: string;
-  userId: string;
-  status: string;
-  taskId: string | null;
-  model: string | null;
-  costCredits: number | null;
-  taskResult?: string | null;
-  options?: string | null;
-}): Promise<ImageToVideoReconcileResult> {
+export async function reconcileImageToVideoGeneration(
+  task: {
+    id: string;
+    userId: string;
+    status: string;
+    taskId: string | null;
+    model: string | null;
+    costCredits: number | null;
+    taskResult?: string | null;
+    options?: string | null;
+  },
+  deps: ImageToVideoReconcileDeps = defaultReconcileDeps
+): Promise<ImageToVideoReconcileResult> {
   const generationId = task.id;
   const userId = task.userId;
   const reservedCredits = task.costCredits || 0;
 
   if (task.status === 'submitting') {
-    const promoted = await promoteStaleImageToVideoSubmitting({
+    const promoted = await deps.promoteStaleSubmitting({
       generationId,
       userId,
     });
@@ -97,8 +125,9 @@ export async function reconcileImageToVideoGeneration(task: {
   }
 
   if (task.status === 'submission_unknown') {
-    // Never auto-resubmit. With a requestId, poll upstream only; without one,
-    // keep credits held for ops — do not surface as a refundable "failed".
+    // Never auto-resubmit. With a requestId, poll upstream and promote
+    // atomically into submitted before claim/persist. Without one, keep
+    // credits held for ops — do not surface as a refundable "failed".
     if (!task.taskId) {
       return {
         status: 'failed',
@@ -111,21 +140,76 @@ export async function reconcileImageToVideoGeneration(task: {
       };
     }
 
+    let provider: WavespeedNormalizedTask;
     try {
-      const provider = await getWavespeedPredictionStatus(task.taskId);
-      if (provider.status === 'completed' && provider.videoUrl) {
-        // Promote into the normal completion path (claim → R2 → finalize).
-        task = { ...task, status: 'submitted' };
-      } else if (provider.status === 'failed') {
+      provider = await deps.getProviderStatus(task.taskId);
+    } catch {
+      return {
+        status: 'processing',
+        providerStatus: 'submission_unknown',
+        videoUrl: null,
+        reservedCredits,
+        error:
+          parsed.result?.error ||
+          'Submission result is uncertain. Please contact support before retrying.',
+      };
+    }
+
+    if (provider.status === 'failed') {
+      const refunded = await deps.refund({
+        generationId,
+        userId,
+        providerStatus: provider.providerStatus,
+        error: provider.error || 'Upstream generation failed',
+      });
+      const refundedParsed = refunded
+        ? parseImageToVideoTask(refunded)
+        : { result: null };
+
+      if (refunded?.status === 'refunded') {
         return {
           status: 'failed',
-          providerStatus: 'submission_unknown',
+          providerStatus: provider.providerStatus,
           videoUrl: null,
           error:
+            refundedParsed.result?.error ||
             provider.error ||
-            'Upstream generation failed. Credits remain reserved; contact support before retrying.',
-          reservedCredits,
+            'Upstream generation failed',
+          refundedCredits: reservedCredits,
         };
+      }
+
+      // Concurrent refund already finished, or status moved elsewhere.
+      const current = await deps.getTaskById({ generationId, userId });
+      if (current?.status === 'refunded') {
+        const currentParsed = parseImageToVideoTask(current);
+        return {
+          status: 'failed',
+          providerStatus: currentParsed.result?.providerStatus || 'failed',
+          videoUrl: null,
+          error: currentParsed.result?.error || provider.error,
+          refundedCredits:
+            currentParsed.result?.refundedCredits ?? reservedCredits,
+        };
+      }
+
+      return {
+        status: 'processing',
+        providerStatus: current?.status || 'submission_unknown',
+        videoUrl: null,
+        reservedCredits,
+        error:
+          'Upstream failed but refund could not claim; contact support before retrying.',
+      };
+    }
+
+    if (provider.status === 'processing') {
+      const promoted = await deps.promoteUnknownToSubmitted({
+        generationId,
+        userId,
+      });
+      if (promoted?.status === 'submitted') {
+        task = promoted;
       } else {
         return {
           status: 'processing',
@@ -136,15 +220,47 @@ export async function reconcileImageToVideoGeneration(task: {
             'Submission was interrupted; recovering from upstream. Do not retry.',
         };
       }
-    } catch {
+    } else if (provider.status === 'completed' && provider.videoUrl) {
+      const promoted = await deps.promoteUnknownToSubmitted({
+        generationId,
+        userId,
+      });
+      if (promoted?.status === 'submitted') {
+        task = promoted;
+      } else {
+        const current = await deps.getTaskById({ generationId, userId });
+        if (current?.status === 'completed') {
+          return {
+            status: 'completed',
+            providerStatus: provider.providerStatus,
+            videoUrl: stableResultUrl(generationId),
+            reservedCredits,
+          };
+        }
+        if (
+          current?.status === 'submitted' ||
+          current?.status === 'completing'
+        ) {
+          task = current;
+        } else {
+          return {
+            status: 'processing',
+            providerStatus: current?.status || 'submission_unknown',
+            videoUrl: null,
+            reservedCredits,
+            error:
+              'Submission was interrupted; recovering from upstream. Do not retry.',
+          };
+        }
+      }
+    } else {
       return {
         status: 'processing',
         providerStatus: 'submission_unknown',
         videoUrl: null,
         reservedCredits,
         error:
-          parsed.result?.error ||
-          'Submission result is uncertain. Please contact support before retrying.',
+          'Submission was interrupted; recovering from upstream. Do not retry.',
       };
     }
   }
@@ -175,10 +291,10 @@ export async function reconcileImageToVideoGeneration(task: {
     };
   }
 
-  const provider = await getWavespeedPredictionStatus(task.taskId);
+  const provider = await deps.getProviderStatus(task.taskId);
 
   if (task.status === 'submitted' && provider.status === 'failed') {
-    const refunded = await refundImageToVideoGeneration({
+    const refunded = await deps.refund({
       generationId,
       userId,
       providerStatus: provider.providerStatus,
@@ -212,12 +328,12 @@ export async function reconcileImageToVideoGeneration(task: {
   if (provider.status === 'completed' && provider.videoUrl) {
     try {
       if (task.status === 'submitted' || task.status === 'completing') {
-        const ownership = await claimImageToVideoCompletion({
+        const ownership = await deps.claimCompletion({
           generationId,
           userId,
         });
         if (ownership === 'unavailable') {
-          const current = await getImageToVideoTaskById({
+          const current = await deps.getTaskById({
             generationId,
             userId,
           });
@@ -263,7 +379,7 @@ export async function reconcileImageToVideoGeneration(task: {
         // claimed | already_completing — both may run idempotent R2 persist.
       }
 
-      const persisted = await persistImageToVideoResultToR2({
+      const persisted = await deps.persistResult({
         userId,
         generationId,
         sourceUrl: provider.videoUrl,
@@ -272,7 +388,7 @@ export async function reconcileImageToVideoGeneration(task: {
         throw new Error('Persist returned empty video key');
       }
 
-      const finalized = await finalizeImageToVideoGeneration({
+      const finalized = await deps.finalize({
         generationId,
         userId,
         providerStatus: provider.providerStatus,
@@ -288,7 +404,7 @@ export async function reconcileImageToVideoGeneration(task: {
         };
       }
 
-      const current = await getImageToVideoTaskById({ generationId, userId });
+      const current = await deps.getTaskById({ generationId, userId });
       if (current?.status === 'completed') {
         return {
           status: 'completed',
@@ -328,6 +444,66 @@ export async function reconcileImageToVideoGeneration(task: {
     videoUrl: null,
     reservedCredits,
   };
+}
+
+/**
+ * Batch reconcile for ops / cron. Does not re-submit WaveSpeed jobs.
+ * Scheduling this endpoint is a deploy-time concern — shipping the route
+ * alone is not unattended recovery.
+ */
+export async function reconcileImageToVideoBatch(params?: {
+  limit?: number;
+  minAgeMs?: number;
+  nowMs?: number;
+  deps?: ImageToVideoReconcileDeps;
+}) {
+  const tasks = await listImageToVideoTasksNeedingReconcile({
+    limit: params?.limit,
+    minAgeMs: params?.minAgeMs,
+    nowMs: params?.nowMs,
+  });
+
+  const results: Array<{
+    generationId: string;
+    userId: string;
+    beforeStatus: string;
+    result: ImageToVideoReconcileResult;
+  }> = [];
+
+  for (const task of tasks) {
+    try {
+      const result = await reconcileImageToVideoGeneration(
+        task,
+        params?.deps ?? defaultReconcileDeps
+      );
+      results.push({
+        generationId: task.id,
+        userId: task.userId,
+        beforeStatus: task.status,
+        result,
+      });
+    } catch (error: any) {
+      console.error('[ops] image-to-video batch reconcile item failed', {
+        generationId: task.id,
+        userId: task.userId,
+        error: error?.message,
+      });
+      results.push({
+        generationId: task.id,
+        userId: task.userId,
+        beforeStatus: task.status,
+        result: {
+          status: 'processing',
+          providerStatus: task.status,
+          videoUrl: null,
+          error: error?.message || 'Reconcile failed',
+          reservedCredits: task.costCredits || 0,
+        },
+      });
+    }
+  }
+
+  return { scanned: tasks.length, results };
 }
 
 export async function resolveSealedImageUrl(sealedImageKey: string) {

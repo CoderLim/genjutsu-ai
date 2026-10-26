@@ -89,6 +89,8 @@ type PersistedGeneration = {
   reservedCredits: number;
   presetId: string;
   variant: ImageToVideoVariant;
+  /** Set before generate POST so a lost response can still resume via status. */
+  generatePending?: boolean;
 };
 
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
@@ -99,6 +101,36 @@ function sleep(ms: number) {
 
 function activeGenerationKey(userId: string) {
   return `image-to-video:active:${userId}`;
+}
+
+function writeActiveGeneration(active: PersistedGeneration) {
+  try {
+    localStorage.setItem(
+      activeGenerationKey(active.userId),
+      JSON.stringify(active)
+    );
+  } catch {
+    // ignore quota / private mode
+  }
+}
+
+function clearActiveGeneration(userId: string) {
+  try {
+    localStorage.removeItem(activeGenerationKey(userId));
+  } catch {
+    // ignore
+  }
+}
+
+/** Explicit failures where credits were refunded or never reserved. */
+function isClearGenerateFailure(code: unknown) {
+  return (
+    code === 'INSUFFICIENT_CREDITS' ||
+    code === 'PROVIDER_SUBMIT_FAILED' ||
+    code === 'GENERATION_CONFLICT' ||
+    code === 'INVALID_INPUT' ||
+    code === 'UNAUTHORIZED'
+  );
 }
 
 function PhotoSlot(props: {
@@ -348,8 +380,10 @@ export function ImageToVideoGeneratorPanel(props: {
 
           if (data?.code === 'GENERATION_NOT_FOUND') {
             notFoundCount += 1;
+            // Require sustained misses — a brief 404 after a lost generate
+            // response must not wipe the recovery handle.
             if (notFoundCount >= 15) {
-              localStorage.removeItem(activeGenerationKey(active.userId));
+              clearActiveGeneration(active.userId);
               setPhase('idle');
               setJobError(m['site.dotd.generation_missing']());
               return;
@@ -373,7 +407,7 @@ export function ImageToVideoGeneratorPanel(props: {
 
         if (polled.status === 'completed' && polled.videoUrl) {
           if (generationRunRef.current !== runId) return;
-          localStorage.removeItem(activeGenerationKey(active.userId));
+          clearActiveGeneration(active.userId);
           setResultUrl(polled.videoUrl);
           setJobError('');
           setPhase('idle');
@@ -396,7 +430,7 @@ export function ImageToVideoGeneratorPanel(props: {
             return;
           }
 
-          localStorage.removeItem(activeGenerationKey(active.userId));
+          clearActiveGeneration(active.userId);
           setPhase('idle');
           const requiredCredits = Number(polled.requiredCredits);
           const balance = Number(polled.balance);
@@ -437,7 +471,7 @@ export function ImageToVideoGeneratorPanel(props: {
       if (!raw) return;
       const active = JSON.parse(raw) as PersistedGeneration;
       if (active.userId !== userId || !active.generationId) {
-        localStorage.removeItem(activeGenerationKey(userId));
+        clearActiveGeneration(userId);
         return;
       }
       const runId = ++generationRunRef.current;
@@ -448,7 +482,7 @@ export function ImageToVideoGeneratorPanel(props: {
       setPhase('generating');
       void pollGeneration(active, runId);
     } catch {
-      localStorage.removeItem(activeGenerationKey(userId));
+      clearActiveGeneration(userId);
     }
   }, [pollGeneration, session?.user?.id, phase]);
 
@@ -456,6 +490,23 @@ export function ImageToVideoGeneratorPanel(props: {
     if (!session?.user) {
       window.location.href = `/sign-in?callbackUrl=${encodeURIComponent('/day-of-the-dead-ai-video#generator')}`;
       return;
+    }
+    // Do not silently start a new paid job while a recovery handle exists.
+    try {
+      const raw = localStorage.getItem(activeGenerationKey(session.user.id));
+      if (raw) {
+        const active = JSON.parse(raw) as PersistedGeneration;
+        if (active.generationId && active.userId === session.user.id) {
+          setGenerationId(active.generationId);
+          setPhase('generating');
+          const runId = ++generationRunRef.current;
+          void pollGeneration(active, runId);
+          toast.error(m['site.generator.still_processing']());
+          return;
+        }
+      }
+    } catch {
+      // ignore parse errors; fall through to normal generate
     }
     if (
       locked ||
@@ -501,17 +552,102 @@ export function ImageToVideoGeneratorPanel(props: {
       });
 
       setPhase('starting');
-      const started = await apiPost<GenerationStart>(
-        '/api/image-to-video/generate',
-        {
-          generationId: id,
-          presetId,
-          variant,
-          imageKey: upload.storageKey,
-          contentType: photo.file.type || 'image/jpeg',
-          contentLength: photo.file.size,
+
+      // Persist BEFORE generate so a lost HTTP response cannot orphan a
+      // paid WaveSpeed job — refresh resumes via status poll.
+      const pendingActive: PersistedGeneration = {
+        userId: session.user.id,
+        generationId: id,
+        reservedCredits: 0,
+        presetId,
+        variant,
+        generatePending: true,
+      };
+      writeActiveGeneration(pendingActive);
+
+      let started: GenerationStart;
+      try {
+        started = await apiPost<GenerationStart>(
+          '/api/image-to-video/generate',
+          {
+            generationId: id,
+            presetId,
+            variant,
+            imageKey: upload.storageKey,
+            contentType: photo.file.type || 'image/jpeg',
+            contentLength: photo.file.size,
+          }
+        );
+      } catch (generateCause) {
+        const apiData =
+          generateCause instanceof ApiError &&
+          generateCause.data &&
+          typeof generateCause.data === 'object'
+            ? (generateCause.data as Record<string, unknown>)
+            : null;
+        const code = apiData?.code;
+
+        if (code === 'INSUFFICIENT_CREDITS') {
+          clearActiveGeneration(session.user.id);
+          setPhase('idle');
+          const requiredCredits = Number(apiData?.requiredCredits);
+          const balance = Number(apiData?.balance);
+          if (Number.isFinite(requiredCredits) && Number.isFinite(balance)) {
+            creditGate.open({ requiredCredits, balance });
+            setJobError('');
+            return;
+          }
+          creditGate.clear();
+          const message =
+            generateCause instanceof Error
+              ? generateCause.message
+              : m['site.generator.failed_unexpected']();
+          toast.error(message);
+          setJobError(message);
+          return;
         }
-      );
+
+        if (code === 'SUBMISSION_UNKNOWN') {
+          writeActiveGeneration({
+            ...pendingActive,
+            generatePending: false,
+          });
+          setPhase('locked');
+          setJobError(
+            generateCause instanceof Error
+              ? generateCause.message
+              : m['site.generator.submission_uncertain']()
+          );
+          return;
+        }
+
+        if (isClearGenerateFailure(code)) {
+          clearActiveGeneration(session.user.id);
+          setPhase('idle');
+          creditGate.clear();
+          const message =
+            generateCause instanceof Error
+              ? generateCause.message
+              : m['site.generator.failed_unexpected']();
+          toast.error(message);
+          setJobError(message);
+          return;
+        }
+
+        // Network / timeout / ambiguous — keep recovery handle and poll.
+        writeActiveGeneration({
+          ...pendingActive,
+          generatePending: false,
+        });
+        setPhase('generating');
+        setJobError(m['site.generator.still_processing']());
+        const runId = ++generationRunRef.current;
+        void pollGeneration(
+          { ...pendingActive, generatePending: false },
+          runId
+        );
+        return;
+      }
 
       const active: PersistedGeneration = {
         userId: session.user.id,
@@ -519,61 +655,16 @@ export function ImageToVideoGeneratorPanel(props: {
         reservedCredits: started.reservedCredits,
         presetId,
         variant,
+        generatePending: false,
       };
-      localStorage.setItem(
-        activeGenerationKey(session.user.id),
-        JSON.stringify(active)
-      );
+      writeActiveGeneration(active);
 
       setPhase('generating');
       const runId = ++generationRunRef.current;
       void pollGeneration(active, runId);
     } catch (cause) {
-      const apiData =
-        cause instanceof ApiError &&
-        cause.data &&
-        typeof cause.data === 'object'
-          ? (cause.data as Record<string, unknown>)
-          : null;
-      const insufficient = apiData?.code === 'INSUFFICIENT_CREDITS';
-      const submissionUnknown = apiData?.code === 'SUBMISSION_UNKNOWN';
-
-      if (cause instanceof ApiError && insufficient) {
-        setPhase('idle');
-        const requiredCredits = Number(apiData?.requiredCredits);
-        const balance = Number(apiData?.balance);
-        if (Number.isFinite(requiredCredits) && Number.isFinite(balance)) {
-          creditGate.open({ requiredCredits, balance });
-          setJobError('');
-          return;
-        }
-      }
-
-      if (submissionUnknown) {
-        // Persist recovery handle even when generate returns before poll starts.
-        try {
-          localStorage.setItem(
-            activeGenerationKey(session.user.id),
-            JSON.stringify({
-              userId: session.user.id,
-              generationId: id,
-              reservedCredits: 0,
-              presetId,
-              variant,
-            } satisfies PersistedGeneration)
-          );
-        } catch {
-          // ignore quota / private mode
-        }
-        setPhase('locked');
-        setJobError(
-          cause instanceof Error
-            ? cause.message
-            : m['site.generator.submission_uncertain']()
-        );
-        return;
-      }
-
+      // Upload / prep failures — generate was never sent; safe to clear.
+      clearActiveGeneration(session.user.id);
       setPhase('idle');
       creditGate.clear();
       const message =

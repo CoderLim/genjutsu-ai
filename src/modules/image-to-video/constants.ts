@@ -36,6 +36,15 @@ export const IMAGE_TO_VIDEO_SUBMITTING_CLAIM_TTL_MS = 3 * 60 * 1000;
  */
 export const IMAGE_TO_VIDEO_COMPLETING_CLAIM_TTL_MS = 3 * 60 * 1000;
 
+/**
+ * Age gate for unattended reconcile sweeps (submitted / completing /
+ * submission_unknown with requestId). Code supports recovery; automatic
+ * scheduling requires deploying a cron that hits the reconcile endpoint.
+ */
+export const IMAGE_TO_VIDEO_RECONCILE_MIN_AGE_MS = 2 * 60 * 1000;
+
+export const IMAGE_TO_VIDEO_RECONCILE_BATCH_LIMIT = 25;
+
 export const IMAGE_TO_VIDEO_MAX_IMAGE_BYTES = 12 * 1024 * 1024;
 
 export function isImageToVideoResolution(

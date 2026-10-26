@@ -1,4 +1,4 @@
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, lt, or } from 'drizzle-orm';
 
 import { db } from '@/core/db';
 import { aiTask } from '@/config/db/schema';
@@ -10,12 +10,22 @@ import {
   IMAGE_TO_VIDEO_COMPLETING_CLAIM_TTL_MS,
   IMAGE_TO_VIDEO_MODEL,
   IMAGE_TO_VIDEO_PROVIDER,
+  IMAGE_TO_VIDEO_RECONCILE_BATCH_LIMIT,
+  IMAGE_TO_VIDEO_RECONCILE_MIN_AGE_MS,
   IMAGE_TO_VIDEO_SCENE,
   IMAGE_TO_VIDEO_SUBMITTING_CLAIM_TTL_MS,
   type ImageToVideoAspectRatio,
   type ImageToVideoResolution,
 } from './constants';
 import type { ImageToVideoPresetId, ImageToVideoVariant } from './presets';
+
+/** Statuses that may atomically enter the refunding claim. */
+export const IMAGE_TO_VIDEO_REFUNDABLE_STATUSES = [
+  'reserved',
+  'submitting',
+  'submitted',
+  'submission_unknown',
+] as const;
 
 export type ImageToVideoTaskStatus =
   | 'initiated'
@@ -501,6 +511,67 @@ export async function promoteStaleImageToVideoSubmitting(params: {
   return getImageToVideoTaskById(params);
 }
 
+/**
+ * Atomic reopen: submission_unknown → submitted when a requestId is known.
+ * Enables the normal claim → R2 → finalize path (do not fake submitted in memory).
+ */
+export async function promoteImageToVideoSubmissionUnknownToSubmitted(params: {
+  generationId: string;
+  userId: string;
+}) {
+  const result = await db()
+    .update(aiTask)
+    .set({
+      status: 'submitted',
+      taskResult: null,
+    })
+    .where(
+      and(
+        eq(aiTask.id, params.generationId),
+        eq(aiTask.userId, params.userId),
+        eq(aiTask.scene, IMAGE_TO_VIDEO_SCENE),
+        eq(aiTask.status, 'submission_unknown'),
+        isNotNull(aiTask.taskId)
+      )
+    );
+  if (rowsAffectedFromUpdate(result) <= 0) return null;
+  return getImageToVideoTaskById(params);
+}
+
+/**
+ * Tasks eligible for unattended reconcile (age-gated). Caller must not
+ * re-submit WaveSpeed — only poll / persist / refund via reconcile.
+ */
+export async function listImageToVideoTasksNeedingReconcile(params?: {
+  limit?: number;
+  minAgeMs?: number;
+  nowMs?: number;
+}) {
+  const limit = Math.min(
+    Math.max(1, params?.limit ?? IMAGE_TO_VIDEO_RECONCILE_BATCH_LIMIT),
+    100
+  );
+  const minAgeMs = params?.minAgeMs ?? IMAGE_TO_VIDEO_RECONCILE_MIN_AGE_MS;
+  const cutoff = new Date((params?.nowMs ?? Date.now()) - minAgeMs);
+
+  return db()
+    .select()
+    .from(aiTask)
+    .where(
+      and(
+        eq(aiTask.scene, IMAGE_TO_VIDEO_SCENE),
+        lt(aiTask.updatedAt, cutoff),
+        or(
+          eq(aiTask.status, 'submitted'),
+          eq(aiTask.status, 'completing'),
+          and(eq(aiTask.status, 'submission_unknown'), isNotNull(aiTask.taskId))
+        )
+      )
+    )
+    .orderBy(aiTask.updatedAt)
+    .limit(limit);
+}
+
 export async function claimImageToVideoCompletion(params: {
   generationId: string;
   userId: string;
@@ -618,7 +689,7 @@ export async function refundImageToVideoGeneration(params: {
           eq(aiTask.id, params.generationId),
           eq(aiTask.userId, params.userId),
           eq(aiTask.scene, IMAGE_TO_VIDEO_SCENE),
-          inArray(aiTask.status, ['reserved', 'submitting', 'submitted'])
+          inArray(aiTask.status, [...IMAGE_TO_VIDEO_REFUNDABLE_STATUSES])
         )
       );
 
