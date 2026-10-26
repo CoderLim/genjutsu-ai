@@ -1,5 +1,4 @@
 import {
-  IMAGE_TO_VIDEO_DEFAULT_ASPECT_RATIO,
   IMAGE_TO_VIDEO_DEFAULT_DURATION,
   IMAGE_TO_VIDEO_DEFAULT_RESOLUTION,
   type ImageToVideoAspectRatio,
@@ -48,7 +47,8 @@ const PRESETS: Record<ImageToVideoPresetId, ImageToVideoPresetDef> = {
     defaultVariant: 'person',
     defaultDuration: IMAGE_TO_VIDEO_DEFAULT_DURATION,
     defaultResolution: IMAGE_TO_VIDEO_DEFAULT_RESOLUTION,
-    defaultAspectRatio: IMAGE_TO_VIDEO_DEFAULT_ASPECT_RATIO,
+    // Demo + output match the landscape sample (not the engine-wide 9:16 default).
+    defaultAspectRatio: '16:9',
     generateAudio: true,
     enabled: true,
     promptFor(variant) {

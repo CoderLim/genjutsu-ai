@@ -5,7 +5,7 @@ export const DOTD_FAQ_ITEMS = [
   {
     question: 'What is a Day of the Dead AI video?',
     answer:
-      'A photo rebuilt as a short vertical clip inside the visual language of Día de los Muertos — sugar-skull makeup, marigolds, papel picado, candlelight, an ofrenda in the background. One upload, about a minute.',
+      'A photo rebuilt as a short landscape clip inside the visual language of Día de los Muertos — sugar-skull makeup, marigolds, papel picado, candlelight, an ofrenda in the background. One upload, about a minute.',
   },
   {
     question: 'Can I use a photo of my pet?',
@@ -144,11 +144,11 @@ export function DayOfTheDeadSeoSections() {
           </div>
           <div>
             <h3 className="text-lg font-medium text-white/85">
-              3. Pick 9:16 and generate
+              3. Generate in 16:9
             </h3>
             <p className="mt-2 text-base leading-7 text-white/58">
-              A single beat reads better than a long one. Export vertical, about
-              8–15 seconds, 1080p when you can.
+              A single beat reads better than a long one. Export landscape 16:9,
+              about 8–15 seconds, 1080p when you can.
             </p>
           </div>
           <div>
@@ -259,9 +259,9 @@ export function DayOfTheDeadSeoSections() {
         </h2>
         <p className="text-base leading-7 text-white/58">
           Sube una foto tuya de frente, o una foto de tu mascota, elige persona
-          o mascota en el generador, y elige formato vertical 9:16. El clip se
-          genera en un minuto. Los cuatro pasos completos están arriba, en
-          inglés. Solo se aceptan fotos propias o de tu mascota — no de otras
+          o mascota en el generador, y genera en formato horizontal 16:9. El
+          clip se genera en un minuto. Los cuatro pasos completos están arriba,
+          en inglés. Solo se aceptan fotos propias o de tu mascota — no de otras
           personas sin permiso por escrito.
         </p>
       </section>

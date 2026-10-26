@@ -3,6 +3,7 @@ import { AwsClient } from 'aws4fetch';
 import { getAllConfigs } from '@/modules/config/service';
 import { getStorage } from '@/modules/storage/service';
 import { getUuid } from '@/lib/hash';
+import { resolveR2ObjectKey } from '@/lib/r2-object-key';
 import {
   buildR2CopySourceHeader,
   buildR2S3ObjectUrl,
@@ -14,6 +15,60 @@ import { IMAGE_TO_VIDEO_MAX_IMAGE_BYTES } from './constants';
 
 const UPLOAD_EXPIRES_SECONDS = 10 * 60;
 const READ_EXPIRES_SECONDS = 60 * 60;
+
+type R2BucketBinding = {
+  put: (
+    key: string,
+    value:
+      | ReadableStream
+      | ArrayBuffer
+      | ArrayBufferView
+      | Blob
+      | string
+      | null,
+    options?: { httpMetadata?: { contentType?: string } }
+  ) => Promise<unknown>;
+};
+
+export class ImageToVideoR2BindingMissingError extends Error {
+  readonly statusCode = 503;
+  constructor() {
+    super(
+      'R2_BUCKET binding is not configured. Add r2_buckets to wrangler.jsonc and redeploy.'
+    );
+    this.name = 'ImageToVideoR2BindingMissingError';
+  }
+}
+
+function isCloudflareWorkersRuntime() {
+  const env = (globalThis as any).__CF_ENV__ ?? (globalThis as any).__env__;
+  return Boolean(env);
+}
+
+function getR2BucketBinding(): R2BucketBinding | null {
+  const env = (globalThis as any).__CF_ENV__ ?? (globalThis as any).__env__;
+  const binding = env?.R2_BUCKET ?? env?.BUCKET;
+  return binding && typeof binding.put === 'function'
+    ? (binding as R2BucketBinding)
+    : null;
+}
+
+/** Map put/proxy failures to HTTP status so the client can retry 5xx. */
+export function statusForImageToVideoProxyUploadError(error: unknown): number {
+  if (error instanceof ImageToVideoR2BindingMissingError) {
+    return error.statusCode;
+  }
+  if (error instanceof Error) {
+    if (
+      /mismatch|Invalid|Unsupported|must be|not an? |Provide |Missing body/i.test(
+        error.message
+      )
+    ) {
+      return 400;
+    }
+  }
+  return 502;
+}
 
 const IMAGE_CONTENT_TYPES: Record<string, string> = {
   'image/jpeg': 'jpg',
@@ -271,7 +326,118 @@ export async function createImageToVideoUploadDescriptor(params: {
     },
     storageKey: normalized.key,
     index: 0,
+    uploadMode: 'signed' as const,
   };
+}
+
+/**
+ * Same-origin upload URL (browser → app → R2). Avoids browser CORS / Failed-to-fetch
+ * against `*.r2.cloudflarestorage.com` — same pattern as Genjutsu proxy uploads.
+ */
+export function createImageToVideoProxyUploadDescriptor(
+  request: Request,
+  params: {
+    userId: string;
+    generationId: string;
+    contentType: string;
+    contentLength: number;
+  }
+) {
+  assertImageToVideoUploadSize(params.contentLength);
+  const normalized = getImageToVideoInputKey(params);
+  const origin = new URL(request.url).origin;
+  const uploadUrl = `${origin}/api/image-to-video/upload/${encodeURIComponent(
+    params.generationId
+  )}`;
+
+  return {
+    uploadUrl,
+    uploadHeaders: {
+      'Content-Type': normalized.contentType,
+    },
+    storageKey: normalized.key,
+    index: 0,
+    uploadMode: 'proxy' as const,
+  };
+}
+
+/**
+ * Write a staging object via Workers R2 binding, or signed S3 PUT on local Node.
+ */
+export async function putImageToVideoStagingObject(params: {
+  key: string;
+  body: ReadableStream | ArrayBuffer | ArrayBufferView | Blob;
+  contentType: string;
+  contentLength: number;
+}) {
+  assertSafeObjectKey(params.key);
+  if (!params.key.startsWith('image-to-video/inputs/')) {
+    throw new Error('Invalid image-to-video staging key');
+  }
+  assertImageToVideoUploadSize(params.contentLength);
+
+  const binding = getR2BucketBinding();
+  if (binding) {
+    const config = await getR2SigningConfig();
+    const objectKey = resolveR2ObjectKey(config.uploadPath, params.key);
+    await binding.put(objectKey, params.body, {
+      httpMetadata: { contentType: params.contentType },
+    });
+    return { via: 'binding' as const, objectKey };
+  }
+
+  if (isCloudflareWorkersRuntime()) {
+    throw new ImageToVideoR2BindingMissingError();
+  }
+
+  const config = await getR2SigningConfig();
+  const objectKey = resolveR2ObjectKey(config.uploadPath, params.key);
+  const bytes =
+    params.body instanceof ReadableStream
+      ? new Uint8Array(await new Response(params.body).arrayBuffer())
+      : params.body instanceof Blob
+        ? new Uint8Array(await params.body.arrayBuffer())
+        : params.body instanceof ArrayBuffer
+          ? new Uint8Array(params.body)
+          : new Uint8Array(
+              params.body.buffer,
+              params.body.byteOffset,
+              params.body.byteLength
+            );
+
+  if (bytes.byteLength !== params.contentLength) {
+    throw new Error(
+      `Upload size mismatch: expected ${params.contentLength}, got ${bytes.byteLength}`
+    );
+  }
+
+  const headers = new Headers({
+    'Content-Type': params.contentType,
+    'Content-Length': String(bytes.byteLength),
+    'x-amz-content-sha256': 'UNSIGNED-PAYLOAD',
+  });
+
+  const response = await createR2Client(config).fetch(
+    new Request(buildR2ObjectUrl(config, params.key), {
+      method: 'PUT',
+      headers,
+      body: bytes.buffer.slice(
+        bytes.byteOffset,
+        bytes.byteOffset + bytes.byteLength
+      ) as ArrayBuffer,
+    })
+  );
+
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '');
+    throw new Error(
+      `Failed to upload to R2: HTTP ${response.status}${
+        detail ? ` - ${detail.slice(0, 300)}` : ''
+      }`
+    );
+  }
+
+  return { via: 's3' as const, objectKey };
 }
 
 /**

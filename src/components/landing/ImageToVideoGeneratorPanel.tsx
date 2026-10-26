@@ -107,6 +107,7 @@ function PhotoSlot(props: {
   disabled?: boolean;
   label: string;
   hint: string;
+  aspectClass?: string;
   onPick: (file: File) => void;
   onRemove: () => void;
 }) {
@@ -126,7 +127,8 @@ function PhotoSlot(props: {
       </div>
       <div
         className={cn(
-          'relative aspect-[3/4] overflow-hidden rounded-2xl border border-dashed border-white/15 bg-black/35',
+          'relative overflow-hidden rounded-2xl border border-dashed border-white/15 bg-black/35',
+          props.aspectClass ?? 'aspect-[3/4]',
           props.disabled && 'opacity-60'
         )}
       >
@@ -280,14 +282,19 @@ export function ImageToVideoGeneratorPanel(props: {
     const guard = imagePrepare.begin();
     void (async () => {
       try {
-        const prepared = await prepareReferenceImageFile(file);
+        const prepared = await prepareReferenceImageFile({
+          file,
+          maxBytes: MAX_IMAGE_BYTES,
+          product: 'image-to-video',
+        });
         if (!guard.isCurrent()) return;
+        const nextFile = prepared.file;
         setPhoto((current) => {
           if (current) URL.revokeObjectURL(current.url);
           return {
             id: crypto.randomUUID(),
-            file: prepared,
-            url: URL.createObjectURL(prepared),
+            file: nextFile,
+            url: URL.createObjectURL(nextFile),
           };
         });
       } catch (cause) {
@@ -538,8 +545,11 @@ export function ImageToVideoGeneratorPanel(props: {
     meta?.previewUrl || '/videos/day-of-the-dead-ai-video-demo.mp4';
   const posterUrl =
     meta?.posterUrl || '/videos/day-of-the-dead-ai-video-demo-poster.jpg';
-  const aspectClass =
-    meta?.defaultAspectRatio === '16:9' ? 'aspect-video' : 'aspect-[9/16]';
+  const isLandscape = meta?.defaultAspectRatio === '16:9';
+  const aspectClass = isLandscape ? 'aspect-video' : 'aspect-[9/16]';
+  const previewFrameClass = isLandscape
+    ? 'relative mx-auto w-full max-w-[520px] rounded-2xl border border-white/10'
+    : 'relative mx-auto max-h-[420px] w-full max-w-[260px] rounded-2xl border border-white/10';
 
   return (
     <div className="mx-auto w-full max-w-[1120px]">
@@ -553,16 +563,13 @@ export function ImageToVideoGeneratorPanel(props: {
           </p>
         </div>
 
-        <div className="grid gap-0 lg:grid-cols-[0.9fr_1.1fr]">
+        <div className="grid gap-0 lg:grid-cols-[1.05fr_0.95fr]">
           <div className="flex items-center justify-center border-b border-white/8 p-4 sm:p-5 lg:border-r lg:border-b-0">
             <FixedTemplatePreview
               src={previewUrl}
               poster={posterUrl}
-              className={cn(
-                'relative mx-auto max-h-[420px] w-full max-w-[260px] rounded-2xl border border-white/10',
-                aspectClass
-              )}
-              objectFit="contain"
+              className={cn(previewFrameClass, aspectClass)}
+              objectFit="cover"
               autoPlay
               loop
               onStatusChange={setDemoStatus}
@@ -589,13 +596,19 @@ export function ImageToVideoGeneratorPanel(props: {
                 ? m['site.dotd.upload_hint_pet']()
                 : m['site.dotd.upload_hint_person']()}
             </p>
-            <div className="mx-auto w-full max-w-xs">
+            <div
+              className={cn(
+                'mx-auto w-full',
+                isLandscape ? 'max-w-md' : 'max-w-xs'
+              )}
+            >
               <PhotoSlot
                 item={photo}
                 inputRef={photoInputRef}
                 disabled={busy}
                 label={m['site.dotd.photo']()}
                 hint={m['site.dotd.photo_hint']()}
+                aspectClass={isLandscape ? 'aspect-video' : 'aspect-[3/4]'}
                 onPick={setPhotoFile}
                 onRemove={clearPhoto}
               />
@@ -698,7 +711,12 @@ export function ImageToVideoGeneratorPanel(props: {
               src={resultUrl}
               controls
               playsInline
-              className="mx-auto mt-4 max-h-[480px] w-full max-w-[280px] rounded-xl bg-black"
+              className={cn(
+                'mx-auto mt-4 w-full rounded-xl bg-black',
+                isLandscape
+                  ? 'max-h-[420px] max-w-[640px]'
+                  : 'max-h-[480px] max-w-[280px]'
+              )}
             />
           ) : (
             <p className="mt-3 text-sm text-white/45">

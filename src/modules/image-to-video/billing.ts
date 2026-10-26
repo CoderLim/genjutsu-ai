@@ -98,12 +98,37 @@ export async function getImageToVideoTaskByGenerationId(generationId: string) {
   return task ?? null;
 }
 
+export function getImageToVideoUploadBinding(task: {
+  options?: string | null;
+}) {
+  const options = parseJson(task.options);
+  if (!options) return null;
+  const stagingImageKey =
+    typeof options.stagingImageKey === 'string'
+      ? options.stagingImageKey
+      : null;
+  const contentType =
+    typeof options.contentType === 'string' ? options.contentType : null;
+  const contentLength = Number(options.contentLength);
+  if (
+    !stagingImageKey ||
+    !contentType ||
+    !Number.isSafeInteger(contentLength) ||
+    contentLength <= 0
+  ) {
+    return null;
+  }
+  return { stagingImageKey, contentType, contentLength };
+}
+
 export async function ensureImageToVideoInitiatedTask(params: {
   generationId: string;
   userId: string;
   presetId: ImageToVideoPresetId;
   variant: ImageToVideoVariant;
   stagingImageKey: string;
+  contentType: string;
+  contentLength: number;
 }) {
   const existing = await getImageToVideoTaskById({
     generationId: params.generationId,
@@ -113,7 +138,9 @@ export async function ensureImageToVideoInitiatedTask(params: {
     const options = parseJson(existing.options);
     if (
       options?.presetId !== params.presetId ||
-      options?.stagingImageKey !== params.stagingImageKey
+      options?.stagingImageKey !== params.stagingImageKey ||
+      options?.contentType !== params.contentType ||
+      Number(options?.contentLength) !== params.contentLength
     ) {
       throw new ImageToVideoGenerationConflictError(
         'This generation ID is already bound to different inputs'
@@ -135,6 +162,8 @@ export async function ensureImageToVideoInitiatedTask(params: {
         presetId: params.presetId,
         variant: params.variant,
         stagingImageKey: params.stagingImageKey,
+        contentType: params.contentType,
+        contentLength: params.contentLength,
       }),
       status: 'initiated',
       taskId: null,

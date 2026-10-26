@@ -25,3 +25,8 @@ test('variant defaults to person', () => {
   const preset = resolveImageToVideoPreset(DAY_OF_THE_DEAD_PRESET_ID);
   assert.equal(resolveImageToVideoVariant(preset, undefined), 'person');
 });
+
+test('day-of-the-dead defaults to landscape 16:9', () => {
+  const preset = resolveImageToVideoPreset(DAY_OF_THE_DEAD_PRESET_ID);
+  assert.equal(preset.defaultAspectRatio, '16:9');
+});

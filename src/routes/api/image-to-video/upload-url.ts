@@ -10,7 +10,7 @@ import {
 } from '@/modules/image-to-video/presets';
 import {
   assertImageToVideoUploadSize,
-  createImageToVideoUploadDescriptor,
+  createImageToVideoProxyUploadDescriptor,
   getImageToVideoInputKey,
 } from '@/modules/image-to-video/storage';
 import { enforceMinIntervalRateLimit } from '@/lib/rate-limit';
@@ -64,9 +64,12 @@ async function POST({ request }: { request: Request }) {
       presetId: preset.id,
       variant,
       stagingImageKey: normalized.key,
+      contentType: normalized.contentType,
+      contentLength,
     });
 
-    const upload = await createImageToVideoUploadDescriptor({
+    // Prefer same-origin proxy (Genjutsu pattern) so browser PUT never hits R2 CORS.
+    const upload = createImageToVideoProxyUploadDescriptor(request, {
       userId: session.user.id,
       generationId,
       contentType: normalized.contentType,
