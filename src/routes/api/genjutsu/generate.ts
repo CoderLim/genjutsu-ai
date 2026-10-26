@@ -156,6 +156,18 @@ import {
   SMALLTOWN_PRODUCT_ID,
 } from '@/modules/smalltown-boy-dance/constants';
 import {
+  assertTinyDeskAiInputs,
+  TinyDeskAiPreflightError,
+} from '@/modules/tiny-desk-ai/assert';
+import {
+  TINY_DESK_AI_ASPECT_RATIO,
+  TINY_DESK_AI_PRODUCT_ID,
+} from '@/modules/tiny-desk-ai/constants';
+import {
+  assertTinyDeskAiProviderBinding,
+  TinyDeskAiProviderBindingError,
+} from '@/modules/tiny-desk-ai/provider';
+import {
   assertZombieHugInputs,
   ZombieHugPreflightError,
 } from '@/modules/zombie-hug/assert';
@@ -400,6 +412,16 @@ async function POST({ request }: { request: Request }) {
       assertBurningBridgesAiInputs(taskOptions);
       assertBurningBridgesAiProviderBinding(task.provider, task.model);
     }
+
+    if (product === TINY_DESK_AI_PRODUCT_ID) {
+      if (!task) {
+        throw new TinyDeskAiPreflightError(
+          'Tiny Desk AI generation must start from a saved attempt'
+        );
+      }
+      assertTinyDeskAiInputs(taskOptions);
+      assertTinyDeskAiProviderBinding(task.provider, task.model);
+    }
     if (product === SAY_IT_RIGHT_AI_PRODUCT_ID) {
       if (!task) {
         throw new SayItRightAiPreflightError(
@@ -458,6 +480,7 @@ async function POST({ request }: { request: Request }) {
       (product === A2O_LITE_AI_PRODUCT_ID ||
         product === ENZO_FERNANDEZ_AI_PRODUCT_ID ||
         product === BURNING_BRIDGES_AI_PRODUCT_ID ||
+        product === TINY_DESK_AI_PRODUCT_ID ||
         product === SAY_IT_RIGHT_AI_PRODUCT_ID ||
         product === FLYING_CAR_AI_PRODUCT_ID ||
         product === COLDPLAY_KISS_CAM_PRODUCT_ID ||
@@ -490,20 +513,22 @@ async function POST({ request }: { request: Request }) {
               ? ENZO_FERNANDEZ_AI_ASPECT_RATIO
               : product === BURNING_BRIDGES_AI_PRODUCT_ID
                 ? BURNING_BRIDGES_AI_ASPECT_RATIO
-                : product === SAY_IT_RIGHT_AI_PRODUCT_ID
-                  ? SAY_IT_RIGHT_AI_ASPECT_RATIO
-                  : product === FLYING_CAR_AI_PRODUCT_ID
-                    ? FLYING_CAR_AI_ASPECT_RATIO
-                    : product === COLDPLAY_KISS_CAM_PRODUCT_ID
-                      ? COLDPLAY_KISS_CAM_ASPECT_RATIO
-                      : product === GANGNAM_STYLE_AI_PRODUCT_ID
-                        ? GANGNAM_STYLE_AI_ASPECT_RATIO
-                        : product === GAS_STATION_DANCE_AI_PRODUCT_ID
-                          ? GAS_STATION_DANCE_AI_ASPECT_RATIO
-                          : product === ZOMBIE_HUG_PRODUCT_ID &&
-                              isZombieHugAspectRatio(taskOptions?.aspectRatio)
-                            ? taskOptions.aspectRatio
-                            : undefined;
+                : product === TINY_DESK_AI_PRODUCT_ID
+                  ? TINY_DESK_AI_ASPECT_RATIO
+                  : product === SAY_IT_RIGHT_AI_PRODUCT_ID
+                    ? SAY_IT_RIGHT_AI_ASPECT_RATIO
+                    : product === FLYING_CAR_AI_PRODUCT_ID
+                      ? FLYING_CAR_AI_ASPECT_RATIO
+                      : product === COLDPLAY_KISS_CAM_PRODUCT_ID
+                        ? COLDPLAY_KISS_CAM_ASPECT_RATIO
+                        : product === GANGNAM_STYLE_AI_PRODUCT_ID
+                          ? GANGNAM_STYLE_AI_ASPECT_RATIO
+                          : product === GAS_STATION_DANCE_AI_PRODUCT_ID
+                            ? GAS_STATION_DANCE_AI_ASPECT_RATIO
+                            : product === ZOMBIE_HUG_PRODUCT_ID &&
+                                isZombieHugAspectRatio(taskOptions?.aspectRatio)
+                              ? taskOptions.aspectRatio
+                              : undefined;
 
     if (isSeedanceFamilyProvider(target.provider) && !hasStorageInput(input)) {
       throw new Error(
@@ -657,6 +682,8 @@ async function POST({ request }: { request: Request }) {
         error instanceof EnzoFernandezAiProviderBindingError ||
         error instanceof BurningBridgesAiPreflightError ||
         error instanceof BurningBridgesAiProviderBindingError ||
+        error instanceof TinyDeskAiPreflightError ||
+        error instanceof TinyDeskAiProviderBindingError ||
         error instanceof SayItRightAiPreflightError ||
         error instanceof SayItRightAiProviderBindingError ||
         error instanceof FlyingCarAiPreflightError ||

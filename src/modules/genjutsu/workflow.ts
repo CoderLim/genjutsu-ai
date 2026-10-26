@@ -20,6 +20,7 @@ export const GAS_STATION_DANCE_AI_PRODUCT = 'gas-station-dance-ai' as const;
 export const BURNING_BRIDGES_AI_PRODUCT = 'burning-bridges-ai' as const;
 export const SAY_IT_RIGHT_AI_PRODUCT = 'say-it-right-ai' as const;
 export const ZOMBIE_HUG_PRODUCT = 'zombie-hug' as const;
+export const TINY_DESK_AI_PRODUCT = 'tiny-desk-ai' as const;
 
 /** Keep inline to avoid a cycle with seedance-higgsfield.ts → workflow. */
 const SEEDANCE_HIGGSFIELD_MODEL_ID =
@@ -41,7 +42,8 @@ export function isGenjutsuProductId(
     value === GAS_STATION_DANCE_AI_PRODUCT ||
     value === BURNING_BRIDGES_AI_PRODUCT ||
     value === SAY_IT_RIGHT_AI_PRODUCT ||
-    value === ZOMBIE_HUG_PRODUCT
+    value === ZOMBIE_HUG_PRODUCT ||
+    value === TINY_DESK_AI_PRODUCT
   );
 }
 

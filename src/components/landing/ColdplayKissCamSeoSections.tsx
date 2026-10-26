@@ -54,6 +54,10 @@ const COMPARE_ROWS = [
 
 const RELATED_TEMPLATES = [
   {
+    label: () => 'Tiny Desk AI',
+    href: '/tiny-desk-ai',
+  },
+  {
     label: () => m['site.kisscam.seo.related_zombie'](),
     href: '/ai-zombie-hug',
   },

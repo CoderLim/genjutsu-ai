@@ -32,6 +32,10 @@ import {
   SMALLTOWN_TEMPLATE_POSTER_PATH,
 } from '@/modules/smalltown-boy-dance/constants';
 import { fixedTemplatePreviewPath } from '@/modules/templates/paths';
+import {
+  TINY_DESK_AI_TEMPLATE_DISPLAY_PATH,
+  TINY_DESK_AI_TEMPLATE_POSTER_PATH,
+} from '@/modules/tiny-desk-ai/constants';
 
 type MotionTemplateBase = {
   id: string;
@@ -93,6 +97,14 @@ export const MOTION_TEMPLATES: MotionTemplate[] = [
     sourceVideo: '/videos/day-of-the-dead-ai-video-demo.mp4',
     href: '/day-of-the-dead-ai-video',
     aspect: 'landscape',
+  },
+  {
+    id: 'tiny-desk-ai',
+    titleKey: 'site.templates.tiny_desk_ai',
+    poster: TINY_DESK_AI_TEMPLATE_POSTER_PATH,
+    sourceVideo: TINY_DESK_AI_TEMPLATE_DISPLAY_PATH,
+    href: '/tiny-desk-ai',
+    aspect: 'portrait',
   },
   {
     id: 'coldplay-kiss-cam',

@@ -1,16 +1,15 @@
 import { AwsClient } from 'aws4fetch';
 
+import { envConfigs } from '@/config';
+import { getAllConfigs } from '@/modules/config/service';
+import { getStorage } from '@/modules/storage/service';
+import { resolveR2ObjectKey } from '@/lib/r2-object-key';
 import {
   buildR2CopySourceHeader,
   buildR2S3ObjectUrl,
   resolveR2SigningConfigFromMap,
   type R2SigningConfig,
 } from '@/lib/r2-signing-config';
-import { resolveR2ObjectKey } from '@/lib/r2-object-key';
-
-import { envConfigs } from '@/config';
-import { getAllConfigs } from '@/modules/config/service';
-import { getStorage } from '@/modules/storage/service';
 
 import type { GenjutsuProductId } from './types';
 
@@ -974,6 +973,13 @@ export function getSayItRightAiTemplateVideoKey() {
   );
 }
 
+export function getTinyDeskAiTemplateVideoKey() {
+  return (
+    envConfigs.tiny_desk_ai_template_video_key?.trim() ||
+    'genjutsu/templates/tiny-desk-ai-v1.mp4'
+  );
+}
+
 async function ensureGenjutsuPublicTemplateInR2(params: {
   key: string;
   localRelative: string;
@@ -1105,6 +1111,14 @@ export async function ensureSayItRightAiTemplateInR2() {
   });
 }
 
+export async function ensureTinyDeskAiTemplateInR2() {
+  return ensureGenjutsuPublicTemplateInR2({
+    key: getTinyDeskAiTemplateVideoKey(),
+    localRelative: 'public/videos/tiny-desk-ai-tpl.mp4',
+    label: 'Tiny Desk AI',
+  });
+}
+
 /**
  * Logical R2 key for a Genjutsu product template (same key seal uses).
  * Exhaustive over GenjutsuProductId — unknown products must not fall through
@@ -1138,6 +1152,8 @@ export function getGenjutsuProductTemplateVideoKey(
       // Aspect-aware callers use getZombieHugTemplateVideoKey(aspect).
       // Default landscape key for the shared GenjutsuProductId helper.
       return getZombieHugTemplateVideoKey();
+    case 'tiny-desk-ai':
+      return getTinyDeskAiTemplateVideoKey();
     default: {
       const _exhaustive: never = product;
       throw new Error(
@@ -1176,6 +1192,8 @@ export async function ensureGenjutsuProductTemplateInR2(
       return ensureSayItRightAiTemplateInR2();
     case 'zombie-hug':
       return ensureZombieHugTemplateInR2();
+    case 'tiny-desk-ai':
+      return ensureTinyDeskAiTemplateInR2();
     default: {
       const _exhaustive: never = product;
       throw new Error(
@@ -1269,6 +1287,7 @@ export async function sealGenjutsuTemplateR2Inputs(params: {
   const gangnamStyleAiKey = getGangnamStyleAiTemplateVideoKey();
   const gasStationDanceAiKey = getGasStationDanceAiTemplateVideoKey();
   const burningBridgesAiKey = getBurningBridgesAiTemplateVideoKey();
+  const tinyDeskAiKey = getTinyDeskAiTemplateVideoKey();
   const templateVideoKey =
     params.templateVideoKey === landscapeKey
       ? await ensureZombieHugTemplateInR2('16:9')
@@ -1292,7 +1311,9 @@ export async function sealGenjutsuTemplateR2Inputs(params: {
                         ? await ensureGasStationDanceAiTemplateInR2()
                         : params.templateVideoKey === burningBridgesAiKey
                           ? await ensureBurningBridgesAiTemplateInR2()
-                          : params.templateVideoKey;
+                          : params.templateVideoKey === tinyDeskAiKey
+                            ? await ensureTinyDeskAiTemplateInR2()
+                            : params.templateVideoKey;
 
   assertSafeObjectKey(templateVideoKey);
   if (!templateVideoKey.startsWith('genjutsu/')) {

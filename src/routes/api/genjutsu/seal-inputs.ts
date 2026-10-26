@@ -36,12 +36,14 @@ import {
   getGenjutsuSealedInputKey,
   getSayItRightAiTemplateVideoKey,
   getSmalltownBoyDanceTemplateVideoKey,
+  getTinyDeskAiTemplateVideoKey,
   getZombieHugTemplateVideoKey,
   sealGenjutsuR2Inputs,
   sealGenjutsuTemplateR2Inputs,
 } from '@/modules/genjutsu/storage';
 import { SAY_IT_RIGHT_AI_PRODUCT_ID } from '@/modules/say-it-right-ai/constants';
 import { SMALLTOWN_PRODUCT_ID } from '@/modules/smalltown-boy-dance/constants';
+import { TINY_DESK_AI_PRODUCT_ID } from '@/modules/tiny-desk-ai/constants';
 import {
   isZombieHugAspectRatio,
   ZOMBIE_HUG_DEFAULT_ASPECT_RATIO,
@@ -141,12 +143,18 @@ async function POST({ request }: { request: Request }) {
                       ? getGasStationDanceAiTemplateVideoKey()
                       : product === BURNING_BRIDGES_AI_PRODUCT_ID
                         ? getBurningBridgesAiTemplateVideoKey()
-                        : product === SAY_IT_RIGHT_AI_PRODUCT_ID
-                          ? getSayItRightAiTemplateVideoKey()
-                          : product === ZOMBIE_HUG_PRODUCT_ID
-                            ? getZombieHugTemplateVideoKey(templateAspectRatio)
-                            : // Legacy: useDefaultTemplate without product → zombie keys.
-                              getZombieHugTemplateVideoKey(templateAspectRatio);
+                        : product === TINY_DESK_AI_PRODUCT_ID
+                          ? getTinyDeskAiTemplateVideoKey()
+                          : product === SAY_IT_RIGHT_AI_PRODUCT_ID
+                            ? getSayItRightAiTemplateVideoKey()
+                            : product === ZOMBIE_HUG_PRODUCT_ID
+                              ? getZombieHugTemplateVideoKey(
+                                  templateAspectRatio
+                                )
+                              : // Legacy: useDefaultTemplate without product → zombie keys.
+                                getZombieHugTemplateVideoKey(
+                                  templateAspectRatio
+                                );
     const videoKey =
       typeof currentOptions?.videoKey === 'string'
         ? currentOptions.videoKey

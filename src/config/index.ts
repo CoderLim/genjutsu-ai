@@ -258,6 +258,11 @@ export const envConfigs: Record<string, string> = {
     procEnv.SAY_IT_RIGHT_AI_TEMPLATE_VIDEO_KEY ??
     'genjutsu/templates/say-it-right-ai-v1.mp4',
 
+  // Tiny Desk AI (server-only). Fixed R2 template; client uploads one lead-singer image.
+  tiny_desk_ai_template_video_key:
+    procEnv.TINY_DESK_AI_TEMPLATE_VIDEO_KEY ??
+    'genjutsu/templates/tiny-desk-ai-v1.mp4',
+
   // Locale (public)
   locale: publicEnv('VITE_DEFAULT_LOCALE') ?? 'en',
 };

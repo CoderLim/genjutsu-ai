@@ -66,6 +66,12 @@ import {
   SMALLTOWN_PRODUCT_ID,
   SMALLTOWN_RESOLUTIONS,
 } from '@/modules/smalltown-boy-dance/constants';
+import { isAllowedTinyDeskAiPrompt } from '@/modules/tiny-desk-ai/assert';
+import {
+  TINY_DESK_AI_MODE,
+  TINY_DESK_AI_PRODUCT_ID,
+  TINY_DESK_AI_RESOLUTIONS,
+} from '@/modules/tiny-desk-ai/constants';
 import { isAllowedZombieHugPrompt } from '@/modules/zombie-hug/assert';
 import {
   ZOMBIE_HUG_MODE,
@@ -193,6 +199,31 @@ async function POST({ request }: { request: Request }) {
     if (isBurningBridgesAi && !isAllowedBurningBridgesAiPrompt(prompt)) {
       return respErr(
         'Burning Bridges AI prompt does not match the fixed product prompt',
+        {
+          status: 400,
+        }
+      );
+    }
+
+    const isTinyDeskAi = product === TINY_DESK_AI_PRODUCT_ID;
+    if (isTinyDeskAi && mode !== TINY_DESK_AI_MODE) {
+      return respErr('Tiny Desk AI only supports objects-swap', {
+        status: 400,
+      });
+    }
+    if (
+      isTinyDeskAi &&
+      !TINY_DESK_AI_RESOLUTIONS.includes(
+        resolution as (typeof TINY_DESK_AI_RESOLUTIONS)[number]
+      )
+    ) {
+      return respErr('Tiny Desk AI only supports 480p and 720p', {
+        status: 400,
+      });
+    }
+    if (isTinyDeskAi && !isAllowedTinyDeskAiPrompt(prompt)) {
+      return respErr(
+        'Tiny Desk AI prompt does not match the fixed product prompt',
         {
           status: 400,
         }

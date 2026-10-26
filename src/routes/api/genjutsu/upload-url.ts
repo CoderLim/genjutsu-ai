@@ -110,6 +110,7 @@ import {
   ensureGasStationDanceAiTemplateInR2,
   ensureSayItRightAiTemplateInR2,
   ensureSmalltownBoyDanceTemplateInR2,
+  ensureTinyDeskAiTemplateInR2,
   ensureZombieHugTemplateInR2,
   GENJUTSU_PROXY_UPLOAD_MAX_BYTES,
   getA2oLiteAiTemplateVideoKey,
@@ -123,6 +124,7 @@ import {
   getGenjutsuInputKey,
   getSayItRightAiTemplateVideoKey,
   getSmalltownBoyDanceTemplateVideoKey,
+  getTinyDeskAiTemplateVideoKey,
   getZombieHugTemplateVideoKey,
 } from '@/modules/genjutsu/storage';
 import type { GenjutsuProvider } from '@/modules/genjutsu/types';
@@ -146,6 +148,19 @@ import {
   SMALLTOWN_PRODUCT_ID,
   SMALLTOWN_RESOLUTIONS,
 } from '@/modules/smalltown-boy-dance/constants';
+import { isAllowedTinyDeskAiPrompt } from '@/modules/tiny-desk-ai/assert';
+import {
+  TINY_DESK_AI_ASPECT_RATIO,
+  TINY_DESK_AI_MAX_IMAGES,
+  TINY_DESK_AI_MIN_IMAGES,
+  TINY_DESK_AI_MODE,
+  TINY_DESK_AI_PRODUCT_ID,
+  TINY_DESK_AI_RESOLUTIONS,
+} from '@/modules/tiny-desk-ai/constants';
+import {
+  assertTinyDeskAiProviderBinding,
+  TinyDeskAiProviderBindingError,
+} from '@/modules/tiny-desk-ai/provider';
 import { isAllowedZombieHugPrompt } from '@/modules/zombie-hug/assert';
 import {
   isZombieHugAspectRatio,
@@ -197,6 +212,7 @@ async function POST({ request }: { request: Request }) {
     const isA2oLiteAi = product === A2O_LITE_AI_PRODUCT_ID;
     const isEnzoFernandezAi = product === ENZO_FERNANDEZ_AI_PRODUCT_ID;
     const isBurningBridgesAi = product === BURNING_BRIDGES_AI_PRODUCT_ID;
+    const isTinyDeskAi = product === TINY_DESK_AI_PRODUCT_ID;
     const isSayItRightAi = product === SAY_IT_RIGHT_AI_PRODUCT_ID;
     const isFlyingCarAi = product === FLYING_CAR_AI_PRODUCT_ID;
     const isColdplayKissCam = product === COLDPLAY_KISS_CAM_PRODUCT_ID;
@@ -214,6 +230,7 @@ async function POST({ request }: { request: Request }) {
         isA2oLiteAi ||
         isEnzoFernandezAi ||
         isBurningBridgesAi ||
+        isTinyDeskAi ||
         isSayItRightAi ||
         isFlyingCarAi ||
         isColdplayKissCam ||
@@ -230,6 +247,7 @@ async function POST({ request }: { request: Request }) {
         isA2oLiteAi ||
         isEnzoFernandezAi ||
         isBurningBridgesAi ||
+        isTinyDeskAi ||
         isSayItRightAi ||
         isFlyingCarAi ||
         isColdplayKissCam ||
@@ -247,11 +265,14 @@ async function POST({ request }: { request: Request }) {
         status: 400,
       });
     }
-    const fixedTemplateImageCount = isSingleImageProduct
-      ? FIXED_TEMPLATE_SINGLE_IMAGE_COUNT
-      : isTripleImageProduct
-        ? FIXED_TEMPLATE_TRIPLE_IMAGE_COUNT
-        : FIXED_TEMPLATE_DUAL_IMAGE_COUNT;
+    // Tiny Desk allows a contiguous 1–5 cast; other fixed templates are exact.
+    const fixedTemplateImageCount = isTinyDeskAi
+      ? null
+      : isSingleImageProduct
+        ? FIXED_TEMPLATE_SINGLE_IMAGE_COUNT
+        : isTripleImageProduct
+          ? FIXED_TEMPLATE_TRIPLE_IMAGE_COUNT
+          : FIXED_TEMPLATE_DUAL_IMAGE_COUNT;
 
     if (mode !== 'motion-transfer' && mode !== 'objects-swap') {
       return respErr('Invalid Genjutsu mode', { status: 400 });
@@ -371,6 +392,29 @@ async function POST({ request }: { request: Request }) {
     if (isBurningBridgesAi && !isAllowedBurningBridgesAiPrompt(prompt)) {
       return respErr(
         'Burning Bridges AI prompt does not match the fixed product prompt',
+        {
+          status: 400,
+        }
+      );
+    }
+    if (isTinyDeskAi && mode !== TINY_DESK_AI_MODE) {
+      return respErr('Tiny Desk AI only supports objects-swap', {
+        status: 400,
+      });
+    }
+    if (
+      isTinyDeskAi &&
+      !TINY_DESK_AI_RESOLUTIONS.includes(
+        resolution as (typeof TINY_DESK_AI_RESOLUTIONS)[number]
+      )
+    ) {
+      return respErr('Tiny Desk AI only supports 480p and 720p', {
+        status: 400,
+      });
+    }
+    if (isTinyDeskAi && !isAllowedTinyDeskAiPrompt(prompt)) {
+      return respErr(
+        'Tiny Desk AI prompt does not match the fixed product prompt',
         {
           status: 400,
         }
@@ -546,13 +590,27 @@ async function POST({ request }: { request: Request }) {
                         : isSmalltown
                           ? 'Smalltown Boy Dance'
                           : 'Crazy Frog';
-      const previewImageCount = isSingleImageProduct
-        ? 1
-        : isTripleImageProduct
-          ? 3
-          : 2;
+      const previewImageCount = isTinyDeskAi
+        ? Math.max(0, contentTypes.length - 1)
+        : isSingleImageProduct
+          ? 1
+          : isTripleImageProduct
+            ? 3
+            : 2;
       const previewUploadCount = previewImageCount + 1;
-      if (
+      if (isTinyDeskAi) {
+        if (
+          previewImageCount < TINY_DESK_AI_MIN_IMAGES ||
+          previewImageCount > TINY_DESK_AI_MAX_IMAGES ||
+          contentTypes.length !== previewUploadCount ||
+          contentLengths.length !== previewUploadCount
+        ) {
+          return respErr(
+            'Tiny Desk AI preview requires one trimmed video plus 1–5 reference images',
+            { status: 400 }
+          );
+        }
+      } else if (
         contentTypes.length !== previewUploadCount ||
         contentLengths.length !== previewUploadCount
       ) {
@@ -585,7 +643,18 @@ async function POST({ request }: { request: Request }) {
         }
       }
     } else if (isFixedTemplateProduct) {
-      if (
+      if (isTinyDeskAi) {
+        if (
+          contentTypes.length < TINY_DESK_AI_MIN_IMAGES ||
+          contentTypes.length > TINY_DESK_AI_MAX_IMAGES ||
+          contentLengths.length !== contentTypes.length
+        ) {
+          return respErr('Upload between 1 and 5 reference images', {
+            status: 400,
+          });
+        }
+      } else if (
+        fixedTemplateImageCount == null ||
         contentTypes.length !== fixedTemplateImageCount ||
         contentLengths.length !== fixedTemplateImageCount
       ) {
@@ -606,11 +675,13 @@ async function POST({ request }: { request: Request }) {
         const mime = contentType.split(';', 1)[0]?.trim().toLowerCase() || '';
         if (!mime.startsWith('image/')) {
           return respErr(
-            isSingleImageProduct
-              ? 'Upload must be an image (JPG, PNG, WebP, or GIF)'
-              : isTripleImageProduct
-                ? 'All three uploads must be images (JPG, PNG, WebP, or GIF)'
-                : 'Both uploads must be images (JPG, PNG, WebP, or GIF)',
+            isTinyDeskAi
+              ? 'All uploads must be images (JPG, PNG, WebP, or GIF)'
+              : isSingleImageProduct
+                ? 'Upload must be an image (JPG, PNG, WebP, or GIF)'
+                : isTripleImageProduct
+                  ? 'All three uploads must be images (JPG, PNG, WebP, or GIF)'
+                  : 'Both uploads must be images (JPG, PNG, WebP, or GIF)',
             { status: 400 }
           );
         }
@@ -637,9 +708,11 @@ async function POST({ request }: { request: Request }) {
                             ? getEnzoFernandezAiTemplateVideoKey()
                             : isBurningBridgesAi
                               ? getBurningBridgesAiTemplateVideoKey()
-                              : isSayItRightAi
-                                ? getSayItRightAiTemplateVideoKey()
-                                : getSmalltownBoyDanceTemplateVideoKey()
+                              : isTinyDeskAi
+                                ? getTinyDeskAiTemplateVideoKey()
+                                : isSayItRightAi
+                                  ? getSayItRightAiTemplateVideoKey()
+                                  : getSmalltownBoyDanceTemplateVideoKey()
           );
         } else if (isCrazyFrog) {
           await ensureCrazyFrogTemplateInR2();
@@ -659,6 +732,8 @@ async function POST({ request }: { request: Request }) {
           await ensureEnzoFernandezAiTemplateInR2();
         } else if (isBurningBridgesAi) {
           await ensureBurningBridgesAiTemplateInR2();
+        } else if (isTinyDeskAi) {
+          await ensureTinyDeskAiTemplateInR2();
         } else if (isSayItRightAi) {
           await ensureSayItRightAiTemplateInR2();
         } else {
@@ -686,9 +761,11 @@ async function POST({ request }: { request: Request }) {
                             ? 'Enzo Fernandez AI template is not configured in R2.'
                             : isBurningBridgesAi
                               ? 'Burning Bridges AI template is not configured in R2.'
-                              : isSayItRightAi
-                                ? 'Say It Right AI template is not configured in R2.'
-                                : 'Smalltown Boy Dance template is not configured in R2.'),
+                              : isTinyDeskAi
+                                ? 'Tiny Desk AI template is not configured in R2.'
+                                : isSayItRightAi
+                                  ? 'Say It Right AI template is not configured in R2.'
+                                  : 'Smalltown Boy Dance template is not configured in R2.'),
           { code: 'TEMPLATE_NOT_CONFIGURED' },
           { status: 503 }
         );
@@ -739,6 +816,9 @@ async function POST({ request }: { request: Request }) {
     }
     if (isBurningBridgesAi && existing) {
       assertBurningBridgesAiProviderBinding(existing.provider, existing.model);
+    }
+    if (isTinyDeskAi && existing) {
+      assertTinyDeskAiProviderBinding(existing.provider, existing.model);
     }
     if (isSayItRightAi && existing) {
       assertSayItRightAiProviderBinding(existing.provider, existing.model);
@@ -794,9 +874,11 @@ async function POST({ request }: { request: Request }) {
                     ? ENZO_FERNANDEZ_AI_ASPECT_RATIO
                     : isBurningBridgesAi
                       ? BURNING_BRIDGES_AI_ASPECT_RATIO
-                      : isSayItRightAi
-                        ? SAY_IT_RIGHT_AI_ASPECT_RATIO
-                        : SMALLTOWN_ASPECT_RATIO;
+                      : isTinyDeskAi
+                        ? TINY_DESK_AI_ASPECT_RATIO
+                        : isSayItRightAi
+                          ? SAY_IT_RIGHT_AI_ASPECT_RATIO
+                          : SMALLTOWN_ASPECT_RATIO;
 
     if (isFixedTemplateProduct) {
       await bindGenjutsuUploadInputs({
@@ -840,11 +922,13 @@ async function POST({ request }: { request: Request }) {
                         ? ENZO_FERNANDEZ_AI_ASPECT_RATIO
                         : isBurningBridgesAi
                           ? BURNING_BRIDGES_AI_ASPECT_RATIO
-                          : isSayItRightAi
-                            ? SAY_IT_RIGHT_AI_ASPECT_RATIO
-                            : isSmalltown
-                              ? SMALLTOWN_ASPECT_RATIO
-                              : CRAZY_FROG_ASPECT_RATIO
+                          : isTinyDeskAi
+                            ? TINY_DESK_AI_ASPECT_RATIO
+                            : isSayItRightAi
+                              ? SAY_IT_RIGHT_AI_ASPECT_RATIO
+                              : isSmalltown
+                                ? SMALLTOWN_ASPECT_RATIO
+                                : CRAZY_FROG_ASPECT_RATIO
           : undefined,
         videoKey: normalizedInputs[0].key,
         imageKeys: normalizedInputs.slice(1).map((item) => item.key),
@@ -901,6 +985,8 @@ async function POST({ request }: { request: Request }) {
       error instanceof A2oLiteAiProviderBindingError ||
       error instanceof EnzoFernandezAiProviderBindingError ||
       error instanceof BurningBridgesAiProviderBindingError ||
+      error instanceof TinyDeskAiProviderBindingError ||
+      error instanceof TinyDeskAiProviderBindingError ||
       error instanceof SayItRightAiProviderBindingError ||
       error instanceof FlyingCarAiProviderBindingError ||
       error instanceof ColdplayKissCamProviderBindingError ||

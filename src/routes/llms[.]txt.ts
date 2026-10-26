@@ -23,6 +23,12 @@ const STATIC_PAGES: { path: string; title: string; description: string }[] = [
     description: 'One-photo Bulin 47 freestyle AI video generator',
   },
   {
+    path: '/tiny-desk-ai',
+    title: 'Tiny Desk AI Video Generator',
+    description:
+      '1–5 photo Outstanding Tiny Desk concert AI video generator (cast swap, fixed desk template)',
+  },
+  {
     path: '/coldplay-kiss-cam',
     title: 'Coldplay Kiss Cam AI Video',
     description:

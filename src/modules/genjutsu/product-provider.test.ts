@@ -15,6 +15,7 @@ import {
   resolveProductProviderTarget,
   SAY_IT_RIGHT_AI_PRODUCT,
   SMALLTOWN_BOY_DANCE_PRODUCT,
+  TINY_DESK_AI_PRODUCT,
   ZOMBIE_HUG_PRODUCT,
 } from './workflow';
 
@@ -150,6 +151,7 @@ test('isGenjutsuProductId allowlist', () => {
   assert.equal(isGenjutsuProductId(BURNING_BRIDGES_AI_PRODUCT), true);
   assert.equal(isGenjutsuProductId(SAY_IT_RIGHT_AI_PRODUCT), true);
   assert.equal(isGenjutsuProductId(ZOMBIE_HUG_PRODUCT), true);
+  assert.equal(isGenjutsuProductId(TINY_DESK_AI_PRODUCT), true);
   assert.equal(isGenjutsuProductId('bulin-47'), false);
   assert.equal(isGenjutsuProductId(''), false);
 });
