@@ -2,12 +2,11 @@ import { createFileRoute } from '@tanstack/react-router';
 
 import { Link } from '@/core/i18n/navigation';
 import { localeLinks, socialMeta } from '@/lib/seo';
+import { m } from '@/paraglide/messages.js';
 import { getLocale } from '@/paraglide/runtime.js';
 import { getLocalizedGenjutsuPromptIdeas } from '@/components/landing/genjutsu-prompts-i18n';
-import { m } from '@/paraglide/messages.js';
 import { SiteFooter } from '@/components/landing/SiteFooter';
 import { SiteHeader } from '@/components/landing/SiteHeader';
-
 
 function GenjutsuPromptsPage() {
   return (
@@ -54,6 +53,17 @@ function GenjutsuPromptsPage() {
               </article>
             ))}
           </div>
+
+          <p className="text-foreground/60 mx-auto mt-10 max-w-2xl text-center text-sm">
+            {m['site.prompts.related_before']()}{' '}
+            <Link
+              href="/tiny-desk-ai"
+              className="text-primary underline-offset-4 hover:underline"
+            >
+              {m['site.prompts.related_tinydesk']()}
+            </Link>
+            {m['site.prompts.related_after']()}
+          </p>
 
           <div className="mt-14 flex justify-center">
             <Link

@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 
 import { Link } from '@/core/i18n/navigation';
+import { getTinyDeskAiSeoPriceAmounts } from '@/modules/tiny-desk-ai/seo-pricing';
 import { m } from '@/paraglide/messages.js';
 
 const HOW_STEPS = [
@@ -18,6 +19,12 @@ const HOW_STEPS = [
   },
 ] as const;
 
+function glancePriceBody() {
+  return m['site.tinydesk.seo.glance_price_body'](
+    getTinyDeskAiSeoPriceAmounts()
+  );
+}
+
 const GLANCE_ITEMS = [
   {
     title: () => m['site.tinydesk.seo.glance_upload_title'](),
@@ -29,7 +36,7 @@ const GLANCE_ITEMS = [
   },
   {
     title: () => m['site.tinydesk.seo.glance_price_title'](),
-    body: () => m['site.tinydesk.seo.glance_price_body'](),
+    body: glancePriceBody,
   },
 ] as const;
 
@@ -51,6 +58,10 @@ const PROMPT_IDEAS = [
 const FAQ_KEYS = [
   { q: 'site.tinydesk.seo.faq1_q', a: 'site.tinydesk.seo.faq1_a' },
   { q: 'site.tinydesk.seo.faq2_q', a: 'site.tinydesk.seo.faq2_a' },
+  {
+    q: 'site.tinydesk.seo.faq_template_q',
+    a: 'site.tinydesk.seo.faq_template_a',
+  },
   { q: 'site.tinydesk.seo.faq3_q', a: 'site.tinydesk.seo.faq3_a' },
   { q: 'site.tinydesk.seo.faq4_q', a: 'site.tinydesk.seo.faq4_a' },
   { q: 'site.tinydesk.seo.faq5_q', a: 'site.tinydesk.seo.faq5_a' },
@@ -61,13 +72,8 @@ const FAQ_KEYS = [
   { q: 'site.tinydesk.seo.faq10_q', a: 'site.tinydesk.seo.faq10_a' },
 ] as const;
 
-/** FAQPage JSON-LD — keep to a short product subset. */
-const FAQ_SCHEMA_KEYS = [
-  FAQ_KEYS[5],
-  FAQ_KEYS[8],
-  FAQ_KEYS[9],
-  FAQ_KEYS[0],
-] as const;
+/** FAQPage JSON-LD — must match visible FAQ items 1:1. */
+const FAQ_SCHEMA_KEYS = FAQ_KEYS;
 
 const RELATED_LINKS = [
   {
@@ -84,17 +90,24 @@ const RELATED_LINKS = [
   },
 ] as const;
 
+function faqAnswer(key: (typeof FAQ_KEYS)[number]['a']) {
+  if (key === 'site.tinydesk.seo.faq9_a') {
+    return m[key](getTinyDeskAiSeoPriceAmounts());
+  }
+  return m[key]();
+}
+
 export function getTinyDeskAiFaqItems() {
   return FAQ_KEYS.map((item) => ({
     question: m[item.q](),
-    answer: m[item.a](),
+    answer: faqAnswer(item.a),
   }));
 }
 
 export function getTinyDeskAiFaqSchemaItems() {
   return FAQ_SCHEMA_KEYS.map((item) => ({
     question: m[item.q](),
-    answer: m[item.a](),
+    answer: faqAnswer(item.a),
   }));
 }
 

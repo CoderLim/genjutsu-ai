@@ -13,8 +13,7 @@ import { toast } from 'sonner';
 import { useSession } from '@/core/auth/client';
 import {
   estimateGenjutsuCreditsForProvider,
-  GENJUTSU_CREDIT_PACKS,
-  getUsdPerCredit,
+  getDisplayUsdPerCredit,
 } from '@/modules/genjutsu/pricing';
 import type { GenjutsuProvider } from '@/modules/genjutsu/types';
 import {
@@ -456,7 +455,7 @@ export function TinyDeskAiGeneratorPanel({
   const generationStartedAtRef = useRef<number | null>(null);
   const resultPanelRef = useRef<HTMLDivElement>(null);
 
-  const starterUsdPerCredit = getUsdPerCredit(GENJUTSU_CREDIT_PACKS[0]!);
+  const displayUsdPerCredit = getDisplayUsdPerCredit();
 
   const estimatedCredits = useMemo(() => {
     return estimateGenjutsuCreditsForProvider({
@@ -1193,7 +1192,7 @@ export function TinyDeskAiGeneratorPanel({
                       {previewEstimatedCredits != null ? (
                         <span className="text-[10px] text-white/40">
                           {m['genjutsu.estimate.approx_usd']({
-                            amount: `$${(previewEstimatedCredits * starterUsdPerCredit).toFixed(2)}`,
+                            amount: `$${(previewEstimatedCredits * displayUsdPerCredit).toFixed(2)}`,
                           })}
                         </span>
                       ) : null}
@@ -1252,7 +1251,7 @@ export function TinyDeskAiGeneratorPanel({
                   {estimatedCredits != null ? (
                     <span className="text-[10px] text-white/40">
                       {m['genjutsu.estimate.approx_usd']({
-                        amount: `$${(estimatedCredits * starterUsdPerCredit).toFixed(2)}`,
+                        amount: `$${(estimatedCredits * displayUsdPerCredit).toFixed(2)}`,
                       })}
                     </span>
                   ) : null}

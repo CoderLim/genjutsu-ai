@@ -228,3 +228,18 @@ export function getCreditPack(id: GenjutsuCreditPackId) {
 export function getUsdPerCredit(pack: GenjutsuCreditPack) {
   return pack.priceCents / 100 / pack.credits;
 }
+
+/**
+ * Pack used for customer-facing “≈ $X” estimates (highlighted Creator).
+ * Starter remains the cheapest floor (“packs start at $4.99”).
+ */
+export function getDisplayCreditPack(): GenjutsuCreditPack {
+  return (
+    GENJUTSU_CREDIT_PACKS.find((pack) => pack.highlighted) ??
+    GENJUTSU_CREDIT_PACKS[0]!
+  );
+}
+
+export function getDisplayUsdPerCredit() {
+  return getUsdPerCredit(getDisplayCreditPack());
+}

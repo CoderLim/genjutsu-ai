@@ -58,6 +58,8 @@ type MotionTemplateApply = MotionTemplateBase & {
 /** Opens a dedicated product page (wrong provider if applied on homepage). */
 type MotionTemplateLink = MotionTemplateBase & {
   href: string;
+  /** Optional gallery CTA label (default: site.templates.use). */
+  ctaLabelKey?: string;
 };
 
 export type MotionTemplate = MotionTemplateApply | MotionTemplateLink;
@@ -104,6 +106,8 @@ export const MOTION_TEMPLATES: MotionTemplate[] = [
     poster: TINY_DESK_AI_TEMPLATE_POSTER_PATH,
     sourceVideo: TINY_DESK_AI_TEMPLATE_DISPLAY_PATH,
     href: '/tiny-desk-ai',
+    // Width-limited gallery CTA — full "Outstanding…" phrase does not fit.
+    ctaLabelKey: 'site.templates.tiny_desk_ai_cta',
     aspect: 'portrait',
   },
   {

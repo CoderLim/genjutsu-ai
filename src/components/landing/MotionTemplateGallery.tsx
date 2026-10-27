@@ -204,10 +204,20 @@ function TemplateCard({
         ) : (
           <Link
             href={template.href}
-            aria-label={m['site.templates.use_aria']({ title })}
-            className={primaryActionClassName}
+            aria-label={
+              template.ctaLabelKey
+                ? tDynamic(template.ctaLabelKey)
+                : m['site.templates.use_aria']({ title })
+            }
+            className={cn(
+              primaryActionClassName,
+              template.ctaLabelKey &&
+                'max-w-[11.5rem] px-2 text-center leading-tight'
+            )}
           >
-            {m['site.templates.use']()}
+            {template.ctaLabelKey
+              ? tDynamic(template.ctaLabelKey)
+              : m['site.templates.use']()}
           </Link>
         )}
         <button

@@ -44,8 +44,6 @@ const TINY_DESK_INPUT_SHOWCASE_PHOTOS = [
 
 const TINY_DESK_INPUT_SHOWCASE_VIDEO = TINY_DESK_EXAMPLE_CASES[0];
 const OG_IMAGE = TINY_DESK_EXAMPLE_CASES[0].poster;
-const DEMO_VIDEO = TINY_DESK_EXAMPLE_CASES[0].src;
-const DEMO_POSTER = TINY_DESK_EXAMPLE_CASES[0].poster;
 /** English-only for now — advertise en + x-default only. */
 const SEO_LOCALES = ['en'] as const;
 
@@ -78,19 +76,19 @@ function howToJsonLd() {
   };
 }
 
-function videoJsonLd(canonical: string) {
-  return {
+function videoJsonLdItems(canonical: string) {
+  return TINY_DESK_EXAMPLE_CASES.map((clip, index) => ({
     '@context': 'https://schema.org',
     '@type': 'VideoObject',
-    name: m['site.tinydesk.hero_title'](),
-    description: m['site.tinydesk.page_description'](),
-    thumbnailUrl: [absoluteUrl(DEMO_POSTER)],
-    contentUrl: absoluteUrl(DEMO_VIDEO),
+    name: `${m['site.tinydesk.example_title']()} ${index + 1}`,
+    description: m['site.tinydesk.example_caption'](),
+    thumbnailUrl: [absoluteUrl(clip.poster)],
+    contentUrl: absoluteUrl(clip.src),
     uploadDate: '2026-10-26',
     duration: 'PT15S',
     encodingFormat: 'video/mp4',
     mainEntityOfPage: canonical,
-  };
+  }));
 }
 
 function softwareApplicationJsonLd(canonical: string) {
@@ -141,7 +139,9 @@ function TinyDeskAiPage() {
     <div className="min-h-screen bg-[hsl(28_25%_9%)] text-[rgb(237,234,222)]">
       <SeoJsonLd value={faqJsonLd()} />
       <SeoJsonLd value={howToJsonLd()} />
-      <SeoJsonLd value={videoJsonLd(canonical)} />
+      {videoJsonLdItems(canonical).map((item) => (
+        <SeoJsonLd key={item.contentUrl} value={item} />
+      ))}
       <SeoJsonLd value={softwareApplicationJsonLd(canonical)} />
       <SeoJsonLd value={breadcrumbJsonLd(canonical)} />
 
