@@ -18,13 +18,13 @@ export const TINY_DESK_AI_TEMPLATE_POSTER_PATH =
   '/videos/tiny-desk-ai-tpl-poster.jpg';
 /**
  * Pre-trimmed 4s clip for paid Preview uploads.
- * Avoids client ffmpeg.wasm re-encode of the full ~19s template when available.
+ * Avoids client ffmpeg.wasm re-encode of the full ~15s template when available.
  */
 export const TINY_DESK_AI_PREVIEW_CLIP_PATH =
   '/videos/tiny-desk-ai-preview-4s.mp4';
 
-/** ffprobe duration of public/videos/tiny-desk-ai-tpl.mp4 (IG reel De3d3xJR_vL). */
-export const TINY_DESK_AI_TEMPLATE_DURATION_SECONDS = 18.828526;
+/** ffprobe duration of public/videos/tiny-desk-ai-tpl.mp4 (first 15s of IG reel De3d3xJR_vL). */
+export const TINY_DESK_AI_TEMPLATE_DURATION_SECONDS = 15;
 
 /** Source is 716×1272. */
 export const TINY_DESK_AI_ASPECT_RATIO: HiggsfieldSeedanceAspectRatio = '9:16';

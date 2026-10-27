@@ -976,7 +976,7 @@ export function getSayItRightAiTemplateVideoKey() {
 export function getTinyDeskAiTemplateVideoKey() {
   return (
     envConfigs.tiny_desk_ai_template_video_key?.trim() ||
-    'genjutsu/templates/tiny-desk-ai-v1.mp4'
+    'genjutsu/templates/tiny-desk-ai-v2.mp4'
   );
 }
 

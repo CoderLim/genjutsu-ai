@@ -87,7 +87,7 @@ function videoJsonLd(canonical: string) {
     thumbnailUrl: [absoluteUrl(DEMO_POSTER)],
     contentUrl: absoluteUrl(DEMO_VIDEO),
     uploadDate: '2026-10-26',
-    duration: 'PT19S',
+    duration: 'PT15S',
     encodingFormat: 'video/mp4',
     mainEntityOfPage: canonical,
   };
