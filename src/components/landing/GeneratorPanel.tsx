@@ -1180,7 +1180,7 @@ export function GeneratorPanel({
   const creditsQuery = useUserCredits(Boolean(session?.user));
   const { data: publicConfig } = usePublicConfig();
   const [internalMode, setInternalMode] =
-    useState<GeneratorMode>('motion-transfer');
+    useState<GeneratorMode>('objects-swap');
   const mode = modeProp ?? internalMode;
 
   const setMode = (next: GeneratorMode) => {
@@ -1190,7 +1190,7 @@ export function GeneratorPanel({
 
   const [prompt, setPrompt] = useState('');
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [resolution, setResolution] = useState<Resolution>('720p');
+  const [resolution, setResolution] = useState<Resolution>('480p');
   const [video, setVideo] = useState<MediaItem | null>(null);
   const [images, setImages] = useState<MediaItem[]>([]);
   const [status, setStatus] = useState<GenerationStatus>('idle');

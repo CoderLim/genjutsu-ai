@@ -31,7 +31,7 @@ function parsePayload(raw: unknown): AdminRecreatePayload | null {
 
   const mode = isMode(data.mode) ? data.mode : 'motion-transfer';
   const prompt = typeof data.prompt === 'string' ? data.prompt : '';
-  const resolution = isResolution(data.resolution) ? data.resolution : '720p';
+  const resolution = isResolution(data.resolution) ? data.resolution : '480p';
   const videoUrl =
     typeof data.videoUrl === 'string' && data.videoUrl.length > 0
       ? data.videoUrl

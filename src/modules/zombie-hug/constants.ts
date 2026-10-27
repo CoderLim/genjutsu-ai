@@ -12,8 +12,8 @@ export const ZOMBIE_HUG_RESOLUTIONS = ['480p', '720p'] as const;
 export type ZombieHugResolution = (typeof ZOMBIE_HUG_RESOLUTIONS)[number];
 /** @deprecated Prefer ZOMBIE_HUG_DEFAULT_RESOLUTION — kept for existing imports. */
 export const ZOMBIE_HUG_RESOLUTION =
-  '720p' as const satisfies ZombieHugResolution;
-export const ZOMBIE_HUG_DEFAULT_RESOLUTION: ZombieHugResolution = '720p';
+  '480p' as const satisfies ZombieHugResolution;
+export const ZOMBIE_HUG_DEFAULT_RESOLUTION: ZombieHugResolution = '480p';
 
 export const ZOMBIE_HUG_ASPECT_RATIOS = ['16:9', '9:16'] as const;
 export type ZombieHugAspectRatio = (typeof ZOMBIE_HUG_ASPECT_RATIOS)[number];

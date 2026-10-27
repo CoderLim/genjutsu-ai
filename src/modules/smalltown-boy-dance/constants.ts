@@ -22,7 +22,7 @@ export const SMALLTOWN_ASPECT_RATIO: HiggsfieldSeedanceAspectRatio = '3:4';
 /** First ship: hide 1080p — credit cost exceeds the largest single pack. */
 export const SMALLTOWN_RESOLUTIONS = ['480p', '720p'] as const;
 export type SmalltownResolution = (typeof SMALLTOWN_RESOLUTIONS)[number];
-export const SMALLTOWN_DEFAULT_RESOLUTION: GenjutsuResolution = '720p';
+export const SMALLTOWN_DEFAULT_RESOLUTION: GenjutsuResolution = '480p';
 
 export function isSmalltownResolution(
   value: unknown
