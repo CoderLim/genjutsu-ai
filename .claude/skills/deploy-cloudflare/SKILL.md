@@ -58,6 +58,7 @@ Narrate auto-picked resource names BEFORE acting so the user can interject with 
 3. **Always run the deploy through `pnpm run cf:deploy`.** It sources `.env.production` into the shell BEFORE the build. This matters because `src/lib/env.ts` `loadEnvFiles()` resolves `.env.local > .env.{NODE_ENV} > .env` and never overwrites existing `process.env` — shell-sourced prod values win over any localhost URL lingering in `.env.local`/`.env.development`, so the right `VITE_APP_URL` gets baked into the bundle (better-auth `trustedOrigins`, payment callbacks, canonicals).
 4. **Admin password handling (Phase 9.A):** the user types the password into chat once; pass it to `init-rbac.ts --admin-password=...` and never echo it back — not in narration, commits, or env files. It's stored hashed (better-auth/crypto). Remind them to rotate it after first login.
 5. **Don't hand-edit `.output/server/wrangler.json`** — it's generated. All config belongs in the root `wrangler.jsonc`, which nitro merges at build time.
+6. **Before `pnpm run cf:deploy`, if this ship touches template keys, `public/videos/*tpl*`, or R2 seed:** run `pnpm r2:verify-templates`. It HEADs physical `uploads/<logical>` the same way generate does. A passing `wrangler r2 object get` of the logical key is not enough. Fail the deploy if verify fails.
 
 ## Phase 0: Preflight
 
@@ -310,6 +311,14 @@ Warn: the zone must already exist in the account, else deploy fails with "not a 
 > - This creates a live URL and replaces any previous deployment. Proceed? (yes/no)
 
 On `yes`:
+
+If this ship changed template video keys or `public/videos/*tpl*`:
+
+```bash
+pnpm r2:verify-templates
+```
+
+Stop if it fails (physical key missing or a bare logical-key orphan). Then:
 
 ```bash
 pnpm run cf:deploy

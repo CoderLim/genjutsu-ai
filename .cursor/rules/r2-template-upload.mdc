@@ -1,0 +1,15 @@
+---
+description: Seed R2 templates with pnpm r2:put, never wrangler logical keys
+alwaysApply: true
+---
+
+# R2 template uploads
+
+App/DB storage keys are **logical** (`genjutsu/templates/tiny-desk-ai-v2.mp4`).
+The App HEADs the **physical** key `uploads/<logical>` via `resolveR2ObjectKey`.
+
+- Seed with `pnpm r2:put --key=<logical> --file=public/videos/….mp4`
+- Then `pnpm r2:verify-templates` (App-path HEAD). Do not treat `wrangler r2 object get` of the logical key as success.
+- Do **not** `wrangler r2 object put genjutsu-ai/<logical>` — wrangler writes that path literally and skips `uploads/`, so generate/preview 503 while the file looks uploaded
+- If you must use wrangler, the object path is `genjutsu-ai/uploads/<logical>`
+- After bumping a template key or replacing the mp4, verify **before** `pnpm cf:deploy` / user traffic

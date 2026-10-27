@@ -6,34 +6,19 @@
  */
 import { AwsClient } from 'aws4fetch';
 
+import { envConfigs } from '../src/config';
 import { resolveR2ObjectKey } from '../src/lib/r2-object-key';
 import {
   buildR2S3ObjectUrl,
   resolveR2SigningConfigFromMap,
 } from '../src/lib/r2-signing-config';
+import { listConfiguredTemplateLogicalKeys } from '../src/lib/r2-template-catalog';
 import { getAllConfigs } from '../src/modules/config/service';
 
-const TEMPLATE_LOGICAL_KEYS = [
-  'genjutsu/templates/zombie-hug.mp4',
-  'genjutsu/templates/zombie-hug-9x16.mp4',
-  'genjutsu/templates/smalltown-boy-dance-v1.mp4',
-  'genjutsu/templates/crazy-frog-v1.mp4',
-  'genjutsu/templates/a2o-lite-ai-v2.mp4',
-  'genjutsu/templates/enzo-fernandez-ai-v1.mp4',
-  'genjutsu/templates/flying-car-ai-v2.mp4',
-  'genjutsu/templates/coldplay-kiss-cam-v3.mp4',
-  'genjutsu/templates/gangnam-style-ai-v1.mp4',
-  'genjutsu/templates/gas-station-dance-ai-v1.mp4',
-  'genjutsu/templates/burning-bridges-ai-v2.mp4',
-  'genjutsu/templates/say-it-right-ai-v1.mp4',
-  'hotel-lobby/templates/default.mp4',
+const EXTRA_HOTEL_LOBBY_LOGICAL_KEYS = [
   'hotel-lobby/templates/crazy-frog-v1.mp4',
   'hotel-lobby/templates/rumpelstiltskin-v1.mp4',
   'hotel-lobby/templates/bulin-47-v1.mp4',
-  'kairo-bad-times/templates/v2.mp4',
-  'kairo-bad-times/templates/v2-preview.mp4',
-  'kairo-bad-times/templates/pet-v3.mp4',
-  'kairo-bad-times/templates/pet-v3-preview.mp4',
 ] as const;
 
 async function main() {
@@ -57,6 +42,12 @@ async function main() {
   console.log('\n### Step 1 Template HEAD');
   let pass = 0;
   let fail = 0;
+  const catalogKeys = listConfiguredTemplateLogicalKeys(envConfigs).map(
+    (row) => row.logicalKey
+  );
+  const TEMPLATE_LOGICAL_KEYS = [
+    ...new Set([...catalogKeys, ...EXTRA_HOTEL_LOBBY_LOGICAL_KEYS]),
+  ];
   for (const logical of TEMPLATE_LOGICAL_KEYS) {
     const physical = resolveR2ObjectKey(signing.uploadPath, logical);
     const url = buildR2S3ObjectUrl(signing, logical);

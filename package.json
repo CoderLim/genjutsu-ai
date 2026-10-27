@@ -14,6 +14,7 @@
     "cf:deploy": "sh -c 'set -a && [ -f .env.production ] && . ./.env.production; set +a && pnpm cf:build && exec wrangler deploy'",
     "postinstall": "mkdir -p data && (test -f src/config/db/schema.ts || node scripts/db-setup.mjs) && paraglide-js compile --project ./project.inlang --outdir ./src/paraglide",
     "r2:put": "tsx scripts/with-env.ts tsx scripts/r2-put-object.ts",
+    "r2:verify-templates": "tsx scripts/with-env.ts tsx scripts/r2-verify-templates.ts",
     "db:setup": "node scripts/db-setup.mjs",
     "db:push": "tsx scripts/with-env.ts drizzle-kit push --config=drizzle.config.ts",
     "db:generate": "tsx scripts/with-env.ts drizzle-kit generate --config=drizzle.config.ts",
