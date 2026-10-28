@@ -85,6 +85,7 @@ const VARIANT_ITEMS = [
 
 const EXPLORE_LINKS = [
   [m['site.crazy.more_a2o'], '/a2o-lite-ai'],
+  [m['site.crazy.more_shan_shen_bu'], '/shan-shen-bu'],
   [m['site.crazy.more_tinydesk'], '/tiny-desk-ai'],
   [m['site.crazy.more_hotel'], '/hotel-lobby-ai'],
   [m['site.crazy.more_zombie'], '/ai-zombie-hug'],

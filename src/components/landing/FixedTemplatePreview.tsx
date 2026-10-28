@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
 import { RotateCcw } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
@@ -42,10 +42,19 @@ export function FixedTemplatePreview({
     onStatusChange?.(media.status);
   }, [media.status, onStatusChange]);
 
+  // Cached videos can already have metadata before onLoadedMetadata attaches.
+  const videoRef = useCallback(
+    (el: HTMLVideoElement | null) => {
+      media.syncFromVideo(el);
+    },
+    [media.syncFromVideo]
+  );
+
   return (
     <div className={cn('relative overflow-hidden bg-black', className)}>
       <video
         key={media.videoSrc}
+        ref={videoRef}
         src={media.videoSrc}
         poster={poster}
         controls

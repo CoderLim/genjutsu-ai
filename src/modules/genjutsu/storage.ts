@@ -980,6 +980,13 @@ export function getTinyDeskAiTemplateVideoKey() {
   );
 }
 
+export function getShanShenBuTemplateVideoKey() {
+  return (
+    envConfigs.shan_shen_bu_template_video_key?.trim() ||
+    'genjutsu/templates/shan-shen-bu-v1.mp4'
+  );
+}
+
 async function ensureGenjutsuPublicTemplateInR2(params: {
   key: string;
   localRelative: string;
@@ -1119,6 +1126,14 @@ export async function ensureTinyDeskAiTemplateInR2() {
   });
 }
 
+export async function ensureShanShenBuTemplateInR2() {
+  return ensureGenjutsuPublicTemplateInR2({
+    key: getShanShenBuTemplateVideoKey(),
+    localRelative: 'public/videos/shan-shen-bu-tpl.mp4',
+    label: 'Shan Shen Bu',
+  });
+}
+
 /**
  * Logical R2 key for a Genjutsu product template (same key seal uses).
  * Exhaustive over GenjutsuProductId — unknown products must not fall through
@@ -1154,6 +1169,8 @@ export function getGenjutsuProductTemplateVideoKey(
       return getZombieHugTemplateVideoKey();
     case 'tiny-desk-ai':
       return getTinyDeskAiTemplateVideoKey();
+    case 'shan-shen-bu':
+      return getShanShenBuTemplateVideoKey();
     default: {
       const _exhaustive: never = product;
       throw new Error(
@@ -1194,6 +1211,8 @@ export async function ensureGenjutsuProductTemplateInR2(
       return ensureZombieHugTemplateInR2();
     case 'tiny-desk-ai':
       return ensureTinyDeskAiTemplateInR2();
+    case 'shan-shen-bu':
+      return ensureShanShenBuTemplateInR2();
     default: {
       const _exhaustive: never = product;
       throw new Error(

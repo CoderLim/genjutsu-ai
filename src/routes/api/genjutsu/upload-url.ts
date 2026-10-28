@@ -109,6 +109,7 @@ import {
   ensureGangnamStyleAiTemplateInR2,
   ensureGasStationDanceAiTemplateInR2,
   ensureSayItRightAiTemplateInR2,
+  ensureShanShenBuTemplateInR2,
   ensureSmalltownBoyDanceTemplateInR2,
   ensureTinyDeskAiTemplateInR2,
   ensureZombieHugTemplateInR2,
@@ -123,6 +124,7 @@ import {
   getGasStationDanceAiTemplateVideoKey,
   getGenjutsuInputKey,
   getSayItRightAiTemplateVideoKey,
+  getShanShenBuTemplateVideoKey,
   getSmalltownBoyDanceTemplateVideoKey,
   getTinyDeskAiTemplateVideoKey,
   getZombieHugTemplateVideoKey,
@@ -143,6 +145,17 @@ import {
   assertSayItRightAiProviderBinding,
   SayItRightAiProviderBindingError,
 } from '@/modules/say-it-right-ai/provider';
+import { isAllowedShanShenBuPrompt } from '@/modules/shan-shen-bu/assert';
+import {
+  SHAN_SHEN_BU_ASPECT_RATIO,
+  SHAN_SHEN_BU_MODE,
+  SHAN_SHEN_BU_PRODUCT_ID,
+  SHAN_SHEN_BU_RESOLUTIONS,
+} from '@/modules/shan-shen-bu/constants';
+import {
+  assertShanShenBuProviderBinding,
+  ShanShenBuProviderBindingError,
+} from '@/modules/shan-shen-bu/provider';
 import {
   SMALLTOWN_ASPECT_RATIO,
   SMALLTOWN_PRODUCT_ID,
@@ -215,6 +228,7 @@ async function POST({ request }: { request: Request }) {
     const isTinyDeskAi = product === TINY_DESK_AI_PRODUCT_ID;
     const isSayItRightAi = product === SAY_IT_RIGHT_AI_PRODUCT_ID;
     const isFlyingCarAi = product === FLYING_CAR_AI_PRODUCT_ID;
+    const isShanShenBu = product === SHAN_SHEN_BU_PRODUCT_ID;
     const isColdplayKissCam = product === COLDPLAY_KISS_CAM_PRODUCT_ID;
     const isGangnamStyleAi = product === GANGNAM_STYLE_AI_PRODUCT_ID;
     const isGasStationDanceAi = product === GAS_STATION_DANCE_AI_PRODUCT_ID;
@@ -223,6 +237,7 @@ async function POST({ request }: { request: Request }) {
     const isSingleImageProduct =
       isEnzoFernandezAi ||
       isFlyingCarAi ||
+      isShanShenBu ||
       isBurningBridgesAi ||
       isSayItRightAi;
     const isProductPreview =
@@ -233,6 +248,7 @@ async function POST({ request }: { request: Request }) {
         isTinyDeskAi ||
         isSayItRightAi ||
         isFlyingCarAi ||
+        isShanShenBu ||
         isColdplayKissCam ||
         isGangnamStyleAi ||
         isGasStationDanceAi ||
@@ -250,6 +266,7 @@ async function POST({ request }: { request: Request }) {
         isTinyDeskAi ||
         isSayItRightAi ||
         isFlyingCarAi ||
+        isShanShenBu ||
         isColdplayKissCam ||
         isGangnamStyleAi ||
         isGasStationDanceAi ||
@@ -318,15 +335,17 @@ async function POST({ request }: { request: Request }) {
                   ? 'Gas Station Dance AI preview must use 480p'
                   : isFlyingCarAi
                     ? 'Flying Car AI preview must use 480p'
-                    : isEnzoFernandezAi
-                      ? 'Enzo Fernandez AI preview must use 480p'
-                      : isBurningBridgesAi
-                        ? 'Burning Bridges AI preview must use 480p'
-                        : isSayItRightAi
-                          ? 'Say It Right AI preview must use 480p'
-                          : isSmalltown
-                            ? 'Smalltown Boy Dance preview must use 480p'
-                            : 'Crazy Frog preview must use 480p',
+                    : isShanShenBu
+                      ? 'Shan Shen Bu preview must use 480p'
+                      : isEnzoFernandezAi
+                        ? 'Enzo Fernandez AI preview must use 480p'
+                        : isBurningBridgesAi
+                          ? 'Burning Bridges AI preview must use 480p'
+                          : isSayItRightAi
+                            ? 'Say It Right AI preview must use 480p'
+                            : isSmalltown
+                              ? 'Smalltown Boy Dance preview must use 480p'
+                              : 'Crazy Frog preview must use 480p',
         { status: 400 }
       );
     }
@@ -466,6 +485,29 @@ async function POST({ request }: { request: Request }) {
         }
       );
     }
+    if (isShanShenBu && mode !== SHAN_SHEN_BU_MODE) {
+      return respErr('Shan Shen Bu only supports objects-swap', {
+        status: 400,
+      });
+    }
+    if (
+      isShanShenBu &&
+      !SHAN_SHEN_BU_RESOLUTIONS.includes(
+        resolution as (typeof SHAN_SHEN_BU_RESOLUTIONS)[number]
+      )
+    ) {
+      return respErr('Shan Shen Bu only supports 480p and 720p', {
+        status: 400,
+      });
+    }
+    if (isShanShenBu && !isAllowedShanShenBuPrompt(prompt)) {
+      return respErr(
+        'Shan Shen Bu prompt does not match the fixed product prompt',
+        {
+          status: 400,
+        }
+      );
+    }
     if (isColdplayKissCam && mode !== COLDPLAY_KISS_CAM_MODE) {
       return respErr('Coldplay Kiss Cam only supports objects-swap', {
         status: 400,
@@ -581,15 +623,17 @@ async function POST({ request }: { request: Request }) {
                 ? 'Gas Station Dance AI'
                 : isFlyingCarAi
                   ? 'Flying Car AI'
-                  : isEnzoFernandezAi
-                    ? 'Enzo Fernandez AI'
-                    : isBurningBridgesAi
-                      ? 'Burning Bridges AI'
-                      : isSayItRightAi
-                        ? 'Say It Right AI'
-                        : isSmalltown
-                          ? 'Smalltown Boy Dance'
-                          : 'Crazy Frog';
+                  : isShanShenBu
+                    ? 'Shan Shen Bu'
+                    : isEnzoFernandezAi
+                      ? 'Enzo Fernandez AI'
+                      : isBurningBridgesAi
+                        ? 'Burning Bridges AI'
+                        : isSayItRightAi
+                          ? 'Say It Right AI'
+                          : isSmalltown
+                            ? 'Smalltown Boy Dance'
+                            : 'Crazy Frog';
       const previewImageCount = isTinyDeskAi
         ? Math.max(0, contentTypes.length - 1)
         : isSingleImageProduct
@@ -704,15 +748,17 @@ async function POST({ request }: { request: Request }) {
                         ? getGasStationDanceAiTemplateVideoKey()
                         : isFlyingCarAi
                           ? getFlyingCarAiTemplateVideoKey()
-                          : isEnzoFernandezAi
-                            ? getEnzoFernandezAiTemplateVideoKey()
-                            : isBurningBridgesAi
-                              ? getBurningBridgesAiTemplateVideoKey()
-                              : isTinyDeskAi
-                                ? getTinyDeskAiTemplateVideoKey()
-                                : isSayItRightAi
-                                  ? getSayItRightAiTemplateVideoKey()
-                                  : getSmalltownBoyDanceTemplateVideoKey()
+                          : isShanShenBu
+                            ? getShanShenBuTemplateVideoKey()
+                            : isEnzoFernandezAi
+                              ? getEnzoFernandezAiTemplateVideoKey()
+                              : isBurningBridgesAi
+                                ? getBurningBridgesAiTemplateVideoKey()
+                                : isTinyDeskAi
+                                  ? getTinyDeskAiTemplateVideoKey()
+                                  : isSayItRightAi
+                                    ? getSayItRightAiTemplateVideoKey()
+                                    : getSmalltownBoyDanceTemplateVideoKey()
           );
         } else if (isCrazyFrog) {
           await ensureCrazyFrogTemplateInR2();
@@ -728,6 +774,8 @@ async function POST({ request }: { request: Request }) {
           await ensureGasStationDanceAiTemplateInR2();
         } else if (isFlyingCarAi) {
           await ensureFlyingCarAiTemplateInR2();
+        } else if (isShanShenBu) {
+          await ensureShanShenBuTemplateInR2();
         } else if (isEnzoFernandezAi) {
           await ensureEnzoFernandezAiTemplateInR2();
         } else if (isBurningBridgesAi) {
@@ -757,15 +805,17 @@ async function POST({ request }: { request: Request }) {
                         ? 'Gas Station Dance AI template is not configured in R2.'
                         : isFlyingCarAi
                           ? 'Flying Car AI template is not configured in R2.'
-                          : isEnzoFernandezAi
-                            ? 'Enzo Fernandez AI template is not configured in R2.'
-                            : isBurningBridgesAi
-                              ? 'Burning Bridges AI template is not configured in R2.'
-                              : isTinyDeskAi
-                                ? 'Tiny Desk AI template is not configured in R2.'
-                                : isSayItRightAi
-                                  ? 'Say It Right AI template is not configured in R2.'
-                                  : 'Smalltown Boy Dance template is not configured in R2.'),
+                          : isShanShenBu
+                            ? 'Shan Shen Bu template is not configured in R2.'
+                            : isEnzoFernandezAi
+                              ? 'Enzo Fernandez AI template is not configured in R2.'
+                              : isBurningBridgesAi
+                                ? 'Burning Bridges AI template is not configured in R2.'
+                                : isTinyDeskAi
+                                  ? 'Tiny Desk AI template is not configured in R2.'
+                                  : isSayItRightAi
+                                    ? 'Say It Right AI template is not configured in R2.'
+                                    : 'Smalltown Boy Dance template is not configured in R2.'),
           { code: 'TEMPLATE_NOT_CONFIGURED' },
           { status: 503 }
         );
@@ -826,6 +876,9 @@ async function POST({ request }: { request: Request }) {
     if (isFlyingCarAi && existing) {
       assertFlyingCarAiProviderBinding(existing.provider, existing.model);
     }
+    if (isShanShenBu && existing) {
+      assertShanShenBuProviderBinding(existing.provider, existing.model);
+    }
     if (isColdplayKissCam && existing) {
       assertColdplayKissCamProviderBinding(existing.provider, existing.model);
     }
@@ -870,15 +923,17 @@ async function POST({ request }: { request: Request }) {
                 ? GAS_STATION_DANCE_AI_ASPECT_RATIO
                 : isFlyingCarAi
                   ? FLYING_CAR_AI_ASPECT_RATIO
-                  : isEnzoFernandezAi
-                    ? ENZO_FERNANDEZ_AI_ASPECT_RATIO
-                    : isBurningBridgesAi
-                      ? BURNING_BRIDGES_AI_ASPECT_RATIO
-                      : isTinyDeskAi
-                        ? TINY_DESK_AI_ASPECT_RATIO
-                        : isSayItRightAi
-                          ? SAY_IT_RIGHT_AI_ASPECT_RATIO
-                          : SMALLTOWN_ASPECT_RATIO;
+                  : isShanShenBu
+                    ? SHAN_SHEN_BU_ASPECT_RATIO
+                    : isEnzoFernandezAi
+                      ? ENZO_FERNANDEZ_AI_ASPECT_RATIO
+                      : isBurningBridgesAi
+                        ? BURNING_BRIDGES_AI_ASPECT_RATIO
+                        : isTinyDeskAi
+                          ? TINY_DESK_AI_ASPECT_RATIO
+                          : isSayItRightAi
+                            ? SAY_IT_RIGHT_AI_ASPECT_RATIO
+                            : SMALLTOWN_ASPECT_RATIO;
 
     if (isFixedTemplateProduct) {
       await bindGenjutsuUploadInputs({
@@ -918,17 +973,19 @@ async function POST({ request }: { request: Request }) {
                     ? GAS_STATION_DANCE_AI_ASPECT_RATIO
                     : isFlyingCarAi
                       ? FLYING_CAR_AI_ASPECT_RATIO
-                      : isEnzoFernandezAi
-                        ? ENZO_FERNANDEZ_AI_ASPECT_RATIO
-                        : isBurningBridgesAi
-                          ? BURNING_BRIDGES_AI_ASPECT_RATIO
-                          : isTinyDeskAi
-                            ? TINY_DESK_AI_ASPECT_RATIO
-                            : isSayItRightAi
-                              ? SAY_IT_RIGHT_AI_ASPECT_RATIO
-                              : isSmalltown
-                                ? SMALLTOWN_ASPECT_RATIO
-                                : CRAZY_FROG_ASPECT_RATIO
+                      : isShanShenBu
+                        ? SHAN_SHEN_BU_ASPECT_RATIO
+                        : isEnzoFernandezAi
+                          ? ENZO_FERNANDEZ_AI_ASPECT_RATIO
+                          : isBurningBridgesAi
+                            ? BURNING_BRIDGES_AI_ASPECT_RATIO
+                            : isTinyDeskAi
+                              ? TINY_DESK_AI_ASPECT_RATIO
+                              : isSayItRightAi
+                                ? SAY_IT_RIGHT_AI_ASPECT_RATIO
+                                : isSmalltown
+                                  ? SMALLTOWN_ASPECT_RATIO
+                                  : CRAZY_FROG_ASPECT_RATIO
           : undefined,
         videoKey: normalizedInputs[0].key,
         imageKeys: normalizedInputs.slice(1).map((item) => item.key),
@@ -989,6 +1046,7 @@ async function POST({ request }: { request: Request }) {
       error instanceof TinyDeskAiProviderBindingError ||
       error instanceof SayItRightAiProviderBindingError ||
       error instanceof FlyingCarAiProviderBindingError ||
+      error instanceof ShanShenBuProviderBindingError ||
       error instanceof ColdplayKissCamProviderBindingError ||
       error instanceof ZombieHugProviderBindingError ||
       error instanceof GangnamStyleAiProviderBindingError ||

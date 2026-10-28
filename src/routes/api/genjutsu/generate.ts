@@ -148,6 +148,18 @@ import {
   SayItRightAiProviderBindingError,
 } from '@/modules/say-it-right-ai/provider';
 import {
+  assertShanShenBuInputs,
+  ShanShenBuPreflightError,
+} from '@/modules/shan-shen-bu/assert';
+import {
+  SHAN_SHEN_BU_ASPECT_RATIO,
+  SHAN_SHEN_BU_PRODUCT_ID,
+} from '@/modules/shan-shen-bu/constants';
+import {
+  assertShanShenBuProviderBinding,
+  ShanShenBuProviderBindingError,
+} from '@/modules/shan-shen-bu/provider';
+import {
   assertSmalltownBoyDanceInputs,
   SmalltownBoyDancePreflightError,
 } from '@/modules/smalltown-boy-dance/assert';
@@ -440,6 +452,15 @@ async function POST({ request }: { request: Request }) {
       assertFlyingCarAiInputs(taskOptions);
       assertFlyingCarAiProviderBinding(task.provider, task.model);
     }
+    if (product === SHAN_SHEN_BU_PRODUCT_ID) {
+      if (!task) {
+        throw new ShanShenBuPreflightError(
+          'Shan Shen Bu generation must start from a saved attempt'
+        );
+      }
+      assertShanShenBuInputs(taskOptions);
+      assertShanShenBuProviderBinding(task.provider, task.model);
+    }
     if (product === COLDPLAY_KISS_CAM_PRODUCT_ID) {
       if (!task) {
         throw new ColdplayKissCamPreflightError(
@@ -483,6 +504,7 @@ async function POST({ request }: { request: Request }) {
         product === TINY_DESK_AI_PRODUCT_ID ||
         product === SAY_IT_RIGHT_AI_PRODUCT_ID ||
         product === FLYING_CAR_AI_PRODUCT_ID ||
+        product === SHAN_SHEN_BU_PRODUCT_ID ||
         product === COLDPLAY_KISS_CAM_PRODUCT_ID ||
         product === GANGNAM_STYLE_AI_PRODUCT_ID ||
         product === GAS_STATION_DANCE_AI_PRODUCT_ID ||
@@ -519,16 +541,20 @@ async function POST({ request }: { request: Request }) {
                     ? SAY_IT_RIGHT_AI_ASPECT_RATIO
                     : product === FLYING_CAR_AI_PRODUCT_ID
                       ? FLYING_CAR_AI_ASPECT_RATIO
-                      : product === COLDPLAY_KISS_CAM_PRODUCT_ID
-                        ? COLDPLAY_KISS_CAM_ASPECT_RATIO
-                        : product === GANGNAM_STYLE_AI_PRODUCT_ID
-                          ? GANGNAM_STYLE_AI_ASPECT_RATIO
-                          : product === GAS_STATION_DANCE_AI_PRODUCT_ID
-                            ? GAS_STATION_DANCE_AI_ASPECT_RATIO
-                            : product === ZOMBIE_HUG_PRODUCT_ID &&
-                                isZombieHugAspectRatio(taskOptions?.aspectRatio)
-                              ? taskOptions.aspectRatio
-                              : undefined;
+                      : product === SHAN_SHEN_BU_PRODUCT_ID
+                        ? SHAN_SHEN_BU_ASPECT_RATIO
+                        : product === COLDPLAY_KISS_CAM_PRODUCT_ID
+                          ? COLDPLAY_KISS_CAM_ASPECT_RATIO
+                          : product === GANGNAM_STYLE_AI_PRODUCT_ID
+                            ? GANGNAM_STYLE_AI_ASPECT_RATIO
+                            : product === GAS_STATION_DANCE_AI_PRODUCT_ID
+                              ? GAS_STATION_DANCE_AI_ASPECT_RATIO
+                              : product === ZOMBIE_HUG_PRODUCT_ID &&
+                                  isZombieHugAspectRatio(
+                                    taskOptions?.aspectRatio
+                                  )
+                                ? taskOptions.aspectRatio
+                                : undefined;
 
     if (isSeedanceFamilyProvider(target.provider) && !hasStorageInput(input)) {
       throw new Error(
@@ -688,6 +714,8 @@ async function POST({ request }: { request: Request }) {
         error instanceof SayItRightAiProviderBindingError ||
         error instanceof FlyingCarAiPreflightError ||
         error instanceof FlyingCarAiProviderBindingError ||
+        error instanceof ShanShenBuPreflightError ||
+        error instanceof ShanShenBuProviderBindingError ||
         error instanceof ColdplayKissCamPreflightError ||
         error instanceof ColdplayKissCamProviderBindingError ||
         error instanceof GangnamStyleAiPreflightError ||

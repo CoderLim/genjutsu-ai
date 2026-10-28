@@ -13,6 +13,7 @@ import {
   GANGNAM_STYLE_AI_PRODUCT,
   GAS_STATION_DANCE_AI_PRODUCT,
   SAY_IT_RIGHT_AI_PRODUCT,
+  SHAN_SHEN_BU_PRODUCT,
   SMALLTOWN_BOY_DANCE_PRODUCT,
   TINY_DESK_AI_PRODUCT,
   ZOMBIE_HUG_PRODUCT,
@@ -24,6 +25,7 @@ const ALL_PRODUCTS: GenjutsuProductId[] = [
   A2O_LITE_AI_PRODUCT,
   ENZO_FERNANDEZ_AI_PRODUCT,
   FLYING_CAR_AI_PRODUCT,
+  SHAN_SHEN_BU_PRODUCT,
   COLDPLAY_KISS_CAM_PRODUCT,
   GANGNAM_STYLE_AI_PRODUCT,
   GAS_STATION_DANCE_AI_PRODUCT,
@@ -72,6 +74,10 @@ test('product id is reflected in its default template key path', () => {
   assert.match(
     getGenjutsuProductTemplateVideoKey(FLYING_CAR_AI_PRODUCT),
     /flying-car-ai/
+  );
+  assert.match(
+    getGenjutsuProductTemplateVideoKey(SHAN_SHEN_BU_PRODUCT),
+    /shan-shen-bu/
   );
   assert.match(
     getGenjutsuProductTemplateVideoKey(COLDPLAY_KISS_CAM_PRODUCT),

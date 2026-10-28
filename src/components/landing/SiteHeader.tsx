@@ -35,6 +35,7 @@ const TRENDING_LINKS = [
   { label: 'Gas Station Dance AI', href: '/gas-station-dance-ai' },
   { label: 'Say It Right AI', href: '/say-it-right-ai' },
   { label: 'Coldplay Kiss Cam', href: '/coldplay-kiss-cam' },
+  { label: 'Shan Shen Bu', href: '/shan-shen-bu' },
   { label: 'Flying Car AI', href: '/flying-car-ai' },
   { label: 'A2O LITE AI', href: '/a2o-lite-ai' },
   { label: 'Enzo Fernandez AI', href: '/enzo-fernandez-ai' },

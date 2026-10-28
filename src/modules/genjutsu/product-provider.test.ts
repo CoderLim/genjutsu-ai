@@ -14,6 +14,7 @@ import {
   resolveGenjutsuProviderTarget,
   resolveProductProviderTarget,
   SAY_IT_RIGHT_AI_PRODUCT,
+  SHAN_SHEN_BU_PRODUCT,
   SMALLTOWN_BOY_DANCE_PRODUCT,
   TINY_DESK_AI_PRODUCT,
   ZOMBIE_HUG_PRODUCT,
@@ -59,6 +60,15 @@ test('flying-car-ai follows the mode env router', () => {
   const fallback = resolveGenjutsuProviderTarget('objects-swap');
   const target = resolveProductProviderTarget(
     FLYING_CAR_AI_PRODUCT,
+    'objects-swap'
+  );
+  assert.deepEqual(target, fallback);
+});
+
+test('shan-shen-bu follows the mode env router', () => {
+  const fallback = resolveGenjutsuProviderTarget('objects-swap');
+  const target = resolveProductProviderTarget(
+    SHAN_SHEN_BU_PRODUCT,
     'objects-swap'
   );
   assert.deepEqual(target, fallback);
@@ -145,6 +155,7 @@ test('isGenjutsuProductId allowlist', () => {
   assert.equal(isGenjutsuProductId(A2O_LITE_AI_PRODUCT), true);
   assert.equal(isGenjutsuProductId(ENZO_FERNANDEZ_AI_PRODUCT), true);
   assert.equal(isGenjutsuProductId(FLYING_CAR_AI_PRODUCT), true);
+  assert.equal(isGenjutsuProductId(SHAN_SHEN_BU_PRODUCT), true);
   assert.equal(isGenjutsuProductId(COLDPLAY_KISS_CAM_PRODUCT), true);
   assert.equal(isGenjutsuProductId(GANGNAM_STYLE_AI_PRODUCT), true);
   assert.equal(isGenjutsuProductId(GAS_STATION_DANCE_AI_PRODUCT), true);

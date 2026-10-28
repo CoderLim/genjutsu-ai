@@ -53,6 +53,12 @@ const STATIC_PAGES: { path: string; title: string; description: string }[] = [
       'One-photo flying-car loop-ramp AI video generator (fixed template)',
   },
   {
+    path: '/shan-shen-bu',
+    title: 'Shan Shen Bu AI Video',
+    description:
+      'One-photo courtyard flash-step AI video generator (fixed template)',
+  },
+  {
     path: '/crazy-frog-ai',
     title: 'Crazy Frog AI Video',
     description: 'Two-photo Crazy Frog chase AI video generator',

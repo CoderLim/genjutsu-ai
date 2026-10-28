@@ -21,6 +21,7 @@ const STATIC_PATHS = [
   '/a2o-lite-ai',
   '/enzo-fernandez-ai',
   '/flying-car-ai',
+  '/shan-shen-bu',
   '/crazy-frog-ai',
   '/kairo-bad-times',
   '/smalltown-boy-dance',
@@ -43,6 +44,7 @@ const LIMITED_STATIC_PATH_LOCALES: Record<string, readonly string[]> = {
   '/bulin-47-ai': [baseLocale],
   // Tiny Desk AI ships English editorial first — do not advertise /ja /ko /es mirrors.
   '/tiny-desk-ai': [baseLocale],
+  '/shan-shen-bu': [baseLocale],
 };
 
 function enabledContentLocales(values: readonly string[]): string[] {

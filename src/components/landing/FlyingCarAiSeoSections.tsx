@@ -63,6 +63,10 @@ const FAQ_KEYS = [
 
 const EXPLORE_LINKS = [
   {
+    label: () => m['site.flying_car.seo.more_shan_shen'](),
+    href: '/shan-shen-bu',
+  },
+  {
     label: () => m['site.flying_car.seo.more_enzo'](),
     href: '/enzo-fernandez-ai',
   },

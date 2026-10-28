@@ -23,7 +23,8 @@ export type GenjutsuProductId =
   | 'burning-bridges-ai'
   | 'say-it-right-ai'
   | 'zombie-hug'
-  | 'tiny-desk-ai';
+  | 'tiny-desk-ai'
+  | 'shan-shen-bu';
 
 export type GenjutsuProviderTarget = {
   provider: GenjutsuProvider;

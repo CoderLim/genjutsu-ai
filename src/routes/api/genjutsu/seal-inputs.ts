@@ -35,6 +35,7 @@ import {
   getGasStationDanceAiTemplateVideoKey,
   getGenjutsuSealedInputKey,
   getSayItRightAiTemplateVideoKey,
+  getShanShenBuTemplateVideoKey,
   getSmalltownBoyDanceTemplateVideoKey,
   getTinyDeskAiTemplateVideoKey,
   getZombieHugTemplateVideoKey,
@@ -42,6 +43,7 @@ import {
   sealGenjutsuTemplateR2Inputs,
 } from '@/modules/genjutsu/storage';
 import { SAY_IT_RIGHT_AI_PRODUCT_ID } from '@/modules/say-it-right-ai/constants';
+import { SHAN_SHEN_BU_PRODUCT_ID } from '@/modules/shan-shen-bu/constants';
 import { SMALLTOWN_PRODUCT_ID } from '@/modules/smalltown-boy-dance/constants';
 import { TINY_DESK_AI_PRODUCT_ID } from '@/modules/tiny-desk-ai/constants';
 import {
@@ -135,26 +137,28 @@ async function POST({ request }: { request: Request }) {
               ? getEnzoFernandezAiTemplateVideoKey()
               : product === FLYING_CAR_AI_PRODUCT_ID
                 ? getFlyingCarAiTemplateVideoKey()
-                : product === COLDPLAY_KISS_CAM_PRODUCT_ID
-                  ? getColdplayKissCamTemplateVideoKey()
-                  : product === GANGNAM_STYLE_AI_PRODUCT_ID
-                    ? getGangnamStyleAiTemplateVideoKey()
-                    : product === GAS_STATION_DANCE_AI_PRODUCT_ID
-                      ? getGasStationDanceAiTemplateVideoKey()
-                      : product === BURNING_BRIDGES_AI_PRODUCT_ID
-                        ? getBurningBridgesAiTemplateVideoKey()
-                        : product === TINY_DESK_AI_PRODUCT_ID
-                          ? getTinyDeskAiTemplateVideoKey()
-                          : product === SAY_IT_RIGHT_AI_PRODUCT_ID
-                            ? getSayItRightAiTemplateVideoKey()
-                            : product === ZOMBIE_HUG_PRODUCT_ID
-                              ? getZombieHugTemplateVideoKey(
-                                  templateAspectRatio
-                                )
-                              : // Legacy: useDefaultTemplate without product → zombie keys.
-                                getZombieHugTemplateVideoKey(
-                                  templateAspectRatio
-                                );
+                : product === SHAN_SHEN_BU_PRODUCT_ID
+                  ? getShanShenBuTemplateVideoKey()
+                  : product === COLDPLAY_KISS_CAM_PRODUCT_ID
+                    ? getColdplayKissCamTemplateVideoKey()
+                    : product === GANGNAM_STYLE_AI_PRODUCT_ID
+                      ? getGangnamStyleAiTemplateVideoKey()
+                      : product === GAS_STATION_DANCE_AI_PRODUCT_ID
+                        ? getGasStationDanceAiTemplateVideoKey()
+                        : product === BURNING_BRIDGES_AI_PRODUCT_ID
+                          ? getBurningBridgesAiTemplateVideoKey()
+                          : product === TINY_DESK_AI_PRODUCT_ID
+                            ? getTinyDeskAiTemplateVideoKey()
+                            : product === SAY_IT_RIGHT_AI_PRODUCT_ID
+                              ? getSayItRightAiTemplateVideoKey()
+                              : product === ZOMBIE_HUG_PRODUCT_ID
+                                ? getZombieHugTemplateVideoKey(
+                                    templateAspectRatio
+                                  )
+                                : // Legacy: useDefaultTemplate without product → zombie keys.
+                                  getZombieHugTemplateVideoKey(
+                                    templateAspectRatio
+                                  );
     const videoKey =
       typeof currentOptions?.videoKey === 'string'
         ? currentOptions.videoKey

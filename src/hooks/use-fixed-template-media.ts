@@ -1,10 +1,17 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 export type FixedTemplateMediaStatus = 'loading' | 'ready' | 'error';
+
+/** HAVE_METADATA — enough to treat the fixed template as playable for gating. */
+const HAVE_METADATA = 1;
 
 /**
  * Track whether a fixed-template <video> could load media metadata.
  * Uses loadedmetadata (not play/autoplay) so a blocked autoplay is not an error.
+ *
+ * Cached / fast-path videos can already be HAVE_METADATA before React attaches
+ * `onLoadedMetadata`, so callers should also call `syncFromVideo` from a ref
+ * callback when the element mounts (and on detach → loading).
  */
 export function useFixedTemplateMedia(src: string) {
   const [status, setStatus] = useState<FixedTemplateMediaStatus>('loading');
@@ -17,12 +24,20 @@ export function useFixedTemplateMedia(src: string) {
     return `${src}${join}_retry=${retryNonce}`;
   }, [src, retryNonce]);
 
-  useEffect(() => {
-    setStatus('loading');
-  }, [videoSrc]);
-
   const onLoadedMetadata = useCallback(() => {
     setStatus('ready');
+  }, []);
+
+  const syncFromVideo = useCallback((video: HTMLVideoElement | null) => {
+    if (!video) {
+      setStatus('loading');
+      return;
+    }
+    if (video.readyState >= HAVE_METADATA) {
+      setStatus('ready');
+      return;
+    }
+    setStatus('loading');
   }, []);
 
   const onError = useCallback(() => {
@@ -37,6 +52,7 @@ export function useFixedTemplateMedia(src: string) {
     status,
     videoSrc,
     onLoadedMetadata,
+    syncFromVideo,
     onError,
     retry,
     isReady: status === 'ready',

@@ -28,6 +28,10 @@ import {
   KAIRO_BAD_TIMES_PREVIEW_PATH,
 } from '@/modules/kairo-bad-times/constants';
 import {
+  SHAN_SHEN_BU_TEMPLATE_PATH,
+  SHAN_SHEN_BU_TEMPLATE_POSTER_PATH,
+} from '@/modules/shan-shen-bu/constants';
+import {
   SMALLTOWN_TEMPLATE_PATH,
   SMALLTOWN_TEMPLATE_POSTER_PATH,
 } from '@/modules/smalltown-boy-dance/constants';
@@ -82,6 +86,14 @@ const DEFAULT_OBJECTS_RESOLUTION = '480p' as const;
  * Order: newest first — prepend new templates at the top of this array.
  */
 export const MOTION_TEMPLATES: MotionTemplate[] = [
+  {
+    id: 'shan-shen-bu',
+    titleKey: 'site.templates.shan_shen_bu',
+    poster: SHAN_SHEN_BU_TEMPLATE_POSTER_PATH,
+    sourceVideo: SHAN_SHEN_BU_TEMPLATE_PATH,
+    href: '/shan-shen-bu',
+    aspect: 'portrait',
+  },
   {
     id: 'night-slide',
     titleKey: 'site.templates.night_slide',

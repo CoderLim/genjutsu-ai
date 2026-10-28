@@ -62,6 +62,12 @@ import {
   SAY_IT_RIGHT_AI_PRODUCT_ID,
   SAY_IT_RIGHT_AI_RESOLUTIONS,
 } from '@/modules/say-it-right-ai/constants';
+import { isAllowedShanShenBuPrompt } from '@/modules/shan-shen-bu/assert';
+import {
+  SHAN_SHEN_BU_MODE,
+  SHAN_SHEN_BU_PRODUCT_ID,
+  SHAN_SHEN_BU_RESOLUTIONS,
+} from '@/modules/shan-shen-bu/constants';
 import {
   SMALLTOWN_PRODUCT_ID,
   SMALLTOWN_RESOLUTIONS,
@@ -272,6 +278,30 @@ async function POST({ request }: { request: Request }) {
     if (isFlyingCarAi && !isAllowedFlyingCarAiPrompt(prompt)) {
       return respErr(
         'Flying Car AI prompt does not match the fixed product prompt',
+        {
+          status: 400,
+        }
+      );
+    }
+    const isShanShenBu = product === SHAN_SHEN_BU_PRODUCT_ID;
+    if (isShanShenBu && mode !== SHAN_SHEN_BU_MODE) {
+      return respErr('Shan Shen Bu only supports objects-swap', {
+        status: 400,
+      });
+    }
+    if (
+      isShanShenBu &&
+      !SHAN_SHEN_BU_RESOLUTIONS.includes(
+        resolution as (typeof SHAN_SHEN_BU_RESOLUTIONS)[number]
+      )
+    ) {
+      return respErr('Shan Shen Bu only supports 480p and 720p', {
+        status: 400,
+      });
+    }
+    if (isShanShenBu && !isAllowedShanShenBuPrompt(prompt)) {
+      return respErr(
+        'Shan Shen Bu prompt does not match the fixed product prompt',
         {
           status: 400,
         }

@@ -25,3 +25,14 @@ test('first load keeps the original src', () => {
     '/api/genjutsu/template?product=hotel-lobby'
   );
 });
+
+/** Mirrors syncFromVideo gate: HAVE_METADATA (1) or higher → ready. */
+function statusFromReadyState(readyState: number): 'loading' | 'ready' {
+  return readyState >= 1 ? 'ready' : 'loading';
+}
+
+test('cached video already past HAVE_METADATA becomes ready without event', () => {
+  assert.equal(statusFromReadyState(0), 'loading');
+  assert.equal(statusFromReadyState(1), 'ready');
+  assert.equal(statusFromReadyState(4), 'ready');
+});

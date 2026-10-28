@@ -263,6 +263,11 @@ export const envConfigs: Record<string, string> = {
     procEnv.TINY_DESK_AI_TEMPLATE_VIDEO_KEY ??
     'genjutsu/templates/tiny-desk-ai-v2.mp4',
 
+  // Shan Shen Bu (server-only). Fixed R2 template; client uploads one image.
+  shan_shen_bu_template_video_key:
+    procEnv.SHAN_SHEN_BU_TEMPLATE_VIDEO_KEY ??
+    'genjutsu/templates/shan-shen-bu-v1.mp4',
+
   // Locale (public)
   locale: publicEnv('VITE_DEFAULT_LOCALE') ?? 'en',
 };
