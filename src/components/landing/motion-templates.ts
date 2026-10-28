@@ -78,8 +78,30 @@ const DEFAULT_OBJECTS_RESOLUTION = '480p' as const;
  * Dedicated product pages (Zombie Hug, Day of the Dead, Crazy Frog, …)
  * use `href` — Recreate on the homepage Genjutsu panel would use the
  * wrong provider/product.
+ *
+ * Order: newest first — prepend new templates at the top of this array.
  */
 export const MOTION_TEMPLATES: MotionTemplate[] = [
+  {
+    id: 'night-slide',
+    titleKey: 'site.templates.night_slide',
+    poster: '/videos/night-slide-tpl-poster.jpg',
+    sourceVideo: '/videos/night-slide-tpl.mp4',
+    prompt: [
+      'Replace the girl in @Video 1 with the subject in @Image 1 — face, hair, build, outfit, and accessories.',
+      '',
+      'SHOT STRUCTURE (same person in both shots):',
+      '1) Wide / full-body night street shot — the girl by the lamppost under the streetlight.',
+      '2) Close-up of the same girl smiling under the streetlight.',
+      '',
+      'The two shots are linked by a horizontal slide transition (camera/subject slide with motion blur). Keep one continuous identity across both shots — do not change who the person is between wide and close-up.',
+      '',
+      'Preserve the slide transition, camera path, night lighting, sidewalk, lamppost, and timing. Use only this authorized likeness.',
+    ].join('\n'),
+    mode: 'objects-swap',
+    resolution: DEFAULT_OBJECTS_RESOLUTION,
+    aspect: 'portrait',
+  },
   {
     id: 'zombie-hug',
     titleKey: 'site.templates.zombie_hug',
@@ -189,26 +211,6 @@ export const MOTION_TEMPLATES: MotionTemplate[] = [
     sourceVideo: fixedTemplatePreviewPath({ product: 'rumpelstiltskin' }),
     href: '/ai-rumpelstiltskin',
     aspect: 'landscape',
-  },
-  {
-    id: 'night-slide',
-    titleKey: 'site.templates.night_slide',
-    poster: '/videos/night-slide-tpl-poster.jpg',
-    sourceVideo: '/videos/night-slide-tpl.mp4',
-    prompt: [
-      'Replace the girl in @Video 1 with the subject in @Image 1 — face, hair, build, outfit, and accessories.',
-      '',
-      'SHOT STRUCTURE (same person in both shots):',
-      '1) Wide / full-body night street shot — the girl by the lamppost under the streetlight.',
-      '2) Close-up of the same girl smiling under the streetlight.',
-      '',
-      'The two shots are linked by a horizontal slide transition (camera/subject slide with motion blur). Keep one continuous identity across both shots — do not change who the person is between wide and close-up.',
-      '',
-      'Preserve the slide transition, camera path, night lighting, sidewalk, lamppost, and timing. Use only this authorized likeness.',
-    ].join('\n'),
-    mode: 'objects-swap',
-    resolution: DEFAULT_OBJECTS_RESOLUTION,
-    aspect: 'portrait',
   },
   {
     id: 'hotel-lobby',
