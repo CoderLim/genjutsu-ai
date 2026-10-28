@@ -70,7 +70,7 @@ export function isMotionTemplateApply(
   return !('href' in template && typeof template.href === 'string');
 }
 
-const DEFAULT_OBJECTS_RESOLUTION = '720p' as const;
+const DEFAULT_OBJECTS_RESOLUTION = '480p' as const;
 
 /**
  * Homepage motion templates. Aspect follows the source clip
@@ -191,6 +191,26 @@ export const MOTION_TEMPLATES: MotionTemplate[] = [
     aspect: 'landscape',
   },
   {
+    id: 'night-slide',
+    titleKey: 'site.templates.night_slide',
+    poster: '/videos/night-slide-tpl-poster.jpg',
+    sourceVideo: '/videos/night-slide-tpl.mp4',
+    prompt: [
+      'Replace the person in @Video 1 with the subject in @Image 1 — face, hair, build, outfit, and accessories.',
+      '',
+      'SHOT STRUCTURE (same person in both shots):',
+      '1) Wide / full-body night street shot — subject by the lamppost under the streetlight.',
+      '2) Close-up of the same person smiling under the streetlight.',
+      '',
+      'The two shots are linked by a horizontal slide transition (camera/subject slide with motion blur). Keep one continuous identity across both shots — do not change who the person is between wide and close-up.',
+      '',
+      'Preserve the slide transition, camera path, night lighting, sidewalk, lamppost, and timing. Use only this authorized likeness.',
+    ].join('\n'),
+    mode: 'objects-swap',
+    resolution: DEFAULT_OBJECTS_RESOLUTION,
+    aspect: 'portrait',
+  },
+  {
     id: 'hotel-lobby',
     titleKey: 'site.templates.hotel_lobby',
     poster: '/readme/hotel-lobby.jpg',
@@ -198,7 +218,7 @@ export const MOTION_TEMPLATES: MotionTemplate[] = [
     sourceVideo: '/videos/hotel-lobby-tpl.mp4',
     prompt: buildHotelLobbyPrompt(2),
     mode: 'objects-swap',
-    resolution: '720p',
+    resolution: DEFAULT_OBJECTS_RESOLUTION,
     aspect: 'landscape',
   },
   {
@@ -369,7 +389,7 @@ Character 2 @Image 2
 
 UNDER NO CIRCUMSTANCES CHANGE THE CHARACTERS' IDENTITIES! THEY MUST LOOK EXACTLY LIKE THEIR REFERENCES! DO NOT ALTER THEIR FACIAL PROPORTIONS OR HAIRSTYLES!`,
     mode: 'motion-transfer',
-    resolution: '720p',
+    resolution: DEFAULT_OBJECTS_RESOLUTION,
     aspect: 'portrait',
   },
 ];
