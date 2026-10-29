@@ -76,3 +76,4 @@ backups/
 
 # Chrome extension packaging (source in chrome-extension/; do not commit store zips)
 /genjutsu-ai-extension.zip
+.worktrees/

@@ -51,6 +51,11 @@ export const NAV_ITEMS: NavItem[] = [
             href: '/image-to-video',
           },
           {
+            title: 'Video Face Swap',
+            description: 'Replace a head in a short video with one portrait',
+            href: '/video-face-swap',
+          },
+          {
             title: 'Lip Sync',
             description: 'Create lip-sync videos with AI',
             href: 'https://fameo.ai/lip-sync-generators/ai-lip-sync-generator',

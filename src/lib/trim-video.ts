@@ -31,18 +31,26 @@ async function getFfmpeg() {
   }
 }
 
+type TrimSource = {
+  sourceUrl?: string;
+  /** Prefer File/Blob when available — more reliable than blob: URLs. */
+  sourceFile?: Blob;
+};
+
 /**
- * Trim a remote/local video to an MP4 clip for Fal video models.
+ * Trim a remote/local video to an MP4 clip for Fal / WaveSpeed video models.
  * Prefers stream-copy; falls back to re-encode if copy fails.
  */
 export async function trimVideoToFile(params: {
-  sourceUrl: string;
+  sourceUrl?: string;
+  sourceFile?: Blob;
   startSeconds: number;
   endSeconds: number;
   fileName?: string;
   /** Re-encode instead of stream-copy for frame-accurate short previews. */
   accurate?: boolean;
 }): Promise<File> {
+  const source = resolveTrimSource(params);
   const start = Math.max(0, params.startSeconds);
   const end = Math.max(start + 0.2, params.endSeconds);
   const duration = end - start;
@@ -53,8 +61,13 @@ export async function trimVideoToFile(params: {
   const ffmpeg = await getFfmpeg();
   const inputName = 'input.bin';
   const outputName = 'output.mp4';
+  const logs: string[] = [];
+  const onLog = ({ message }: { message: string }) => {
+    if (message) logs.push(message.slice(0, 240));
+  };
+  ffmpeg.on('log', onLog);
 
-  await ffmpeg.writeFile(inputName, await fetchFile(params.sourceUrl));
+  await ffmpeg.writeFile(inputName, await fetchFile(source));
 
   const run = async (args: string[]) => {
     await ffmpeg.deleteFile(outputName).catch(() => undefined);
@@ -69,7 +82,10 @@ export async function trimVideoToFile(params: {
     return data;
   };
 
-  const reencode = (videoCodec: 'libx264' | 'mpeg4') =>
+  const reencode = (
+    videoCodec: 'libx264' | 'mpeg4',
+    audioMode: 'none' | 'aac'
+  ) =>
     run([
       '-i',
       inputName,
@@ -80,10 +96,9 @@ export async function trimVideoToFile(params: {
       '-c:v',
       videoCodec,
       ...(videoCodec === 'libx264'
-        ? ['-preset', 'veryfast', '-crf', '23']
+        ? ['-preset', 'veryfast', '-crf', '23', '-pix_fmt', 'yuv420p']
         : ['-q:v', '5']),
-      '-c:a',
-      'aac',
+      ...(audioMode === 'aac' ? ['-c:a', 'aac'] : ['-an']),
       '-movflags',
       '+faststart',
       outputName,
@@ -106,32 +121,46 @@ export async function trimVideoToFile(params: {
       outputName,
     ]);
 
-  let data: Uint8Array;
+  /** Try strategies in order; keep first success. Prefer keeping audio. */
+  const strategies: Array<() => Promise<Uint8Array>> = params.accurate
+    ? [
+        // Keep soundtrack when possible. Only strip audio after AAC + copy fail
+        // (old path preferred -an, so Preview clips were silent).
+        () => reencode('libx264', 'aac'),
+        () => streamCopy(),
+        () => reencode('libx264', 'none'),
+        () => reencode('mpeg4', 'none'),
+      ]
+    : [
+        () => streamCopy(),
+        () => reencode('libx264', 'aac'),
+        () => reencode('libx264', 'none'),
+        () => reencode('mpeg4', 'none'),
+      ];
+
+  let data: Uint8Array | null = null;
+  let lastError: unknown;
   try {
-    if (params.accurate) {
+    for (const strategy of strategies) {
       try {
-        data = await reencode('libx264');
-      } catch {
-        // Some @ffmpeg/core builds / large sources fail libx264 in-browser.
-        try {
-          data = await reencode('mpeg4');
-        } catch {
-          data = await streamCopy();
-        }
-      }
-    } else {
-      try {
-        // Prefer fast stream-copy for existing callers that do not need exact timing.
-        data = await streamCopy();
-      } catch {
-        try {
-          data = await reencode('libx264');
-        } catch {
-          data = await reencode('mpeg4');
-        }
+        data = await strategy();
+        break;
+      } catch (cause) {
+        lastError = cause;
       }
     }
+    if (!data) {
+      const detail =
+        lastError instanceof Error ? lastError.message : 'unknown error';
+      const logTail = logs.slice(-6).join(' | ');
+      throw new Error(
+        logTail
+          ? `Video trim failed (${detail}). ${logTail}`
+          : `Video trim failed (${detail})`
+      );
+    }
   } finally {
+    ffmpeg.off('log', onLog);
     await ffmpeg.deleteFile(inputName).catch(() => undefined);
     await ffmpeg.deleteFile(outputName).catch(() => undefined);
   }
@@ -144,4 +173,10 @@ export async function trimVideoToFile(params: {
     type: 'video/mp4',
     lastModified: Date.now(),
   });
+}
+
+function resolveTrimSource(params: TrimSource): Blob | string {
+  if (params.sourceFile) return params.sourceFile;
+  if (params.sourceUrl) return params.sourceUrl;
+  throw new Error('trimVideoToFile requires sourceFile or sourceUrl');
 }

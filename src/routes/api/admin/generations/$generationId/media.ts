@@ -36,6 +36,12 @@ import {
   createKairoBadTimesR2ReadUrl,
 } from '@/modules/kairo-bad-times/storage';
 import { hasPermission } from '@/modules/rbac/service';
+import { getVideoFaceSwapTaskByGenerationId } from '@/modules/video-face-swap/billing';
+import { VIDEO_FACE_SWAP_SCENE } from '@/modules/video-face-swap/constants';
+import {
+  assertVideoFaceSwapSealedKeyOwned,
+  createVideoFaceSwapR2ReadUrl,
+} from '@/modules/video-face-swap/storage';
 
 function errorResponse(message: string, status: number) {
   return new Response(message, {
@@ -112,7 +118,11 @@ async function GET({
     hotelTask || genjutsuTask || kairoTask
       ? null
       : await getImageToVideoTaskByGenerationId(params.generationId);
-  const task = hotelTask ?? genjutsuTask ?? kairoTask ?? i2vTask;
+  const vfsTask =
+    hotelTask || genjutsuTask || kairoTask || i2vTask
+      ? null
+      : await getVideoFaceSwapTaskByGenerationId(params.generationId);
+  const task = hotelTask ?? genjutsuTask ?? kairoTask ?? i2vTask ?? vfsTask;
   if (!task) return errorResponse('Generation not found', 404);
 
   const options = parseOptions(task.options);
@@ -120,6 +130,47 @@ async function GET({
   const rawIndex = searchParams.get('index');
   const index = rawIndex == null ? Number.NaN : Number(rawIndex);
   const proxy = searchParams.get('proxy') === '1';
+
+  // Video face swap: index 0 = sealed source video, index 1 = sealed head photo.
+  if (task.scene === VIDEO_FACE_SWAP_SCENE) {
+    const sealedVideoKey =
+      typeof options?.sealedVideoKey === 'string'
+        ? options.sealedVideoKey
+        : typeof options?.videoKey === 'string'
+          ? options.videoKey
+          : null;
+    const sealedImageKey =
+      typeof options?.sealedImageKey === 'string'
+        ? options.sealedImageKey
+        : Array.isArray(options?.imageKeys) &&
+            typeof options.imageKeys[0] === 'string'
+          ? options.imageKeys[0]
+          : null;
+    if (!sealedVideoKey || !sealedImageKey) {
+      return errorResponse('Generation input not found', 404);
+    }
+    if (!Number.isInteger(index) || (index !== 0 && index !== 1)) {
+      return errorResponse('Invalid media index', 400);
+    }
+    try {
+      assertVideoFaceSwapSealedKeyOwned({
+        userId: task.userId,
+        generationId: task.id,
+        role: 'video',
+        key: sealedVideoKey,
+      });
+      assertVideoFaceSwapSealedKeyOwned({
+        userId: task.userId,
+        generationId: task.id,
+        role: 'image',
+        key: sealedImageKey,
+      });
+    } catch {
+      return errorResponse('Generation input not found', 404);
+    }
+    const key = index === 0 ? sealedVideoKey : sealedImageKey;
+    return deliverMedia(await createVideoFaceSwapR2ReadUrl(key), proxy);
+  }
 
   // Image-to-video: sealed photo only (no template video). index 0 = image.
   if (task.scene === IMAGE_TO_VIDEO_SCENE) {
