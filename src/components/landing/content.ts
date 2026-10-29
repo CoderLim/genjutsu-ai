@@ -716,6 +716,10 @@ export const FOOTER_COLUMNS: FooterColumn[] = [
     title: 'More Tools',
     links: [
       {
+        label: 'Video Face Swap',
+        href: '/video-face-swap',
+      },
+      {
         label: 'A2O LITE AI',
         href: 'https://a2oliteai.org',
       },

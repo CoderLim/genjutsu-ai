@@ -47,7 +47,6 @@ const TRENDING_LINKS = [
   { label: 'Hotel Lobby', href: '/hotel-lobby-ai' },
   { label: 'Zombie Hug', href: '/ai-zombie-hug' },
   { label: 'Day of the Dead AI Video', href: '/day-of-the-dead-ai-video' },
-  { label: 'Video Face Swap', href: '/video-face-swap' },
 ] as const;
 
 const navLinkClass =
