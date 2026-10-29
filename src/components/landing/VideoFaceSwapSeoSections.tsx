@@ -193,7 +193,7 @@ export function VideoFaceSwapSeoSections() {
       </section>
 
       <section className="space-y-4">
-        <h2 className="font-serif text-2xl tracking-tight text-zinc-900 dark:text-zinc-50">
+        <h2 className="text-2xl font-semibold tracking-tight text-white/90">
           How to swap a face in a video
         </h2>
         <ol className="list-decimal space-y-3 pl-5">
@@ -210,9 +210,8 @@ export function VideoFaceSwapSeoSections() {
           </li>
           <li>
             <strong>Choose the output resolution.</strong> Select 480p for a
-            lower-cost result or 720p for higher-resolution output. You can
-            optionally add a short instruction, but it cannot guarantee which
-            person is targeted in complex footage.
+            lower-cost result or 720p for higher-resolution output. Multi-person
+            or multi-cut footage may not target the person you expect.
           </li>
           <li>
             <strong>Review credits and generate.</strong> We show the estimated
@@ -223,7 +222,7 @@ export function VideoFaceSwapSeoSections() {
       </section>
 
       <section className="space-y-4">
-        <h2 className="font-serif text-2xl tracking-tight text-zinc-900 dark:text-zinc-50">
+        <h2 className="text-2xl font-semibold tracking-tight text-white/90">
           Why keeping the original performance matters
         </h2>
         <p>
@@ -242,13 +241,13 @@ export function VideoFaceSwapSeoSections() {
       </section>
 
       <section className="space-y-4">
-        <h2 className="font-serif text-2xl tracking-tight text-zinc-900 dark:text-zinc-50">
+        <h2 className="text-2xl font-semibold tracking-tight text-white/90">
           Video face swap vs. photo face swap
         </h2>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[28rem] border-collapse text-sm">
             <thead>
-              <tr className="border-b border-zinc-200 text-left dark:border-zinc-700">
+              <tr className="border-b border-white/12 text-left text-white/70">
                 <th className="py-2 pr-3 font-medium" />
                 <th className="py-2 pr-3 font-medium">Photo face swap</th>
                 <th className="py-2 font-medium">
@@ -257,19 +256,19 @@ export function VideoFaceSwapSeoSections() {
               </tr>
             </thead>
             <tbody>
-              <tr className="border-b border-zinc-100 dark:border-zinc-800">
+              <tr className="border-b border-white/8">
                 <td className="py-2 pr-3 font-medium">Input</td>
                 <td className="py-2 pr-3">Still images</td>
                 <td className="py-2">One source video + one portrait</td>
               </tr>
-              <tr className="border-b border-zinc-100 dark:border-zinc-800">
+              <tr className="border-b border-white/8">
                 <td className="py-2 pr-3 font-medium">Main challenge</td>
                 <td className="py-2 pr-3">Face angle and lighting</td>
                 <td className="py-2">
                   Moving faces, changing perspective and occlusion
                 </td>
               </tr>
-              <tr className="border-b border-zinc-100 dark:border-zinc-800">
+              <tr className="border-b border-white/8">
                 <td className="py-2 pr-3 font-medium">Output</td>
                 <td className="py-2 pr-3">A single edited image</td>
                 <td className="py-2">A processed video</td>
@@ -292,7 +291,7 @@ export function VideoFaceSwapSeoSections() {
       </section>
 
       <section className="space-y-4">
-        <h2 className="font-serif text-2xl tracking-tight text-zinc-900 dark:text-zinc-50">
+        <h2 className="text-2xl font-semibold tracking-tight text-white/90">
           What changes — and what stays
         </h2>
         <p>
@@ -310,7 +309,7 @@ export function VideoFaceSwapSeoSections() {
       </section>
 
       <section className="space-y-4">
-        <h2 className="font-serif text-2xl tracking-tight text-zinc-900 dark:text-zinc-50">
+        <h2 className="text-2xl font-semibold tracking-tight text-white/90">
           Specs at a glance
         </h2>
         <div className="overflow-x-auto">
@@ -319,8 +318,7 @@ export function VideoFaceSwapSeoSections() {
               {[
                 ['Source video', '3–120 seconds · MP4 / MOV / WebM · ≤100 MB'],
                 ['Reference images', 'Exactly one portrait'],
-                ['Output resolution', '480p or 720p'],
-                ['Prompt', 'Optional guidance'],
+                ['Output resolution', '480p or 720p (default 480p)'],
                 [
                   'Multi-shot input',
                   'Accepted; cross-shot identity consistency is not guaranteed',
@@ -336,11 +334,8 @@ export function VideoFaceSwapSeoSections() {
                 ],
                 ['Page language', 'English at initial launch'],
               ].map(([label, value]) => (
-                <tr
-                  key={label}
-                  className="border-b border-zinc-100 dark:border-zinc-800"
-                >
-                  <td className="py-2 pr-4 font-medium text-zinc-900 dark:text-zinc-100">
+                <tr key={label} className="border-b border-white/8">
+                  <td className="py-2 pr-4 font-medium text-white/80">
                     {label}
                   </td>
                   <td className="py-2">{value}</td>
@@ -352,7 +347,7 @@ export function VideoFaceSwapSeoSections() {
       </section>
 
       <section className="space-y-4">
-        <h2 className="font-serif text-2xl tracking-tight text-zinc-900 dark:text-zinc-50">
+        <h2 className="text-2xl font-semibold tracking-tight text-white/90">
           Consent, likeness and responsible use
         </h2>
         <p>
@@ -366,7 +361,7 @@ export function VideoFaceSwapSeoSections() {
       </section>
 
       <section className="space-y-4">
-        <h2 className="font-serif text-2xl tracking-tight text-zinc-900 dark:text-zinc-50">
+        <h2 className="text-2xl font-semibold tracking-tight text-white/90">
           What people use video head swaps for
         </h2>
         <p>
@@ -380,15 +375,13 @@ export function VideoFaceSwapSeoSections() {
       </section>
 
       <section className="space-y-4">
-        <h2 className="font-serif text-2xl tracking-tight text-zinc-900 dark:text-zinc-50">
+        <h2 className="text-2xl font-semibold tracking-tight text-white/90">
           FAQ
         </h2>
         <div className="space-y-5">
           {VIDEO_FACE_SWAP_FAQ_ITEMS.map((item) => (
             <div key={item.question}>
-              <h3 className="font-medium text-zinc-900 dark:text-zinc-50">
-                {item.question}
-              </h3>
+              <h3 className="font-medium text-white/88">{item.question}</h3>
               <p className="mt-1">{item.answer}</p>
             </div>
           ))}
@@ -396,7 +389,7 @@ export function VideoFaceSwapSeoSections() {
       </section>
 
       <section className="space-y-3">
-        <h2 className="font-serif text-2xl tracking-tight text-zinc-900 dark:text-zinc-50">
+        <h2 className="text-2xl font-semibold tracking-tight text-white/90">
           Related tools
         </h2>
         <ul className="list-disc space-y-1 pl-5">

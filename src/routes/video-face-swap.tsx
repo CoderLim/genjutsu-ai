@@ -14,6 +14,7 @@ import {
 import { SeoJsonLd } from '@/components/seo-json-ld';
 
 const PAGE_PATH = '/video-face-swap';
+const OG_IMAGE = '/og/video-face-swap.jpg';
 /** English-only at launch — advertise en + x-default only. */
 const SEO_LOCALES = ['en'] as const;
 
@@ -45,6 +46,13 @@ function softwareApplicationJsonLd() {
     operatingSystem: 'Web',
     url: absoluteUrl(PAGE_PATH),
     description: DESCRIPTION,
+    image: absoluteUrl(OG_IMAGE),
+    offers: {
+      '@type': 'Offer',
+      price: '0',
+      priceCurrency: 'USD',
+      description: 'Prepaid credits; estimate shown before generation',
+    },
   };
 }
 
@@ -92,7 +100,12 @@ export const Route = createFileRoute('/video-face-swap')({
           title: loaderData.title,
           description: loaderData.description,
           url: loaderData.canonical,
+          image: absoluteUrl(OG_IMAGE),
         }),
+        {
+          property: 'og:image:alt',
+          content: 'Video face swap before and after with reference portrait',
+        },
       ],
       links: [
         { rel: 'canonical', href: loaderData.canonical },
