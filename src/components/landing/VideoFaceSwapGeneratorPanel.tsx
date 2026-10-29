@@ -187,6 +187,33 @@ function newId() {
   return `vfs${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function isAllowedVideoFaceSwapVideo(file: File) {
+  const type = (file.type || '').toLowerCase();
+  if (
+    type === 'video/mp4' ||
+    type === 'video/quicktime' ||
+    type === 'video/webm' ||
+    type.includes('mp4')
+  ) {
+    return true;
+  }
+  return /\.(mp4|mov|webm)$/i.test(file.name);
+}
+
+function videoFaceSwapUploadContentType(file: File) {
+  const type = (file.type || '').toLowerCase();
+  if (
+    type === 'video/mp4' ||
+    type === 'video/quicktime' ||
+    type === 'video/webm'
+  ) {
+    return type;
+  }
+  if (/\.mov$/i.test(file.name)) return 'video/quicktime';
+  if (/\.webm$/i.test(file.name)) return 'video/webm';
+  return 'video/mp4';
+}
+
 async function readVideoDurationSeconds(file: File): Promise<number> {
   const url = URL.createObjectURL(file);
   return await new Promise<number>((resolve, reject) => {
@@ -235,7 +262,7 @@ function VideoSlot(props: {
       <input
         ref={props.inputRef}
         type="file"
-        accept="video/mp4"
+        accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm"
         className="hidden"
         onChange={onChange}
       />
@@ -286,7 +313,7 @@ function VideoSlot(props: {
               Source video
             </span>
             <span className="mt-1 block text-xs text-white/38">
-              MP4 · 3–30s · ≤100 MB
+              MP4 / MOV / WebM · 3–120s · ≤100 MB
             </span>
           </span>
         </button>
@@ -542,8 +569,8 @@ export function VideoFaceSwapGeneratorPanel() {
   }
 
   async function onPickVideo(file: File) {
-    if (!file.type.includes('mp4') && file.type !== 'video/mp4') {
-      toast.error('Please upload an MP4 video');
+    if (!isAllowedVideoFaceSwapVideo(file)) {
+      toast.error('Please upload an MP4, MOV, or WebM video');
       return;
     }
     if (file.size > VIDEO_FACE_SWAP_MAX_VIDEO_BYTES) {
@@ -576,7 +603,7 @@ export function VideoFaceSwapGeneratorPanel() {
       setJobError('');
       setSubmissionUnknown(false);
     } catch {
-      toast.error('Could not read that video. Try another MP4.');
+      toast.error('Could not read that video. Try another MP4, MOV, or WebM.');
     }
   }
 
@@ -660,7 +687,7 @@ export function VideoFaceSwapGeneratorPanel() {
         '/api/video-face-swap/upload-url',
         {
           generationId,
-          videoContentType: videoFile.type || 'video/mp4',
+          videoContentType: videoFaceSwapUploadContentType(videoFile),
           videoContentLength: videoFile.size,
           imageContentType: headPhoto.file.type || 'image/jpeg',
           imageContentLength: headPhoto.file.size,
@@ -692,7 +719,7 @@ export function VideoFaceSwapGeneratorPanel() {
           generationId,
           videoKey: videoUpload.storageKey,
           imageKey: imageUpload.storageKey,
-          videoContentType: videoFile.type || 'video/mp4',
+          videoContentType: videoFaceSwapUploadContentType(videoFile),
           videoContentLength: videoFile.size,
           imageContentType: headPhoto.file.type || 'image/jpeg',
           imageContentLength: headPhoto.file.size,

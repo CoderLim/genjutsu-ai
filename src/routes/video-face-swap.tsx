@@ -8,6 +8,7 @@ import { SiteHeader } from '@/components/landing/SiteHeader';
 import { VideoFaceSwapGeneratorPanel } from '@/components/landing/VideoFaceSwapGeneratorPanel';
 import {
   getVideoFaceSwapFaqSchemaItems,
+  VideoFaceSwapEffectDemo,
   VideoFaceSwapSeoSections,
 } from '@/components/landing/VideoFaceSwapSeoSections';
 import { SeoJsonLd } from '@/components/seo-json-ld';
@@ -18,7 +19,7 @@ const SEO_LOCALES = ['en'] as const;
 
 const TITLE = 'Video Face Swap Generator – AI Head Swap | Genjutsu AI';
 const DESCRIPTION =
-  'Swap a face in a video with one authorized portrait. Upload a 3–30s clip, keep the original body motion, and generate an AI head swap in 480p or 720p.';
+  'Swap a face in a video with one authorized portrait. Upload a 3–120s clip, keep the original body motion, and generate an AI head swap in 480p or 720p.';
 
 function faqJsonLd() {
   return {
@@ -123,7 +124,7 @@ function VideoFaceSwapPage() {
         </div>
 
         <main className="relative z-10">
-          <section className="mx-auto max-w-7xl px-4 pt-14 pb-12 text-center sm:pt-20 md:px-5 md:pb-16">
+          <section className="mx-auto max-w-7xl px-4 pt-10 pb-8 text-center sm:pt-14 md:px-5 md:pb-10">
             <div className="mx-auto mb-4 flex w-fit items-center gap-2 rounded-full border border-[rgba(204,144,92,0.2)] bg-[rgba(204,144,92,0.07)] px-3 py-1.5 text-xs font-medium text-[rgb(220,155,99)]">
               <WandSparkles className="size-3.5" />
               Video Face Swap · Head Swap
@@ -149,6 +150,10 @@ function VideoFaceSwapPage() {
 
             <div id="generator" className="mt-8 text-left sm:mt-10">
               <VideoFaceSwapGeneratorPanel />
+            </div>
+
+            <div className="mx-auto mt-6 w-full max-w-[1120px] text-left sm:mt-8">
+              <VideoFaceSwapEffectDemo />
             </div>
           </section>
 

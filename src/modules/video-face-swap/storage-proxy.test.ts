@@ -29,7 +29,7 @@ test('proxy upload descriptors are same-origin under /api/video-face-swap/upload
     /^https:\/\/example\.com\/api\/video-face-swap\/upload\/gen12345678\?role=video$/
   );
   assert.match(video.storageKey, /^video-face-swap\/inputs\//);
-  assert.match(video.storageKey, /\/video\.mp4$/);
+  assert.match(video.storageKey, /\/video\.(?:mp4|mov|webm)$/);
   assert.equal(video.role, 'video');
 
   assert.match(image.uploadUrl, /\?role=image$/);

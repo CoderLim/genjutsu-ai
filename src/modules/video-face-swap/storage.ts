@@ -79,8 +79,11 @@ const IMAGE_CONTENT_TYPES: Record<string, string> = {
   'image/png': 'png',
 };
 
+/** Containers we can probe for duration and that WaveSpeed commonly accepts via URL. */
 const VIDEO_CONTENT_TYPES: Record<string, string> = {
   'video/mp4': 'mp4',
+  'video/quicktime': 'mov',
+  'video/webm': 'webm',
 };
 
 export type VideoFaceSwapUploadRole = 'video' | 'image';
@@ -284,7 +287,9 @@ export function getVideoFaceSwapInputKey(params: {
     params.contentType.split(';', 1)[0]?.trim().toLowerCase() || '';
   if (params.role === 'video') {
     const ext = VIDEO_CONTENT_TYPES[normalized];
-    if (!ext) throw new Error('Unsupported video content type (MP4 only)');
+    if (!ext) {
+      throw new Error('Unsupported video content type (MP4, MOV, or WebM)');
+    }
     return {
       key: `${getVideoFaceSwapInputPrefix(params)}video.${ext}`,
       contentType: normalized,
@@ -310,7 +315,7 @@ export function assertVideoFaceSwapStagingKeyOwned(params: {
   const prefix = getVideoFaceSwapInputPrefix(params);
   const pattern =
     params.role === 'video'
-      ? new RegExp(`^${escapeRegExp(prefix)}video\\.mp4$`)
+      ? new RegExp(`^${escapeRegExp(prefix)}video\\.(?:mp4|mov|webm)$`)
       : new RegExp(`^${escapeRegExp(prefix)}head\\.(?:jpg|png)$`);
   if (!pattern.test(params.key)) {
     throw new Error('Invalid video-face-swap staging key');
@@ -327,7 +332,7 @@ export function assertVideoFaceSwapSealedKeyOwned(params: {
   const prefix = getVideoFaceSwapSealedInputPrefix(params);
   const pattern =
     params.role === 'video'
-      ? new RegExp(`^${escapeRegExp(prefix)}[A-Za-z0-9_-]+\\.mp4$`)
+      ? new RegExp(`^${escapeRegExp(prefix)}[A-Za-z0-9_-]+\\.(?:mp4|mov|webm)$`)
       : new RegExp(`^${escapeRegExp(prefix)}[A-Za-z0-9_-]+\\.(?:jpg|png)$`);
   if (!pattern.test(params.key)) {
     throw new Error('Invalid video-face-swap sealed key');

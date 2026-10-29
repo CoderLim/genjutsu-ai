@@ -1,4 +1,110 @@
+import { useEffect, useRef } from 'react';
+
 import { Link } from '@/core/i18n/navigation';
+
+const DEMO_BEFORE_SRC = '/videos/face-swap-demo-before.mp4';
+const DEMO_AFTER_SRC = '/videos/face-swap-demo-after.mp4';
+const DEMO_FACE_SRC = '/images/face-swap-demo-face.webp';
+
+export function VideoFaceSwapEffectDemo() {
+  const beforeRef = useRef<HTMLVideoElement>(null);
+  const afterRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    const before = beforeRef.current;
+    const after = afterRef.current;
+    if (!before || !after) return;
+
+    const playBoth = () => {
+      void before.play().catch(() => undefined);
+      void after.play().catch(() => undefined);
+    };
+
+    const syncFromBefore = () => {
+      if (Math.abs(after.currentTime - before.currentTime) > 0.15) {
+        after.currentTime = before.currentTime;
+      }
+    };
+
+    const onEnded = () => {
+      before.currentTime = 0;
+      after.currentTime = 0;
+      playBoth();
+    };
+
+    before.addEventListener('timeupdate', syncFromBefore);
+    before.addEventListener('ended', onEnded);
+    after.addEventListener('ended', onEnded);
+    playBoth();
+
+    return () => {
+      before.removeEventListener('timeupdate', syncFromBefore);
+      before.removeEventListener('ended', onEnded);
+      after.removeEventListener('ended', onEnded);
+    };
+  }, []);
+
+  return (
+    <div className="space-y-3">
+      <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-black shadow-[0_24px_60px_-28px_rgba(0,0,0,0.85)]">
+        <div className="grid grid-cols-2 gap-0">
+          <div className="relative min-w-0">
+            <video
+              ref={beforeRef}
+              src={DEMO_BEFORE_SRC}
+              muted
+              playsInline
+              autoPlay
+              loop
+              preload="metadata"
+              className="aspect-video w-full object-cover"
+              aria-label="Original source video"
+            />
+            <span className="absolute bottom-2 left-2 rounded-md bg-black/65 px-2 py-0.5 text-[11px] font-medium tracking-wide text-white/80 backdrop-blur">
+              Before
+            </span>
+          </div>
+          <div className="relative min-w-0">
+            <video
+              ref={afterRef}
+              src={DEMO_AFTER_SRC}
+              muted
+              playsInline
+              autoPlay
+              loop
+              preload="metadata"
+              className="aspect-video w-full object-cover"
+              aria-label="Head swap result video"
+            />
+            <span className="absolute right-2 bottom-2 rounded-md bg-black/65 px-2 py-0.5 text-[11px] font-medium tracking-wide text-white/80 backdrop-blur">
+              After
+            </span>
+          </div>
+        </div>
+
+        <div
+          className="pointer-events-none absolute inset-y-0 left-1/2 z-10 w-px -translate-x-1/2 bg-white/25"
+          aria-hidden
+        />
+        <div className="pointer-events-none absolute top-1/2 left-1/2 z-20 -translate-x-1/2 -translate-y-1/2">
+          <div className="size-14 overflow-hidden rounded-full border-2 border-white/85 bg-black shadow-[0_8px_28px_rgba(0,0,0,0.55)] ring-2 ring-black/50 sm:size-[4.5rem]">
+            <img
+              src={DEMO_FACE_SRC}
+              alt="Reference portrait used for the head swap"
+              className="size-full object-cover"
+              width={96}
+              height={96}
+              decoding="async"
+            />
+          </div>
+        </div>
+      </div>
+      <p className="text-center text-xs text-white/40">
+        Example result — source clip on the left, head swap on the right
+      </p>
+    </div>
+  );
+}
 
 export const VIDEO_FACE_SWAP_FAQ_ITEMS = [
   {
@@ -14,7 +120,7 @@ export const VIDEO_FACE_SWAP_FAQ_ITEMS = [
   {
     question: 'How long can the video be?',
     answer:
-      'This version accepts videos from 3 to 30 seconds. The limit is set for this tool and may change after additional testing.',
+      'Videos from 3 to 120 seconds are accepted, matching the provider billing range. Shorter clips are billed as 3 seconds; longer clips must be trimmed first.',
   },
   {
     question: 'What resolutions are available?',
@@ -62,7 +168,7 @@ export function getVideoFaceSwapFaqSchemaItems() {
 
 export function VideoFaceSwapSeoSections() {
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-14 px-4 pt-14 pb-20 text-left text-[15px] leading-7 text-white/55 md:pt-20">
+    <div className="mx-auto w-full max-w-3xl space-y-14 px-4 pt-8 pb-20 text-left text-[15px] leading-7 text-white/55 md:pt-12">
       <section className="space-y-4">
         <h2 className="text-2xl font-semibold tracking-tight text-white/90 sm:text-3xl">
           What a video face swap actually takes
@@ -92,9 +198,9 @@ export function VideoFaceSwapSeoSections() {
         </h2>
         <ol className="list-decimal space-y-3 pl-5">
           <li>
-            <strong>Upload your source video.</strong> Choose a 3–30 second clip
-            with a clear main subject. Preview your original video before
-            starting.
+            <strong>Upload your source video.</strong> Choose a 3–120 second
+            MP4, MOV, or WebM clip with a clear main subject. Preview your
+            original video before starting.
           </li>
           <li>
             <strong>Add one reference portrait.</strong> Use a sharp
@@ -211,7 +317,7 @@ export function VideoFaceSwapSeoSections() {
           <table className="w-full min-w-[24rem] border-collapse text-sm">
             <tbody>
               {[
-                ['Source video', '3–30 seconds per generation (site limit)'],
+                ['Source video', '3–120 seconds · MP4 / MOV / WebM · ≤100 MB'],
                 ['Reference images', 'Exactly one portrait'],
                 ['Output resolution', '480p or 720p'],
                 ['Prompt', 'Optional guidance'],

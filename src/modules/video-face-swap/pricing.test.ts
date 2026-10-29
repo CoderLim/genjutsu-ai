@@ -13,11 +13,12 @@ test('billable seconds ceil with 3s floor', () => {
   assert.equal(billableSecondsForVideoFaceSwap(4.2), 5);
   assert.equal(billableSecondsForVideoFaceSwap(15), 15);
   assert.equal(billableSecondsForVideoFaceSwap(30), 30);
+  assert.equal(billableSecondsForVideoFaceSwap(120), 120);
 });
 
-test('rejects duration outside 3–30', () => {
+test('rejects duration outside WaveSpeed 3–120s billed range', () => {
   assert.throws(() => billableSecondsForVideoFaceSwap(2.99));
-  assert.throws(() => billableSecondsForVideoFaceSwap(30.01));
+  assert.throws(() => billableSecondsForVideoFaceSwap(120.01));
 });
 
 test('pricing table matches plan credits', () => {
@@ -56,6 +57,18 @@ test('pricing table matches plan credits', () => {
       resolution: '720p' as const,
       usd: 2.4,
       credits: 408,
+    },
+    {
+      durationSeconds: 120,
+      resolution: '480p' as const,
+      usd: 4.8,
+      credits: 816,
+    },
+    {
+      durationSeconds: 120,
+      resolution: '720p' as const,
+      usd: 9.6,
+      credits: 1632,
     },
   ];
 

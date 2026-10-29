@@ -188,7 +188,7 @@ export async function probeVideoFaceSwapDurationSeconds(signedUrl: string) {
   }
   if (duration == null || !Number.isFinite(duration) || duration <= 0) {
     throw new Error(
-      'Could not determine source video duration; re-encode as MP4 and try again'
+      'Could not determine source video duration; re-encode as MP4/MOV/WebM and try again'
     );
   }
   return normalizeVideoFaceSwapDurationSeconds(duration);

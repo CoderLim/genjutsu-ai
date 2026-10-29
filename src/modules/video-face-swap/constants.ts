@@ -4,18 +4,20 @@ export const VIDEO_FACE_SWAP_PROVIDER = 'wavespeed';
 /** Locked engine model — WaveSpeed Video Head Swap (not video-face-swap). */
 export const VIDEO_FACE_SWAP_MODEL = 'wavespeed-ai/video-head-swap';
 
+/** WaveSpeed video-head-swap: shorter inputs billed as 3s. */
 export const VIDEO_FACE_SWAP_MIN_DURATION_SECONDS = 3;
-export const VIDEO_FACE_SWAP_MAX_DURATION_SECONDS = 30;
+/** WaveSpeed video-head-swap published max billed duration (longer inputs capped). */
+export const VIDEO_FACE_SWAP_MAX_DURATION_SECONDS = 120;
 export const VIDEO_FACE_SWAP_MIN_BILLABLE_SECONDS = 3;
-/** Paid preview clip length (homepage Genjutsu semantics). */
+/** Legacy paid-preview constant (UI preview removed; kept for billing snapshots). */
 export const VIDEO_FACE_SWAP_PREVIEW_DURATION_SECONDS = 4;
 
 export const VIDEO_FACE_SWAP_RESOLUTIONS = ['480p', '720p'] as const;
 export type VideoFaceSwapResolution =
   (typeof VIDEO_FACE_SWAP_RESOLUTIONS)[number];
-/** Product default; official API default is 480p — revisit after P0. */
+/** Product default — matches WaveSpeed API default and cheaper entry price. */
 export const VIDEO_FACE_SWAP_DEFAULT_RESOLUTION: VideoFaceSwapResolution =
-  '720p';
+  '480p';
 export const VIDEO_FACE_SWAP_PREVIEW_RESOLUTION: VideoFaceSwapResolution =
   '480p';
 
