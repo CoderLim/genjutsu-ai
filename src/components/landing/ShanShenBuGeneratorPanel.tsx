@@ -19,6 +19,7 @@ import {
   SHAN_SHEN_BU_DEFAULT_PROMPT,
   SHAN_SHEN_BU_DEFAULT_RESOLUTION,
   SHAN_SHEN_BU_MODE,
+  SHAN_SHEN_BU_PREVIEW_CLIP_PATH,
   SHAN_SHEN_BU_PRODUCT_ID,
   SHAN_SHEN_BU_RESOLUTIONS,
   SHAN_SHEN_BU_TEMPLATE_DURATION_SECONDS,
@@ -190,6 +191,24 @@ const activeGenerationKey = (userId: string) =>
 
 const sleep = (ms: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+/** Fetch the pre-baked 4s Preview clip (no client ffmpeg). */
+async function loadShanShenBuPreviewClipFile(): Promise<File> {
+  const response = await fetch(SHAN_SHEN_BU_PREVIEW_CLIP_PATH, {
+    cache: 'force-cache',
+  });
+  if (!response.ok) {
+    throw new Error(`Preview clip HTTP ${response.status}`);
+  }
+  const blob = await response.blob();
+  if (blob.size <= 0) {
+    throw new Error('Preview clip was empty');
+  }
+  return new File([blob], 'shan-shen-bu-preview.mp4', {
+    type: blob.type || 'video/mp4',
+    lastModified: Date.now(),
+  });
+}
 
 function createMediaItem(file: File): MediaItem {
   return {
@@ -768,25 +787,36 @@ export function ShanShenBuGeneratorPanel({
       let media: File[];
       if (isPreview) {
         let clipFile: File;
-        let durationSeconds: number;
         try {
-          clipFile = await trimVideoToFile({
-            sourceUrl: SHAN_SHEN_BU_TEMPLATE_PATH,
-            startSeconds: 0,
-            endSeconds: PREVIEW_DURATION_SECONDS,
-            fileName: 'shan-shen-bu-preview.mp4',
-            accurate: true,
-          });
-          durationSeconds = await readLocalVideoDurationSeconds(clipFile);
+          clipFile = await loadShanShenBuPreviewClipFile();
         } catch (cause) {
-          console.error('Shan Shen Bu preview preparation failed:', cause);
-          throw new Error(m['site.generator.preview_trim_failed']());
-        }
-        if (
-          durationSeconds < PREVIEW_DURATION_SECONDS - 0.01 ||
-          durationSeconds > PREVIEW_DURATION_SECONDS + 0.2
-        ) {
-          throw new Error(m['site.generator.preview_trim_failed']());
+          console.error(
+            'Shan Shen Bu preview clip fetch failed, falling back to trim:',
+            cause
+          );
+          try {
+            clipFile = await trimVideoToFile({
+              sourceUrl: SHAN_SHEN_BU_TEMPLATE_PATH,
+              startSeconds: 0,
+              endSeconds: PREVIEW_DURATION_SECONDS,
+              fileName: 'shan-shen-bu-preview.mp4',
+              accurate: true,
+            });
+            const durationSeconds =
+              await readLocalVideoDurationSeconds(clipFile);
+            if (
+              durationSeconds < PREVIEW_DURATION_SECONDS - 0.01 ||
+              durationSeconds > PREVIEW_DURATION_SECONDS + 0.2
+            ) {
+              throw new Error('trim duration out of range');
+            }
+          } catch (trimCause) {
+            console.error(
+              'Shan Shen Bu preview preparation failed:',
+              trimCause
+            );
+            throw new Error(m['site.generator.preview_trim_failed']());
+          }
         }
         media = [clipFile, photo.file];
       } else {

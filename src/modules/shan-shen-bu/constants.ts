@@ -11,6 +11,13 @@ export const SHAN_SHEN_BU_TEMPLATE_PATH = `/api/genjutsu/template?product=${SHAN
 export const SHAN_SHEN_BU_TEMPLATE_POSTER_PATH =
   '/videos/shan-shen-bu-tpl-poster.jpg';
 
+/**
+ * Pre-trimmed 4s clip for paid Preview uploads.
+ * Avoids client ffmpeg.wasm re-encode of the full template when available.
+ */
+export const SHAN_SHEN_BU_PREVIEW_CLIP_PATH =
+  '/videos/shan-shen-bu-preview-4s.mp4';
+
 /** ffprobe duration of public/videos/shan-shen-bu-tpl.mp4 */
 export const SHAN_SHEN_BU_TEMPLATE_DURATION_SECONDS = 14.2;
 
@@ -30,15 +37,23 @@ export function isShanShenBuResolution(
 /**
  * Target mapping only. Complete replacement + preservation live in
  * `buildSeedanceWorkflowPrompt` (objects-swap).
- * @Image 1 = person, animal, or clear foreground subject — replaces the
+ * Use logical `Reference 1` — providers map it to @Image1 / @Image 1 / etc.
+ * Reference 1 = person, animal, or clear foreground subject — replaces the
  * elderly man performing the flash-step (闪身步).
  */
 export const SHAN_SHEN_BU_DEFAULT_PROMPT = [
-  'Replace the elderly man in the source video — short gray/white hair, dark short-sleeve shirt, dark rolled trousers, gray slide sandals, performing a quick martial-arts flash-step jump in a paved courtyard alley — with the main subject from @Image 1.',
-  "The subject in @Image 1 may be a person, an animal, or another clear foreground subject. Use that subject's complete appearance throughout the clip.",
+  'Replace the elderly man in the source video — short gray/white hair, dark short-sleeve shirt, dark rolled trousers, gray slide sandals, performing a quick martial-arts flash-step jump in a paved courtyard alley — with the main subject from Reference 1.',
+  "The subject in Reference 1 may be a person, an animal, or another clear foreground subject. Use that subject's complete appearance throughout the clip.",
   "Inherit the original man's full trajectory and flash-step choreography: jumps, spins, dodges, footwork, and camera timing. Match scale, orientation, and motion to the original performer in every shot.",
   "Do not keep the original man's face, hair, body, or clothing. Preserve the courtyard, paved ground, concrete walls, metal door, clothesline, camera motion, framing, and timing.",
 ].join('\n\n');
 
-/** No legacy prompt versions are accepted; new attempts use the current prompt. */
-export const LEGACY_SHAN_SHEN_BU_PROMPTS = [] as const;
+/** Prior prompt used hard-coded `@Image 1` tokens; keep for in-flight attempts. */
+export const LEGACY_SHAN_SHEN_BU_PROMPTS = [
+  [
+    'Replace the elderly man in the source video — short gray/white hair, dark short-sleeve shirt, dark rolled trousers, gray slide sandals, performing a quick martial-arts flash-step jump in a paved courtyard alley — with the main subject from @Image 1.',
+    "The subject in @Image 1 may be a person, an animal, or another clear foreground subject. Use that subject's complete appearance throughout the clip.",
+    "Inherit the original man's full trajectory and flash-step choreography: jumps, spins, dodges, footwork, and camera timing. Match scale, orientation, and motion to the original performer in every shot.",
+    "Do not keep the original man's face, hair, body, or clothing. Preserve the courtyard, paved ground, concrete walls, metal door, clothesline, camera motion, framing, and timing.",
+  ].join('\n\n'),
+] as const;
