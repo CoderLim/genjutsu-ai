@@ -46,8 +46,6 @@ const LIMITED_STATIC_PATH_LOCALES: Record<string, readonly string[]> = {
   // Tiny Desk AI ships English editorial first — do not advertise /ja /ko /es mirrors.
   '/tiny-desk-ai': [baseLocale],
   '/shan-shen-bu': [baseLocale],
-  // Video Face Swap V1 is English-only until real translations ship.
-  '/video-face-swap': [baseLocale],
 };
 
 function enabledContentLocales(values: readonly string[]): string[] {

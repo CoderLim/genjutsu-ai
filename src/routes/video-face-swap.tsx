@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router';
 import { WandSparkles } from 'lucide-react';
 
 import { absoluteUrl, localeLinks, socialMeta } from '@/lib/seo';
+import { m } from '@/paraglide/messages.js';
 import { getLocale } from '@/paraglide/runtime.js';
 import { SiteFooter } from '@/components/landing/SiteFooter';
 import { SiteHeader } from '@/components/landing/SiteHeader';
@@ -15,12 +16,6 @@ import { SeoJsonLd } from '@/components/seo-json-ld';
 
 const PAGE_PATH = '/video-face-swap';
 const OG_IMAGE = '/og/video-face-swap.jpg';
-/** English-only at launch — advertise en + x-default only. */
-const SEO_LOCALES = ['en'] as const;
-
-const TITLE = 'Video Face Swap Generator – AI Head Swap | Genjutsu AI';
-const DESCRIPTION =
-  'Swap a face in a video with one authorized portrait. Upload a 3–120s clip, keep the original body motion, and generate an AI head swap in 480p or 720p.';
 
 function faqJsonLd() {
   return {
@@ -37,26 +32,26 @@ function faqJsonLd() {
   };
 }
 
-function softwareApplicationJsonLd() {
+function softwareApplicationJsonLd(locale: string) {
   return {
     '@context': 'https://schema.org',
     '@type': 'SoftwareApplication',
-    name: 'Video Face Swap Generator',
+    name: m['site.vfs.software_name']({}, { locale }),
     applicationCategory: 'MultimediaApplication',
     operatingSystem: 'Web',
     url: absoluteUrl(PAGE_PATH),
-    description: DESCRIPTION,
+    description: m['site.vfs.page_description']({}, { locale }),
     image: absoluteUrl(OG_IMAGE),
     offers: {
       '@type': 'Offer',
       price: '0',
       priceCurrency: 'USD',
-      description: 'Prepaid credits; estimate shown before generation',
+      description: m['site.vfs.offer_description']({}, { locale }),
     },
   };
 }
 
-function breadcrumbJsonLd(canonical: string) {
+function breadcrumbJsonLd(canonical: string, locale: string) {
   return {
     '@context': 'https://schema.org',
     '@type': 'BreadcrumbList',
@@ -70,7 +65,7 @@ function breadcrumbJsonLd(canonical: string) {
       {
         '@type': 'ListItem',
         position: 2,
-        name: 'Video Face Swap',
+        name: m['site.vfs.breadcrumb_name']({}, { locale }),
         item: canonical,
       },
     ],
@@ -80,12 +75,11 @@ function breadcrumbJsonLd(canonical: string) {
 export const Route = createFileRoute('/video-face-swap')({
   loader: () => {
     const locale = getLocale();
-    const { canonical, alternates } = localeLinks(PAGE_PATH, locale, [
-      ...SEO_LOCALES,
-    ]);
+    const { canonical, alternates } = localeLinks(PAGE_PATH, locale);
     return {
-      title: TITLE,
-      description: DESCRIPTION,
+      locale,
+      title: m['site.vfs.page_title']({}, { locale }),
+      description: m['site.vfs.page_description']({}, { locale }),
       canonical,
       alternates,
     };
@@ -104,7 +98,10 @@ export const Route = createFileRoute('/video-face-swap')({
         }),
         {
           property: 'og:image:alt',
-          content: 'Video face swap before and after with reference portrait',
+          content: m['site.vfs.og_image_alt'](
+            {},
+            { locale: loaderData.locale }
+          ),
         },
       ],
       links: [
@@ -119,16 +116,17 @@ export const Route = createFileRoute('/video-face-swap')({
 function VideoFaceSwapPage() {
   const loaderData = Route.useLoaderData();
   const canonical = loaderData.canonical;
+  const locale = loaderData.locale;
 
   return (
     <div className="min-h-screen bg-[hsl(28_25%_9%)] text-[rgb(237,234,222)]">
       <SeoJsonLd value={faqJsonLd()} />
-      <SeoJsonLd value={softwareApplicationJsonLd()} />
-      <SeoJsonLd value={breadcrumbJsonLd(canonical)} />
+      <SeoJsonLd value={softwareApplicationJsonLd(locale)} />
+      <SeoJsonLd value={breadcrumbJsonLd(canonical, locale)} />
 
       <div className="relative overflow-hidden">
         <div className="pointer-events-none absolute inset-0" aria-hidden>
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_18%,rgba(154,91,55,0.22),transparent_38%),linear-gradient(to_bottom,rgba(13,10,9,0.5),hsl(28_25%_9%)_78%)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_18%,rgba(154,91,55,0.22),transparent_38%),linear-gradient(to_bottom,hsl(13,10,9,0.5),hsl(28_25%_9%)_78%)]" />
           <div className="absolute top-24 left-1/2 h-[420px] w-[900px] -translate-x-1/2 rounded-full bg-[rgba(204,144,92,0.055)] blur-3xl" />
         </div>
 
@@ -140,25 +138,23 @@ function VideoFaceSwapPage() {
           <section className="mx-auto max-w-7xl px-4 pt-10 pb-8 text-center sm:pt-14 md:px-5 md:pb-10">
             <div className="mx-auto mb-4 flex w-fit items-center gap-2 rounded-full border border-[rgba(204,144,92,0.2)] bg-[rgba(204,144,92,0.07)] px-3 py-1.5 text-xs font-medium text-[rgb(220,155,99)]">
               <WandSparkles className="size-3.5" />
-              Video Face Swap · Head Swap
+              {m['site.vfs.hero_badge']()}
             </div>
 
             <h1 className="mx-auto max-w-4xl text-[34px] leading-[1.08] font-bold tracking-[-1.4px] sm:text-[44px] md:text-[56px]">
-              Video Face Swap Generator
+              {m['site.vfs.hero_title']()}
             </h1>
             <p className="mx-auto mt-5 max-w-3xl text-base leading-7 text-white/58 sm:text-lg">
-              Replace a head in your video with one portrait you have permission
-              to use. Keep the original performance and scene while AI adapts
-              the head to the camera angle and lighting.
+              {m['site.vfs.hero_desc']()}
             </p>
             <div className="mx-auto mt-4 flex flex-wrap items-center justify-center gap-2 text-xs text-white/40">
-              <span>One Portrait</span>
+              <span>{m['site.vfs.chip_portrait']()}</span>
               <span aria-hidden>·</span>
-              <span>Original Motion</span>
+              <span>{m['site.vfs.chip_motion']()}</span>
               <span aria-hidden>·</span>
-              <span>Up to 720p</span>
+              <span>{m['site.vfs.chip_resolution']()}</span>
               <span aria-hidden>·</span>
-              <span>Authorized Media Only</span>
+              <span>{m['site.vfs.chip_authorized']()}</span>
             </div>
 
             <div id="generator" className="mt-8 text-left sm:mt-10">

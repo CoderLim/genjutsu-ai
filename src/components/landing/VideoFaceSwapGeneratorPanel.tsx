@@ -284,7 +284,7 @@ function VideoSlot(props: {
             type="button"
             onClick={props.onRemove}
             disabled={props.disabled}
-            aria-label="Remove source video"
+            aria-label={m['site.vfs.remove_video_aria']()}
             className="absolute top-2 right-2 z-10 flex size-8 items-center justify-center rounded-full bg-black/70 text-white/80 backdrop-blur transition hover:bg-black/90 disabled:opacity-40"
           >
             <CloseIcon className="size-4" />
@@ -310,10 +310,10 @@ function VideoSlot(props: {
           </span>
           <span>
             <span className="block text-sm font-medium text-white/78">
-              Source video
+              {m['site.vfs.source_video']()}
             </span>
             <span className="mt-1 block text-xs text-white/38">
-              MP4 / MOV / WebM · 3–120s · ≤100 MB
+              {m['site.vfs.source_hint']()}
             </span>
           </span>
         </button>
@@ -353,14 +353,14 @@ function PhotoSlot(props: {
         >
           <img
             src={props.item.url}
-            alt="Head reference"
+            alt={m['site.vfs.head_alt']()}
             className="absolute inset-0 size-full object-contain"
           />
           <button
             type="button"
             onClick={props.onRemove}
             disabled={props.disabled}
-            aria-label="Remove head photo"
+            aria-label={m['site.vfs.remove_photo_aria']()}
             className="absolute top-2 right-2 z-10 flex size-8 items-center justify-center rounded-full bg-black/70 text-white/80 backdrop-blur transition hover:bg-black/90 disabled:opacity-40"
           >
             <CloseIcon className="size-4" />
@@ -381,10 +381,10 @@ function PhotoSlot(props: {
           </span>
           <span>
             <span className="block text-sm font-medium text-white/78">
-              Head photo
+              {m['site.vfs.head_photo']()}
             </span>
             <span className="mt-1 block text-xs text-white/38">
-              One JPG/PNG · ≤12 MB
+              {m['site.vfs.head_hint']()}
             </span>
           </span>
         </button>
@@ -518,10 +518,7 @@ export function VideoFaceSwapGeneratorPanel() {
         );
         if (poll.providerStatus === 'submission_unknown') {
           setSubmissionUnknown(true);
-          setJobError(
-            poll.error ||
-              'Submission result is uncertain. Credits remain reserved — do not retry. Contact support.'
-          );
+          setJobError(poll.error || m['site.vfs.err_submission_unknown']());
           if (userId) clearActive(userId);
           return;
         }
@@ -542,8 +539,10 @@ export function VideoFaceSwapGeneratorPanel() {
           setJobError(
             poll.error ||
               (poll.refundedCredits
-                ? `Generation failed. ${poll.refundedCredits} credits were refunded.`
-                : 'Generation failed.')
+                ? m['site.vfs.err_failed_refund']({
+                    count: String(poll.refundedCredits),
+                  })
+                : m['site.vfs.err_failed']())
           );
           if (userId) clearActive(userId);
           return;
@@ -555,10 +554,12 @@ export function VideoFaceSwapGeneratorPanel() {
         );
         await sleep(2500);
       }
-      setJobError('Still processing. Refresh later — your job is saved.');
+      setJobError(m['site.vfs.err_still_processing']());
     } catch (error: unknown) {
       const message =
-        error instanceof Error ? error.message : 'Failed to poll status';
+        error instanceof Error
+          ? error.message
+          : m['site.vfs.err_poll_failed']();
       setJobError(message);
     } finally {
       if (token === pollAbortRef.current) {
@@ -570,11 +571,11 @@ export function VideoFaceSwapGeneratorPanel() {
 
   async function onPickVideo(file: File) {
     if (!isAllowedVideoFaceSwapVideo(file)) {
-      toast.error('Please upload an MP4, MOV, or WebM video');
+      toast.error(m['site.vfs.toast_video_type']());
       return;
     }
     if (file.size > VIDEO_FACE_SWAP_MAX_VIDEO_BYTES) {
-      toast.error(m['site.generator.video_size_error']());
+      toast.error(m['site.vfs.video_size_error']());
       return;
     }
     try {
@@ -603,13 +604,13 @@ export function VideoFaceSwapGeneratorPanel() {
       setJobError('');
       setSubmissionUnknown(false);
     } catch {
-      toast.error('Could not read that video. Try another MP4, MOV, or WebM.');
+      toast.error(m['site.vfs.toast_video_read']());
     }
   }
 
   async function onPickImage(file: File) {
     if (!/^image\/(jpeg|jpg|png)$/i.test(file.type)) {
-      toast.error('Please upload a JPG or PNG portrait');
+      toast.error(m['site.vfs.toast_image_type']());
       return;
     }
     if (file.size > VIDEO_FACE_SWAP_MAX_IMAGE_BYTES) {
@@ -637,7 +638,7 @@ export function VideoFaceSwapGeneratorPanel() {
       return;
     }
     if (!sourceVideo || !headPhoto) {
-      toast.error('Upload a source video and one head photo');
+      toast.error(m['site.vfs.toast_need_media']());
       return;
     }
     if (!consent) {
@@ -646,15 +647,13 @@ export function VideoFaceSwapGeneratorPanel() {
         behavior: 'smooth',
         block: 'nearest',
       });
-      toast.error(
-        'Check the box to confirm you have rights to edit this media'
-      );
+      toast.error(m['site.vfs.toast_need_consent']());
       return;
     }
 
     const requiredCredits = estimatedCredits;
     if (requiredCredits == null) {
-      toast.error('Could not estimate credits for this video');
+      toast.error(m['site.vfs.toast_estimate_failed']());
       return;
     }
     const balance = creditsQuery.data?.balance;
@@ -698,7 +697,7 @@ export function VideoFaceSwapGeneratorPanel() {
       const videoUpload = setup.uploads.find((u) => u.role === 'video');
       const imageUpload = setup.uploads.find((u) => u.role === 'image');
       if (!videoUpload || !imageUpload) {
-        throw new Error('Upload URLs were incomplete');
+        throw new Error(m['site.vfs.err_upload_incomplete']());
       }
 
       await uploadToSignedUrl({
@@ -736,9 +735,7 @@ export function VideoFaceSwapGeneratorPanel() {
 
       if (started.status === 'submission_unknown') {
         setSubmissionUnknown(true);
-        setJobError(
-          'Submission result is uncertain. Credits remain reserved — do not retry. Contact support.'
-        );
+        setJobError(m['site.vfs.err_submission_unknown']());
         clearActive(userId);
         return;
       }
@@ -778,9 +775,7 @@ export function VideoFaceSwapGeneratorPanel() {
           clearActive(userId);
         } else if (code === 'SUBMISSION_UNKNOWN') {
           setSubmissionUnknown(true);
-          setJobError(
-            'Submission result is uncertain. Credits remain reserved — do not retry. Contact support.'
-          );
+          setJobError(m['site.vfs.err_submission_unknown']());
           clearActive(userId);
         } else {
           creditGate.clear();
@@ -791,7 +786,7 @@ export function VideoFaceSwapGeneratorPanel() {
       } else {
         creditGate.clear();
         const message =
-          error instanceof Error ? error.message : 'Generation failed';
+          error instanceof Error ? error.message : m['site.vfs.err_failed']();
         toast.error(message);
         setJobError(message);
         setActiveGenerationId(null);
@@ -809,7 +804,7 @@ export function VideoFaceSwapGeneratorPanel() {
         <div className="grid gap-0 lg:grid-cols-2">
           <div className="border-b border-white/8 p-4 sm:p-5 lg:border-r lg:border-b-0">
             <p className="mb-2 text-xs font-medium tracking-wide text-white/45 uppercase">
-              Source video
+              {m['site.vfs.source_video']()}
             </p>
             <VideoSlot
               item={sourceVideo}
@@ -825,7 +820,7 @@ export function VideoFaceSwapGeneratorPanel() {
 
           <div className="p-4 sm:p-5">
             <p className="mb-2 text-xs font-medium tracking-wide text-white/45 uppercase">
-              Head photo
+              {m['site.vfs.head_photo']()}
             </p>
             <PhotoSlot
               item={headPhoto}
@@ -853,7 +848,9 @@ export function VideoFaceSwapGeneratorPanel() {
               {jobError}
               {activeGenerationId ? (
                 <span className="mt-1 block text-xs opacity-70">
-                  Job {activeGenerationId.slice(0, 8)}
+                  {m['site.vfs.job_label']({
+                    id: activeGenerationId.slice(0, 8),
+                  })}
                 </span>
               ) : null}
             </div>
@@ -942,10 +939,10 @@ export function VideoFaceSwapGeneratorPanel() {
                       : 'text-white/55'
                   )}
                 >
-                  I confirm I have the rights to edit this video and portrait
+                  {m['site.vfs.consent_label']()}
                   {consentAttention && !consent ? (
                     <span className="mt-0.5 block text-[11px] text-amber-200/80">
-                      Check this to unlock Generate
+                      {m['site.vfs.consent_unlock']()}
                     </span>
                   ) : null}
                 </span>
@@ -1023,7 +1020,7 @@ export function VideoFaceSwapGeneratorPanel() {
               </p>
               <p className="mt-0.5 truncate text-xs text-white/40">
                 {resultUrl && !busy
-                  ? 'Head swap result'
+                  ? m['site.vfs.result_subtitle']()
                   : phase === 'uploading' || phase === 'starting'
                     ? m['site.generator.starting']()
                     : statusText ||
@@ -1039,7 +1036,7 @@ export function VideoFaceSwapGeneratorPanel() {
                   className="inline-flex h-9 items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 text-xs font-medium text-white/70 transition hover:bg-white/10 hover:text-white"
                 >
                   <Download className="size-3.5" />
-                  Download
+                  {m['site.common.download']()}
                 </a>
               </div>
             ) : null}
