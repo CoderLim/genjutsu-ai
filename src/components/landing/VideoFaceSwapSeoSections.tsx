@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 
 import { Link } from '@/core/i18n/navigation';
+import { getVideoFaceSwapSeoPriceAmounts } from '@/modules/video-face-swap/seo-pricing';
 import { m } from '@/paraglide/messages.js';
 
 const DEMO_BEFORE_SRC = '/videos/face-swap-demo-before.mp4';
@@ -108,6 +109,7 @@ export function VideoFaceSwapEffectDemo() {
 }
 
 function faqItems() {
+  const prices = getVideoFaceSwapSeoPriceAmounts();
   return [
     {
       question: m['site.vfs.faq1_q'](),
@@ -135,7 +137,7 @@ function faqItems() {
     },
     {
       question: m['site.vfs.faq7_q'](),
-      answer: m['site.vfs.faq7_a'](),
+      answer: m['site.vfs.faq7_a'](prices),
     },
     {
       question: m['site.vfs.faq8_q'](),
@@ -158,6 +160,7 @@ export function getVideoFaceSwapFaqSchemaItems() {
 
 export function VideoFaceSwapSeoSections() {
   const faqs = faqItems();
+  const prices = getVideoFaceSwapSeoPriceAmounts();
   const specs: Array<[string, string]> = [
     [m['site.vfs.specs_source_label'](), m['site.vfs.specs_source_value']()],
     [m['site.vfs.specs_images_label'](), m['site.vfs.specs_images_value']()],
@@ -170,7 +173,10 @@ export function VideoFaceSwapSeoSections() {
       m['site.vfs.specs_multishot_value'](),
     ],
     [m['site.vfs.specs_people_label'](), m['site.vfs.specs_people_value']()],
-    [m['site.vfs.specs_price_label'](), m['site.vfs.specs_price_value']()],
+    [
+      m['site.vfs.specs_price_label'](),
+      m['site.vfs.specs_price_value'](prices),
+    ],
     [m['site.vfs.specs_time_label'](), m['site.vfs.specs_time_value']()],
     [m['site.vfs.specs_lang_label'](), m['site.vfs.specs_lang_value']()],
   ];
@@ -205,9 +211,17 @@ export function VideoFaceSwapSeoSections() {
           </li>
           <li>
             <strong>{m['site.vfs.how_step4_strong']()}</strong>
-            {m['site.vfs.how_step4_rest']()}
+            {m['site.vfs.how_step4_rest'](prices)}
           </li>
         </ol>
+      </section>
+
+      <section className="space-y-4">
+        <h2 className="text-2xl font-semibold tracking-tight text-white/90">
+          {m['site.vfs.pricing_title']()}
+        </h2>
+        <p>{m['site.vfs.pricing_rule']()}</p>
+        <p>{m['site.vfs.pricing_examples'](prices)}</p>
       </section>
 
       <section className="space-y-4">

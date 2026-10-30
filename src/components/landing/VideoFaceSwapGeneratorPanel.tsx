@@ -11,6 +11,7 @@ import { CircleHelp, Download } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useSession } from '@/core/auth/client';
+import { getDisplayUsdPerCredit } from '@/modules/genjutsu/pricing';
 import {
   VIDEO_FACE_SWAP_CONSENT_VERSION,
   VIDEO_FACE_SWAP_DEFAULT_RESOLUTION,
@@ -22,6 +23,7 @@ import {
   type VideoFaceSwapResolution,
 } from '@/modules/video-face-swap/constants';
 import { estimateVideoFaceSwapCredits } from '@/modules/video-face-swap/pricing';
+import { getVideoFaceSwapSeoPriceAmounts } from '@/modules/video-face-swap/seo-pricing';
 import { ApiError, apiGet, apiPost, uploadToSignedUrl } from '@/lib/api-client';
 import { cn } from '@/lib/cn';
 import { m } from '@/paraglide/messages.js';
@@ -447,6 +449,9 @@ export function VideoFaceSwapGeneratorPanel() {
       return null;
     }
   }, [sourceVideo?.durationSeconds, resolution]);
+
+  const displayUsdPerCredit = useMemo(() => getDisplayUsdPerCredit(), []);
+  const billingExamples = useMemo(() => getVideoFaceSwapSeoPriceAmounts(), []);
 
   const mediaReady = Boolean(sourceVideo?.file && headPhoto?.file);
   const canGenerate =
@@ -956,7 +961,9 @@ export function VideoFaceSwapGeneratorPanel() {
                         ? m['genjutsu.estimate.credits']({
                             count: estimatedCredits.toLocaleString(),
                           })
-                        : '—'}
+                        : m['site.vfs.estimate_placeholder']({
+                            count: billingExamples.credits3s480,
+                          })}
                       <TooltipProvider delay={200}>
                         <Tooltip>
                           <TooltipTrigger
@@ -969,13 +976,28 @@ export function VideoFaceSwapGeneratorPanel() {
                           <TooltipContent
                             side="top"
                             align="end"
-                            className="max-w-[240px] text-left leading-snug"
+                            className="max-w-[280px] text-left leading-snug"
                           >
-                            {m['genjutsu.estimate.tooltip']()}
+                            {m['site.vfs.estimate_tooltip'](billingExamples)}
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
                     </span>
+                    {estimatedCredits != null ? (
+                      <span className="text-[10px] text-white/35">
+                        {m['genjutsu.estimate.approx_usd']({
+                          amount: `$${(
+                            estimatedCredits * displayUsdPerCredit
+                          ).toFixed(2)}`,
+                        })}
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-white/35">
+                        {m['genjutsu.estimate.approx_usd']({
+                          amount: billingExamples.usd3s480,
+                        })}
+                      </span>
+                    )}
                   </div>
                   <button
                     type="button"

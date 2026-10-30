@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { WandSparkles } from 'lucide-react';
 
+import { getVideoFaceSwapSeoPriceAmounts } from '@/modules/video-face-swap/seo-pricing';
 import { absoluteUrl, localeLinks, socialMeta } from '@/lib/seo';
 import { m } from '@/paraglide/messages.js';
 import { getLocale } from '@/paraglide/runtime.js';
@@ -46,7 +47,10 @@ function softwareApplicationJsonLd(locale: string) {
       '@type': 'Offer',
       price: '0',
       priceCurrency: 'USD',
-      description: m['site.vfs.offer_description']({}, { locale }),
+      description: m['site.vfs.offer_description'](
+        getVideoFaceSwapSeoPriceAmounts(),
+        { locale }
+      ),
     },
   };
 }
