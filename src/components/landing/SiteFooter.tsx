@@ -341,6 +341,21 @@ export function SiteFooter() {
                 className="h-[27px] w-auto"
               />
             </a>
+            <a
+              href="https://bestsky.tools?utm_source=badge"
+              target="_blank"
+              rel="noopener"
+            >
+              <img
+                src="https://assets.bestsky.tools/badges/featured-light.svg"
+                alt="Featured on BestskyTools"
+                width={150}
+                height={48}
+                loading="lazy"
+                decoding="async"
+                className="h-[27px] w-auto"
+              />
+            </a>
           </div>
         </footer>
       </div>
