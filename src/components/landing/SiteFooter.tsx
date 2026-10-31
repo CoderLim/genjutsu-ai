@@ -300,6 +300,47 @@ export function SiteFooter() {
                 className="h-[27px] w-auto"
               />
             </a>
+            <a
+              href="https://newtool.site/item/genjutsu-ai-genjutsuainet"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <img
+                src="https://newtool.site/badges/newtool-light.svg"
+                alt="Featured on NewTool.site"
+                width={210}
+                height={54}
+                loading="lazy"
+                decoding="async"
+                className="h-[27px] w-auto"
+              />
+            </a>
+            <a
+              href="https://turbo0.com/item/genjutsu-ai"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <img
+                src="https://img.turbo0.com/badge-listed-light.svg"
+                alt="Listed on Turbo0"
+                width={162}
+                height={54}
+                loading="lazy"
+                decoding="async"
+                className="h-[27px] w-auto"
+              />
+            </a>
+            <a href="https://fazier.com" target="_blank" rel="noopener">
+              <img
+                src="https://fazier.com/api/v1/public/badges/launch_badges.svg?badge_type=launched&theme=light"
+                alt="Launched on Fazier"
+                width={120}
+                height={51}
+                loading="lazy"
+                decoding="async"
+                className="h-[27px] w-auto"
+              />
+            </a>
           </div>
         </footer>
       </div>
