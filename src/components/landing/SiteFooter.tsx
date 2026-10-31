@@ -285,6 +285,21 @@ export function SiteFooter() {
                 className="h-[27px] w-auto"
               />
             </a>
+            <a
+              href="https://neeed.directory/products/genjutsu-ai-2?utm_source=genjutsu-ai-2"
+              target="_blank"
+              rel="noopener"
+            >
+              <img
+                src="https://neeed.directory/badges/neeed-badge-light.svg"
+                alt="Featured on neeed.directory"
+                width={139}
+                height={44}
+                loading="lazy"
+                decoding="async"
+                className="h-[27px] w-auto"
+              />
+            </a>
           </div>
         </footer>
       </div>
