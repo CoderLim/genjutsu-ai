@@ -95,6 +95,16 @@ const DEFAULT_OBJECTS_RESOLUTION = '480p' as const;
  */
 export const MOTION_TEMPLATES: MotionTemplate[] = [
   {
+    id: 'throwing-flame',
+    titleKey: 'site.templates.throwing_flame',
+    poster: '/videos/throwing-flame-tpl-poster.jpg',
+    sourceVideo: '/videos/throwing-flame-tpl.mp4',
+    prompt: 'Replace the girl in @Video 1 with @Image 1',
+    mode: 'objects-swap',
+    resolution: DEFAULT_OBJECTS_RESOLUTION,
+    aspect: 'portrait',
+  },
+  {
     id: 'wassup-in-a-minute-ai',
     titleKey: 'site.templates.wassup_in_a_minute_ai',
     poster: WASSUP_IN_A_MINUTE_AI_TEMPLATE_POSTER_PATH,
