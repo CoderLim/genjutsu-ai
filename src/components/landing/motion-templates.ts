@@ -19,6 +19,10 @@ import {
   CRAZY_FROG_TEMPLATE_POSTER_PATH,
 } from '@/modules/crazy-frog/constants';
 import {
+  DECK_THE_HALLS_DANCE_AI_DUO_TEMPLATE_DISPLAY_PATH,
+  DECK_THE_HALLS_DANCE_AI_DUO_TEMPLATE_POSTER_PATH,
+} from '@/modules/deck-the-halls-dance-ai/constants';
+import {
   ENZO_FERNANDEZ_AI_TEMPLATE_PATH,
   ENZO_FERNANDEZ_AI_TEMPLATE_POSTER_PATH,
 } from '@/modules/enzo-fernandez-ai/constants';
@@ -94,6 +98,14 @@ const DEFAULT_OBJECTS_RESOLUTION = '480p' as const;
  * Order: newest first — prepend new templates at the top of this array.
  */
 export const MOTION_TEMPLATES: MotionTemplate[] = [
+  {
+    id: 'deck-the-halls-dance',
+    titleKey: 'site.templates.deck_the_halls_dance',
+    poster: DECK_THE_HALLS_DANCE_AI_DUO_TEMPLATE_POSTER_PATH,
+    sourceVideo: DECK_THE_HALLS_DANCE_AI_DUO_TEMPLATE_DISPLAY_PATH,
+    href: '/deck-the-halls-dance-ai',
+    aspect: 'portrait',
+  },
   {
     id: 'throwing-flame',
     titleKey: 'site.templates.throwing_flame',

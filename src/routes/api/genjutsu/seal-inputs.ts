@@ -7,6 +7,11 @@ import { BURNING_BRIDGES_AI_PRODUCT_ID } from '@/modules/burning-bridges-ai/cons
 import { CHIPMUNKS_DANCE_PRODUCT_ID } from '@/modules/chipmunks-dance/constants';
 import { COLDPLAY_KISS_CAM_PRODUCT_ID } from '@/modules/coldplay-kiss-cam/constants';
 import { CRAZY_FROG_PRODUCT_ID } from '@/modules/crazy-frog/constants';
+import {
+  DECK_THE_HALLS_DANCE_AI_DEFAULT_CAST_MODE,
+  DECK_THE_HALLS_DANCE_AI_PRODUCT_ID,
+  isDeckTheHallsDanceAiCastMode,
+} from '@/modules/deck-the-halls-dance-ai/constants';
 import { ENZO_FERNANDEZ_AI_PRODUCT_ID } from '@/modules/enzo-fernandez-ai/constants';
 import { FLYING_CAR_AI_PRODUCT_ID } from '@/modules/flying-car-ai/constants';
 import { GANGNAM_STYLE_AI_PRODUCT_ID } from '@/modules/gangnam-style-ai/constants';
@@ -33,6 +38,7 @@ import {
   getChipmunksDanceTemplateVideoKey,
   getColdplayKissCamTemplateVideoKey,
   getCrazyFrogTemplateVideoKey,
+  getDeckTheHallsDanceAiTemplateVideoKey,
   getEnzoFernandezAiTemplateVideoKey,
   getFlyingCarAiTemplateVideoKey,
   getGangnamStyleAiTemplateVideoKey,
@@ -167,14 +173,23 @@ async function POST({ request }: { request: Request }) {
                                     ? getWassupInAMinuteAiTemplateVideoKey()
                                     : product === SAY_IT_RIGHT_AI_PRODUCT_ID
                                       ? getSayItRightAiTemplateVideoKey()
-                                      : product === ZOMBIE_HUG_PRODUCT_ID
-                                        ? getZombieHugTemplateVideoKey(
-                                            templateAspectRatio
+                                      : product ===
+                                          DECK_THE_HALLS_DANCE_AI_PRODUCT_ID
+                                        ? getDeckTheHallsDanceAiTemplateVideoKey(
+                                            isDeckTheHallsDanceAiCastMode(
+                                              currentOptions?.preset
+                                            )
+                                              ? currentOptions.preset
+                                              : DECK_THE_HALLS_DANCE_AI_DEFAULT_CAST_MODE
                                           )
-                                        : // Legacy: useDefaultTemplate without product → zombie keys.
-                                          getZombieHugTemplateVideoKey(
-                                            templateAspectRatio
-                                          );
+                                        : product === ZOMBIE_HUG_PRODUCT_ID
+                                          ? getZombieHugTemplateVideoKey(
+                                              templateAspectRatio
+                                            )
+                                          : // Legacy: useDefaultTemplate without product → zombie keys.
+                                            getZombieHugTemplateVideoKey(
+                                              templateAspectRatio
+                                            );
     const videoKey =
       typeof currentOptions?.videoKey === 'string'
         ? currentOptions.videoKey

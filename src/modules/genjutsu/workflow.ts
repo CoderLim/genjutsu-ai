@@ -1,10 +1,10 @@
 import { envConfigs } from '@/config';
+
 import {
   getProductGenjutsuModelProfile,
   HIGGSFIELD_GENJUTSU_MODELS,
   isKnownHiggsfieldGenjutsuModel,
 } from './model-config';
-
 import type {
   GenjutsuMode,
   GenjutsuProductId,
@@ -24,6 +24,8 @@ export const GANGNAM_STYLE_AI_PRODUCT = 'gangnam-style-ai' as const;
 export const GAS_STATION_DANCE_AI_PRODUCT = 'gas-station-dance-ai' as const;
 export const BURNING_BRIDGES_AI_PRODUCT = 'burning-bridges-ai' as const;
 export const SAY_IT_RIGHT_AI_PRODUCT = 'say-it-right-ai' as const;
+export const DECK_THE_HALLS_DANCE_AI_PRODUCT =
+  'deck-the-halls-dance-ai' as const;
 export const ZOMBIE_HUG_PRODUCT = 'zombie-hug' as const;
 export const TINY_DESK_AI_PRODUCT = 'tiny-desk-ai' as const;
 export const SHAN_SHEN_BU_PRODUCT = 'shan-shen-bu' as const;
@@ -52,6 +54,7 @@ export function isGenjutsuProductId(
     value === GAS_STATION_DANCE_AI_PRODUCT ||
     value === BURNING_BRIDGES_AI_PRODUCT ||
     value === SAY_IT_RIGHT_AI_PRODUCT ||
+    value === DECK_THE_HALLS_DANCE_AI_PRODUCT ||
     value === ZOMBIE_HUG_PRODUCT ||
     value === TINY_DESK_AI_PRODUCT ||
     value === SHAN_SHEN_BU_PRODUCT ||
@@ -213,9 +216,9 @@ export function resolveProductProviderTarget(
 /**
  * Persisted product tasks were bound by the server when the attempt was created.
  * Allow known Standard/Light targets across subsequent env/profile changes.
- * This check is intentionally limited to the five Higgsfield Genjutsu product
- * pages. Do not reuse it in Seedance-family product assert functions: those
- * pages have different provider/model contracts.
+ * This check is for Higgsfield Genjutsu product pages with Standard/Light pins.
+ * Do not reuse it in Seedance-family product assert functions: those pages have
+ * different provider/model contracts.
  */
 export function isPersistedProductProviderTarget(
   provider: unknown,

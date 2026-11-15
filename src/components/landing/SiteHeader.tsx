@@ -47,6 +47,11 @@ const TRENDING_LINKS = [
     poster: '/videos/long-trival-tpl-poster.jpg',
   },
   {
+    label: 'Deck the Halls Dance AI',
+    href: '/deck-the-halls-dance-ai',
+    poster: '/videos/deck-the-halls-dance-duo-tpl-poster.jpg',
+  },
+  {
     label: 'Say It Right AI',
     href: '/say-it-right-ai',
     poster: '/videos/say-it-right-dance-tpl-poster.jpg',

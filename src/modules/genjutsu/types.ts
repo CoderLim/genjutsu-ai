@@ -22,6 +22,7 @@ export type GenjutsuProductId =
   | 'gas-station-dance-ai'
   | 'burning-bridges-ai'
   | 'say-it-right-ai'
+  | 'deck-the-halls-dance-ai'
   | 'zombie-hug'
   | 'tiny-desk-ai'
   | 'shan-shen-bu'

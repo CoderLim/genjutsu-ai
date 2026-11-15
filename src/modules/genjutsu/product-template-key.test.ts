@@ -10,6 +10,7 @@ import {
   CHIPMUNKS_DANCE_PRODUCT,
   COLDPLAY_KISS_CAM_PRODUCT,
   CRAZY_FROG_PRODUCT,
+  DECK_THE_HALLS_DANCE_AI_PRODUCT,
   ENZO_FERNANDEZ_AI_PRODUCT,
   FLYING_CAR_AI_PRODUCT,
   GANGNAM_STYLE_AI_PRODUCT,
@@ -38,6 +39,7 @@ const ALL_PRODUCTS: GenjutsuProductId[] = [
   BICEP_HEART_PRODUCT,
   BURNING_BRIDGES_AI_PRODUCT,
   SAY_IT_RIGHT_AI_PRODUCT,
+  DECK_THE_HALLS_DANCE_AI_PRODUCT,
   ZOMBIE_HUG_PRODUCT,
   TINY_DESK_AI_PRODUCT,
   WASSUP_IN_A_MINUTE_AI_PRODUCT,
@@ -118,6 +120,10 @@ test('product id is reflected in its default template key path', () => {
   assert.match(
     getGenjutsuProductTemplateVideoKey(SAY_IT_RIGHT_AI_PRODUCT),
     /say-it-right-ai/
+  );
+  assert.match(
+    getGenjutsuProductTemplateVideoKey(DECK_THE_HALLS_DANCE_AI_PRODUCT),
+    /deck-the-halls-dance-ai/
   );
   assert.match(
     getGenjutsuProductTemplateVideoKey(ZOMBIE_HUG_PRODUCT),

@@ -1001,6 +1001,21 @@ export function getSayItRightAiTemplateVideoKey() {
   );
 }
 
+export function getDeckTheHallsDanceAiTemplateVideoKey(
+  castMode: 'solo' | 'duo' = 'solo'
+) {
+  if (castMode === 'duo') {
+    return (
+      envConfigs.deck_the_halls_dance_ai_duo_template_video_key?.trim() ||
+      'genjutsu/templates/deck-the-halls-dance-ai-duo.mp4'
+    );
+  }
+  return (
+    envConfigs.deck_the_halls_dance_ai_template_video_key?.trim() ||
+    'genjutsu/templates/deck-the-halls-dance-ai.mp4'
+  );
+}
+
 export function getTinyDeskAiTemplateVideoKey() {
   return (
     envConfigs.tiny_desk_ai_template_video_key?.trim() ||
@@ -1178,6 +1193,29 @@ export async function ensureSayItRightAiTemplateInR2() {
   });
 }
 
+export async function ensureDeckTheHallsDanceAiTemplateInR2(
+  castMode: 'solo' | 'duo' = 'solo'
+) {
+  return ensureGenjutsuPublicTemplateInR2({
+    key: getDeckTheHallsDanceAiTemplateVideoKey(castMode),
+    localRelative:
+      castMode === 'duo'
+        ? 'public/videos/deck-the-halls-dance-duo-tpl.mp4'
+        : 'public/videos/deck-the-halls-dance-tpl.mp4',
+    label:
+      castMode === 'duo'
+        ? 'Deck the Halls Dance AI (duo)'
+        : 'Deck the Halls Dance AI',
+  });
+}
+
+export async function getDeckTheHallsDanceAiTemplatePreviewUrl(
+  castMode: 'solo' | 'duo' = 'solo'
+) {
+  const key = await ensureDeckTheHallsDanceAiTemplateInR2(castMode);
+  return createGenjutsuR2ReadUrl(key);
+}
+
 export async function ensureTinyDeskAiTemplateInR2() {
   return ensureGenjutsuPublicTemplateInR2({
     key: getTinyDeskAiTemplateVideoKey(),
@@ -1223,6 +1261,8 @@ export function getGenjutsuProductTemplateVideoKey(
       return getBurningBridgesAiTemplateVideoKey();
     case 'say-it-right-ai':
       return getSayItRightAiTemplateVideoKey();
+    case 'deck-the-halls-dance-ai':
+      return getDeckTheHallsDanceAiTemplateVideoKey();
     case 'zombie-hug':
       // Aspect-aware callers use getZombieHugTemplateVideoKey(aspect).
       // Default landscape key for the shared GenjutsuProductId helper.
@@ -1275,6 +1315,8 @@ export async function ensureGenjutsuProductTemplateInR2(
       return ensureBurningBridgesAiTemplateInR2();
     case 'say-it-right-ai':
       return ensureSayItRightAiTemplateInR2();
+    case 'deck-the-halls-dance-ai':
+      return ensureDeckTheHallsDanceAiTemplateInR2();
     case 'zombie-hug':
       return ensureZombieHugTemplateInR2();
     case 'tiny-desk-ai':

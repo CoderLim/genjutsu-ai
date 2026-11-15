@@ -278,6 +278,14 @@ export const envConfigs: Record<string, string> = {
     procEnv.SAY_IT_RIGHT_AI_TEMPLATE_VIDEO_KEY ??
     'genjutsu/templates/say-it-right-ai-v1.mp4',
 
+  // Deck the Halls Dance AI (server-only). Solo + duo fixed R2 templates.
+  deck_the_halls_dance_ai_template_video_key:
+    procEnv.DECK_THE_HALLS_DANCE_AI_TEMPLATE_VIDEO_KEY ??
+    'genjutsu/templates/deck-the-halls-dance-ai.mp4',
+  deck_the_halls_dance_ai_duo_template_video_key:
+    procEnv.DECK_THE_HALLS_DANCE_AI_DUO_TEMPLATE_VIDEO_KEY ??
+    'genjutsu/templates/deck-the-halls-dance-ai-duo.mp4',
+
   // Tiny Desk AI (server-only). Fixed R2 template; client uploads one lead-singer image.
   tiny_desk_ai_template_video_key:
     procEnv.TINY_DESK_AI_TEMPLATE_VIDEO_KEY ??

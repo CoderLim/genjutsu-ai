@@ -39,6 +39,7 @@ const STATIC_PATHS = [
   '/blog',
   '/burning-bridges-ai',
   '/say-it-right-ai',
+  '/deck-the-halls-dance-ai',
   '/privacy-policy',
   '/terms-of-service',
   '/refund-policy',
@@ -59,6 +60,8 @@ const LIMITED_STATIC_PATH_LOCALES: Record<string, readonly string[]> = {
   '/58th-floor-ai-video': [baseLocale],
   // Chipmunks Dance ships English editorial first.
   '/chipmunks-dance': [baseLocale],
+  // Deck the Halls Dance ships English editorial first.
+  '/deck-the-halls-dance-ai': [baseLocale],
   // Tiny Desk AI ships English editorial first — do not advertise /ja /ko /es mirrors.
   '/tiny-desk-ai': [baseLocale],
   '/shan-shen-bu': [baseLocale],

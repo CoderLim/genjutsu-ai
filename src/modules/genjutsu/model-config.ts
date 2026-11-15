@@ -21,10 +21,8 @@ export type HiggsfieldGenjutsuProfile = keyof typeof HIGGSFIELD_GENJUTSU_MODELS;
  * Only product pages explicitly listed here are pinned to a model.
  * Other products and the homepage continue to use their existing env routing.
  *
- * These five templates previously followed the homepage's Genjutsu Light
- * configuration. Four remain on Light; Wassup in a Minute uses Standard.
- * Pinning them makes it safe to change the homepage independently.
- * Review each product's output quality before choosing Standard or Light.
+ * Explicit product pages pin Standard or Light so homepage env changes do not
+ * retarget them. Review each product's output quality before choosing a profile.
  */
 export const PRODUCT_GENJUTSU_MODEL_PROFILES: Partial<
   Record<GenjutsuProductId, HiggsfieldGenjutsuProfile>
@@ -33,6 +31,7 @@ export const PRODUCT_GENJUTSU_MODEL_PROFILES: Partial<
   'tiny-desk-ai': 'light',
   'chipmunks-dance': 'light',
   'bicep-heart': 'light',
+  'deck-the-halls-dance-ai': 'light',
   'wassup-in-a-minute-ai': 'standard',
 };
 
@@ -51,10 +50,11 @@ export function getProductGenjutsuModelProfile(
   return PRODUCT_GENJUTSU_MODEL_PROFILES[product as GenjutsuProductId];
 }
 
-export function isHiggsfieldGenjutsuLightModel(model: string | null | undefined) {
+export function isHiggsfieldGenjutsuLightModel(
+  model: string | null | undefined
+) {
   return (
-    typeof model === 'string' &&
-    model.startsWith('higgsfield/genjutsu-light/')
+    typeof model === 'string' && model.startsWith('higgsfield/genjutsu-light/')
   );
 }
 

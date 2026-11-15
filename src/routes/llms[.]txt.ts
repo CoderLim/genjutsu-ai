@@ -110,6 +110,12 @@ const STATIC_PAGES: { path: string; title: string; description: string }[] = [
       'One-photo Say It Right trio dance AI video maker (fixed template, 9:16)',
   },
   {
+    path: '/deck-the-halls-dance-ai',
+    title: 'Deck the Halls Dance AI',
+    description:
+      'One-photo Deck the Halls Dance Christmas dance AI video maker (fixed night parking-lot template, 9:16)',
+  },
+  {
     path: '/kairo-bad-times',
     title: 'Kairo Bad Times AI Video',
     description: 'One-photo Kairo Bad Times motion-template AI video generator',

@@ -20,6 +20,7 @@ async function GET({ request }: { request: Request }) {
       product,
       aspect: searchParams.get('aspect'),
       subject: searchParams.get('subject'),
+      cast: searchParams.get('cast'),
     });
 
     if (!proxy) {

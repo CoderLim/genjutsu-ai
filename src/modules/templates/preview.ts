@@ -1,4 +1,9 @@
 import {
+  DECK_THE_HALLS_DANCE_AI_DEFAULT_CAST_MODE,
+  isDeckTheHallsDanceAiCastMode,
+} from '@/modules/deck-the-halls-dance-ai/constants';
+import {
+  getDeckTheHallsDanceAiTemplatePreviewUrl,
   getGenjutsuProductTemplatePreviewUrl,
   getZombieHugTemplatePreviewUrl,
 } from '@/modules/genjutsu/storage';
@@ -24,6 +29,7 @@ export async function resolveFixedTemplatePreviewUrl(params: {
   product: string;
   aspect?: string | null;
   subject?: string | null;
+  cast?: string | null;
 }): Promise<string> {
   const product = params.product;
 
@@ -35,6 +41,14 @@ export async function resolveFixedTemplatePreviewUrl(params: {
       ? params.aspect
       : ZOMBIE_HUG_DEFAULT_ASPECT_RATIO;
     return getZombieHugTemplatePreviewUrl(aspectRatio);
+  }
+
+  // Deck the Halls Dance: solo | duo templates.
+  if (product === 'deck-the-halls-dance-ai') {
+    const castMode = isDeckTheHallsDanceAiCastMode(params.cast)
+      ? params.cast
+      : DECK_THE_HALLS_DANCE_AI_DEFAULT_CAST_MODE;
+    return getDeckTheHallsDanceAiTemplatePreviewUrl(castMode);
   }
 
   // Genjutsu product ids (incl. crazy-frog) win over hotel-lobby legacy preset ids.

@@ -36,6 +36,12 @@ import {
   CRAZY_FROG_PRODUCT_ID,
   CRAZY_FROG_RESOLUTIONS,
 } from '@/modules/crazy-frog/constants';
+import { isAllowedDeckTheHallsDanceAiPrompt } from '@/modules/deck-the-halls-dance-ai/assert';
+import {
+  DECK_THE_HALLS_DANCE_AI_MODE,
+  DECK_THE_HALLS_DANCE_AI_PRODUCT_ID,
+  DECK_THE_HALLS_DANCE_AI_RESOLUTIONS,
+} from '@/modules/deck-the-halls-dance-ai/constants';
 import { isAllowedEnzoFernandezAiPrompt } from '@/modules/enzo-fernandez-ai/assert';
 import {
   ENZO_FERNANDEZ_AI_MODE,
@@ -283,6 +289,31 @@ async function POST({ request }: { request: Request }) {
     if (isSayItRightAi && !isAllowedSayItRightAiPrompt(prompt)) {
       return respErr(
         'Say It Right AI prompt does not match the fixed product prompt',
+        {
+          status: 400,
+        }
+      );
+    }
+    const isDeckTheHallsDanceAi =
+      product === DECK_THE_HALLS_DANCE_AI_PRODUCT_ID;
+    if (isDeckTheHallsDanceAi && mode !== DECK_THE_HALLS_DANCE_AI_MODE) {
+      return respErr('Deck the Halls Dance AI only supports objects-swap', {
+        status: 400,
+      });
+    }
+    if (
+      isDeckTheHallsDanceAi &&
+      !DECK_THE_HALLS_DANCE_AI_RESOLUTIONS.includes(
+        resolution as (typeof DECK_THE_HALLS_DANCE_AI_RESOLUTIONS)[number]
+      )
+    ) {
+      return respErr('Deck the Halls Dance AI only supports 480p and 720p', {
+        status: 400,
+      });
+    }
+    if (isDeckTheHallsDanceAi && !isAllowedDeckTheHallsDanceAiPrompt(prompt)) {
+      return respErr(
+        'Deck the Halls Dance AI prompt does not match the fixed product prompt',
         {
           status: 400,
         }
