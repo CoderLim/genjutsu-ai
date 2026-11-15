@@ -55,10 +55,11 @@ const FAQ_KEYS = [
   { q: 'site.deckhalls.seo.faq6_q', a: 'site.deckhalls.seo.faq6_a' },
 ] as const;
 
-/** FAQPage JSON-LD — keep to 3–5 entries. */
+/** FAQPage JSON-LD — keep to 3–5 entries; include photo-count (Solo/Duo). */
 const FAQ_SCHEMA_KEYS = [
   FAQ_KEYS[0],
   FAQ_KEYS[1],
+  FAQ_KEYS[2],
   FAQ_KEYS[3],
   FAQ_KEYS[4],
 ] as const;
@@ -198,8 +199,8 @@ export function DeckTheHallsDanceAiSeoSections() {
         <p>{m['site.deckhalls.seo.tiktok_body']()}</p>
         <div className="mx-auto mt-10 max-w-sm overflow-hidden rounded-[20px] border border-white/10 bg-black/25 p-2.5">
           <video
-            src="/videos/deck-the-halls-dance-tpl.mp4"
-            poster="/videos/deck-the-halls-dance-tpl-poster.jpg"
+            src="/videos/deck-the-halls-dance-duo-tpl.mp4"
+            poster="/videos/deck-the-halls-dance-duo-tpl-poster.jpg"
             title={m['site.deckhalls.seo.sample_title']()}
             controls
             playsInline

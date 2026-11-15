@@ -113,7 +113,7 @@ const STATIC_PAGES: { path: string; title: string; description: string }[] = [
     path: '/deck-the-halls-dance-ai',
     title: 'Deck the Halls Dance AI',
     description:
-      'One-photo Deck the Halls Dance Christmas dance AI video maker (fixed night parking-lot template, 9:16)',
+      'Solo (1 photo, night parking lot) or Duo (2 photos, kitchen) Deck the Halls Dance Christmas AI video maker (9:16)',
   },
   {
     path: '/kairo-bad-times',

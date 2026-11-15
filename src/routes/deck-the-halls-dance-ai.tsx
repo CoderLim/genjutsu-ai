@@ -16,10 +16,11 @@ import { SiteHeader } from '@/components/landing/SiteHeader';
 import { SeoJsonLd } from '@/components/seo-json-ld';
 
 const PAGE_PATH = '/deck-the-halls-dance-ai';
-const OG_IMAGE = '/videos/deck-the-halls-dance-tpl-poster.jpg';
-const TEMPLATE_VIDEO = '/videos/deck-the-halls-dance-tpl.mp4';
-const TEMPLATE_POSTER = '/videos/deck-the-halls-dance-tpl-poster.jpg';
-const TEMPLATE_DURATION = 'PT11S';
+/** Default cast is Duo — OG / VideoObject follow the kitchen duo template. */
+const OG_IMAGE = '/videos/deck-the-halls-dance-duo-tpl-poster.jpg';
+const TEMPLATE_VIDEO = '/videos/deck-the-halls-dance-duo-tpl.mp4';
+const TEMPLATE_POSTER = '/videos/deck-the-halls-dance-duo-tpl-poster.jpg';
+const TEMPLATE_DURATION = 'PT10S';
 const TEMPLATE_UPLOAD_DATE = '2026-11-15';
 
 function faqJsonLd() {
@@ -187,7 +188,7 @@ export const Route = createFileRoute('/deck-the-halls-dance-ai')({
         {
           property: 'og:image:alt',
           content:
-            'Deck the Halls Dance AI street-party dance — lead dancer in night parking-lot dancer in a high-visibility safety vest',
+            'Deck the Halls Dance AI Duo — two dancers in a bright open-plan kitchen Christmas dance template',
         },
       ],
       links: [{ rel: 'canonical', href: canonical }, ...alternates],
