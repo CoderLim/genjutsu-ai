@@ -8,6 +8,7 @@ import {
   A2O_LITE_AI_PRODUCT,
   BICEP_HEART_PRODUCT,
   BURNING_BRIDGES_AI_PRODUCT,
+  CAN_I_RIDE_DANCE_AI_PRODUCT,
   CHIPMUNKS_DANCE_PRODUCT,
   COLDPLAY_KISS_CAM_PRODUCT,
   CRAZY_FROG_PRODUCT,
@@ -185,6 +186,17 @@ test('deck-the-halls-dance-ai is pinned to Genjutsu Light', () => {
   });
 });
 
+test('can-i-ride-dance-ai is pinned to Genjutsu Light', () => {
+  const target = resolveProductProviderTarget(
+    CAN_I_RIDE_DANCE_AI_PRODUCT,
+    'objects-swap'
+  );
+  assert.deepEqual(target, {
+    provider: 'higgsfield',
+    model: 'higgsfield/genjutsu-light/object-swap/v1.0',
+  });
+});
+
 test('say-it-right-ai follows the mode env router', () => {
   const fallback = resolveGenjutsuProviderTarget('objects-swap');
   const target = resolveProductProviderTarget(
@@ -240,6 +252,7 @@ test('isGenjutsuProductId allowlist', () => {
   assert.equal(isGenjutsuProductId(BURNING_BRIDGES_AI_PRODUCT), true);
   assert.equal(isGenjutsuProductId(SAY_IT_RIGHT_AI_PRODUCT), true);
   assert.equal(isGenjutsuProductId(DECK_THE_HALLS_DANCE_AI_PRODUCT), true);
+  assert.equal(isGenjutsuProductId(CAN_I_RIDE_DANCE_AI_PRODUCT), true);
   assert.equal(isGenjutsuProductId(ZOMBIE_HUG_PRODUCT), true);
   assert.equal(isGenjutsuProductId(TINY_DESK_AI_PRODUCT), true);
   assert.equal(isGenjutsuProductId(WASSUP_IN_A_MINUTE_AI_PRODUCT), true);

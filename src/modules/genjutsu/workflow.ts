@@ -26,6 +26,7 @@ export const BURNING_BRIDGES_AI_PRODUCT = 'burning-bridges-ai' as const;
 export const SAY_IT_RIGHT_AI_PRODUCT = 'say-it-right-ai' as const;
 export const DECK_THE_HALLS_DANCE_AI_PRODUCT =
   'deck-the-halls-dance-ai' as const;
+export const CAN_I_RIDE_DANCE_AI_PRODUCT = 'can-i-ride-dance-ai' as const;
 export const ZOMBIE_HUG_PRODUCT = 'zombie-hug' as const;
 export const TINY_DESK_AI_PRODUCT = 'tiny-desk-ai' as const;
 export const SHAN_SHEN_BU_PRODUCT = 'shan-shen-bu' as const;
@@ -55,6 +56,7 @@ export function isGenjutsuProductId(
     value === BURNING_BRIDGES_AI_PRODUCT ||
     value === SAY_IT_RIGHT_AI_PRODUCT ||
     value === DECK_THE_HALLS_DANCE_AI_PRODUCT ||
+    value === CAN_I_RIDE_DANCE_AI_PRODUCT ||
     value === ZOMBIE_HUG_PRODUCT ||
     value === TINY_DESK_AI_PRODUCT ||
     value === SHAN_SHEN_BU_PRODUCT ||

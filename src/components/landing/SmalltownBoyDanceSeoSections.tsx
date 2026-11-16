@@ -57,6 +57,10 @@ const FAQ_KEYS = [
 
 const EXPLORE_LINKS = [
   {
+    label: () => m['site.smalltown.seo.more_caniride'](),
+    href: '/can-i-ride-dance-ai',
+  },
+  {
     label: () => m['site.smalltown.seo.more_chipmunks'](),
     href: '/chipmunks-dance',
   },

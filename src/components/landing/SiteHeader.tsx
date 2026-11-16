@@ -42,6 +42,11 @@ const TRENDING_LINKS = [
     poster: '/videos/tiny-desk-ai-tpl-poster.jpg',
   },
   {
+    label: 'Can I Ride Dance AI',
+    href: '/can-i-ride-dance-ai',
+    poster: '/videos/can-i-ride-dance-duo-tpl-poster.jpg',
+  },
+  {
     label: 'Gas Station Dance AI',
     href: '/gas-station-dance-ai',
     poster: '/videos/long-trival-tpl-poster.jpg',

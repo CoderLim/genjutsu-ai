@@ -7,6 +7,7 @@ import {
   A2O_LITE_AI_PRODUCT,
   BICEP_HEART_PRODUCT,
   BURNING_BRIDGES_AI_PRODUCT,
+  CAN_I_RIDE_DANCE_AI_PRODUCT,
   CHIPMUNKS_DANCE_PRODUCT,
   COLDPLAY_KISS_CAM_PRODUCT,
   CRAZY_FROG_PRODUCT,
@@ -39,6 +40,7 @@ const ALL_PRODUCTS: GenjutsuProductId[] = [
   BICEP_HEART_PRODUCT,
   BURNING_BRIDGES_AI_PRODUCT,
   SAY_IT_RIGHT_AI_PRODUCT,
+  CAN_I_RIDE_DANCE_AI_PRODUCT,
   DECK_THE_HALLS_DANCE_AI_PRODUCT,
   ZOMBIE_HUG_PRODUCT,
   TINY_DESK_AI_PRODUCT,
@@ -124,6 +126,10 @@ test('product id is reflected in its default template key path', () => {
   assert.match(
     getGenjutsuProductTemplateVideoKey(DECK_THE_HALLS_DANCE_AI_PRODUCT),
     /deck-the-halls-dance-ai/
+  );
+  assert.match(
+    getGenjutsuProductTemplateVideoKey(CAN_I_RIDE_DANCE_AI_PRODUCT),
+    /can-i-ride-dance-ai/
   );
   assert.match(
     getGenjutsuProductTemplateVideoKey(ZOMBIE_HUG_PRODUCT),

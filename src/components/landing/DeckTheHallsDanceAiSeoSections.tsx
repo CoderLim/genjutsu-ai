@@ -66,6 +66,10 @@ const FAQ_SCHEMA_KEYS = [
 
 const RELATED_TEMPLATES = [
   {
+    label: () => m['site.deckhalls.seo.related_caniride'](),
+    href: '/can-i-ride-dance-ai',
+  },
+  {
     label: () => m['site.deckhalls.seo.related_gas'](),
     href: '/gas-station-dance-ai',
   },

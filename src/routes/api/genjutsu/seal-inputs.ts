@@ -4,6 +4,11 @@ import { getAuth } from '@/core/auth';
 import { A2O_LITE_AI_PRODUCT_ID } from '@/modules/a2o-lite-ai/constants';
 import { BICEP_HEART_AI_PRODUCT_ID } from '@/modules/bicep-heart-ai/constants';
 import { BURNING_BRIDGES_AI_PRODUCT_ID } from '@/modules/burning-bridges-ai/constants';
+import {
+  CAN_I_RIDE_DANCE_AI_DEFAULT_CAST_MODE,
+  CAN_I_RIDE_DANCE_AI_PRODUCT_ID,
+  isCanIRideDanceAiCastMode,
+} from '@/modules/can-i-ride-dance-ai/constants';
 import { CHIPMUNKS_DANCE_PRODUCT_ID } from '@/modules/chipmunks-dance/constants';
 import { COLDPLAY_KISS_CAM_PRODUCT_ID } from '@/modules/coldplay-kiss-cam/constants';
 import { CRAZY_FROG_PRODUCT_ID } from '@/modules/crazy-frog/constants';
@@ -35,6 +40,7 @@ import {
   getA2oLiteAiTemplateVideoKey,
   getBicepHeartTemplateVideoKey,
   getBurningBridgesAiTemplateVideoKey,
+  getCanIRideDanceAiTemplateVideoKey,
   getChipmunksDanceTemplateVideoKey,
   getColdplayKissCamTemplateVideoKey,
   getCrazyFrogTemplateVideoKey,
@@ -182,14 +188,23 @@ async function POST({ request }: { request: Request }) {
                                               ? currentOptions.preset
                                               : DECK_THE_HALLS_DANCE_AI_DEFAULT_CAST_MODE
                                           )
-                                        : product === ZOMBIE_HUG_PRODUCT_ID
-                                          ? getZombieHugTemplateVideoKey(
-                                              templateAspectRatio
+                                        : product ===
+                                            CAN_I_RIDE_DANCE_AI_PRODUCT_ID
+                                          ? getCanIRideDanceAiTemplateVideoKey(
+                                              isCanIRideDanceAiCastMode(
+                                                currentOptions?.preset
+                                              )
+                                                ? currentOptions.preset
+                                                : CAN_I_RIDE_DANCE_AI_DEFAULT_CAST_MODE
                                             )
-                                          : // Legacy: useDefaultTemplate without product → zombie keys.
-                                            getZombieHugTemplateVideoKey(
-                                              templateAspectRatio
-                                            );
+                                          : product === ZOMBIE_HUG_PRODUCT_ID
+                                            ? getZombieHugTemplateVideoKey(
+                                                templateAspectRatio
+                                              )
+                                            : // Legacy: useDefaultTemplate without product → zombie keys.
+                                              getZombieHugTemplateVideoKey(
+                                                templateAspectRatio
+                                              );
     const videoKey =
       typeof currentOptions?.videoKey === 'string'
         ? currentOptions.videoKey

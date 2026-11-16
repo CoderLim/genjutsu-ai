@@ -34,6 +34,22 @@ import {
   assertBurningBridgesAiProviderBinding,
   BurningBridgesAiProviderBindingError,
 } from '@/modules/burning-bridges-ai/provider';
+import { isAllowedCanIRideDanceAiPrompt } from '@/modules/can-i-ride-dance-ai/assert';
+import {
+  CAN_I_RIDE_DANCE_AI_ASPECT_RATIO,
+  CAN_I_RIDE_DANCE_AI_DEFAULT_CAST_MODE,
+  CAN_I_RIDE_DANCE_AI_MODE,
+  CAN_I_RIDE_DANCE_AI_PRODUCT_ID,
+  CAN_I_RIDE_DANCE_AI_RESOLUTIONS,
+  getCanIRideDanceAiImageCount,
+  getCanIRideDanceAiPrompt,
+  isCanIRideDanceAiCastMode,
+  type CanIRideDanceAiCastMode,
+} from '@/modules/can-i-ride-dance-ai/constants';
+import {
+  assertCanIRideDanceAiProviderBinding,
+  CanIRideDanceAiProviderBindingError,
+} from '@/modules/can-i-ride-dance-ai/provider';
 import { isAllowedChipmunksDancePrompt } from '@/modules/chipmunks-dance/assert';
 import {
   CHIPMUNKS_DANCE_ASPECT_RATIO,
@@ -141,6 +157,7 @@ import {
   ensureA2oLiteAiTemplateInR2,
   ensureBicepHeartTemplateInR2,
   ensureBurningBridgesAiTemplateInR2,
+  ensureCanIRideDanceAiTemplateInR2,
   ensureChipmunksDanceTemplateInR2,
   ensureColdplayKissCamTemplateInR2,
   ensureCrazyFrogTemplateInR2,
@@ -160,6 +177,7 @@ import {
   getA2oLiteAiTemplateVideoKey,
   getBicepHeartTemplateVideoKey,
   getBurningBridgesAiTemplateVideoKey,
+  getCanIRideDanceAiTemplateVideoKey,
   getChipmunksDanceTemplateVideoKey,
   getColdplayKissCamTemplateVideoKey,
   getCrazyFrogTemplateVideoKey,
@@ -302,6 +320,7 @@ async function POST({ request }: { request: Request }) {
     const isSayItRightAi = product === SAY_IT_RIGHT_AI_PRODUCT_ID;
     const isDeckTheHallsDanceAi =
       product === DECK_THE_HALLS_DANCE_AI_PRODUCT_ID;
+    const isCanIRideDanceAi = product === CAN_I_RIDE_DANCE_AI_PRODUCT_ID;
     const isFlyingCarAi = product === FLYING_CAR_AI_PRODUCT_ID;
     const isShanShenBu = product === SHAN_SHEN_BU_PRODUCT_ID;
     const isColdplayKissCam = product === COLDPLAY_KISS_CAM_PRODUCT_ID;
@@ -332,6 +351,7 @@ async function POST({ request }: { request: Request }) {
         isTinyDeskAi ||
         isSayItRightAi ||
         isDeckTheHallsDanceAi ||
+        isCanIRideDanceAi ||
         isFlyingCarAi ||
         isShanShenBu ||
         isColdplayKissCam ||
@@ -355,6 +375,7 @@ async function POST({ request }: { request: Request }) {
         isTinyDeskAi ||
         isSayItRightAi ||
         isDeckTheHallsDanceAi ||
+        isCanIRideDanceAi ||
         isFlyingCarAi ||
         isShanShenBu ||
         isColdplayKissCam ||
@@ -390,17 +411,34 @@ async function POST({ request }: { request: Request }) {
         status: 400,
       });
     }
+    const canIRideCastMode: CanIRideDanceAiCastMode | null = isCanIRideDanceAi
+      ? isCanIRideDanceAiCastMode(body.preset)
+        ? body.preset
+        : CAN_I_RIDE_DANCE_AI_DEFAULT_CAST_MODE
+      : null;
+    if (
+      isCanIRideDanceAi &&
+      body.preset != null &&
+      !isCanIRideDanceAiCastMode(body.preset)
+    ) {
+      return respErr('Can I Ride Dance AI cast must be solo or duo', {
+        status: 400,
+      });
+    }
+    const castDanceMode = deckHallsCastMode || canIRideCastMode || undefined;
     // Tiny Desk / Wassup allow variable cast sizes; other fixed templates are exact.
     const fixedTemplateImageCount =
       isTinyDeskAi || isWassupInAMinuteAi
         ? null
         : isDeckTheHallsDanceAi && deckHallsCastMode
           ? getDeckTheHallsDanceAiImageCount(deckHallsCastMode)
-          : isSingleImageProduct
-            ? FIXED_TEMPLATE_SINGLE_IMAGE_COUNT
-            : isTripleImageProduct
-              ? FIXED_TEMPLATE_TRIPLE_IMAGE_COUNT
-              : FIXED_TEMPLATE_DUAL_IMAGE_COUNT;
+          : isCanIRideDanceAi && canIRideCastMode
+            ? getCanIRideDanceAiImageCount(canIRideCastMode)
+            : isSingleImageProduct
+              ? FIXED_TEMPLATE_SINGLE_IMAGE_COUNT
+              : isTripleImageProduct
+                ? FIXED_TEMPLATE_TRIPLE_IMAGE_COUNT
+                : FIXED_TEMPLATE_DUAL_IMAGE_COUNT;
 
     if (mode !== 'motion-transfer' && mode !== 'objects-swap') {
       return respErr('Invalid Genjutsu mode', { status: 400 });
@@ -464,9 +502,11 @@ async function POST({ request }: { request: Request }) {
                                     ? 'Say It Right AI preview must use 480p'
                                     : isDeckTheHallsDanceAi
                                       ? 'Deck the Halls Dance AI preview must use 480p'
-                                      : isSmalltown
-                                        ? 'Smalltown Boy Dance preview must use 480p'
-                                        : 'Crazy Frog preview must use 480p',
+                                      : isCanIRideDanceAi
+                                        ? 'Can I Ride Dance AI preview must use 480p'
+                                        : isSmalltown
+                                          ? 'Smalltown Boy Dance preview must use 480p'
+                                          : 'Crazy Frog preview must use 480p',
         { status: 400 }
       );
     }
@@ -613,6 +653,39 @@ async function POST({ request }: { request: Request }) {
     ) {
       return respErr(
         'Deck the Halls Dance AI prompt does not match the selected cast mode',
+        { status: 400 }
+      );
+    }
+    if (isCanIRideDanceAi && mode !== CAN_I_RIDE_DANCE_AI_MODE) {
+      return respErr('Can I Ride Dance AI only supports objects-swap', {
+        status: 400,
+      });
+    }
+    if (
+      isCanIRideDanceAi &&
+      !CAN_I_RIDE_DANCE_AI_RESOLUTIONS.includes(
+        resolution as (typeof CAN_I_RIDE_DANCE_AI_RESOLUTIONS)[number]
+      )
+    ) {
+      return respErr('Can I Ride Dance AI only supports 480p and 720p', {
+        status: 400,
+      });
+    }
+    if (isCanIRideDanceAi && !isAllowedCanIRideDanceAiPrompt(prompt)) {
+      return respErr(
+        'Can I Ride Dance AI prompt does not match the fixed product prompt',
+        {
+          status: 400,
+        }
+      );
+    }
+    if (
+      isCanIRideDanceAi &&
+      canIRideCastMode &&
+      prompt !== getCanIRideDanceAiPrompt(canIRideCastMode)
+    ) {
+      return respErr(
+        'Can I Ride Dance AI prompt does not match the selected cast mode',
         { status: 400 }
       );
     }
@@ -886,19 +959,23 @@ async function POST({ request }: { request: Request }) {
                                 ? 'Say It Right AI'
                                 : isDeckTheHallsDanceAi
                                   ? 'Deck the Halls Dance AI'
-                                  : isSmalltown
-                                    ? 'Smalltown Boy Dance'
-                                    : 'Crazy Frog';
+                                  : isCanIRideDanceAi
+                                    ? 'Can I Ride Dance AI'
+                                    : isSmalltown
+                                      ? 'Smalltown Boy Dance'
+                                      : 'Crazy Frog';
       const previewImageCount =
         isTinyDeskAi || isWassupInAMinuteAi
           ? Math.max(0, contentTypes.length - 1)
           : isDeckTheHallsDanceAi && deckHallsCastMode
             ? getDeckTheHallsDanceAiImageCount(deckHallsCastMode)
-            : isSingleImageProduct
-              ? 1
-              : isTripleImageProduct
-                ? 3
-                : 2;
+            : isCanIRideDanceAi && canIRideCastMode
+              ? getCanIRideDanceAiImageCount(canIRideCastMode)
+              : isSingleImageProduct
+                ? 1
+                : isTripleImageProduct
+                  ? 3
+                  : 2;
       const previewUploadCount = previewImageCount + 1;
       if (isTinyDeskAi) {
         if (
@@ -1049,7 +1126,12 @@ async function POST({ request }: { request: Request }) {
                                                 deckHallsCastMode ||
                                                   DECK_THE_HALLS_DANCE_AI_DEFAULT_CAST_MODE
                                               )
-                                            : getSmalltownBoyDanceTemplateVideoKey()
+                                            : isCanIRideDanceAi
+                                              ? getCanIRideDanceAiTemplateVideoKey(
+                                                  canIRideCastMode ||
+                                                    CAN_I_RIDE_DANCE_AI_DEFAULT_CAST_MODE
+                                                )
+                                              : getSmalltownBoyDanceTemplateVideoKey()
           );
         } else if (isCrazyFrog) {
           await ensureCrazyFrogTemplateInR2();
@@ -1086,6 +1168,10 @@ async function POST({ request }: { request: Request }) {
         } else if (isDeckTheHallsDanceAi) {
           await ensureDeckTheHallsDanceAiTemplateInR2(
             deckHallsCastMode || DECK_THE_HALLS_DANCE_AI_DEFAULT_CAST_MODE
+          );
+        } else if (isCanIRideDanceAi) {
+          await ensureCanIRideDanceAiTemplateInR2(
+            canIRideCastMode || CAN_I_RIDE_DANCE_AI_DEFAULT_CAST_MODE
           );
         } else {
           await ensureSmalltownBoyDanceTemplateInR2();
@@ -1126,7 +1212,9 @@ async function POST({ request }: { request: Request }) {
                                           ? 'Say It Right AI template is not configured in R2.'
                                           : isDeckTheHallsDanceAi
                                             ? 'Deck the Halls Dance AI template is not configured in R2.'
-                                            : 'Smalltown Boy Dance template is not configured in R2.'),
+                                            : isCanIRideDanceAi
+                                              ? 'Can I Ride Dance AI template is not configured in R2.'
+                                              : 'Smalltown Boy Dance template is not configured in R2.'),
           { code: 'TEMPLATE_NOT_CONFIGURED' },
           { status: 503 }
         );
@@ -1192,6 +1280,9 @@ async function POST({ request }: { request: Request }) {
         existing.provider,
         existing.model
       );
+    }
+    if (isCanIRideDanceAi && existing) {
+      assertCanIRideDanceAiProviderBinding(existing.provider, existing.model);
     }
     if (isFlyingCarAi && existing) {
       assertFlyingCarAiProviderBinding(existing.provider, existing.model);
@@ -1272,7 +1363,9 @@ async function POST({ request }: { request: Request }) {
                                     ? SAY_IT_RIGHT_AI_ASPECT_RATIO
                                     : isDeckTheHallsDanceAi
                                       ? DECK_THE_HALLS_DANCE_AI_ASPECT_RATIO
-                                      : SMALLTOWN_ASPECT_RATIO;
+                                      : isCanIRideDanceAi
+                                        ? CAN_I_RIDE_DANCE_AI_ASPECT_RATIO
+                                        : SMALLTOWN_ASPECT_RATIO;
 
     if (isFixedTemplateProduct) {
       await bindGenjutsuUploadInputs({
@@ -1285,7 +1378,7 @@ async function POST({ request }: { request: Request }) {
         ...target,
         useDefaultTemplate: true,
         aspectRatio: productAspectRatio,
-        preset: deckHallsCastMode || undefined,
+        preset: castDanceMode,
         imageKeys: normalizedInputs.map((item) => item.key),
         contentTypes: normalizedInputs.map((item) => item.contentType),
         contentLengths,
@@ -1300,7 +1393,7 @@ async function POST({ request }: { request: Request }) {
         product,
         ...target,
         preview: isProductPreview || undefined,
-        preset: deckHallsCastMode || undefined,
+        preset: castDanceMode,
         aspectRatio: isProductPreview
           ? isZombieHug
             ? zombieAspectRatio!
@@ -1334,9 +1427,11 @@ async function POST({ request }: { request: Request }) {
                                         ? SAY_IT_RIGHT_AI_ASPECT_RATIO
                                         : isDeckTheHallsDanceAi
                                           ? DECK_THE_HALLS_DANCE_AI_ASPECT_RATIO
-                                          : isSmalltown
-                                            ? SMALLTOWN_ASPECT_RATIO
-                                            : CRAZY_FROG_ASPECT_RATIO
+                                          : isCanIRideDanceAi
+                                            ? CAN_I_RIDE_DANCE_AI_ASPECT_RATIO
+                                            : isSmalltown
+                                              ? SMALLTOWN_ASPECT_RATIO
+                                              : CRAZY_FROG_ASPECT_RATIO
           : undefined,
         videoKey: normalizedInputs[0].key,
         imageKeys: normalizedInputs.slice(1).map((item) => item.key),
@@ -1398,6 +1493,7 @@ async function POST({ request }: { request: Request }) {
       error instanceof TinyDeskAiProviderBindingError ||
       error instanceof SayItRightAiProviderBindingError ||
       error instanceof DeckTheHallsDanceAiProviderBindingError ||
+      error instanceof CanIRideDanceAiProviderBindingError ||
       error instanceof FlyingCarAiProviderBindingError ||
       error instanceof ShanShenBuProviderBindingError ||
       error instanceof ColdplayKissCamProviderBindingError ||

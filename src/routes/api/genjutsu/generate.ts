@@ -38,6 +38,18 @@ import {
   BurningBridgesAiProviderBindingError,
 } from '@/modules/burning-bridges-ai/provider';
 import {
+  assertCanIRideDanceAiInputs,
+  CanIRideDanceAiPreflightError,
+} from '@/modules/can-i-ride-dance-ai/assert';
+import {
+  CAN_I_RIDE_DANCE_AI_ASPECT_RATIO,
+  CAN_I_RIDE_DANCE_AI_PRODUCT_ID,
+} from '@/modules/can-i-ride-dance-ai/constants';
+import {
+  assertCanIRideDanceAiProviderBinding,
+  CanIRideDanceAiProviderBindingError,
+} from '@/modules/can-i-ride-dance-ai/provider';
+import {
   assertChipmunksDanceInputs,
   ChipmunksDancePreflightError,
 } from '@/modules/chipmunks-dance/assert';
@@ -529,6 +541,15 @@ async function POST({ request }: { request: Request }) {
       assertDeckTheHallsDanceAiInputs(taskOptions);
       assertDeckTheHallsDanceAiProviderBinding(task.provider, task.model);
     }
+    if (product === CAN_I_RIDE_DANCE_AI_PRODUCT_ID) {
+      if (!task) {
+        throw new CanIRideDanceAiPreflightError(
+          'Can I Ride Dance AI generation must start from a saved attempt'
+        );
+      }
+      assertCanIRideDanceAiInputs(taskOptions);
+      assertCanIRideDanceAiProviderBinding(task.provider, task.model);
+    }
     if (product === FLYING_CAR_AI_PRODUCT_ID) {
       if (!task) {
         throw new FlyingCarAiPreflightError(
@@ -618,6 +639,7 @@ async function POST({ request }: { request: Request }) {
         product === TINY_DESK_AI_PRODUCT_ID ||
         product === SAY_IT_RIGHT_AI_PRODUCT_ID ||
         product === DECK_THE_HALLS_DANCE_AI_PRODUCT_ID ||
+        product === CAN_I_RIDE_DANCE_AI_PRODUCT_ID ||
         product === FLYING_CAR_AI_PRODUCT_ID ||
         product === SHAN_SHEN_BU_PRODUCT_ID ||
         product === COLDPLAY_KISS_CAM_PRODUCT_ID ||
@@ -661,29 +683,31 @@ async function POST({ request }: { request: Request }) {
                       ? SAY_IT_RIGHT_AI_ASPECT_RATIO
                       : product === DECK_THE_HALLS_DANCE_AI_PRODUCT_ID
                         ? DECK_THE_HALLS_DANCE_AI_ASPECT_RATIO
-                        : product === FLYING_CAR_AI_PRODUCT_ID
-                          ? FLYING_CAR_AI_ASPECT_RATIO
-                          : product === SHAN_SHEN_BU_PRODUCT_ID
-                            ? SHAN_SHEN_BU_ASPECT_RATIO
-                            : product === COLDPLAY_KISS_CAM_PRODUCT_ID
-                              ? COLDPLAY_KISS_CAM_ASPECT_RATIO
-                              : product === GANGNAM_STYLE_AI_PRODUCT_ID
-                                ? GANGNAM_STYLE_AI_ASPECT_RATIO
-                                : product === GAS_STATION_DANCE_AI_PRODUCT_ID
-                                  ? GAS_STATION_DANCE_AI_ASPECT_RATIO
-                                  : product === GLOW_STICK_AI_PRODUCT_ID
-                                    ? GLOW_STICK_AI_ASPECT_RATIO
-                                    : product ===
-                                        WASSUP_IN_A_MINUTE_AI_PRODUCT_ID
-                                      ? WASSUP_IN_A_MINUTE_AI_ASPECT_RATIO
-                                      : product === CHIPMUNKS_DANCE_PRODUCT_ID
-                                        ? CHIPMUNKS_DANCE_ASPECT_RATIO
-                                        : product === ZOMBIE_HUG_PRODUCT_ID &&
-                                            isZombieHugAspectRatio(
-                                              taskOptions?.aspectRatio
-                                            )
-                                          ? taskOptions.aspectRatio
-                                          : undefined;
+                        : product === CAN_I_RIDE_DANCE_AI_PRODUCT_ID
+                          ? CAN_I_RIDE_DANCE_AI_ASPECT_RATIO
+                          : product === FLYING_CAR_AI_PRODUCT_ID
+                            ? FLYING_CAR_AI_ASPECT_RATIO
+                            : product === SHAN_SHEN_BU_PRODUCT_ID
+                              ? SHAN_SHEN_BU_ASPECT_RATIO
+                              : product === COLDPLAY_KISS_CAM_PRODUCT_ID
+                                ? COLDPLAY_KISS_CAM_ASPECT_RATIO
+                                : product === GANGNAM_STYLE_AI_PRODUCT_ID
+                                  ? GANGNAM_STYLE_AI_ASPECT_RATIO
+                                  : product === GAS_STATION_DANCE_AI_PRODUCT_ID
+                                    ? GAS_STATION_DANCE_AI_ASPECT_RATIO
+                                    : product === GLOW_STICK_AI_PRODUCT_ID
+                                      ? GLOW_STICK_AI_ASPECT_RATIO
+                                      : product ===
+                                          WASSUP_IN_A_MINUTE_AI_PRODUCT_ID
+                                        ? WASSUP_IN_A_MINUTE_AI_ASPECT_RATIO
+                                        : product === CHIPMUNKS_DANCE_PRODUCT_ID
+                                          ? CHIPMUNKS_DANCE_ASPECT_RATIO
+                                          : product === ZOMBIE_HUG_PRODUCT_ID &&
+                                              isZombieHugAspectRatio(
+                                                taskOptions?.aspectRatio
+                                              )
+                                            ? taskOptions.aspectRatio
+                                            : undefined;
 
     if (isSeedanceFamilyProvider(target.provider) && !hasStorageInput(input)) {
       throw new Error(
@@ -860,6 +884,8 @@ async function POST({ request }: { request: Request }) {
         error instanceof SayItRightAiProviderBindingError ||
         error instanceof DeckTheHallsDanceAiPreflightError ||
         error instanceof DeckTheHallsDanceAiProviderBindingError ||
+        error instanceof CanIRideDanceAiPreflightError ||
+        error instanceof CanIRideDanceAiProviderBindingError ||
         error instanceof FlyingCarAiPreflightError ||
         error instanceof FlyingCarAiProviderBindingError ||
         error instanceof ShanShenBuPreflightError ||

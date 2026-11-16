@@ -62,8 +62,15 @@ function GenjutsuPromptsPage() {
             >
               {m['site.prompts.related_tinydesk']()}
             </Link>
-            {m['site.prompts.related_after']()} Prefer a short clip face swap?
-            Try{' '}
+            {m['site.prompts.related_after']()} Prefer the Can I Ride duo
+            template? Try{' '}
+            <Link
+              href="/can-i-ride-dance-ai"
+              className="text-primary underline-offset-4 hover:underline"
+            >
+              {m['site.prompts.related_caniride']()}
+            </Link>
+            . Prefer a short clip face swap? Try{' '}
             <Link
               href="/live-face-swap"
               className="text-primary underline-offset-4 hover:underline"

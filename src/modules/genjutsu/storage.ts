@@ -1016,6 +1016,21 @@ export function getDeckTheHallsDanceAiTemplateVideoKey(
   );
 }
 
+export function getCanIRideDanceAiTemplateVideoKey(
+  castMode: 'solo' | 'duo' = 'solo'
+) {
+  if (castMode === 'duo') {
+    return (
+      envConfigs.can_i_ride_dance_ai_duo_template_video_key?.trim() ||
+      'genjutsu/templates/can-i-ride-dance-ai-duo.mp4'
+    );
+  }
+  return (
+    envConfigs.can_i_ride_dance_ai_template_video_key?.trim() ||
+    'genjutsu/templates/can-i-ride-dance-ai.mp4'
+  );
+}
+
 export function getTinyDeskAiTemplateVideoKey() {
   return (
     envConfigs.tiny_desk_ai_template_video_key?.trim() ||
@@ -1209,10 +1224,31 @@ export async function ensureDeckTheHallsDanceAiTemplateInR2(
   });
 }
 
+export async function ensureCanIRideDanceAiTemplateInR2(
+  castMode: 'solo' | 'duo' = 'solo'
+) {
+  return ensureGenjutsuPublicTemplateInR2({
+    key: getCanIRideDanceAiTemplateVideoKey(castMode),
+    localRelative:
+      castMode === 'duo'
+        ? 'public/videos/can-i-ride-dance-duo-tpl.mp4'
+        : 'public/videos/can-i-ride-dance-tpl.mp4',
+    label:
+      castMode === 'duo' ? 'Can I Ride Dance AI (duo)' : 'Can I Ride Dance AI',
+  });
+}
+
 export async function getDeckTheHallsDanceAiTemplatePreviewUrl(
   castMode: 'solo' | 'duo' = 'solo'
 ) {
   const key = await ensureDeckTheHallsDanceAiTemplateInR2(castMode);
+  return createGenjutsuR2ReadUrl(key);
+}
+
+export async function getCanIRideDanceAiTemplatePreviewUrl(
+  castMode: 'solo' | 'duo' = 'solo'
+) {
+  const key = await ensureCanIRideDanceAiTemplateInR2(castMode);
   return createGenjutsuR2ReadUrl(key);
 }
 
@@ -1263,6 +1299,8 @@ export function getGenjutsuProductTemplateVideoKey(
       return getSayItRightAiTemplateVideoKey();
     case 'deck-the-halls-dance-ai':
       return getDeckTheHallsDanceAiTemplateVideoKey();
+    case 'can-i-ride-dance-ai':
+      return getCanIRideDanceAiTemplateVideoKey();
     case 'zombie-hug':
       // Aspect-aware callers use getZombieHugTemplateVideoKey(aspect).
       // Default landscape key for the shared GenjutsuProductId helper.
@@ -1317,6 +1355,8 @@ export async function ensureGenjutsuProductTemplateInR2(
       return ensureSayItRightAiTemplateInR2();
     case 'deck-the-halls-dance-ai':
       return ensureDeckTheHallsDanceAiTemplateInR2();
+    case 'can-i-ride-dance-ai':
+      return ensureCanIRideDanceAiTemplateInR2();
     case 'zombie-hug':
       return ensureZombieHugTemplateInR2();
     case 'tiny-desk-ai':

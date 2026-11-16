@@ -655,6 +655,10 @@ export const FOOTER_COLUMNS: FooterColumn[] = [
         href: '/gas-station-dance-ai',
       },
       {
+        label: 'Can I Ride Dance AI',
+        href: '/can-i-ride-dance-ai',
+      },
+      {
         label: 'Burning Bridges AI',
         href: '/burning-bridges-ai',
       },
@@ -925,6 +929,11 @@ export const GENJUTSU_PROMPT_IDEAS = [
     title: 'Bicep Heart Trend restyle',
     prompt:
       'Keep the same two people and the bicep heart pose. Restyle as 2D anime with a soft rim light and a dark blue background.',
+  },
+  {
+    title: 'Can I Ride duo dance',
+    prompt:
+      'Put two people from the reference photos into the Can I Ride duo routine: waist bounces, fists up, big waves, arms crossed in an X, knee lift and hop. Keep each identity on LEFT and RIGHT. Preserve the parking-lot night background and timing. No face blending.',
   },
 ] as const;
 

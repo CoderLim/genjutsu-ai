@@ -7,6 +7,10 @@ import {
   BURNING_BRIDGES_AI_TEMPLATE_POSTER_PATH,
 } from '@/modules/burning-bridges-ai/constants';
 import {
+  CAN_I_RIDE_DANCE_AI_DUO_TEMPLATE_DISPLAY_PATH,
+  CAN_I_RIDE_DANCE_AI_DUO_TEMPLATE_POSTER_PATH,
+} from '@/modules/can-i-ride-dance-ai/constants';
+import {
   CHIPMUNKS_DANCE_TEMPLATE_DISPLAY_PATH,
   CHIPMUNKS_DANCE_TEMPLATE_POSTER_PATH,
 } from '@/modules/chipmunks-dance/constants';
@@ -98,6 +102,14 @@ const DEFAULT_OBJECTS_RESOLUTION = '480p' as const;
  * Order: newest first — prepend new templates at the top of this array.
  */
 export const MOTION_TEMPLATES: MotionTemplate[] = [
+  {
+    id: 'can-i-ride-dance',
+    titleKey: 'site.templates.can_i_ride_dance',
+    poster: CAN_I_RIDE_DANCE_AI_DUO_TEMPLATE_POSTER_PATH,
+    sourceVideo: CAN_I_RIDE_DANCE_AI_DUO_TEMPLATE_DISPLAY_PATH,
+    href: '/can-i-ride-dance-ai',
+    aspect: 'portrait',
+  },
   {
     id: 'deck-the-halls-dance',
     titleKey: 'site.templates.deck_the_halls_dance',

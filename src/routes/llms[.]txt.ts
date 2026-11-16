@@ -116,6 +116,12 @@ const STATIC_PAGES: { path: string; title: string; description: string }[] = [
       'Solo (1 photo, night parking lot) or Duo (2 photos, kitchen) Deck the Halls Dance Christmas AI video maker (9:16)',
   },
   {
+    path: '/can-i-ride-dance-ai',
+    title: 'Can I Ride Dance AI',
+    description:
+      'Solo (1 photo, hallway) or Duo (2 photos, parking lot) Can I Ride Dance AI video maker (9:16)',
+  },
+  {
     path: '/kairo-bad-times',
     title: 'Kairo Bad Times AI Video',
     description: 'One-photo Kairo Bad Times motion-template AI video generator',

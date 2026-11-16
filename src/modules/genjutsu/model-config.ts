@@ -32,6 +32,7 @@ export const PRODUCT_GENJUTSU_MODEL_PROFILES: Partial<
   'chipmunks-dance': 'light',
   'bicep-heart': 'light',
   'deck-the-halls-dance-ai': 'light',
+  'can-i-ride-dance-ai': 'light',
   'wassup-in-a-minute-ai': 'standard',
 };
 

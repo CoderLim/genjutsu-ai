@@ -18,6 +18,7 @@ const PROMPT_COPY = [
   { title: m['site.seo.idea14_title'], prompt: m['site.seo.idea14_prompt'] },
   { title: m['site.seo.idea15_title'], prompt: m['site.seo.idea15_prompt'] },
   { title: m['site.seo.idea16_title'], prompt: m['site.seo.idea16_prompt'] },
+  { title: m['site.seo.idea17_title'], prompt: m['site.seo.idea17_prompt'] },
 ];
 
 export function getLocalizedGenjutsuPromptIdeas() {

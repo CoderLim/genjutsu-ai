@@ -64,6 +64,7 @@ export const CHIPMUNKS_HOWTO_STEPS = [
 ] as const;
 
 const MORE_LINKS = [
+  { label: 'Can I Ride Dance AI', href: '/can-i-ride-dance-ai' },
   { label: 'Smalltown Boy dance', href: '/smalltown-boy-dance' },
   { label: 'A2O LITE NEON dance', href: '/a2o-lite-ai' },
   { label: 'Crazy Frog chase', href: '/crazy-frog-ai' },

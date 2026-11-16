@@ -1,8 +1,13 @@
 import {
+  CAN_I_RIDE_DANCE_AI_DEFAULT_CAST_MODE,
+  isCanIRideDanceAiCastMode,
+} from '@/modules/can-i-ride-dance-ai/constants';
+import {
   DECK_THE_HALLS_DANCE_AI_DEFAULT_CAST_MODE,
   isDeckTheHallsDanceAiCastMode,
 } from '@/modules/deck-the-halls-dance-ai/constants';
 import {
+  getCanIRideDanceAiTemplatePreviewUrl,
   getDeckTheHallsDanceAiTemplatePreviewUrl,
   getGenjutsuProductTemplatePreviewUrl,
   getZombieHugTemplatePreviewUrl,
@@ -49,6 +54,14 @@ export async function resolveFixedTemplatePreviewUrl(params: {
       ? params.cast
       : DECK_THE_HALLS_DANCE_AI_DEFAULT_CAST_MODE;
     return getDeckTheHallsDanceAiTemplatePreviewUrl(castMode);
+  }
+
+  // Can I Ride Dance: solo | duo templates.
+  if (product === 'can-i-ride-dance-ai') {
+    const castMode = isCanIRideDanceAiCastMode(params.cast)
+      ? params.cast
+      : CAN_I_RIDE_DANCE_AI_DEFAULT_CAST_MODE;
+    return getCanIRideDanceAiTemplatePreviewUrl(castMode);
   }
 
   // Genjutsu product ids (incl. crazy-frog) win over hotel-lobby legacy preset ids.

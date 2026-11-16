@@ -19,6 +19,12 @@ import {
   BURNING_BRIDGES_AI_PRODUCT_ID,
   BURNING_BRIDGES_AI_RESOLUTIONS,
 } from '@/modules/burning-bridges-ai/constants';
+import { isAllowedCanIRideDanceAiPrompt } from '@/modules/can-i-ride-dance-ai/assert';
+import {
+  CAN_I_RIDE_DANCE_AI_MODE,
+  CAN_I_RIDE_DANCE_AI_PRODUCT_ID,
+  CAN_I_RIDE_DANCE_AI_RESOLUTIONS,
+} from '@/modules/can-i-ride-dance-ai/constants';
 import { isAllowedChipmunksDancePrompt } from '@/modules/chipmunks-dance/assert';
 import {
   CHIPMUNKS_DANCE_MODE,
@@ -314,6 +320,30 @@ async function POST({ request }: { request: Request }) {
     if (isDeckTheHallsDanceAi && !isAllowedDeckTheHallsDanceAiPrompt(prompt)) {
       return respErr(
         'Deck the Halls Dance AI prompt does not match the fixed product prompt',
+        {
+          status: 400,
+        }
+      );
+    }
+    const isCanIRideDanceAi = product === CAN_I_RIDE_DANCE_AI_PRODUCT_ID;
+    if (isCanIRideDanceAi && mode !== CAN_I_RIDE_DANCE_AI_MODE) {
+      return respErr('Can I Ride Dance AI only supports objects-swap', {
+        status: 400,
+      });
+    }
+    if (
+      isCanIRideDanceAi &&
+      !CAN_I_RIDE_DANCE_AI_RESOLUTIONS.includes(
+        resolution as (typeof CAN_I_RIDE_DANCE_AI_RESOLUTIONS)[number]
+      )
+    ) {
+      return respErr('Can I Ride Dance AI only supports 480p and 720p', {
+        status: 400,
+      });
+    }
+    if (isCanIRideDanceAi && !isAllowedCanIRideDanceAiPrompt(prompt)) {
+      return respErr(
+        'Can I Ride Dance AI prompt does not match the fixed product prompt',
         {
           status: 400,
         }
