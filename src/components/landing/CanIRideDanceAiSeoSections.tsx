@@ -150,7 +150,7 @@ function Section({
       <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">
         {title}
       </h2>
-      <div className="mt-5 max-w-3xl space-y-4 text-sm leading-7 text-white/48 sm:text-base">
+      <div className="mt-5 max-w-5xl space-y-4 text-sm leading-7 text-white/48 sm:text-base">
         {children}
       </div>
     </div>
@@ -327,7 +327,7 @@ export function CanIRideDanceAiSeoSections() {
           </h2>
           <div className="mt-7 space-y-8">
             {getCanIRideDanceAiFaqItems().map((item) => (
-              <div key={item.question} className="max-w-3xl">
+              <div key={item.question} className="max-w-5xl">
                 <h3 className="text-lg font-semibold text-white/88">
                   {item.question}
                 </h3>
@@ -341,14 +341,14 @@ export function CanIRideDanceAiSeoSections() {
       </section>
 
       <section className="mx-auto max-w-5xl px-4 py-14 md:px-5 md:pb-16">
-        <p className="max-w-3xl text-sm leading-7 text-white/40">
+        <p className="max-w-5xl text-sm leading-7 text-white/40">
           {m['site.caniride.seo.legal']()}
         </p>
         <div className="mt-10">
           <h2 className="text-2xl font-semibold tracking-tight">
             {m['site.caniride.seo.more_title']()}
           </h2>
-          <p className="mt-3 max-w-3xl text-sm leading-7 text-white/45">
+          <p className="mt-3 max-w-5xl text-sm leading-7 text-white/45">
             {m['site.caniride.seo.more_intro']()}
           </p>
           <div className="mt-5 flex flex-wrap gap-3">

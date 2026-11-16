@@ -98,12 +98,6 @@ function breadcrumbJsonLd(canonical: string) {
       {
         '@type': 'ListItem',
         position: 2,
-        name: 'Dance Templates',
-        item: absoluteUrl('/'),
-      },
-      {
-        '@type': 'ListItem',
-        position: 3,
         name: 'Can I Ride Dance AI',
         item: canonical,
       },
@@ -138,7 +132,7 @@ function CanIRideDanceAiPage() {
             <h1 className="mt-3 font-serif text-4xl tracking-tight text-white md:text-5xl">
               {m['site.caniride.hero_title']()}
             </h1>
-            <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-white/60 sm:mx-0 sm:text-lg">
+            <p className="mx-auto mt-4 max-w-5xl text-base leading-7 text-white/60 sm:mx-0 sm:text-lg">
               {m['site.caniride.hero_description']()}
             </p>
 
@@ -174,7 +168,8 @@ export const Route = createFileRoute('/can-i-ride-dance-ai')({
     const locale = loaderData?.locale ?? 'en';
     const title = m['site.caniride.meta_title']({}, { locale });
     const description = m['site.caniride.meta_description']({}, { locale });
-    const { canonical, alternates } = localeLinks(PAGE_PATH, locale);
+    // English editorial only — do not advertise locale mirrors as translations.
+    const { canonical, alternates } = localeLinks(PAGE_PATH, locale, ['en']);
     return {
       meta: [
         { title },
