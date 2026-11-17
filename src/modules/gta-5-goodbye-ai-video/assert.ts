@@ -43,7 +43,7 @@ export function isAllowedGta5GoodbyeAiVideoPrompt(
  * Server-side product lock.
  *
  * Full run: fixed server R2 template (`useDefaultTemplate`), exactly one
- * reference image (the woman to replace), fixed prompt + 9:16 aspect.
+ * reference image (the girl to replace), fixed prompt + 16:9 aspect.
  *
  * Preview: same prompt/aspect/product, but client uploads a trimmed ≤4s
  * template clip at 480p plus the one image — `preview: true`,
@@ -70,7 +70,7 @@ export function assertGta5GoodbyeAiVideoInputs(options: TaskOptions | null) {
 
   if (options.aspectRatio !== GTA_5_GOODBYE_AI_VIDEO_ASPECT_RATIO) {
     throw new Gta5GoodbyeAiVideoPreflightError(
-      'GTA 5 Goodbye AI Video requires a fixed 9:16 aspect ratio'
+      'GTA 5 Goodbye AI Video requires a fixed 16:9 aspect ratio'
     );
   }
 

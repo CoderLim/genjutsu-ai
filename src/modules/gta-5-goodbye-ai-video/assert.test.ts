@@ -68,7 +68,7 @@ test('rejects prompt tampering', () => {
 test('rejects wrong aspect, resolution, and image count', () => {
   assert.throws(
     () =>
-      assertGta5GoodbyeAiVideoInputs({ ...validOptions, aspectRatio: '16:9' }),
+      assertGta5GoodbyeAiVideoInputs({ ...validOptions, aspectRatio: '9:16' }),
     Gta5GoodbyeAiVideoPreflightError
   );
   assert.throws(

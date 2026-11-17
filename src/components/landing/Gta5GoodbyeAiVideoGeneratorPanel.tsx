@@ -1016,8 +1016,7 @@ export function Gta5GoodbyeAiVideoGeneratorPanel({
                 inputRef={photoInputRef}
                 disabled={busy}
                 label={m['site.gta5goodbye.photo']()}
-                hint=""
-                hideCopy
+                hint={m['site.gta5goodbye.photo_note']()}
                 onPick={(file) => setPhotoFile(file)}
                 onRemove={() => clearPhoto()}
               />

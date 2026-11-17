@@ -997,7 +997,7 @@ export function getBurningBridgesAiTemplateVideoKey() {
 export function getGta5GoodbyeAiVideoTemplateVideoKey() {
   return (
     envConfigs.gta_5_goodbye_ai_video_template_video_key?.trim() ||
-    'genjutsu/templates/gta-5-goodbye-ai-video-v1.mp4'
+    'genjutsu/templates/gta-5-goodbye-ai-video-v2.mp4'
   );
 }
 

@@ -24,11 +24,11 @@ export const GTA_5_GOODBYE_AI_VIDEO_PREVIEW_CLIP_PATH =
   '/videos/gta-5-goodbye-ai-video-preview-4s.mp4';
 
 /** ffprobe duration of public/videos/gta-5-goodbye-ai-video-tpl.mp4 */
-export const GTA_5_GOODBYE_AI_VIDEO_TEMPLATE_DURATION_SECONDS = 14.668005;
+export const GTA_5_GOODBYE_AI_VIDEO_TEMPLATE_DURATION_SECONDS = 14.666667;
 
-/** Source container is 720×1280 (letterboxed cinematic inside). */
+/** Landscape cinematic template (cropped from letterboxed source). */
 export const GTA_5_GOODBYE_AI_VIDEO_ASPECT_RATIO: HiggsfieldSeedanceAspectRatio =
-  '9:16';
+  '16:9';
 
 export const GTA_5_GOODBYE_AI_VIDEO_RESOLUTIONS = ['480p', '720p'] as const;
 export type Gta5GoodbyeAiVideoResolution =
@@ -44,15 +44,11 @@ export function isGta5GoodbyeAiVideoResolution(
 
 /**
  * Target mapping only. Complete replacement + preservation live in
- * `buildSeedanceWorkflowPrompt` (objects-swap).
- * @Image 1 = the young woman who waves goodbye / parting driver figure.
- * Keep other people, vehicles, road, and camera path unchanged.
+ * the objects-swap workflow wrapper.
+ * @Image 1 = the girl throughout the template.
  */
-export const GTA_5_GOODBYE_AI_VIDEO_DEFAULT_PROMPT = [
-  'Replace the young woman in the dusk goodbye drive — the woman who waves and appears as the parting driver / foreground figure — with @Image 1.',
-  "Use @Image 1 for that person's complete face, hair, body, and clothing throughout the clip.",
-  'Do not change the other people, cars, motorcycle, road, dusk lighting, camera motion, framing, or timing.',
-].join('\n\n');
+export const GTA_5_GOODBYE_AI_VIDEO_DEFAULT_PROMPT =
+  'Replace the girl throughout the video with @Image 1.';
 
 /** No legacy prompt versions are accepted; new attempts use the current prompt. */
 export const LEGACY_GTA_5_GOODBYE_AI_VIDEO_PROMPTS = [] as const;

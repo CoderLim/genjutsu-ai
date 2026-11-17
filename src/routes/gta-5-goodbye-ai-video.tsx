@@ -88,8 +88,8 @@ function videoJsonLd() {
     thumbnailUrl: absoluteUrl(TEMPLATE_POSTER),
     uploadDate: ARTICLE_DATE_PUBLISHED,
     duration: 'PT15S',
-    width: 720,
-    height: 1280,
+    width: 1280,
+    height: 720,
   };
 }
 
@@ -197,7 +197,7 @@ export const Route = createFileRoute('/gta-5-goodbye-ai-video')({
         {
           property: 'og:image:alt',
           content:
-            'GTA 5 goodbye AI video — one photo dusk drive template, vertical 9:16',
+            'GTA 5 goodbye AI video — one photo dusk drive template, landscape 16:9',
         },
       ],
       links: [{ rel: 'canonical', href: canonical }, ...alternates],

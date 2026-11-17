@@ -107,7 +107,7 @@ const STATIC_PAGES: { path: string; title: string; description: string }[] = [
     path: '/gta-5-goodbye-ai-video',
     title: 'GTA 5 Goodbye AI Video',
     description:
-      'One-photo GTA 5 goodbye AI video maker — 15 seconds, vertical 9:16 (fixed template)',
+      'One-photo GTA 5 goodbye AI video maker — 15 seconds, landscape 16:9 (fixed template)',
   },
   {
     path: '/say-it-right-ai',
