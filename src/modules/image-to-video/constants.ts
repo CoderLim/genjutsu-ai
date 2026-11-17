@@ -1,15 +1,18 @@
 export const IMAGE_TO_VIDEO_SCENE = 'image-to-video';
 export const IMAGE_TO_VIDEO_PROVIDER = 'wavespeed';
 
-/** Locked engine model — not ENV-routed (sd2.5 vs sd2.0). */
-export const IMAGE_TO_VIDEO_MODEL =
-  'bytedance/seedance-2.0/image-to-video-turbo';
+/**
+ * Locked engine model — standard (not turbo) so 480p is available.
+ * Turbo only allows 720p/1080p.
+ */
+export const IMAGE_TO_VIDEO_MODEL = 'bytedance/seedance-2.0/image-to-video';
 
 export const IMAGE_TO_VIDEO_MIN_DURATION = 4;
 export const IMAGE_TO_VIDEO_MAX_DURATION = 15;
 export const IMAGE_TO_VIDEO_DEFAULT_DURATION = 5;
 
-export const IMAGE_TO_VIDEO_RESOLUTIONS = ['720p', '1080p'] as const;
+/** User-selectable tiers (4k omitted from product UI for now). */
+export const IMAGE_TO_VIDEO_RESOLUTIONS = ['480p', '720p', '1080p'] as const;
 export type ImageToVideoResolution =
   (typeof IMAGE_TO_VIDEO_RESOLUTIONS)[number];
 export const IMAGE_TO_VIDEO_DEFAULT_RESOLUTION: ImageToVideoResolution = '720p';
@@ -50,7 +53,7 @@ export const IMAGE_TO_VIDEO_MAX_IMAGE_BYTES = 12 * 1024 * 1024;
 export function isImageToVideoResolution(
   value: unknown
 ): value is ImageToVideoResolution {
-  return value === '720p' || value === '1080p';
+  return value === '480p' || value === '720p' || value === '1080p';
 }
 
 export function isImageToVideoAspectRatio(

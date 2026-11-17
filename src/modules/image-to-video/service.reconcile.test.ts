@@ -26,7 +26,7 @@ function baseTask(overrides: Partial<FakeTask> = {}): FakeTask {
     userId: 'user_1',
     status: 'submission_unknown',
     taskId: 'req_ws_1',
-    model: 'bytedance/seedance-2.0/image-to-video-turbo',
+    model: 'bytedance/seedance-2.0/image-to-video',
     costCredits: 12,
     taskResult: JSON.stringify({ error: 'network blip' }),
     options: null,

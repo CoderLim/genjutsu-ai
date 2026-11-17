@@ -14,6 +14,9 @@ export const DAY_OF_THE_DEAD_PERSON_PROMPT = `Transform the person in the upload
 
 **Constraints:** Maintain consistent facial identity, realistic anatomy, stable facial features, and smooth temporal consistency. No face swapping, no identity changes, no distorted facial features, no extra limbs, no sudden scene cuts.`;
 
+/** Default expanded Jatayu prompt (editable on /jatayu-video-prompt). */
+export const JATAYU_EXPANDED_PROMPT = `A vertical 9:16 cinematic shot at golden hour. The uploaded clip is the exact identity reference: keep the face, hairstyle and skin tone unchanged, front-facing, standing calmly in frame. Behind the subject, one giant eagle — red-brown plumage, weathered bronze feathers, hooked beak, wingspan filling the sky — rises slowly from behind the shoulder and spreads both wings wide. Wind lifts loose hair and clothing. Dust and small pebbles drift low across the ground. A small flock of distant birds crosses the horizon. Warm backlight, sun low behind the eagle, soft rim light on the subject's shoulders, gentle atmospheric haze, shallow depth of field. Camera: locked-off medium-wide with a slow push-in, no cuts. Photorealistic, 35mm film grain, high dynamic range, warm amber highlights with deep teal shadows. No text, no logos, no captions, no watermark, no fast movement, no crowd.`;
+
 export const DAY_OF_THE_DEAD_PET_PROMPT = `Transform the pet in the uploaded photo into a magical Mexican Day of the Dead (Día de los Muertos) portrait through a cinematic transformation.
 
 **Identity Preservation:** Keep the exact same animal throughout the video. Preserve species, breed, fur or feather color and pattern, ear/eye shape, body proportions, and recognizable markings. Do not turn the animal into a human or change species.

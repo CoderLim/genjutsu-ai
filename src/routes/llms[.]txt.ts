@@ -122,6 +122,12 @@ const STATIC_PAGES: { path: string; title: string; description: string }[] = [
       'Solo (1 photo, hallway) or Duo (2 photos, parking lot) Can I Ride Dance AI video maker (9:16)',
   },
   {
+    path: '/jatayu-video-prompt',
+    title: 'Jatayu AI Video Prompt',
+    description:
+      'Free copy-paste Jatayu AI video prompt for Google Flow, Edits and CapCut',
+  },
+  {
     path: '/kairo-bad-times',
     title: 'Kairo Bad Times AI Video',
     description: 'One-photo Kairo Bad Times motion-template AI video generator',

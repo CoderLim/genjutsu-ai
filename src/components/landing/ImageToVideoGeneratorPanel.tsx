@@ -77,7 +77,7 @@ type PresetMeta = {
   variants: ImageToVideoVariant[];
   defaultVariant: ImageToVideoVariant;
   defaultDuration: number;
-  defaultResolution: '720p' | '1080p';
+  defaultResolution: '480p' | '720p' | '1080p';
   defaultAspectRatio: string;
   estimatedCredits: number;
   displayName: string;

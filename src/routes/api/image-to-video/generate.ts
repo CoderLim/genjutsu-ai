@@ -26,6 +26,7 @@ import {
 import {
   ImageToVideoPreflightError,
   resolveImageToVideoPreset,
+  resolveImageToVideoPrompt,
   resolveImageToVideoVariant,
 } from '@/modules/image-to-video/presets';
 import {
@@ -109,7 +110,7 @@ async function POST({ request }: { request: Request }) {
       ? body.aspectRatio
       : preset.defaultAspectRatio || IMAGE_TO_VIDEO_DEFAULT_ASPECT_RATIO;
 
-    const prompt = preset.promptFor(variant);
+    const prompt = resolveImageToVideoPrompt(preset, variant, body.prompt);
 
     const existing = await getImageToVideoTaskById({
       generationId,

@@ -8,22 +8,42 @@ import {
   estimateImageToVideoProviderCost,
 } from './pricing';
 
-test('I2V turbo 720p 5s matches WaveSpeed table', () => {
+test('I2V standard 480p 5s matches WaveSpeed table', () => {
+  const quote = estimateImageToVideoProviderCost({
+    duration: 5,
+    resolution: '480p',
+  });
+  assert.ok(Math.abs(quote.providerCostUsd - 0.6) < 1e-9);
+  assert.equal(
+    estimateImageToVideoCredits({ duration: 5, resolution: '480p' }),
+    calculateProviderCredits(0.6)
+  );
+});
+
+test('I2V standard 720p 5s matches WaveSpeed table', () => {
   const quote = estimateImageToVideoProviderCost({
     duration: 5,
     resolution: '720p',
   });
-  assert.ok(Math.abs(quote.providerCostUsd - 0.7) < 1e-9);
+  assert.ok(Math.abs(quote.providerCostUsd - 1.2) < 1e-9);
   assert.equal(
     estimateImageToVideoCredits({ duration: 5, resolution: '720p' }),
-    calculateProviderCredits(0.7)
+    calculateProviderCredits(1.2)
   );
 });
 
-test('I2V turbo 1080p 5s matches WaveSpeed table', () => {
+test('I2V standard 1080p 5s matches WaveSpeed table', () => {
   const quote = estimateImageToVideoProviderCost({
     duration: 5,
     resolution: '1080p',
   });
-  assert.equal(quote.providerCostUsd, 0.8);
+  assert.equal(quote.providerCostUsd, 3);
+});
+
+test('I2V standard 720p 7s scales linearly', () => {
+  const quote = estimateImageToVideoProviderCost({
+    duration: 7,
+    resolution: '720p',
+  });
+  assert.ok(Math.abs(quote.providerCostUsd - 1.68) < 1e-9);
 });

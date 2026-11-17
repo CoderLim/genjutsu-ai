@@ -28,7 +28,8 @@ const NAV_LINKS = [
   { label: m['site.header.blog'], href: '/blog' },
 ] as const;
 
-const AI_PHOTO_EDITOR_HREF = 'https://getaiphotoeditor.com/';
+const AI_PHOTO_EDITOR_HREF =
+  'https://getaiphotoeditor.com/?utm_source=genjutsu-ai';
 
 const TRENDING_LINKS = [
   {

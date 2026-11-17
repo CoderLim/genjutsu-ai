@@ -36,6 +36,7 @@ const STATIC_PATHS = [
   '/glow-stick-ai',
   '/wassup-in-a-minute-ai',
   '/chipmunks-dance',
+  '/jatayu-video-prompt',
   '/blog',
   '/burning-bridges-ai',
   '/say-it-right-ai',
@@ -65,6 +66,8 @@ const LIMITED_STATIC_PATH_LOCALES: Record<string, readonly string[]> = {
   '/deck-the-halls-dance-ai': [baseLocale],
   // Can I Ride Dance ships English editorial first.
   '/can-i-ride-dance-ai': [baseLocale],
+  // Jatayu prompt page ships English editorial first.
+  '/jatayu-video-prompt': [baseLocale],
   // Tiny Desk AI ships English editorial first — do not advertise /ja /ko /es mirrors.
   '/tiny-desk-ai': [baseLocale],
   '/shan-shen-bu': [baseLocale],
