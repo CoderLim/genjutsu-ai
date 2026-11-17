@@ -13,6 +13,21 @@ import {
   type MotionTemplate,
 } from '@/components/landing/motion-templates';
 
+/** True when the device has no hover (touch phones/tablets). SSR defaults false. */
+function useHoverNone() {
+  const [hoverNone, setHoverNone] = useState(false);
+
+  useEffect(() => {
+    const mql = window.matchMedia('(hover: none)');
+    const update = () => setHoverNone(mql.matches);
+    update();
+    mql.addEventListener('change', update);
+    return () => mql.removeEventListener('change', update);
+  }, []);
+
+  return hoverNone;
+}
+
 /** Load + play muted loop only when the card nears the viewport. */
 function useLazyAutoplayVideo(src: string) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -132,17 +147,26 @@ function TemplateCard({
   applying,
   onSelect,
   onPreview,
+  touchMode,
   className,
 }: {
   template: MotionTemplate;
   applying: boolean;
   onSelect?: (template: MotionTemplate) => void;
   onPreview: (template: MotionTemplate) => void;
+  touchMode: boolean;
   className?: string;
 }) {
   const title = tDynamic(template.titleKey);
   const previewSrc = getMotionTemplatePreviewSrc(template);
   const { containerRef, videoRef } = useLazyAutoplayVideo(previewSrc);
+  const useAriaLabel = isMotionTemplateApply(template)
+    ? m['site.templates.use_aria']({ title })
+    : template.ctaLabelKey
+      ? tDynamic(template.ctaLabelKey)
+      : m['site.templates.use_aria']({ title });
+  const touchApplyDisabled =
+    isMotionTemplateApply(template) && (applying || !onSelect);
 
   return (
     <div
@@ -177,58 +201,74 @@ function TemplateCard({
         </p>
       </div>
 
-      <div
-        className={cn(
-          'absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/55 px-2 transition-opacity duration-200',
-          'pointer-events-none opacity-0',
-          'group-hover:pointer-events-auto group-hover:opacity-100',
-          'group-focus-within:pointer-events-auto group-focus-within:opacity-100',
-          '[@media(hover:none)]:pointer-events-auto [@media(hover:none)]:opacity-100'
-        )}
-      >
-        {isMotionTemplateApply(template) ? (
+      {touchMode ? (
+        isMotionTemplateApply(template) ? (
           <button
             type="button"
-            disabled={applying || !onSelect}
+            disabled={touchApplyDisabled}
             onClick={() => onSelect?.(template)}
-            aria-label={m['site.templates.use_aria']({ title })}
+            aria-label={useAriaLabel}
             className={cn(
-              primaryActionClassName,
-              (applying || !onSelect) && 'cursor-not-allowed opacity-60'
+              'absolute inset-0 z-10 cursor-pointer',
+              touchApplyDisabled && 'cursor-not-allowed'
             )}
-          >
-            {applying
-              ? m['site.templates.applying']()
-              : m['site.templates.use']()}
-          </button>
+          />
         ) : (
           <Link
             href={template.href}
-            aria-label={
-              template.ctaLabelKey
-                ? tDynamic(template.ctaLabelKey)
-                : m['site.templates.use_aria']({ title })
-            }
-            className={cn(
-              primaryActionClassName,
-              template.ctaLabelKey &&
-                'max-w-[11.5rem] px-2 text-center leading-tight'
-            )}
-          >
-            {template.ctaLabelKey
-              ? tDynamic(template.ctaLabelKey)
-              : m['site.templates.use']()}
-          </Link>
-        )}
-        <button
-          type="button"
-          onClick={() => onPreview(template)}
-          aria-label={m['site.templates.preview_aria']({ title })}
-          className="inline-flex h-8 w-full max-w-[9.5rem] cursor-pointer items-center justify-center rounded-lg border border-white/25 bg-black/45 px-3 text-[11px] font-semibold text-[rgb(237,234,222)] shadow-md backdrop-blur-sm transition hover:bg-white/10"
+            aria-label={useAriaLabel}
+            className="absolute inset-0 z-10 cursor-pointer"
+          />
+        )
+      ) : (
+        <div
+          className={cn(
+            'absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/55 px-2 transition-opacity duration-200',
+            'pointer-events-none opacity-0',
+            'group-hover:pointer-events-auto group-hover:opacity-100',
+            'group-focus-within:pointer-events-auto group-focus-within:opacity-100'
+          )}
         >
-          {m['site.templates.preview']()}
-        </button>
-      </div>
+          {isMotionTemplateApply(template) ? (
+            <button
+              type="button"
+              disabled={applying || !onSelect}
+              onClick={() => onSelect?.(template)}
+              aria-label={m['site.templates.use_aria']({ title })}
+              className={cn(
+                primaryActionClassName,
+                (applying || !onSelect) && 'cursor-not-allowed opacity-60'
+              )}
+            >
+              {applying
+                ? m['site.templates.applying']()
+                : m['site.templates.use']()}
+            </button>
+          ) : (
+            <Link
+              href={template.href}
+              aria-label={useAriaLabel}
+              className={cn(
+                primaryActionClassName,
+                template.ctaLabelKey &&
+                  'max-w-[11.5rem] px-2 text-center leading-tight'
+              )}
+            >
+              {template.ctaLabelKey
+                ? tDynamic(template.ctaLabelKey)
+                : m['site.templates.use']()}
+            </Link>
+          )}
+          <button
+            type="button"
+            onClick={() => onPreview(template)}
+            aria-label={m['site.templates.preview_aria']({ title })}
+            className="inline-flex h-8 w-full max-w-[9.5rem] cursor-pointer items-center justify-center rounded-lg border border-white/25 bg-black/45 px-3 text-[11px] font-semibold text-[rgb(237,234,222)] shadow-md backdrop-blur-sm transition hover:bg-white/10"
+          >
+            {m['site.templates.preview']()}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -296,6 +336,7 @@ export function MotionTemplateGallery({
   onSelect,
 }: MotionTemplateGalleryProps) {
   const blocks = groupTemplateBlocks(MOTION_TEMPLATES);
+  const touchMode = useHoverNone();
   const [previewTemplate, setPreviewTemplate] = useState<MotionTemplate | null>(
     null
   );
@@ -335,6 +376,7 @@ export function MotionTemplateGallery({
                   applying={applyingTemplateId === block.template.id}
                   onSelect={onSelect}
                   onPreview={handlePreview}
+                  touchMode={touchMode}
                   className="aspect-[1/2]"
                 />
               </div>
@@ -349,6 +391,7 @@ export function MotionTemplateGallery({
                   applying={applyingTemplateId === block.template.id}
                   onSelect={onSelect}
                   onPreview={handlePreview}
+                  touchMode={touchMode}
                   className="aspect-[2/1]"
                 />
               </div>
@@ -367,6 +410,7 @@ export function MotionTemplateGallery({
                   applying={applyingTemplateId === template.id}
                   onSelect={onSelect}
                   onPreview={handlePreview}
+                  touchMode={touchMode}
                   className="aspect-[2/1]"
                 />
               ))}

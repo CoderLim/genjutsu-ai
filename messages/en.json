@@ -1024,7 +1024,7 @@
   "site.generator.image_preparing": "Please wait until your image finishes loading before generating.",
   "site.generator.image_replace_failed": "Could not update the image. Your previous photo is still selected.",
   "site.templates.title": "Motion templates",
-  "site.templates.description": "Hover a template to Use template or Preview. Use template fills this generator or opens the matching trend page—then add your images and generate.",
+  "site.templates.description": "Tap a template to use it. On desktop, hover for Use template or Preview. Use fills this generator or opens the matching trend page—then add your images and generate.",
   "site.templates.use": "Use template",
   "site.templates.preview": "Preview",
   "site.templates.applying": "Loading…",
