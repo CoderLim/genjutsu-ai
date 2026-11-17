@@ -176,13 +176,15 @@ test('burning-bridges-ai follows the mode env router', () => {
   assert.deepEqual(target, fallback);
 });
 
-test('gta-5-goodbye-ai-video follows the mode env router', () => {
-  const fallback = resolveGenjutsuProviderTarget('objects-swap');
+test('gta-5-goodbye-ai-video is pinned to Genjutsu Standard', () => {
   const target = resolveProductProviderTarget(
     GTA_5_GOODBYE_AI_VIDEO_PRODUCT,
     'objects-swap'
   );
-  assert.deepEqual(target, fallback);
+  assert.deepEqual(target, {
+    provider: 'higgsfield',
+    model: HIGGSFIELD_GENJUTSU_MODELS.standard['objects-swap'],
+  });
 });
 
 test('deck-the-halls-dance-ai is pinned to Genjutsu Light', () => {

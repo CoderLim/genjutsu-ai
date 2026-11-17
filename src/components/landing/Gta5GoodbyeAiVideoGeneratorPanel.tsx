@@ -1001,8 +1001,8 @@ export function Gta5GoodbyeAiVideoGeneratorPanel({
             <FixedTemplatePreview
               src={GTA_5_GOODBYE_AI_VIDEO_TEMPLATE_DISPLAY_PATH}
               poster={GTA_5_GOODBYE_AI_VIDEO_TEMPLATE_POSTER_PATH}
-              className="relative mx-auto aspect-[4/3] max-h-[420px] w-full rounded-2xl border border-white/10"
-              objectFit="contain"
+              className="relative mx-auto aspect-video max-h-[420px] w-full rounded-2xl border border-white/10"
+              objectFit="cover"
               autoPlay
               loop
               onStatusChange={setTemplateStatus}
@@ -1256,7 +1256,7 @@ export function Gta5GoodbyeAiVideoGeneratorPanel({
                 controls
                 autoPlay
                 playsInline
-                className="mx-auto aspect-video max-h-[720px] w-full max-w-full rounded-2xl bg-black object-contain"
+                className="mx-auto aspect-video max-h-[720px] w-full max-w-full rounded-2xl bg-black object-cover"
               />
             </div>
           ) : null}

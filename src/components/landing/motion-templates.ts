@@ -112,7 +112,7 @@ export const MOTION_TEMPLATES: MotionTemplate[] = [
     poster: GTA_5_GOODBYE_AI_VIDEO_TEMPLATE_POSTER_PATH,
     sourceVideo: GTA_5_GOODBYE_AI_VIDEO_TEMPLATE_DISPLAY_PATH,
     href: '/gta-5-goodbye-ai-video',
-    aspect: 'portrait',
+    aspect: 'landscape',
   },
   {
     id: 'jatayu',

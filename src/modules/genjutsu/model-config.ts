@@ -33,6 +33,7 @@ export const PRODUCT_GENJUTSU_MODEL_PROFILES: Partial<
   'bicep-heart': 'light',
   'deck-the-halls-dance-ai': 'light',
   'can-i-ride-dance-ai': 'light',
+  'gta-5-goodbye-ai-video': 'standard',
   'wassup-in-a-minute-ai': 'standard',
 };
 

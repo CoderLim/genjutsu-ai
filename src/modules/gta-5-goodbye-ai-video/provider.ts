@@ -1,15 +1,13 @@
-import type {
-  GenjutsuProvider,
-  GenjutsuProviderTarget,
-} from '@/modules/genjutsu/types';
+import type { GenjutsuProviderTarget } from '@/modules/genjutsu/types';
 import {
-  GTA_5_GOODBYE_AI_VIDEO_PRODUCT,
-  isSeedanceFamilyProvider,
-  resolveObjectsSwapTargetForProvider,
+  isPersistedProductProviderTarget,
   resolveProductProviderTarget,
 } from '@/modules/genjutsu/workflow';
 
-import { GTA_5_GOODBYE_AI_VIDEO_MODE } from './constants';
+import {
+  GTA_5_GOODBYE_AI_VIDEO_MODE,
+  GTA_5_GOODBYE_AI_VIDEO_PRODUCT_ID,
+} from './constants';
 
 export class Gta5GoodbyeAiVideoProviderBindingError extends Error {
   constructor(message: string) {
@@ -19,20 +17,19 @@ export class Gta5GoodbyeAiVideoProviderBindingError extends Error {
 }
 
 /**
- * Same router as Enzo / Crazy Frog / Gas Station:
- * `GENJUTSU_OBJECT_SWAP_PROVIDER` (homepage objects-swap), optionally overridden
- * by `GENJUTSU_PRODUCT_PROVIDER` for allowlisted product pages.
+ * Server-owned Higgsfield Genjutsu (standard) pin — independent of homepage
+ * `GENJUTSU_OBJECT_SWAP_PROVIDER` and `GENJUTSU_PRODUCT_PROVIDER` (Seedance).
  */
 export function resolveGta5GoodbyeAiVideoProviderTarget(): GenjutsuProviderTarget {
   return resolveProductProviderTarget(
-    GTA_5_GOODBYE_AI_VIDEO_PRODUCT,
+    GTA_5_GOODBYE_AI_VIDEO_PRODUCT_ID,
     GTA_5_GOODBYE_AI_VIDEO_MODE
   );
 }
 
 /**
  * Persisted attempts keep the provider/model they were created with.
- * Accept any Seedance-family objects-swap pair for that provider.
+ * Accept previous Light jobs as well as the current product-scoped Standard pin.
  */
 export function assertGta5GoodbyeAiVideoProviderBinding(
   provider: unknown,
@@ -48,17 +45,15 @@ export function assertGta5GoodbyeAiVideoProviderBinding(
       'GTA 5 Goodbye AI Video task is missing a provider/model binding'
     );
   }
-  if (!isSeedanceFamilyProvider(provider)) {
+  if (
+    !isPersistedProductProviderTarget(
+      provider,
+      model,
+      GTA_5_GOODBYE_AI_VIDEO_MODE
+    )
+  ) {
     throw new Gta5GoodbyeAiVideoProviderBindingError(
-      'GTA 5 Goodbye AI Video requires a Seedance family provider'
-    );
-  }
-  const expected = resolveObjectsSwapTargetForProvider(
-    provider as GenjutsuProvider
-  );
-  if (model !== expected.model) {
-    throw new Gta5GoodbyeAiVideoProviderBindingError(
-      'GTA 5 Goodbye AI Video task model does not match the Seedance objects-swap target for its provider'
+      `GTA 5 Goodbye AI Video does not support persisted provider/model (${String(provider)} / ${String(model)})`
     );
   }
 }
