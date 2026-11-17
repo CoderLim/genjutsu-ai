@@ -51,6 +51,7 @@ import {
   getGasStationDanceAiTemplateVideoKey,
   getGenjutsuSealedInputKey,
   getGlowStickAiTemplateVideoKey,
+  getGta5GoodbyeAiVideoTemplateVideoKey,
   getSayItRightAiTemplateVideoKey,
   getShanShenBuTemplateVideoKey,
   getSmalltownBoyDanceTemplateVideoKey,
@@ -61,6 +62,7 @@ import {
   sealGenjutsuTemplateR2Inputs,
 } from '@/modules/genjutsu/storage';
 import { GLOW_STICK_AI_PRODUCT_ID } from '@/modules/glow-stick-ai/constants';
+import { GTA_5_GOODBYE_AI_VIDEO_PRODUCT_ID } from '@/modules/gta-5-goodbye-ai-video/constants';
 import { SAY_IT_RIGHT_AI_PRODUCT_ID } from '@/modules/say-it-right-ai/constants';
 import { SHAN_SHEN_BU_PRODUCT_ID } from '@/modules/shan-shen-bu/constants';
 import { SMALLTOWN_PRODUCT_ID } from '@/modules/smalltown-boy-dance/constants';
@@ -171,40 +173,43 @@ async function POST({ request }: { request: Request }) {
                             ? getChipmunksDanceTemplateVideoKey()
                             : product === BURNING_BRIDGES_AI_PRODUCT_ID
                               ? getBurningBridgesAiTemplateVideoKey()
-                              : product === BICEP_HEART_AI_PRODUCT_ID
-                                ? getBicepHeartTemplateVideoKey()
-                                : product === TINY_DESK_AI_PRODUCT_ID
-                                  ? getTinyDeskAiTemplateVideoKey()
-                                  : product === WASSUP_IN_A_MINUTE_AI_PRODUCT_ID
-                                    ? getWassupInAMinuteAiTemplateVideoKey()
-                                    : product === SAY_IT_RIGHT_AI_PRODUCT_ID
-                                      ? getSayItRightAiTemplateVideoKey()
-                                      : product ===
-                                          DECK_THE_HALLS_DANCE_AI_PRODUCT_ID
-                                        ? getDeckTheHallsDanceAiTemplateVideoKey(
-                                            isDeckTheHallsDanceAiCastMode(
-                                              currentOptions?.preset
-                                            )
-                                              ? currentOptions.preset
-                                              : DECK_THE_HALLS_DANCE_AI_DEFAULT_CAST_MODE
-                                          )
+                              : product === GTA_5_GOODBYE_AI_VIDEO_PRODUCT_ID
+                                ? getGta5GoodbyeAiVideoTemplateVideoKey()
+                                : product === BICEP_HEART_AI_PRODUCT_ID
+                                  ? getBicepHeartTemplateVideoKey()
+                                  : product === TINY_DESK_AI_PRODUCT_ID
+                                    ? getTinyDeskAiTemplateVideoKey()
+                                    : product ===
+                                        WASSUP_IN_A_MINUTE_AI_PRODUCT_ID
+                                      ? getWassupInAMinuteAiTemplateVideoKey()
+                                      : product === SAY_IT_RIGHT_AI_PRODUCT_ID
+                                        ? getSayItRightAiTemplateVideoKey()
                                         : product ===
-                                            CAN_I_RIDE_DANCE_AI_PRODUCT_ID
-                                          ? getCanIRideDanceAiTemplateVideoKey(
-                                              isCanIRideDanceAiCastMode(
+                                            DECK_THE_HALLS_DANCE_AI_PRODUCT_ID
+                                          ? getDeckTheHallsDanceAiTemplateVideoKey(
+                                              isDeckTheHallsDanceAiCastMode(
                                                 currentOptions?.preset
                                               )
                                                 ? currentOptions.preset
-                                                : CAN_I_RIDE_DANCE_AI_DEFAULT_CAST_MODE
+                                                : DECK_THE_HALLS_DANCE_AI_DEFAULT_CAST_MODE
                                             )
-                                          : product === ZOMBIE_HUG_PRODUCT_ID
-                                            ? getZombieHugTemplateVideoKey(
-                                                templateAspectRatio
+                                          : product ===
+                                              CAN_I_RIDE_DANCE_AI_PRODUCT_ID
+                                            ? getCanIRideDanceAiTemplateVideoKey(
+                                                isCanIRideDanceAiCastMode(
+                                                  currentOptions?.preset
+                                                )
+                                                  ? currentOptions.preset
+                                                  : CAN_I_RIDE_DANCE_AI_DEFAULT_CAST_MODE
                                               )
-                                            : // Legacy: useDefaultTemplate without product → zombie keys.
-                                              getZombieHugTemplateVideoKey(
-                                                templateAspectRatio
-                                              );
+                                            : product === ZOMBIE_HUG_PRODUCT_ID
+                                              ? getZombieHugTemplateVideoKey(
+                                                  templateAspectRatio
+                                                )
+                                              : // Legacy: useDefaultTemplate without product → zombie keys.
+                                                getZombieHugTemplateVideoKey(
+                                                  templateAspectRatio
+                                                );
     const videoKey =
       typeof currentOptions?.videoKey === 'string'
         ? currentOptions.videoKey

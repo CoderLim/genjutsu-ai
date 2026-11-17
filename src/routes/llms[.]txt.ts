@@ -104,6 +104,12 @@ const STATIC_PAGES: { path: string; title: string; description: string }[] = [
       'One-photo Drake party-scene Burning Bridges AI video maker (fixed template)',
   },
   {
+    path: '/gta-5-goodbye-ai-video',
+    title: 'GTA 5 Goodbye AI Video',
+    description:
+      'One-photo GTA 5 goodbye AI video maker — 15 seconds, vertical 9:16 (fixed template)',
+  },
+  {
     path: '/say-it-right-ai',
     title: 'Say It Right AI',
     description:

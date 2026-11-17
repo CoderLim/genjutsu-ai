@@ -54,6 +54,10 @@ const COMPARE_ROWS = [
 
 const RELATED_TEMPLATES = [
   {
+    label: () => 'GTA 5 Goodbye AI Video',
+    href: '/gta-5-goodbye-ai-video',
+  },
+  {
     label: () => 'Live Face Swap',
     href: '/live-face-swap',
   },

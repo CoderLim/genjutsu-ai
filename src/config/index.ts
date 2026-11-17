@@ -273,6 +273,11 @@ export const envConfigs: Record<string, string> = {
     procEnv.BURNING_BRIDGES_AI_TEMPLATE_VIDEO_KEY ??
     'genjutsu/templates/burning-bridges-ai-v2.mp4',
 
+  // GTA 5 Goodbye AI Video (server-only). Fixed R2 template; client uploads one image.
+  gta_5_goodbye_ai_video_template_video_key:
+    procEnv.GTA_5_GOODBYE_AI_VIDEO_TEMPLATE_VIDEO_KEY ??
+    'genjutsu/templates/gta-5-goodbye-ai-video-v1.mp4',
+
   // Say It Right AI (server-only). Seeds from homepage say-it-right-dance; one image.
   say_it_right_ai_template_video_key:
     procEnv.SAY_IT_RIGHT_AI_TEMPLATE_VIDEO_KEY ??

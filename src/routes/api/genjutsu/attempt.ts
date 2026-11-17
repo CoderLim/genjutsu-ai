@@ -91,6 +91,12 @@ import {
   GLOW_STICK_AI_PRODUCT_ID,
   GLOW_STICK_AI_RESOLUTIONS,
 } from '@/modules/glow-stick-ai/constants';
+import { isAllowedGta5GoodbyeAiVideoPrompt } from '@/modules/gta-5-goodbye-ai-video/assert';
+import {
+  GTA_5_GOODBYE_AI_VIDEO_MODE,
+  GTA_5_GOODBYE_AI_VIDEO_PRODUCT_ID,
+  GTA_5_GOODBYE_AI_VIDEO_RESOLUTIONS,
+} from '@/modules/gta-5-goodbye-ai-video/constants';
 import { isAllowedSayItRightAiPrompt } from '@/modules/say-it-right-ai/assert';
 import {
   SAY_IT_RIGHT_AI_MODE,
@@ -246,6 +252,31 @@ async function POST({ request }: { request: Request }) {
     if (isBurningBridgesAi && !isAllowedBurningBridgesAiPrompt(prompt)) {
       return respErr(
         'Burning Bridges AI prompt does not match the fixed product prompt',
+        {
+          status: 400,
+        }
+      );
+    }
+
+    const isGta5GoodbyeAiVideo = product === GTA_5_GOODBYE_AI_VIDEO_PRODUCT_ID;
+    if (isGta5GoodbyeAiVideo && mode !== GTA_5_GOODBYE_AI_VIDEO_MODE) {
+      return respErr('GTA 5 Goodbye AI Video only supports objects-swap', {
+        status: 400,
+      });
+    }
+    if (
+      isGta5GoodbyeAiVideo &&
+      !GTA_5_GOODBYE_AI_VIDEO_RESOLUTIONS.includes(
+        resolution as (typeof GTA_5_GOODBYE_AI_VIDEO_RESOLUTIONS)[number]
+      )
+    ) {
+      return respErr('GTA 5 Goodbye AI Video only supports 480p and 720p', {
+        status: 400,
+      });
+    }
+    if (isGta5GoodbyeAiVideo && !isAllowedGta5GoodbyeAiVideoPrompt(prompt)) {
+      return respErr(
+        'GTA 5 Goodbye AI Video prompt does not match the fixed product prompt',
         {
           status: 400,
         }

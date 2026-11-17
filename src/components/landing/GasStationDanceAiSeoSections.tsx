@@ -72,6 +72,10 @@ const FAQ_KEYS = [
 
 const RELATED_TEMPLATES = [
   {
+    label: () => m['site.gasstation.seo.related_gta5goodbye'](),
+    href: '/gta-5-goodbye-ai-video',
+  },
+  {
     label: () => m['site.gasstation.seo.related_caniride'](),
     href: '/can-i-ride-dance-ai',
   },

@@ -53,6 +53,11 @@ const TRENDING_LINKS = [
     poster: '/videos/can-i-ride-dance-duo-tpl-poster.jpg',
   },
   {
+    label: 'GTA 5 Goodbye AI Video',
+    href: '/gta-5-goodbye-ai-video',
+    poster: '/videos/gta-5-goodbye-ai-video-tpl-poster.jpg',
+  },
+  {
     label: 'Gas Station Dance AI',
     href: '/gas-station-dance-ai',
     poster: '/videos/long-trival-tpl-poster.jpg',

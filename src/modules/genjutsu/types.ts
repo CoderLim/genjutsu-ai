@@ -21,6 +21,7 @@ export type GenjutsuProductId =
   | 'gangnam-style-ai'
   | 'gas-station-dance-ai'
   | 'burning-bridges-ai'
+  | 'gta-5-goodbye-ai-video'
   | 'say-it-right-ai'
   | 'deck-the-halls-dance-ai'
   | 'can-i-ride-dance-ai'

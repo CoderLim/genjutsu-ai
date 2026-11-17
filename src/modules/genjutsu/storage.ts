@@ -994,6 +994,13 @@ export function getBurningBridgesAiTemplateVideoKey() {
   );
 }
 
+export function getGta5GoodbyeAiVideoTemplateVideoKey() {
+  return (
+    envConfigs.gta_5_goodbye_ai_video_template_video_key?.trim() ||
+    'genjutsu/templates/gta-5-goodbye-ai-video-v1.mp4'
+  );
+}
+
 export function getSayItRightAiTemplateVideoKey() {
   return (
     envConfigs.say_it_right_ai_template_video_key?.trim() ||
@@ -1200,6 +1207,14 @@ export async function ensureBurningBridgesAiTemplateInR2() {
   });
 }
 
+export async function ensureGta5GoodbyeAiVideoTemplateInR2() {
+  return ensureGenjutsuPublicTemplateInR2({
+    key: getGta5GoodbyeAiVideoTemplateVideoKey(),
+    localRelative: 'public/videos/gta-5-goodbye-ai-video-tpl.mp4',
+    label: 'GTA 5 Goodbye AI Video',
+  });
+}
+
 export async function ensureSayItRightAiTemplateInR2() {
   return ensureGenjutsuPublicTemplateInR2({
     key: getSayItRightAiTemplateVideoKey(),
@@ -1295,6 +1310,8 @@ export function getGenjutsuProductTemplateVideoKey(
       return getGasStationDanceAiTemplateVideoKey();
     case 'burning-bridges-ai':
       return getBurningBridgesAiTemplateVideoKey();
+    case 'gta-5-goodbye-ai-video':
+      return getGta5GoodbyeAiVideoTemplateVideoKey();
     case 'say-it-right-ai':
       return getSayItRightAiTemplateVideoKey();
     case 'deck-the-halls-dance-ai':
@@ -1351,6 +1368,8 @@ export async function ensureGenjutsuProductTemplateInR2(
       return ensureGasStationDanceAiTemplateInR2();
     case 'burning-bridges-ai':
       return ensureBurningBridgesAiTemplateInR2();
+    case 'gta-5-goodbye-ai-video':
+      return ensureGta5GoodbyeAiVideoTemplateInR2();
     case 'say-it-right-ai':
       return ensureSayItRightAiTemplateInR2();
     case 'deck-the-halls-dance-ai':
@@ -1466,6 +1485,7 @@ export async function sealGenjutsuTemplateR2Inputs(params: {
   const glowStickAiKey = getGlowStickAiTemplateVideoKey();
   const chipmunksDanceKey = getChipmunksDanceTemplateVideoKey();
   const burningBridgesAiKey = getBurningBridgesAiTemplateVideoKey();
+  const gta5GoodbyeAiVideoKey = getGta5GoodbyeAiVideoTemplateVideoKey();
   const bicepHeartKey = getBicepHeartTemplateVideoKey();
   const tinyDeskAiKey = getTinyDeskAiTemplateVideoKey();
   const wassupInAMinuteAiKey = getWassupInAMinuteAiTemplateVideoKey();
@@ -1496,14 +1516,17 @@ export async function sealGenjutsuTemplateR2Inputs(params: {
                             ? await ensureChipmunksDanceTemplateInR2()
                             : params.templateVideoKey === burningBridgesAiKey
                               ? await ensureBurningBridgesAiTemplateInR2()
-                              : params.templateVideoKey === bicepHeartKey
-                                ? await ensureBicepHeartTemplateInR2()
-                                : params.templateVideoKey === tinyDeskAiKey
-                                  ? await ensureTinyDeskAiTemplateInR2()
-                                  : params.templateVideoKey ===
-                                      wassupInAMinuteAiKey
-                                    ? await ensureWassupInAMinuteAiTemplateInR2()
-                                    : params.templateVideoKey;
+                              : params.templateVideoKey ===
+                                  gta5GoodbyeAiVideoKey
+                                ? await ensureGta5GoodbyeAiVideoTemplateInR2()
+                                : params.templateVideoKey === bicepHeartKey
+                                  ? await ensureBicepHeartTemplateInR2()
+                                  : params.templateVideoKey === tinyDeskAiKey
+                                    ? await ensureTinyDeskAiTemplateInR2()
+                                    : params.templateVideoKey ===
+                                        wassupInAMinuteAiKey
+                                      ? await ensureWassupInAMinuteAiTemplateInR2()
+                                      : params.templateVideoKey;
 
   assertSafeObjectKey(templateVideoKey);
   if (!templateVideoKey.startsWith('genjutsu/')) {

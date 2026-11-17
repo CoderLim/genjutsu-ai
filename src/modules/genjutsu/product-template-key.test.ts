@@ -17,6 +17,7 @@ import {
   GANGNAM_STYLE_AI_PRODUCT,
   GAS_STATION_DANCE_AI_PRODUCT,
   GLOW_STICK_PRODUCT,
+  GTA_5_GOODBYE_AI_VIDEO_PRODUCT,
   SAY_IT_RIGHT_AI_PRODUCT,
   SHAN_SHEN_BU_PRODUCT,
   SMALLTOWN_BOY_DANCE_PRODUCT,
@@ -39,6 +40,7 @@ const ALL_PRODUCTS: GenjutsuProductId[] = [
   CHIPMUNKS_DANCE_PRODUCT,
   BICEP_HEART_PRODUCT,
   BURNING_BRIDGES_AI_PRODUCT,
+  GTA_5_GOODBYE_AI_VIDEO_PRODUCT,
   SAY_IT_RIGHT_AI_PRODUCT,
   CAN_I_RIDE_DANCE_AI_PRODUCT,
   DECK_THE_HALLS_DANCE_AI_PRODUCT,
@@ -118,6 +120,10 @@ test('product id is reflected in its default template key path', () => {
   assert.match(
     getGenjutsuProductTemplateVideoKey(BURNING_BRIDGES_AI_PRODUCT),
     /burning-bridges-ai/
+  );
+  assert.match(
+    getGenjutsuProductTemplateVideoKey(GTA_5_GOODBYE_AI_VIDEO_PRODUCT),
+    /gta-5-goodbye-ai-video/
   );
   assert.match(
     getGenjutsuProductTemplateVideoKey(SAY_IT_RIGHT_AI_PRODUCT),

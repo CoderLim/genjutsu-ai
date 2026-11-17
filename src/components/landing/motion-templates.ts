@@ -34,6 +34,10 @@ import {
   FLYING_CAR_AI_TEMPLATE_PATH,
   FLYING_CAR_AI_TEMPLATE_POSTER_PATH,
 } from '@/modules/flying-car-ai/constants';
+import {
+  GTA_5_GOODBYE_AI_VIDEO_TEMPLATE_DISPLAY_PATH,
+  GTA_5_GOODBYE_AI_VIDEO_TEMPLATE_POSTER_PATH,
+} from '@/modules/gta-5-goodbye-ai-video/constants';
 import { buildHotelLobbyPrompt } from '@/modules/hotel-lobby/prompt';
 import {
   KAIRO_BAD_TIMES_POSTER_PATH,
@@ -102,6 +106,14 @@ const DEFAULT_OBJECTS_RESOLUTION = '480p' as const;
  * Order: newest first — prepend new templates at the top of this array.
  */
 export const MOTION_TEMPLATES: MotionTemplate[] = [
+  {
+    id: 'gta-5-goodbye-ai-video',
+    titleKey: 'site.templates.gta_5_goodbye_ai_video',
+    poster: GTA_5_GOODBYE_AI_VIDEO_TEMPLATE_POSTER_PATH,
+    sourceVideo: GTA_5_GOODBYE_AI_VIDEO_TEMPLATE_DISPLAY_PATH,
+    href: '/gta-5-goodbye-ai-video',
+    aspect: 'portrait',
+  },
   {
     id: 'jatayu',
     titleKey: 'site.templates.jatayu',

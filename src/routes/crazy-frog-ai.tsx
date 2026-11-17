@@ -84,6 +84,7 @@ const VARIANT_ITEMS = [
 ] as const;
 
 const EXPLORE_LINKS = [
+  [m['site.crazy.more_gta5goodbye'], '/gta-5-goodbye-ai-video'],
   [m['site.crazy.more_jatayu'], '/jatayu-video-prompt'],
   [m['site.crazy.more_chipmunks'], '/chipmunks-dance'],
   [m['site.crazy.more_a2o'], '/a2o-lite-ai'],

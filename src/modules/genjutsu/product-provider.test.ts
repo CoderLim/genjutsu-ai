@@ -18,6 +18,7 @@ import {
   GANGNAM_STYLE_AI_PRODUCT,
   GAS_STATION_DANCE_AI_PRODUCT,
   GLOW_STICK_PRODUCT,
+  GTA_5_GOODBYE_AI_VIDEO_PRODUCT,
   isGenjutsuProductId,
   resolveGenjutsuProviderTarget,
   resolveGenjutsuPublicPricingConfig,
@@ -175,6 +176,15 @@ test('burning-bridges-ai follows the mode env router', () => {
   assert.deepEqual(target, fallback);
 });
 
+test('gta-5-goodbye-ai-video follows the mode env router', () => {
+  const fallback = resolveGenjutsuProviderTarget('objects-swap');
+  const target = resolveProductProviderTarget(
+    GTA_5_GOODBYE_AI_VIDEO_PRODUCT,
+    'objects-swap'
+  );
+  assert.deepEqual(target, fallback);
+});
+
 test('deck-the-halls-dance-ai is pinned to Genjutsu Light', () => {
   const target = resolveProductProviderTarget(
     DECK_THE_HALLS_DANCE_AI_PRODUCT,
@@ -250,6 +260,7 @@ test('isGenjutsuProductId allowlist', () => {
   assert.equal(isGenjutsuProductId(CHIPMUNKS_DANCE_PRODUCT), true);
   assert.equal(isGenjutsuProductId(BICEP_HEART_PRODUCT), true);
   assert.equal(isGenjutsuProductId(BURNING_BRIDGES_AI_PRODUCT), true);
+  assert.equal(isGenjutsuProductId(GTA_5_GOODBYE_AI_VIDEO_PRODUCT), true);
   assert.equal(isGenjutsuProductId(SAY_IT_RIGHT_AI_PRODUCT), true);
   assert.equal(isGenjutsuProductId(DECK_THE_HALLS_DANCE_AI_PRODUCT), true);
   assert.equal(isGenjutsuProductId(CAN_I_RIDE_DANCE_AI_PRODUCT), true);

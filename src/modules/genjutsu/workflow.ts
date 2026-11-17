@@ -23,6 +23,7 @@ export const COLDPLAY_KISS_CAM_PRODUCT = 'coldplay-kiss-cam' as const;
 export const GANGNAM_STYLE_AI_PRODUCT = 'gangnam-style-ai' as const;
 export const GAS_STATION_DANCE_AI_PRODUCT = 'gas-station-dance-ai' as const;
 export const BURNING_BRIDGES_AI_PRODUCT = 'burning-bridges-ai' as const;
+export const GTA_5_GOODBYE_AI_VIDEO_PRODUCT = 'gta-5-goodbye-ai-video' as const;
 export const SAY_IT_RIGHT_AI_PRODUCT = 'say-it-right-ai' as const;
 export const DECK_THE_HALLS_DANCE_AI_PRODUCT =
   'deck-the-halls-dance-ai' as const;
@@ -54,6 +55,7 @@ export function isGenjutsuProductId(
     value === GANGNAM_STYLE_AI_PRODUCT ||
     value === GAS_STATION_DANCE_AI_PRODUCT ||
     value === BURNING_BRIDGES_AI_PRODUCT ||
+    value === GTA_5_GOODBYE_AI_VIDEO_PRODUCT ||
     value === SAY_IT_RIGHT_AI_PRODUCT ||
     value === DECK_THE_HALLS_DANCE_AI_PRODUCT ||
     value === CAN_I_RIDE_DANCE_AI_PRODUCT ||

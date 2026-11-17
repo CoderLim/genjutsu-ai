@@ -167,6 +167,7 @@ import {
   ensureGangnamStyleAiTemplateInR2,
   ensureGasStationDanceAiTemplateInR2,
   ensureGlowStickAiTemplateInR2,
+  ensureGta5GoodbyeAiVideoTemplateInR2,
   ensureSayItRightAiTemplateInR2,
   ensureShanShenBuTemplateInR2,
   ensureSmalltownBoyDanceTemplateInR2,
@@ -188,6 +189,7 @@ import {
   getGasStationDanceAiTemplateVideoKey,
   getGenjutsuInputKey,
   getGlowStickAiTemplateVideoKey,
+  getGta5GoodbyeAiVideoTemplateVideoKey,
   getSayItRightAiTemplateVideoKey,
   getShanShenBuTemplateVideoKey,
   getSmalltownBoyDanceTemplateVideoKey,
@@ -211,6 +213,17 @@ import {
   assertGlowStickAiProviderBinding,
   GlowStickAiProviderBindingError,
 } from '@/modules/glow-stick-ai/provider';
+import { isAllowedGta5GoodbyeAiVideoPrompt } from '@/modules/gta-5-goodbye-ai-video/assert';
+import {
+  GTA_5_GOODBYE_AI_VIDEO_ASPECT_RATIO,
+  GTA_5_GOODBYE_AI_VIDEO_MODE,
+  GTA_5_GOODBYE_AI_VIDEO_PRODUCT_ID,
+  GTA_5_GOODBYE_AI_VIDEO_RESOLUTIONS,
+} from '@/modules/gta-5-goodbye-ai-video/constants';
+import {
+  assertGta5GoodbyeAiVideoProviderBinding,
+  Gta5GoodbyeAiVideoProviderBindingError,
+} from '@/modules/gta-5-goodbye-ai-video/provider';
 import { isAllowedSayItRightAiPrompt } from '@/modules/say-it-right-ai/assert';
 import {
   SAY_IT_RIGHT_AI_ASPECT_RATIO,
@@ -315,6 +328,7 @@ async function POST({ request }: { request: Request }) {
     const isA2oLiteAi = product === A2O_LITE_AI_PRODUCT_ID;
     const isEnzoFernandezAi = product === ENZO_FERNANDEZ_AI_PRODUCT_ID;
     const isBurningBridgesAi = product === BURNING_BRIDGES_AI_PRODUCT_ID;
+    const isGta5GoodbyeAiVideo = product === GTA_5_GOODBYE_AI_VIDEO_PRODUCT_ID;
     const isBicepHeartAi = product === BICEP_HEART_AI_PRODUCT_ID;
     const isTinyDeskAi = product === TINY_DESK_AI_PRODUCT_ID;
     const isSayItRightAi = product === SAY_IT_RIGHT_AI_PRODUCT_ID;
@@ -340,6 +354,7 @@ async function POST({ request }: { request: Request }) {
       isFlyingCarAi ||
       isShanShenBu ||
       isBurningBridgesAi ||
+      isGta5GoodbyeAiVideo ||
       isBicepHeartAi ||
       isSayItRightAi;
     const isProductPreview =
@@ -347,6 +362,7 @@ async function POST({ request }: { request: Request }) {
         isA2oLiteAi ||
         isEnzoFernandezAi ||
         isBurningBridgesAi ||
+        isGta5GoodbyeAiVideo ||
         isBicepHeartAi ||
         isTinyDeskAi ||
         isSayItRightAi ||
@@ -371,6 +387,7 @@ async function POST({ request }: { request: Request }) {
         isA2oLiteAi ||
         isEnzoFernandezAi ||
         isBurningBridgesAi ||
+        isGta5GoodbyeAiVideo ||
         isBicepHeartAi ||
         isTinyDeskAi ||
         isSayItRightAi ||
@@ -496,17 +513,19 @@ async function POST({ request }: { request: Request }) {
                               ? 'Enzo Fernandez AI preview must use 480p'
                               : isBurningBridgesAi
                                 ? 'Burning Bridges AI preview must use 480p'
-                                : isBicepHeartAi
-                                  ? 'Bicep Heart AI preview must use 480p'
-                                  : isSayItRightAi
-                                    ? 'Say It Right AI preview must use 480p'
-                                    : isDeckTheHallsDanceAi
-                                      ? 'Deck the Halls Dance AI preview must use 480p'
-                                      : isCanIRideDanceAi
-                                        ? 'Can I Ride Dance AI preview must use 480p'
-                                        : isSmalltown
-                                          ? 'Smalltown Boy Dance preview must use 480p'
-                                          : 'Crazy Frog preview must use 480p',
+                                : isGta5GoodbyeAiVideo
+                                  ? 'GTA 5 Goodbye AI Video preview must use 480p'
+                                  : isBicepHeartAi
+                                    ? 'Bicep Heart AI preview must use 480p'
+                                    : isSayItRightAi
+                                      ? 'Say It Right AI preview must use 480p'
+                                      : isDeckTheHallsDanceAi
+                                        ? 'Deck the Halls Dance AI preview must use 480p'
+                                        : isCanIRideDanceAi
+                                          ? 'Can I Ride Dance AI preview must use 480p'
+                                          : isSmalltown
+                                            ? 'Smalltown Boy Dance preview must use 480p'
+                                            : 'Crazy Frog preview must use 480p',
         { status: 400 }
       );
     }
@@ -572,6 +591,29 @@ async function POST({ request }: { request: Request }) {
     if (isBurningBridgesAi && !isAllowedBurningBridgesAiPrompt(prompt)) {
       return respErr(
         'Burning Bridges AI prompt does not match the fixed product prompt',
+        {
+          status: 400,
+        }
+      );
+    }
+    if (isGta5GoodbyeAiVideo && mode !== GTA_5_GOODBYE_AI_VIDEO_MODE) {
+      return respErr('GTA 5 Goodbye AI Video only supports objects-swap', {
+        status: 400,
+      });
+    }
+    if (
+      isGta5GoodbyeAiVideo &&
+      !GTA_5_GOODBYE_AI_VIDEO_RESOLUTIONS.includes(
+        resolution as (typeof GTA_5_GOODBYE_AI_VIDEO_RESOLUTIONS)[number]
+      )
+    ) {
+      return respErr('GTA 5 Goodbye AI Video only supports 480p and 720p', {
+        status: 400,
+      });
+    }
+    if (isGta5GoodbyeAiVideo && !isAllowedGta5GoodbyeAiVideoPrompt(prompt)) {
+      return respErr(
+        'GTA 5 Goodbye AI Video prompt does not match the fixed product prompt',
         {
           status: 400,
         }
@@ -953,17 +995,19 @@ async function POST({ request }: { request: Request }) {
                           ? 'Enzo Fernandez AI'
                           : isBurningBridgesAi
                             ? 'Burning Bridges AI'
-                            : isBicepHeartAi
-                              ? 'Bicep Heart AI'
-                              : isSayItRightAi
-                                ? 'Say It Right AI'
-                                : isDeckTheHallsDanceAi
-                                  ? 'Deck the Halls Dance AI'
-                                  : isCanIRideDanceAi
-                                    ? 'Can I Ride Dance AI'
-                                    : isSmalltown
-                                      ? 'Smalltown Boy Dance'
-                                      : 'Crazy Frog';
+                            : isGta5GoodbyeAiVideo
+                              ? 'GTA 5 Goodbye AI Video'
+                              : isBicepHeartAi
+                                ? 'Bicep Heart AI'
+                                : isSayItRightAi
+                                  ? 'Say It Right AI'
+                                  : isDeckTheHallsDanceAi
+                                    ? 'Deck the Halls Dance AI'
+                                    : isCanIRideDanceAi
+                                      ? 'Can I Ride Dance AI'
+                                      : isSmalltown
+                                        ? 'Smalltown Boy Dance'
+                                        : 'Crazy Frog';
       const previewImageCount =
         isTinyDeskAi || isWassupInAMinuteAi
           ? Math.max(0, contentTypes.length - 1)
@@ -1115,23 +1159,25 @@ async function POST({ request }: { request: Request }) {
                                   ? getEnzoFernandezAiTemplateVideoKey()
                                   : isBurningBridgesAi
                                     ? getBurningBridgesAiTemplateVideoKey()
-                                    : isTinyDeskAi
-                                      ? getTinyDeskAiTemplateVideoKey()
-                                      : isWassupInAMinuteAi
-                                        ? getWassupInAMinuteAiTemplateVideoKey()
-                                        : isSayItRightAi
-                                          ? getSayItRightAiTemplateVideoKey()
-                                          : isDeckTheHallsDanceAi
-                                            ? getDeckTheHallsDanceAiTemplateVideoKey(
-                                                deckHallsCastMode ||
-                                                  DECK_THE_HALLS_DANCE_AI_DEFAULT_CAST_MODE
-                                              )
-                                            : isCanIRideDanceAi
-                                              ? getCanIRideDanceAiTemplateVideoKey(
-                                                  canIRideCastMode ||
-                                                    CAN_I_RIDE_DANCE_AI_DEFAULT_CAST_MODE
+                                    : isGta5GoodbyeAiVideo
+                                      ? getGta5GoodbyeAiVideoTemplateVideoKey()
+                                      : isTinyDeskAi
+                                        ? getTinyDeskAiTemplateVideoKey()
+                                        : isWassupInAMinuteAi
+                                          ? getWassupInAMinuteAiTemplateVideoKey()
+                                          : isSayItRightAi
+                                            ? getSayItRightAiTemplateVideoKey()
+                                            : isDeckTheHallsDanceAi
+                                              ? getDeckTheHallsDanceAiTemplateVideoKey(
+                                                  deckHallsCastMode ||
+                                                    DECK_THE_HALLS_DANCE_AI_DEFAULT_CAST_MODE
                                                 )
-                                              : getSmalltownBoyDanceTemplateVideoKey()
+                                              : isCanIRideDanceAi
+                                                ? getCanIRideDanceAiTemplateVideoKey(
+                                                    canIRideCastMode ||
+                                                      CAN_I_RIDE_DANCE_AI_DEFAULT_CAST_MODE
+                                                  )
+                                                : getSmalltownBoyDanceTemplateVideoKey()
           );
         } else if (isCrazyFrog) {
           await ensureCrazyFrogTemplateInR2();
@@ -1157,6 +1203,8 @@ async function POST({ request }: { request: Request }) {
           await ensureEnzoFernandezAiTemplateInR2();
         } else if (isBurningBridgesAi) {
           await ensureBurningBridgesAiTemplateInR2();
+        } else if (isGta5GoodbyeAiVideo) {
+          await ensureGta5GoodbyeAiVideoTemplateInR2();
         } else if (isBicepHeartAi) {
           await ensureBicepHeartTemplateInR2();
         } else if (isTinyDeskAi) {
@@ -1204,17 +1252,19 @@ async function POST({ request }: { request: Request }) {
                                   ? 'Enzo Fernandez AI template is not configured in R2.'
                                   : isBurningBridgesAi
                                     ? 'Burning Bridges AI template is not configured in R2.'
-                                    : isBicepHeartAi
-                                      ? 'Bicep Heart AI template is not configured in R2.'
-                                      : isTinyDeskAi
-                                        ? 'Tiny Desk AI template is not configured in R2.'
-                                        : isSayItRightAi
-                                          ? 'Say It Right AI template is not configured in R2.'
-                                          : isDeckTheHallsDanceAi
-                                            ? 'Deck the Halls Dance AI template is not configured in R2.'
-                                            : isCanIRideDanceAi
-                                              ? 'Can I Ride Dance AI template is not configured in R2.'
-                                              : 'Smalltown Boy Dance template is not configured in R2.'),
+                                    : isGta5GoodbyeAiVideo
+                                      ? 'GTA 5 Goodbye AI Video template is not configured in R2.'
+                                      : isBicepHeartAi
+                                        ? 'Bicep Heart AI template is not configured in R2.'
+                                        : isTinyDeskAi
+                                          ? 'Tiny Desk AI template is not configured in R2.'
+                                          : isSayItRightAi
+                                            ? 'Say It Right AI template is not configured in R2.'
+                                            : isDeckTheHallsDanceAi
+                                              ? 'Deck the Halls Dance AI template is not configured in R2.'
+                                              : isCanIRideDanceAi
+                                                ? 'Can I Ride Dance AI template is not configured in R2.'
+                                                : 'Smalltown Boy Dance template is not configured in R2.'),
           { code: 'TEMPLATE_NOT_CONFIGURED' },
           { status: 503 }
         );
@@ -1265,6 +1315,12 @@ async function POST({ request }: { request: Request }) {
     }
     if (isBurningBridgesAi && existing) {
       assertBurningBridgesAiProviderBinding(existing.provider, existing.model);
+    }
+    if (isGta5GoodbyeAiVideo && existing) {
+      assertGta5GoodbyeAiVideoProviderBinding(
+        existing.provider,
+        existing.model
+      );
     }
     if (isBicepHeartAi && existing) {
       assertBicepHeartAiProviderBinding(existing.provider, existing.model);
@@ -1355,17 +1411,19 @@ async function POST({ request }: { request: Request }) {
                             ? ENZO_FERNANDEZ_AI_ASPECT_RATIO
                             : isBurningBridgesAi
                               ? BURNING_BRIDGES_AI_ASPECT_RATIO
-                              : isBicepHeartAi
-                                ? BICEP_HEART_AI_ASPECT_RATIO
-                                : isTinyDeskAi
-                                  ? TINY_DESK_AI_ASPECT_RATIO
-                                  : isSayItRightAi
-                                    ? SAY_IT_RIGHT_AI_ASPECT_RATIO
-                                    : isDeckTheHallsDanceAi
-                                      ? DECK_THE_HALLS_DANCE_AI_ASPECT_RATIO
-                                      : isCanIRideDanceAi
-                                        ? CAN_I_RIDE_DANCE_AI_ASPECT_RATIO
-                                        : SMALLTOWN_ASPECT_RATIO;
+                              : isGta5GoodbyeAiVideo
+                                ? GTA_5_GOODBYE_AI_VIDEO_ASPECT_RATIO
+                                : isBicepHeartAi
+                                  ? BICEP_HEART_AI_ASPECT_RATIO
+                                  : isTinyDeskAi
+                                    ? TINY_DESK_AI_ASPECT_RATIO
+                                    : isSayItRightAi
+                                      ? SAY_IT_RIGHT_AI_ASPECT_RATIO
+                                      : isDeckTheHallsDanceAi
+                                        ? DECK_THE_HALLS_DANCE_AI_ASPECT_RATIO
+                                        : isCanIRideDanceAi
+                                          ? CAN_I_RIDE_DANCE_AI_ASPECT_RATIO
+                                          : SMALLTOWN_ASPECT_RATIO;
 
     if (isFixedTemplateProduct) {
       await bindGenjutsuUploadInputs({
@@ -1419,19 +1477,21 @@ async function POST({ request }: { request: Request }) {
                                 ? ENZO_FERNANDEZ_AI_ASPECT_RATIO
                                 : isBurningBridgesAi
                                   ? BURNING_BRIDGES_AI_ASPECT_RATIO
-                                  : isBicepHeartAi
-                                    ? BICEP_HEART_AI_ASPECT_RATIO
-                                    : isTinyDeskAi
-                                      ? TINY_DESK_AI_ASPECT_RATIO
-                                      : isSayItRightAi
-                                        ? SAY_IT_RIGHT_AI_ASPECT_RATIO
-                                        : isDeckTheHallsDanceAi
-                                          ? DECK_THE_HALLS_DANCE_AI_ASPECT_RATIO
-                                          : isCanIRideDanceAi
-                                            ? CAN_I_RIDE_DANCE_AI_ASPECT_RATIO
-                                            : isSmalltown
-                                              ? SMALLTOWN_ASPECT_RATIO
-                                              : CRAZY_FROG_ASPECT_RATIO
+                                  : isGta5GoodbyeAiVideo
+                                    ? GTA_5_GOODBYE_AI_VIDEO_ASPECT_RATIO
+                                    : isBicepHeartAi
+                                      ? BICEP_HEART_AI_ASPECT_RATIO
+                                      : isTinyDeskAi
+                                        ? TINY_DESK_AI_ASPECT_RATIO
+                                        : isSayItRightAi
+                                          ? SAY_IT_RIGHT_AI_ASPECT_RATIO
+                                          : isDeckTheHallsDanceAi
+                                            ? DECK_THE_HALLS_DANCE_AI_ASPECT_RATIO
+                                            : isCanIRideDanceAi
+                                              ? CAN_I_RIDE_DANCE_AI_ASPECT_RATIO
+                                              : isSmalltown
+                                                ? SMALLTOWN_ASPECT_RATIO
+                                                : CRAZY_FROG_ASPECT_RATIO
           : undefined,
         videoKey: normalizedInputs[0].key,
         imageKeys: normalizedInputs.slice(1).map((item) => item.key),
@@ -1488,6 +1548,7 @@ async function POST({ request }: { request: Request }) {
       error instanceof A2oLiteAiProviderBindingError ||
       error instanceof EnzoFernandezAiProviderBindingError ||
       error instanceof BurningBridgesAiProviderBindingError ||
+      error instanceof Gta5GoodbyeAiVideoProviderBindingError ||
       error instanceof BicepHeartAiProviderBindingError ||
       error instanceof TinyDeskAiProviderBindingError ||
       error instanceof TinyDeskAiProviderBindingError ||

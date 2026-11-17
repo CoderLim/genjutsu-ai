@@ -113,6 +113,7 @@ const COMPARE_ROWS = [
 ] as const;
 
 const RELATED_LINKS = [
+  { label: 'GTA 5 Goodbye AI Video', href: '/gta-5-goodbye-ai-video' },
   { label: 'AI Zombie Hug', href: '/ai-zombie-hug' },
   { label: 'Crazy Frog AI', href: '/crazy-frog-ai' },
   { label: 'Coldplay Kiss Cam', href: '/coldplay-kiss-cam' },

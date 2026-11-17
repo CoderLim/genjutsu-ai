@@ -663,6 +663,10 @@ export const FOOTER_COLUMNS: FooterColumn[] = [
         href: '/burning-bridges-ai',
       },
       {
+        label: 'GTA 5 Goodbye AI Video',
+        href: '/gta-5-goodbye-ai-video',
+      },
+      {
         label: 'Deck the Halls Dance AI',
         href: '/deck-the-halls-dance-ai',
       },

@@ -39,6 +39,7 @@ const STATIC_PATHS = [
   '/jatayu-video-prompt',
   '/blog',
   '/burning-bridges-ai',
+  '/gta-5-goodbye-ai-video',
   '/say-it-right-ai',
   '/deck-the-halls-dance-ai',
   '/can-i-ride-dance-ai',
@@ -66,6 +67,8 @@ const LIMITED_STATIC_PATH_LOCALES: Record<string, readonly string[]> = {
   '/deck-the-halls-dance-ai': [baseLocale],
   // Can I Ride Dance ships English editorial first.
   '/can-i-ride-dance-ai': [baseLocale],
+  // GTA 5 Goodbye ships English editorial first.
+  '/gta-5-goodbye-ai-video': [baseLocale],
   // Jatayu prompt page ships English editorial first.
   '/jatayu-video-prompt': [baseLocale],
   // Tiny Desk AI ships English editorial first — do not advertise /ja /ko /es mirrors.
