@@ -103,6 +103,14 @@ const DEFAULT_OBJECTS_RESOLUTION = '480p' as const;
  */
 export const MOTION_TEMPLATES: MotionTemplate[] = [
   {
+    id: 'jatayu',
+    titleKey: 'site.templates.jatayu',
+    poster: '/videos/demos/jatayu-case-01-poster.jpg',
+    sourceVideo: '/videos/demos/jatayu-case-01.mp4',
+    href: '/jatayu-video-prompt',
+    aspect: 'landscape',
+  },
+  {
     id: 'can-i-ride-dance',
     titleKey: 'site.templates.can_i_ride_dance',
     poster: CAN_I_RIDE_DANCE_AI_DUO_TEMPLATE_POSTER_PATH,

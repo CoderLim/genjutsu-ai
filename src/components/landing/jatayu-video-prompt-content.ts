@@ -12,8 +12,9 @@ export const JATAYU_DEMO_UPLOAD_DATE = '2026-11-17';
 
 export const JATAYU_PAGE_TITLE =
   'Jatayu AI Video Prompt — Copy the Google Flow Prompt';
+/** ~158 chars — keep under typical SERP truncation (~160). */
 export const JATAYU_PAGE_DESCRIPTION =
-  'Copy the free Jatayu AI video prompt for Google Flow, Edits and CapCut. Turn a normal selfie into a cinematic Ramayana eagle scene in 3 steps — no login, no paywall.';
+  'Copy the free Jatayu AI video prompt for Google Flow, Edits and CapCut. Turn a selfie into a cinematic Ramayana eagle scene in 3 steps — no login, no paywall.';
 
 /** Word-for-word from public Google Flow creator post, 14 Nov 2026. */
 export const JATAYU_ORIGINAL_PUBLIC_PROMPT =

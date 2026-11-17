@@ -258,13 +258,13 @@ export function JatayuVideoPromptSeoSections() {
           Jatayu AI Video Prompt (Free, Copy &amp; Paste)
         </h1>
         <p className="mx-auto mt-5 max-w-2xl text-left text-[15px] leading-7 text-white/62 sm:text-base">
-          Turn a short rooftop clip into the Ramayana eagle scene. The setup
-          spreading on Instagram right now: you stand in frame, and a giant
-          golden-brown eagle rises behind you and spreads its wings. Below are
-          two prompts — the original public version, reproduced word for word
-          with its source, and our longer expanded version with camera and
-          negative-prompt detail. Both are free to copy; no follow, no comment,
-          no DM.
+          Turn a short rooftop clip into the Ramayana eagle scene. This Jatayu
+          video prompt is the setup spreading on Instagram right now: you stand
+          in frame, and a giant golden-brown eagle rises behind you and spreads
+          its wings. Below are two prompts — the original public version,
+          reproduced word for word with its source, and our longer expanded
+          version with camera and negative-prompt detail. Both are free to copy;
+          no follow, no comment, no DM.
         </p>
 
         <div className="mt-7 flex flex-col items-center gap-2">
@@ -295,8 +295,9 @@ export function JatayuVideoPromptSeoSections() {
             The Jatayu AI Video Prompt (Expanded Version)
           </h2>
           <p className="mt-4 text-sm leading-7 text-white/50 sm:text-base">
-            Paste this whole block into the prompt box. Keep the first sentence
-            — it is what holds your face together across frames.
+            Copy this Jatayu video prompt as one block. Paste this whole block
+            into the prompt box. Keep the first sentence — it is what holds your
+            face together across frames.
           </p>
           <div className="mt-6">
             <PromptBlock
@@ -433,7 +434,8 @@ export function JatayuVideoPromptSeoSections() {
             <ol className="mt-4 list-decimal space-y-3 pl-5 text-sm leading-7 text-white/55 sm:text-base">
               <li>
                 CapCut → image-to-video → import your short clip and add an
-                eagle reference image.
+                eagle reference image. This is the usual path for an ai jatayu
+                edit when you want captions and music in the same project.
               </li>
               <li>Paste the expanded prompt, choose 9:16, generate.</li>
               <li>
@@ -469,13 +471,13 @@ export function JatayuVideoPromptSeoSections() {
           <figure className="mt-10">
             <img
               src={JATAYU_DEMO_POSTER}
-              alt="Jatayu video prompt generator with format, birds and lightning options"
+              alt="Jatayu AI video still — eagle spreading its wings behind the subject at golden hour"
               className="w-full rounded-2xl border border-white/10 object-cover opacity-90"
               loading="lazy"
             />
             <figcaption className="mt-2 text-center text-xs text-white/35">
-              Jatayu video prompt generator with format, birds and lightning
-              options
+              Still from the example clip — use the generator above to adjust
+              format, birds and lightning
             </figcaption>
           </figure>
         </div>
@@ -526,14 +528,26 @@ export function JatayuVideoPromptSeoSections() {
       </section>
 
       <section className="mx-auto max-w-3xl px-4 py-12 md:px-5 md:pb-16">
-        <p className="text-sm leading-6 text-white/45">
+        <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm leading-6 text-white/45">
           <Link
             href="/"
             className="text-[rgb(220,155,99)] underline-offset-4 hover:underline"
           >
             More viral AI video trends and prompts
           </Link>
-        </p>
+          <Link
+            href="/day-of-the-dead-ai-video"
+            className="text-[rgb(220,155,99)] underline-offset-4 hover:underline"
+          >
+            Day of the Dead AI video
+          </Link>
+          <Link
+            href="/crazy-frog-ai"
+            className="text-[rgb(220,155,99)] underline-offset-4 hover:underline"
+          >
+            Crazy Frog AI video
+          </Link>
+        </div>
       </section>
     </>
   );

@@ -50,6 +50,7 @@ function videoJsonLd() {
 }
 
 function breadcrumbJsonLd() {
+  // Two-level until /ai-video-trends hub exists — do not invent a fake middle crumb.
   return {
     '@context': 'https://schema.org',
     '@type': 'BreadcrumbList',
@@ -63,12 +64,6 @@ function breadcrumbJsonLd() {
       {
         '@type': 'ListItem',
         position: 2,
-        name: 'AI Video Trends',
-        item: absoluteUrl('/'),
-      },
-      {
-        '@type': 'ListItem',
-        position: 3,
         name: 'Jatayu AI Video Prompt',
         item: absoluteUrl(JATAYU_PAGE_PATH),
       },
