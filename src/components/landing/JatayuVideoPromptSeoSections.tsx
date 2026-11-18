@@ -255,7 +255,7 @@ export function JatayuVideoPromptSeoSections() {
     <>
       <section className="mx-auto max-w-3xl px-4 pt-20 pb-10 text-center sm:pt-24 md:px-5">
         <h1 className="text-[34px] leading-[1.08] font-bold tracking-[-1.4px] text-white sm:text-[44px] md:text-[52px]">
-          Jatayu AI Video Prompt (Free, Copy &amp; Paste)
+          Jatayu Video Prompt (Free, Copy &amp; Paste)
         </h1>
         <p className="mx-auto mt-5 max-w-2xl text-left text-[15px] leading-7 text-white/62 sm:text-base">
           Turn a short rooftop clip into the Ramayana eagle scene. This Jatayu
@@ -292,7 +292,7 @@ export function JatayuVideoPromptSeoSections() {
       >
         <div className="mx-auto max-w-3xl px-4 py-14 md:px-5 md:py-16">
           <h2 className="text-3xl font-semibold tracking-tight text-white sm:text-4xl">
-            The Jatayu AI Video Prompt (Expanded Version)
+            The Jatayu Video Prompt (Expanded Version)
           </h2>
           <p className="mt-4 text-sm leading-7 text-white/50 sm:text-base">
             Copy this Jatayu video prompt as one block. Paste this whole block

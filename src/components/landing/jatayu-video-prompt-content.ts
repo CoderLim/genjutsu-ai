@@ -11,10 +11,10 @@ export const JATAYU_DEMO_DURATION = 'PT7S';
 export const JATAYU_DEMO_UPLOAD_DATE = '2026-11-17';
 
 export const JATAYU_PAGE_TITLE =
-  'Jatayu AI Video Prompt — Copy the Google Flow Prompt';
+  'Jatayu Video Prompt — Copy the Google Flow Prompt';
 /** ~158 chars — keep under typical SERP truncation (~160). */
 export const JATAYU_PAGE_DESCRIPTION =
-  'Copy the free Jatayu AI video prompt for Google Flow, Edits and CapCut. Turn a selfie into a cinematic Ramayana eagle scene in 3 steps — no login, no paywall.';
+  'Copy the free Jatayu Video Prompt for Google Flow, Edits and CapCut. Turn a selfie into a cinematic Ramayana eagle scene in 3 steps — no login, no paywall.';
 
 /** Word-for-word from public Google Flow creator post, 14 Nov 2026. */
 export const JATAYU_ORIGINAL_PUBLIC_PROMPT =
@@ -30,7 +30,7 @@ export const JATAYU_FAQ_ITEMS = [
       'Yes. Both versions on this page are free to copy — no login, no follow, no comment, no DM.',
   },
   {
-    question: 'Which AI tool is this Jatayu AI video prompt for?',
+    question: 'Which AI tool is this Jatayu Video Prompt for?',
     answer:
       'Google Flow is where the trend started, using its Video + Ingredients mode with a short clip and an eagle reference image. The text also works in the AI video features of Edits and CapCut; if a tool rejects it, keep the first two sentences and drop the rest.',
   },

@@ -33,7 +33,7 @@ const AI_PHOTO_EDITOR_HREF =
 
 const TRENDING_LINKS = [
   {
-    label: 'Jatayu AI Video Prompt',
+    label: 'Jatayu Video Prompt',
     href: '/jatayu-video-prompt',
     poster: '/videos/demos/jatayu-case-01-poster.jpg',
   },

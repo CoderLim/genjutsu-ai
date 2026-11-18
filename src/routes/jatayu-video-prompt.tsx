@@ -64,7 +64,7 @@ function breadcrumbJsonLd() {
       {
         '@type': 'ListItem',
         position: 2,
-        name: 'Jatayu AI Video Prompt',
+        name: 'Jatayu Video Prompt',
         item: absoluteUrl(JATAYU_PAGE_PATH),
       },
     ],

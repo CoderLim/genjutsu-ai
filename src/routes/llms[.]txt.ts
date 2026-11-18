@@ -129,9 +129,9 @@ const STATIC_PAGES: { path: string; title: string; description: string }[] = [
   },
   {
     path: '/jatayu-video-prompt',
-    title: 'Jatayu AI Video Prompt',
+    title: 'Jatayu Video Prompt',
     description:
-      'Free copy-paste Jatayu AI video prompt for Google Flow, Edits and CapCut',
+      'Free copy-paste Jatayu Video Prompt for Google Flow, Edits and CapCut',
   },
   {
     path: '/kairo-bad-times',
