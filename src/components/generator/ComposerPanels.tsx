@@ -1,11 +1,15 @@
 import {
   Children,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type ReactNode,
+  type RefObject,
 } from 'react';
+import { createPortal } from 'react-dom';
 import {
   ArrowRight,
   Check,
@@ -256,25 +260,85 @@ function ComposerAspectRatioField({
   );
 }
 
+type PanelPlacement = {
+  left: number;
+  maxHeight: number;
+  top?: number;
+  bottom?: number;
+};
+
 function PanelShell({
   open,
   onClose,
+  anchorRef,
   className,
   children,
 }: {
   open: boolean;
   onClose: () => void;
+  anchorRef: RefObject<HTMLButtonElement | null>;
   className?: string;
   children: ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const [placement, setPlacement] = useState<PanelPlacement | null>(null);
+
+  // Render at document level so the site header cannot cover the chooser.
+  // Measure the real space above the trigger instead of assuming 70vh fits.
+  useLayoutEffect(() => {
+    if (!open) return;
+    const updatePlacement = () => {
+      const anchor = anchorRef.current;
+      if (!anchor) return;
+
+      const bounds = anchor.getBoundingClientRect();
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      const edgeGap = 12;
+      const triggerGap = 8;
+      const above = Math.max(0, bounds.top - edgeGap - triggerGap);
+      const below = Math.max(0, viewportHeight - bounds.bottom - edgeGap - triggerGap);
+      const placeBelow = above < 200 && below > above;
+      const maxHeight = Math.min(440, placeBelow ? below : above);
+      const panelWidth = ref.current?.getBoundingClientRect().width ?? 0;
+      const left = Math.max(
+        edgeGap,
+        Math.min(bounds.left, viewportWidth - panelWidth - edgeGap)
+      );
+      const next: PanelPlacement = {
+        left,
+        maxHeight,
+        ...(placeBelow
+          ? { top: bounds.bottom + triggerGap }
+          : { bottom: viewportHeight - bounds.top + triggerGap }),
+      };
+
+      setPlacement((current) =>
+        current &&
+        current.left === next.left &&
+        current.maxHeight === next.maxHeight &&
+        current.top === next.top &&
+        current.bottom === next.bottom
+          ? current
+          : next
+      );
+    };
+
+    updatePlacement();
+    window.addEventListener('resize', updatePlacement);
+    window.addEventListener('scroll', updatePlacement, true);
+    return () => {
+      window.removeEventListener('resize', updatePlacement);
+      window.removeEventListener('scroll', updatePlacement, true);
+    };
+  }, [open, anchorRef]);
 
   useEffect(() => {
     if (!open) return;
     function onPointerDown(event: MouseEvent) {
       const target = event.target as Node;
       if (ref.current?.contains(target)) return;
-      // Keep open when clicking the matching toolbar trigger (handled by toggle).
+      // Trigger clicks are handled by their own toolbar toggles.
       const trigger = (event.target as HTMLElement | null)?.closest?.(
         '[data-composer-trigger]'
       );
@@ -292,18 +356,27 @@ function PanelShell({
     };
   }, [open, onClose]);
 
-  if (!open) return null;
-  return (
+  if (!open || typeof document === 'undefined') return null;
+
+  const panelStyle: CSSProperties = {
+    ...(placement ?? { left: 0, top: 0, maxHeight: 440 }),
+    visibility: placement ? 'visible' : 'hidden',
+    ['--composer-panel-max-height' as string]: `${placement?.maxHeight ?? 440}px`,
+  };
+
+  return createPortal(
     <div
       ref={ref}
       role="dialog"
+      style={panelStyle}
       className={cn(
-        'animate-in fade-in slide-in-from-bottom-1 absolute bottom-full left-0 z-[80] mb-2 overflow-hidden rounded-[20px] border border-[rgba(20,17,18,0.08)] bg-white shadow-[0_18px_48px_-18px_rgba(24,14,16,0.28),0_4px_14px_-6px_rgba(24,14,16,0.12)] duration-200',
+        'animate-in fade-in slide-in-from-bottom-1 fixed z-[9999] overflow-y-auto rounded-[20px] border border-[rgba(20,17,18,0.08)] bg-white shadow-[0_18px_48px_-18px_rgba(24,14,16,0.28),0_4px_14px_-6px_rgba(24,14,16,0.12)] duration-200',
         className
       )}
     >
       {children}
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -350,6 +423,9 @@ export function ComposerToolbar({
   );
   const currentFamilyId = getGeneratorModelFamilyId(model.id);
   const [open, setOpen] = useState<OpenPanel>(null);
+  const modelTriggerRef = useRef<HTMLButtonElement>(null);
+  const settingsTriggerRef = useRef<HTMLButtonElement>(null);
+  const workflowTriggerRef = useRef<HTMLButtonElement>(null);
   const [familyId, setFamilyId] = useState(currentFamilyId);
 
   useEffect(() => {
@@ -383,6 +459,7 @@ export function ComposerToolbar({
       <div className="relative">
         <button
           type="button"
+          ref={modelTriggerRef}
           data-composer-trigger="model"
           aria-expanded={open === 'model'}
           aria-label="Model"
@@ -401,11 +478,15 @@ export function ComposerToolbar({
         </button>
         <PanelShell
           open={open === 'model'}
+          anchorRef={modelTriggerRef}
           onClose={() => setOpen(null)}
           className="w-[min(94vw,640px)]"
         >
-          <div className="grid max-h-[min(70vh,440px)] grid-cols-[124px_minmax(0,1fr)] sm:grid-cols-[184px_minmax(0,1fr)]">
-            <aside className="border-r border-[rgba(20,17,18,0.06)] bg-[rgba(20,17,18,0.02)] p-2">
+          <div
+            className="grid min-h-0 grid-cols-[124px_minmax(0,1fr)] sm:grid-cols-[184px_minmax(0,1fr)]"
+            style={{ maxHeight: 'min(440px, var(--composer-panel-max-height))' }}
+          >
+            <aside className="min-h-0 overflow-y-auto border-r border-[rgba(20,17,18,0.06)] bg-[rgba(20,17,18,0.02)] p-2">
               <p className="px-2 pt-1 pb-2 text-[10px] font-semibold tracking-[0.08em] text-[rgba(18,15,16,0.45)] uppercase">
                 Models
               </p>
@@ -445,7 +526,7 @@ export function ComposerToolbar({
                 })}
               </div>
             </aside>
-            <div className="space-y-2 overflow-y-auto p-2.5">
+            <div className="min-h-0 space-y-2 overflow-y-auto p-2.5">
               {(activeFamily?.models ?? []).map((item) => {
                 const selected = isSameGeneratorModelChoice(item, model);
                 const highlights = getGeneratorModelHighlights(item);
@@ -513,6 +594,7 @@ export function ComposerToolbar({
         <div className="relative">
           <button
             type="button"
+            ref={settingsTriggerRef}
             data-composer-trigger="settings"
             aria-expanded={open === 'settings'}
             aria-label="Settings"
@@ -564,6 +646,7 @@ export function ComposerToolbar({
           </button>
           <PanelShell
             open={open === 'settings'}
+            anchorRef={settingsTriggerRef}
             onClose={() => setOpen(null)}
             className="w-[min(calc(100vw-2rem),392px)] p-1.5"
           >
@@ -652,6 +735,7 @@ export function ComposerToolbar({
         <div className="relative">
           <button
             type="button"
+            ref={workflowTriggerRef}
             data-composer-trigger="workflow"
             aria-expanded={open === 'workflow'}
             aria-label="Generation mode"
@@ -667,6 +751,7 @@ export function ComposerToolbar({
           </button>
           <PanelShell
             open={open === 'workflow'}
+            anchorRef={workflowTriggerRef}
             onClose={() => setOpen(null)}
             className="min-w-[160px] p-1.5"
           >
