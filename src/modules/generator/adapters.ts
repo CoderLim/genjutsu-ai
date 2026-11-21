@@ -65,41 +65,50 @@ const MODEL_IDENTITIES: Record<string, ProviderIdentity> = {
  * substituting a different model (notably H3 Turbo, still unverified).
  */
 export const ADDITIONAL_FAL_ENDPOINTS: Record<
-  string, Partial<Record<'text-to-video' | 'first-frame' | 'text-to-image' | 'image-to-image', string>>
+  string, Partial<Record<'text-to-video' | 'first-frame' | 'all-in-one-reference' | 'text-to-image' | 'image-to-image', string>>
 > = {
   'seedance-2-fast': {
+    'all-in-one-reference': 'bytedance/seedance-2.0/fast/reference-to-video',
     'text-to-video': 'bytedance/seedance-2.0/fast/text-to-video',
     'first-frame': 'bytedance/seedance-2.0/fast/image-to-video',
   },
   'seedance-2-mini': {
+    'all-in-one-reference': 'bytedance/seedance-2.0/mini/reference-to-video',
     'text-to-video': 'bytedance/seedance-2.0/mini/text-to-video',
     'first-frame': 'bytedance/seedance-2.0/mini/image-to-video',
   },
   'seedance-2.5': {
+    'all-in-one-reference': 'bytedance/seedance-2.5/reference-to-video',
     'text-to-video': 'bytedance/seedance-2.5/text-to-video',
     'first-frame': 'bytedance/seedance-2.5/image-to-video',
   },
   'seedance-2.5-flash': {
+    'all-in-one-reference': 'bytedance/seedance-2.5/flash/reference-to-video',
     'text-to-video': 'bytedance/seedance-2.5/flash/text-to-video',
     'first-frame': 'bytedance/seedance-2.5/flash/image-to-video',
   },
   'minimax-h3': {
+    'all-in-one-reference': 'minimax/h3/reference-to-video',
     'text-to-video': 'minimax/h3/text-to-video',
     'first-frame': 'minimax/h3/image-to-video',
   },
   'minimax-h3-max-turbo': {
+    'all-in-one-reference': 'minimax/h3-max-turbo/reference-to-video',
     'text-to-video': 'minimax/h3-max-turbo/text-to-video',
     'first-frame': 'minimax/h3-max-turbo/image-to-video',
   },
   'minimax-h3-max': {
+    'all-in-one-reference': 'minimax/h3-max/reference-to-video',
     'text-to-video': 'minimax/h3-max/text-to-video',
     'first-frame': 'minimax/h3-max/image-to-video',
   },
   'kling-4': {
+    'all-in-one-reference': 'kling/v4/reference-to-video',
     'text-to-video': 'kling/v4/text-to-video',
     'first-frame': 'kling/v4/image-to-video',
   },
   'kling-4-flash': {
+    'all-in-one-reference': 'kling/v4/flash/reference-to-video',
     'text-to-video': 'kling/v4/flash/text-to-video',
     'first-frame': 'kling/v4/flash/image-to-video',
   },
@@ -129,17 +138,24 @@ export class GeneratorProviderNotConfiguredError extends Error {
 }
 
 export function getGeneratorProviderIdentity(
-  modelId: string, workflow?: Workflow
+  modelId: string, workflow?: Workflow, hasReferences?: boolean
 ): ProviderIdentity {
   const extra = ADDITIONAL_FAL_ENDPOINTS[modelId];
   if (extra) {
-    const apiWorkflow = workflow === 'start-end' ? 'first-frame' : workflow;
+    const apiWorkflow = workflow === 'start-end' ? 'first-frame'
+      : workflow === 'all-in-one-reference' &&
+        (hasReferences === false || !extra['all-in-one-reference'])
+        ? 'text-to-video'
+        : workflow;
     const endpoint = apiWorkflow ? extra[apiWorkflow as keyof typeof extra]
       : extra['first-frame'] ?? extra['text-to-image'];
     if (!endpoint) throw new Error('Unsupported Fal model/workflow endpoint');
     return { provider: 'fal', providerModelId: endpoint };
   }
-  const identity = MODEL_IDENTITIES[modelId];
+  const resolvedModelId = modelId === 'all-in-one-video' &&
+    workflow === 'all-in-one-reference' && hasReferences === false
+    ? 'text-to-video-standard' : modelId;
+  const identity = MODEL_IDENTITIES[resolvedModelId];
   if (!identity) throw new Error('Unknown generator adapter: ' + modelId);
   // Both UI workflows share one named model; Fal has separate queue endpoints
   // for generation and editing. The selected endpoint is sealed in task options.
@@ -206,6 +222,8 @@ export function buildGeneratorProviderRequest(
   media: MediaReadUrls
 ): Record<string, unknown> {
   const params = state.params;
+  const hasReferenceFiles = media.referenceImages.length > 0 ||
+    media.referenceVideos.length > 0 || media.referenceAudio.length > 0;
   if (ADDITIONAL_FAL_ENDPOINTS[state.modelId]) {
     const id = state.modelId;
     if (id.startsWith('minimax-h3-image')) {
@@ -222,6 +240,10 @@ export function buildGeneratorProviderRequest(
       };
     }
     const hasImage = state.workflow === 'first-frame' || state.workflow === 'start-end';
+    const isReference = state.workflow === 'all-in-one-reference' && hasReferenceFiles;
+    if (isReference && !ADDITIONAL_FAL_ENDPOINTS[id]['all-in-one-reference']) {
+      throw new Error('This model does not support reference uploads');
+    }
     if (hasImage && !media.startFrame) throw new Error('Start frame required');
     if (state.workflow === 'start-end' && !media.endFrame) {
       throw new Error('End frame required');
@@ -234,6 +256,10 @@ export function buildGeneratorProviderRequest(
     if (id.startsWith('kling-4')) {
       return {
         ...base,
+        ...(isReference ? {
+          image_urls: media.referenceImages,
+          aspect_ratio: params.aspectRatio,
+        } : {}),
         ...(hasImage
           ? {
               start_image_url: media.startFrame,
@@ -261,6 +287,9 @@ export function buildGeneratorProviderRequest(
     if (id === 'minimax-h3' || id.startsWith('minimax-h3-max')) {
       return {
         ...base,
+        ...(isReference ? {
+          reference_image_urls: media.referenceImages,
+        } : {}),
         ...(hasImage ? {
           image_url: media.startFrame,
           ...(state.workflow === 'start-end'
@@ -275,6 +304,7 @@ export function buildGeneratorProviderRequest(
     // legacy image property.
     return {
       ...base,
+      ...(isReference ? { image_urls: media.referenceImages } : {}),
       ...(hasImage ? {
         image_url: media.startFrame,
         ...(state.workflow === 'start-end' ? { end_image_url: media.endFrame } : {}),
@@ -322,15 +352,9 @@ export function buildGeneratorProviderRequest(
   }
 
   if (state.modelId === 'all-in-one-video') {
-    if (
-      state.workflow === 'all-in-one-reference' &&
-      !media.referenceImages.length &&
-      !media.referenceVideos.length &&
-      !media.referenceAudio.length
-    ) throw new Error('Add at least one reference');
     return {
       prompt: state.prompt,
-      ...(state.workflow === 'all-in-one-reference' ? {
+      ...(state.workflow === 'all-in-one-reference' && hasReferenceFiles ? {
         reference_images: media.referenceImages,
         reference_videos: media.referenceVideos,
         reference_audios: media.referenceAudio,
@@ -410,7 +434,9 @@ export async function submitGeneratorProvider(
   state: GeneratorState,
   media: MediaReadUrls
 ) {
-  const identity = getGeneratorProviderIdentity(state.modelId, state.workflow);
+  const hasReferences = media.referenceImages.length > 0 ||
+    media.referenceVideos.length > 0 || media.referenceAudio.length > 0;
+  const identity = getGeneratorProviderIdentity(state.modelId, state.workflow, hasReferences);
   const body = buildGeneratorProviderRequest(state, media);
   if (identity.provider === 'wavespeed') {
     await assertWavespeedConfigured();
