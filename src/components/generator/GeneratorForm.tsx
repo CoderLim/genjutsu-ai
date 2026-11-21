@@ -24,6 +24,7 @@ import {
   generatorReadinessError,
   getGeneratorSlotCapacity,
   isGeneratorSlotOptional,
+  isGeneratorJobActive,
   shouldPollGeneratorJob,
 } from '@/modules/generator/form-state';
 import {
@@ -568,7 +569,8 @@ export function GeneratorForm({
   }
 
   async function onGenerate() {
-    if (!form || !model || !quote || busy || mediaBusy || submitLock.current)
+    if (!form || !model || !quote || busy || mediaBusy || submitLock.current ||
+      isGeneratorJobActive(job))
       return;
     try {
       assertGeneratorReady(form, model);
@@ -670,7 +672,7 @@ export function GeneratorForm({
     !readinessError &&
     !busy &&
     !mediaBusy &&
-    job?.status !== 'review';
+    !isGeneratorJobActive(job);
   const activeSlots = INPUT_SLOTS.filter((slot) => !!spec.slots[slot]);
   const workflows = Object.keys(model.workflows) as Workflow[];
   const settingsFields = [

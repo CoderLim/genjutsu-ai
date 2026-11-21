@@ -95,3 +95,10 @@ export function availableGeneratorFieldValues(
     )
   );
 }
+
+/** Avoid accidental double charging with a fresh ID during a pending job. */
+export function isGeneratorJobActive(job: {
+  status: 'processing' | 'completed' | 'failed' | 'review';
+} | null): boolean {
+  return !!job && (job.status === 'processing' || job.status === 'review');
+}

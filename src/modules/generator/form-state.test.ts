@@ -6,6 +6,7 @@ import {
   generatorReadinessError,
   getGeneratorSlotCapacity,
   isGeneratorSlotOptional,
+  isGeneratorJobActive,
   shouldPollGeneratorJob,
 } from './form-state';
 import { getGeneratorModel, GENERATOR_MODELS } from './catalog';
@@ -121,4 +122,12 @@ test('settings present only options valid under model constraints', () => {
     availableGeneratorFieldValues(spec, high.params, 'aspectRatio', ['16:9','9:16']),
     ['16:9','9:16']
   );
+});
+
+test('pending or ambiguous generation blocks a second new submission', () => {
+  assert.equal(isGeneratorJobActive({status: 'processing'}), true);
+  assert.equal(isGeneratorJobActive({status: 'review'}), true);
+  assert.equal(isGeneratorJobActive({status: 'completed'}), false);
+  assert.equal(isGeneratorJobActive({status: 'failed'}), false);
+  assert.equal(isGeneratorJobActive(null), false);
 });
