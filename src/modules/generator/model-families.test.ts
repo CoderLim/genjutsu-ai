@@ -4,6 +4,8 @@ import test from 'node:test';
 import { GENERATOR_MODELS, listGeneratorModels, getGeneratorModel } from './catalog';
 import {
   getGeneratorModelFamilyId,
+  getGeneratorModelHighlights,
+  getGeneratorStartingCredits,
   groupGeneratorModels,
   getGeneratorModelChoices,
   getGeneratorWorkflowChoices,
@@ -205,4 +207,49 @@ test('Seedance Fast workflows use Fast endpoints, not original Seedance profiles
   assert.ok(choices.every(x => x.modelId === fast.id));
   const old = GENERATOR_MODELS.find(x => x.id === 'photo-to-video-standard')!;
   assert.equal(isSameGeneratorModelChoice(old, fast), false);
+});
+
+test('family descriptions explain a useful strength without exposing settings', () => {
+  const groups = groupGeneratorModels(getGeneratorModelChoices(listGeneratorModels()));
+  assert.deepEqual(groups.map(group => [group.label, group.blurb]), [
+    ['Seedance', 'Multi-reference video creation'],
+    ['Nano Banana', 'Multi-reference image edits'],
+    ['MiniMax', 'High-resolution images & video'],
+    ['Kling', 'Cinematic video motion'],
+    ['FLUX', 'Fast image generation & edits'],
+  ]);
+});
+
+test('model highlights use configured maximum capabilities and actual minimum credit quotes', () => {
+  const examples: Array<[string, number, string, number | null]> = [
+    ['photo-to-video-standard', 82, 'Up to 4K', 15],
+    ['seedance-2-fast', 76, 'Up to 720p', 15],
+    ['seedance-2-mini', 52, 'Up to 720p', 15],
+    ['seedance-2.5', 152, 'Up to 720p', 30],
+    ['seedance-2.5-flash', 100, 'Up to 720p', 30],
+    ['minimax-h3', 45, 'Up to 4K', 15],
+    ['minimax-h3-max', 80, 'Up to 768p', 15],
+    ['kling-4', 81, 'Up to 1080p', 30],
+    ['kling-4-flash', 51, 'Up to 720p', 20],
+    ['nano-banana-2', 14, 'Up to 4K', null],
+    ['nano-banana-pro', 26, 'Up to 4K', null],
+    ['minimax-h3-image', 8, 'Up to 4K', null],
+    ['minimax-h3-image-highspeed', 12, 'Up to 4K', null],
+    ['text-to-image-fast', 4, 'Up to 4 outputs', null],
+    ['image-edit-standard', 9, 'Up to 4 refs', null],
+  ];
+  for (const [id, minimum, capability, duration] of examples) {
+    const model = getGeneratorModel(id);
+    const details = getGeneratorModelHighlights(model);
+    assert.equal(details.startingCredits, minimum, id);
+    assert.equal(details.capability, capability, id);
+    assert.equal(details.maxDuration, duration, id);
+    assert.ok(details.description.length <= 55, id);
+  }
+  const disabled = GENERATOR_MODELS.find(m => m.id === 'minimax-h3-turbo')!;
+  assert.equal(getGeneratorStartingCredits(disabled), null);
+  assert.equal(getGeneratorModelHighlights(disabled).capability, 'Up to 768p');
+  for (const model of getGeneratorModelChoices(listGeneratorModels())) {
+    assert.ok((getGeneratorStartingCredits(model) ?? 0) > 0, model.id);
+  }
 });
