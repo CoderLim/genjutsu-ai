@@ -83,6 +83,10 @@ export const ADDITIONAL_FAL_ENDPOINTS: Record<
     'text-to-video': 'bytedance/seedance-2.5/flash/text-to-video',
     'first-frame': 'bytedance/seedance-2.5/flash/image-to-video',
   },
+  'minimax-h3': {
+    'text-to-video': 'minimax/h3/text-to-video',
+    'first-frame': 'minimax/h3/image-to-video',
+  },
   'minimax-h3-max-turbo': {
     'text-to-video': 'minimax/h3-max-turbo/text-to-video',
     'first-frame': 'minimax/h3-max-turbo/image-to-video',
@@ -243,7 +247,7 @@ export function buildGeneratorProviderRequest(
         ...(id === 'kling-3' ? { generate_audio: params.generateAudio } : {}),
       };
     }
-    if (id.startsWith('minimax-h3-max')) {
+    if (id === 'minimax-h3' || id.startsWith('minimax-h3-max')) {
       return {
         ...base,
         ...(hasImage ? {
