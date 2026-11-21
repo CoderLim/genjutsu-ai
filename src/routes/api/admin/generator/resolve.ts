@@ -104,13 +104,17 @@ async function POST({ request }: { request: Request }) {
       return respData(await reconcileGeneratorTask(updated));
     }
     if (action === 'refund') {
-      if (body.confirmedProviderNotCharged !== true) {
+      if (task.status === 'query_review') {
+        if (body.confirmedProviderBillingReviewed !== true) {
+          throw new Error('Verify upstream request and billing before manual refund');
+        }
+      } else if (body.confirmedProviderNotCharged !== true) {
         throw new Error('Manual provider charge verification required');
       }
       const refunded = await refundGeneratorTask({
         userId, generationId,
         reason: task.status === 'query_review'
-          ? 'Admin verified the provider charge and approved a manual refund'
+          ? 'Admin reviewed upstream billing and approved a manual refund'
           : 'Admin verified provider did not accept this request',
         allowedStatuses: [task.status],
       });
