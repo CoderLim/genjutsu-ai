@@ -116,6 +116,14 @@ async function GET({ request }: { request: Request }) {
           ? displayNameForHotelLobbyPresetId(options?.presetId) || 'Hotel Lobby'
           : null;
       const isGenerator = row.scene === GENERATOR_SCENE;
+      const generatorResult = isGenerator ? parseJson(row.taskResult) : null;
+      const generatorKeys = Array.isArray(generatorResult?.resultKeys)
+        ? generatorResult.resultKeys.filter((key: unknown): key is string => typeof key === 'string')
+        : [];
+      const generatorResultUrls = isGenerator && row.status === 'completed'
+        ? generatorKeys.map((_: string, index: number) =>
+            `/api/generator/result/${encodeURIComponent(row.id)}?index=${index}`)
+        : [];
       const generatorParams = isGenerator ? options?.params : null;
       const mode = isGenerator && typeof options?.workflow === 'string'
         ? options.workflow
@@ -140,6 +148,7 @@ async function GET({ request }: { request: Request }) {
             ? generatorParams.duration
             : typeof options?.duration === 'number' ? options.duration : null,
         costCredits: row.costCredits,
+        resultUrls: generatorResultUrls,
         sourceVideoUrl: hasSourceVideo
           ? `${mediaBase}/source/${encodeURIComponent(row.id)}`
           : null,
