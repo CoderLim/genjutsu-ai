@@ -20,6 +20,7 @@ import {
   type Workflow,
 } from '@/modules/generator/types';
 import { assertGeneratorReady } from '@/modules/generator/validation';
+import { referenceVideoBillableSeconds, assertReferenceAudioDuration } from '@/modules/generator/reference-metadata';
 import { MediaUploader } from './MediaUploader';
 
 const FIELD_ORDER = [
@@ -77,6 +78,39 @@ function slotUrls(inputs: GeneratorInputs, slot: MediaSlot): string[] {
     : Array.isArray(value) ? value : [];
 }
 
+/** Browser metadata is for instant quote only; server rechecks sealed inputs. */
+function mediaDurationFromBlobUrl(url: string, slot: MediaSlot): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const element = document.createElement(slot === 'referenceVideos' ? 'video' : 'audio');
+    element.preload = 'metadata';
+    let settled = false;
+    const cleanup = () => {
+      element.removeAttribute('src');
+      element.load();
+      clearTimeout(timer);
+    };
+    const success = () => {
+      if (settled) return;
+      settled = true;
+      const seconds = element.duration;
+      cleanup();
+      if (Number.isFinite(seconds) && seconds > 0) resolve(seconds);
+      else reject(new Error('Unable to read media duration; use MP4, MOV, WAV or M4A'));
+    };
+    const failure = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(new Error('Unable to read media duration; use MP4, MOV, WAV or M4A'));
+    };
+    const timer = setTimeout(failure, 12000);
+    element.addEventListener('loadedmetadata', success, { once: true });
+    element.addEventListener('error', failure, { once: true });
+    element.src = url;
+    element.load();
+  });
+}
+
 export function GeneratorForm({
   mediaType,
   initialModelId,
@@ -100,6 +134,9 @@ export function GeneratorForm({
   const [pageError, setPageError] = useState('');
   const [busy, setBusy] = useState(false);
   const [stage, setStage] = useState('');
+  const [mediaBusy, setMediaBusy] = useState(false);
+  const mediaReadLock = useRef(false);
+  const mediaDurations = useRef(new Map<string, number>());
   const [job, setJob] = useState<JobInfo | null>(null);
   const [priceChange, setPriceChange] = useState<PriceChange | null>(null);
   const [retryAttempt, setRetryAttempt] = useState<PriceChange | null>(null);
@@ -126,6 +163,7 @@ export function GeneratorForm({
       if (!referenced.has(url)) {
         URL.revokeObjectURL(url);
         localFiles.current.delete(url);
+        mediaDurations.current.delete(url);
       }
     }
   }, [draft]);
@@ -133,6 +171,7 @@ export function GeneratorForm({
   useEffect(() => () => {
     for (const url of localFiles.current.keys()) URL.revokeObjectURL(url);
     localFiles.current.clear();
+    mediaDurations.current.clear();
   }, []);
 
   const spec = model && form ? getWorkflowSpec(model, form.workflow) : null;
@@ -164,15 +203,27 @@ export function GeneratorForm({
     return () => { canceled = true; clearInterval(handle); };
   }, [job?.generationId, job?.status]);
 
+  function syncReferenceQuote(next: GeneratorState, target: GeneratorModel): GeneratorState {
+    if (!target.workflows[next.workflow]?.fields.inputVideoSeconds) return next;
+    const durations = next.inputs.referenceVideos.map(url => {
+      const seconds = mediaDurations.current.get(url);
+      if (seconds === undefined) throw new Error('Missing reference video duration');
+      return seconds;
+    });
+    const billable = referenceVideoBillableSeconds(durations);
+    return updateGeneratorState(next, target, { params: { inputVideoSeconds: billable } });
+  }
+
   function mutate(
     patch: Partial<Omit<GeneratorState, 'modelId' | 'mediaType'>>,
     nextModel?: GeneratorModel
   ) {
+    if (busy || mediaReadLock.current || submitLock.current) return;
     setPageError('');
     setPriceChange(null);
     setRetryAttempt(null);
     setDraft(prev => prev && (nextModel ?? model)
-      ? updateGeneratorState(prev, nextModel ?? model!, patch)
+      ? syncReferenceQuote(updateGeneratorState(prev, nextModel ?? model!, patch), nextModel ?? model!)
       : prev
     );
   }
@@ -187,6 +238,7 @@ export function GeneratorForm({
   }
 
   function setModel(modelId: string) {
+    if (busy || mediaReadLock.current || submitLock.current) return;
     const next = models.find(item => item.id === modelId);
     if (!next) return;
     setUploadError('');
@@ -194,13 +246,13 @@ export function GeneratorForm({
     setPriceChange(null);
     setRetryAttempt(null);
     setDraft(prev => prev
-      ? normalizeGeneratorState(prev, next)
+      ? syncReferenceQuote(normalizeGeneratorState(prev, next), next)
       : createGeneratorState(next)
     );
   }
 
-  function onFiles(slot: MediaSlot, files: File[]) {
-    if (!spec || !form) return;
+  async function onFiles(slot: MediaSlot, files: File[]) {
+    if (!spec || !form || busy || mediaReadLock.current || submitLock.current) return;
     const rule = spec.slots[slot];
     if (!rule) return;
     const available = rule.max - slotUrls(form.inputs, slot).length;
@@ -215,25 +267,63 @@ export function GeneratorForm({
       return;
     }
 
-    const urls = accepted.map(file => {
-      const url = URL.createObjectURL(file);
-      localFiles.current.set(url, file);
-      return url;
-    });
-    setUploadError('');
-    setPageError('');
-    setPriceChange(null);
-    setRetryAttempt(null);
-    setDraft(prev => {
-      if (!prev) return null;
-      const inputs = { ...prev.inputs };
-      if (slot === 'startFrame' || slot === 'endFrame') {
-        inputs[slot] = urls[0] ?? null;
-      } else {
-        inputs[slot] = [...inputs[slot], ...urls];
+    mediaReadLock.current = true;
+    setMediaBusy(true);
+    const urls: string[] = [];
+    const durations = new Map<string, number>();
+    try {
+      for (const file of accepted) {
+        const url = URL.createObjectURL(file);
+        urls.push(url);
+        if (slot === 'referenceVideos' || slot === 'referenceAudio') {
+          const seconds = await mediaDurationFromBlobUrl(url, slot);
+          if ((rule.minSeconds !== undefined && seconds < rule.minSeconds) ||
+              (rule.maxSeconds !== undefined && seconds > rule.maxSeconds)) {
+            throw new Error('Reference media duration exceeds model limits');
+          }
+          durations.set(url, seconds);
+        }
       }
-      return updateGeneratorState(prev, model!, { inputs });
-    });
+      // Validate combined durations before adding the files to the form.
+      if (slot === 'referenceVideos') {
+        referenceVideoBillableSeconds([
+          ...form.inputs.referenceVideos.map(url => mediaDurations.current.get(url) ?? NaN),
+          ...urls.map(url => durations.get(url) ?? NaN),
+        ]);
+      }
+      if (slot === 'referenceAudio') {
+        assertReferenceAudioDuration([
+          ...form.inputs.referenceAudio.map(url => mediaDurations.current.get(url) ?? NaN),
+          ...urls.map(url => durations.get(url) ?? NaN),
+        ]);
+      }
+      for (let i = 0; i < urls.length; i++) {
+        localFiles.current.set(urls[i], accepted[i]);
+        if (durations.has(urls[i])) {
+          mediaDurations.current.set(urls[i], durations.get(urls[i])!);
+        }
+      }
+      setUploadError('');
+      setPageError('');
+      setPriceChange(null);
+      setRetryAttempt(null);
+      setDraft(prev => {
+        if (!prev) return null;
+        const inputs = { ...prev.inputs };
+        if (slot === 'startFrame' || slot === 'endFrame') {
+          inputs[slot] = urls[0] ?? null;
+        } else {
+          inputs[slot] = [...inputs[slot], ...urls];
+        }
+        return syncReferenceQuote(updateGeneratorState(prev, model!, { inputs }), model!);
+      });
+    } catch (error) {
+      for (const url of urls) URL.revokeObjectURL(url);
+      setUploadError(error instanceof Error ? error.message : 'Could not read the uploaded media');
+    } finally {
+      mediaReadLock.current = false;
+      setMediaBusy(false);
+    }
   }
 
   function removeFile(slot: MediaSlot, url: string) {
@@ -318,7 +408,7 @@ export function GeneratorForm({
   }
 
   async function onGenerate() {
-    if (!form || !model || !quote || busy || submitLock.current) return;
+    if (!form || !model || !quote || busy || mediaBusy || submitLock.current) return;
     try {
       assertGeneratorReady(form, model);
     } catch (error) {
@@ -401,7 +491,7 @@ export function GeneratorForm({
     );
   }
 
-  const canSubmit = model.enabled && !!form.prompt.trim() && !!quote && !busy;
+  const canSubmit = model.enabled && !!form.prompt.trim() && !!quote && !busy && !mediaBusy;
   return (
     <section className="bg-card rounded-2xl border p-4 sm:p-6">
       <nav aria-label="Generator type" className="mb-5 flex gap-2">
@@ -447,6 +537,7 @@ export function GeneratorForm({
               />
             );
           })}
+          {mediaBusy ? <p className="text-muted-foreground text-xs">Reading media duration for accurate credits...</p> : null}
           {uploadError ? <p role="alert" className="text-destructive text-xs">{uploadError}</p> : null}
 
           <div className="space-y-2">
