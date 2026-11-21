@@ -19,6 +19,7 @@ import {
   Clock3,
   LayoutGrid,
   Monitor,
+  Sparkles,
 } from 'lucide-react';
 
 import type {
@@ -148,6 +149,11 @@ function AspectRatioGlyph({
   ratio: string;
   active: boolean;
 }) {
+  if (ratio === 'auto') {
+    return <Sparkles aria-hidden="true" className={cn(
+      'size-4', active ? 'text-[rgb(18,15,16)]' : 'text-[rgba(18,15,16,0.45)]'
+    )} />;
+  }
   const [w, h] = ratio.split(':').map(Number);
   const safeW = Number.isFinite(w) && w > 0 ? w : 1;
   const safeH = Number.isFinite(h) && h > 0 ? h : 1;
