@@ -298,6 +298,7 @@ export async function completeGeneratorTask(input: {
 export async function refundGeneratorTask(input: {
   userId: string; generationId: string;
   reason: string; providerStatus?: string;
+  allowedStatuses?: readonly (typeof REFUNDABLE)[number][];
 }) {
   const token = getUuid();
   return db().transaction(async (tx: any) => {
@@ -307,14 +308,17 @@ export async function refundGeneratorTask(input: {
     }).where(and(
       eq(aiTask.id, input.generationId), eq(aiTask.userId, input.userId),
       eq(aiTask.scene, GENERATOR_SCENE),
-      inArray(aiTask.status, [...REFUNDABLE])
+      inArray(aiTask.status, [...(input.allowedStatuses ?? REFUNDABLE)])
     ));
 
     const task = await getTaskFromTx(tx, input.generationId);
     if (task.status !== 'refunding' ||
         parseTaskJson(task.taskResult).refundClaim !== token) return null;
 
-    if (task.creditId && task.costCredits > 0) await revoke(task.creditId, tx);
+    if (task.creditId && task.costCredits > 0) {
+      const restored = await revoke(task.creditId, tx);
+      if (!restored) throw new Error('Unable to restore reserved generator credits');
+    }
     await tx.update(aiTask).set({
       status: 'refunded',
       taskResult: JSON.stringify({
@@ -357,6 +361,7 @@ export async function recoverStaleGeneratorTask(task: GeneratorTask) {
     return await refundGeneratorTask({
       generationId: task.id, userId: task.userId,
       reason: 'Generation was not submitted',
+      allowedStatuses: ['reserved'],
     });
   }
   if (task.status === 'submitting') {
