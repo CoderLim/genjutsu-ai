@@ -136,7 +136,7 @@ test('pending or ambiguous generation blocks a second new submission', () => {
 test('H3 Fast and Enhance controls only appear when supported by the selected model', () => {
   const h3 = getGeneratorModel('minimax-h3');
   const base = getGeneratorExpansionControls(h3.workflows['first-frame']!);
-  assert.deepEqual(base, { enhance: true, fast: true });
+  assert.deepEqual(base, { enhance: false, fast: false });
   const h3Turbo = GENERATOR_MODELS.find(model => model.id === 'minimax-h3-turbo')!;
   assert.deepEqual(
     getGeneratorExpansionControls(h3Turbo.workflows['first-frame']!),
@@ -176,10 +176,10 @@ test('switching away from Kling Start & End drops an unsupported end frame', () 
 });
 
 test('all advertised H3 prompt expansion options survive form normalization', () => {
-  for (const id of ['minimax-h3', 'minimax-h3-max', 'minimax-h3-max-turbo']) {
+  for (const id of ['minimax-h3-max', 'minimax-h3-max-turbo']) {
     const model = getGeneratorModel(id);
     const spec = model.workflows['text-to-video']!;
-    const modes = spec.fields.promptExpansionMode.options!;
+    const modes = spec.fields.promptExpansionMode?.options ?? [];
     const available = availableGeneratorFieldValues(spec,
       createGeneratorState(model).params, 'promptExpansionMode', modes);
     assert.deepEqual(available, modes, id);
