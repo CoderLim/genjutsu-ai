@@ -125,12 +125,24 @@ const MINIMAX_IMAGE_FIELDS: Record<string, FieldSpec> = {
 };
 
 function minimaxImage(id: string, name: string): GeneratorModel {
+  // Fixed customer credit tiers. Fal bills actual text+image tokens, so a
+  // per-reference surcharge gives room for up to 16 large input images.
+  const highspeed = id.endsWith('highspeed');
   return {
-    id, name, mediaType: 'image', enabled: false,
+    id, name, mediaType: 'image', enabled: true,
     defaultWorkflow: 'text-to-image',
     pricing: {
-      version: 'pending-fal-image-billing-2026-11',
-      precision: 'estimate', rule: { kind: 'fixed', credits: 0 },
+      version: highspeed ? '2026-11-21-h3-image-highspeed-v1' : '2026-11-21-h3-image-v1',
+      precision: 'exact',
+      rule: {
+        kind: 'matrix',
+        fields: ['resolution'],
+        creditsByCombination: highspeed
+          ? { '1K': 12, '2K': 18, '4K': 42 }
+          : { '1K': 8, '2K': 12, '4K': 24 },
+      },
+      includedReferenceImages: 1,
+      extraReferenceImageCredits: highspeed ? 8 : 5,
     },
     workflows: {
       'text-to-image': {
