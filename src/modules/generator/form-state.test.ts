@@ -345,3 +345,23 @@ test('image composer keeps an optional reference upload and updates quote withou
   assert.equal(schnell.workflows['image-to-image'], undefined);
   assert.equal(schnell.workflows['text-to-image']!.slots.referenceImages, undefined);
 });
+
+test('switching between reference-capable image models keeps uploads without opening edit mode', () => {
+  const nano = getGeneratorModel('nano-banana-2');
+  const minimax = getGeneratorModel('minimax-h3-image');
+  const flash = getGeneratorModel('image-edit-standard');
+  const from = updateGeneratorState(createGeneratorState(nano), nano, {
+    prompt: 'Turn this into a watercolor',
+    inputs: { ...createGeneratorState(nano).inputs,
+      referenceImages: ['photo-1', 'photo-2'] },
+  });
+  const next = normalizeGeneratorState(from, minimax, minimax.defaultWorkflow);
+  assert.equal(next.workflow, 'text-to-image');
+  assert.deepEqual(next.inputs.referenceImages, ['photo-1', 'photo-2']);
+  const flux = normalizeGeneratorState(next, flash, flash.defaultWorkflow);
+  assert.equal(flux.workflow, 'text-to-image');
+  assert.deepEqual(flux.inputs.referenceImages, ['photo-1', 'photo-2']);
+  const schnell = getGeneratorModel('text-to-image-fast');
+  assert.deepEqual(normalizeGeneratorState(flux, schnell, schnell.defaultWorkflow)
+    .inputs.referenceImages, []);
+});
