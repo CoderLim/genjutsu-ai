@@ -26,7 +26,7 @@ export function calculateGeneratorCredits(
   const pricing = model.pricing;
   const params = state.params;
   const count = params.outputCount ?? 1;
-  if (!Number.isInteger(count) || typeof count !== 'number' || count < 1) {
+  if (typeof count !== 'number' || !Number.isInteger(count) || count < 1) {
     throw new Error('Invalid output count');
   }
 
