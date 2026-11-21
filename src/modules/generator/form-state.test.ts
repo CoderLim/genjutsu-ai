@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import {
   availableGeneratorFieldValues,
+  filterGeneratorLocalMedia,
   generatorReadinessError,
   getGeneratorExpansionControls,
   getGeneratorSlotCapacity,
@@ -258,4 +259,54 @@ test('image model forms have consistent text/edit modes, reference limits and fo
   const lite = getGeneratorModel('nano-banana-2-lite');
   assert.deepEqual(lite.workflows['text-to-image']!.fields.resolution.options, ['1K']);
   assert.deepEqual(lite.workflows['image-to-image']!.fields.resolution.options, ['1K']);
+});
+
+test('switching from WebP Seedance frame to JPEG/PNG-only Kling Turbo removes the file', () => {
+  const seedance = getGeneratorModel('photo-to-video-standard');
+  const turbo = getGeneratorModel('kling-3-turbo');
+  const first = updateGeneratorState(createGeneratorState(seedance), seedance, {
+    inputs: { ...createGeneratorState(seedance).inputs, startFrame: 'blob:webp' },
+    prompt: 'Animate this scene',
+  });
+  const local = new Map([
+    ['blob:webp', { type: 'image/webp', size: 30_000 }],
+  ]);
+  const switched = normalizeGeneratorState(first, turbo);
+  assert.equal(switched.inputs.startFrame, 'blob:webp');
+  const clean = filterGeneratorLocalMedia(switched, turbo, url => local.get(url));
+  assert.equal(clean.inputs.startFrame, null);
+  assert.match(generatorReadinessError(clean, turbo) ?? '', /startFrame/);
+
+  const png = new Map([['blob:png', { type: 'image/png', size: 40_000 }]]);
+  const valid = updateGeneratorState(first, seedance, {
+    inputs: { ...first.inputs, startFrame: 'blob:png' },
+  });
+  assert.equal(filterGeneratorLocalMedia(
+    normalizeGeneratorState(valid, turbo), turbo, url => png.get(url)
+  ).inputs.startFrame, 'blob:png');
+});
+
+test('model or workflow changes remove oversize, missing and unsupported reference files', () => {
+  const nano = getGeneratorModel('nano-banana-2');
+  const edit = updateGeneratorState(createGeneratorState(nano), nano, {
+    workflow: 'image-to-image',
+    inputs: {
+      ...createGeneratorState(nano).inputs,
+      referenceImages: ['good', 'oversized', 'wrong-mime', 'missing'],
+    },
+  });
+  const files = new Map([
+    ['good', { type: 'image/jpeg', size: 200_000 }],
+    ['oversized', { type: 'image/jpeg', size: 13 * 1048576 }],
+    ['wrong-mime', { type: 'video/mp4', size: 100_000 }],
+  ]);
+  const filtered = filterGeneratorLocalMedia(edit, nano, url => files.get(url));
+  assert.deepEqual(filtered.inputs.referenceImages, ['good']);
+  assert.equal(generatorReadinessError({
+    ...filtered, prompt: 'Change background to a forest',
+  }, nano), null);
+
+  const text = normalizeGeneratorState(filtered, nano, 'text-to-image');
+  assert.deepEqual(filterGeneratorLocalMedia(text, nano, url => files.get(url))
+    .inputs.referenceImages, []);
 });
