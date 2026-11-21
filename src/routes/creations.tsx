@@ -37,6 +37,7 @@ type LiveSessionHistory = {
 interface Generation {
   id: string;
   scene: string;
+  mediaType?: 'image' | 'video';
   prompt: string;
   status: string;
   mode: string | null;
@@ -86,6 +87,9 @@ function isProcessingStatus(status: string) {
 }
 
 function statusPathFor(generation: Pick<Generation, 'id' | 'scene'>) {
+  if (generation.scene === 'generic-generator') {
+    return `/api/generator/status?generationId=${encodeURIComponent(generation.id)}`;
+  }
   if (generation.scene === 'hotel-lobby') {
     return `/api/hotel-lobby/status?generationId=${encodeURIComponent(generation.id)}`;
   }
@@ -96,6 +100,7 @@ function statusPathFor(generation: Pick<Generation, 'id' | 'scene'>) {
 }
 
 function sceneLabel(generation: Pick<Generation, 'scene' | 'mode'>) {
+  if (generation.scene === 'generic-generator') return 'AI Generator';
   if (generation.scene === 'hotel-lobby') {
     return generation.mode || m['creations.scene.hotel_lobby']();
   }
@@ -296,7 +301,11 @@ function GenerationCard({
   return (
     <Card className="overflow-hidden py-0">
       <div className="bg-muted relative aspect-video overflow-hidden">
-        {completed && sourceUrl && resultUrl ? (
+        {completed && generation.mediaType === 'image' && resultUrl ? (
+          <a href={resultUrl} target="_blank" rel="noopener noreferrer" className="block size-full" aria-label="View generated image">
+            <img src={resultUrl} alt={generation.prompt || 'Generated image'} className="size-full object-contain" />
+          </a>
+        ) : completed && sourceUrl && resultUrl ? (
           <div className="grid size-full grid-cols-2">
             <VideoThumb
               src={sourceUrl}
@@ -397,7 +406,10 @@ function GenerationCard({
         </div>
 
         <div className="flex gap-2">
-          {completed && resultUrl ? (
+          {completed && resultUrl && generation.mediaType === 'image' ? (
+            <a href={resultUrl} target="_blank" rel="noopener noreferrer"
+              className={buttonVariants({ variant: 'outline' })}>View Image</a>
+          ) : completed && resultUrl ? (
             <Button
               variant="outline"
               onClick={() =>
