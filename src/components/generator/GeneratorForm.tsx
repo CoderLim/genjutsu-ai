@@ -918,7 +918,7 @@ export function GeneratorForm({
         <div className="mt-1.5 flex flex-col gap-2 px-1 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 sm:gap-2">
             <ComposerToolbar
-              models={allModels}
+              models={allModels.filter(item => item.mediaType === mediaType)}
               model={model}
               workflow={form.workflow}
               params={form.params}

@@ -256,7 +256,7 @@ export const GENERATOR_MODELS: readonly GeneratorModel[] = [
   },
   {
     id: 'text-to-image-fast',
-    name: 'Text to Image · Fast',
+    name: 'FLUX.1 Schnell',
     mediaType: 'image',
     enabled: true,
     defaultWorkflow: 'text-to-image',
@@ -273,7 +273,7 @@ export const GENERATOR_MODELS: readonly GeneratorModel[] = [
   },
   {
     id: 'image-edit-standard',
-    name: 'Image Editor · Standard',
+    name: 'FLUX.2 Flash',
     mediaType: 'image',
     enabled: true,
     defaultWorkflow: 'image-to-image',

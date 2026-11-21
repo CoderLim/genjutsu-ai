@@ -15,14 +15,15 @@ import { calculateGeneratorCredits } from './pricing';
 
 test('model chooser lists Seedance and Nano Banana, not workflow categories', () => {
   const groups = groupGeneratorModels(listGeneratorModels());
-  assert.deepEqual(groups.map(g => g.label), ['Seedance', 'Nano Banana', 'Image Tools']);
+  assert.deepEqual(groups.map(g => g.label), ['Seedance', 'Nano Banana', 'FLUX']);
   assert.deepEqual(groups[0].models.map(m => m.id), [
     'photo-to-video-standard', 'text-to-video-standard',
     'multi-image-to-video', 'all-in-one-video',
   ]);
   assert.deepEqual(groups[1].models.map(m => m.id), ['nano-banana-2', 'nano-banana-pro']);
   assert.equal(getGeneratorModelFamilyId('nano-banana-pro'), 'nano-banana');
-  assert.equal(groupGeneratorModels(GENERATOR_MODELS).at(-1)?.id, 'video-preview');
+  assert.equal(getGeneratorModelFamilyId('reference-to-video-pro'), 'minimax');
+  assert.equal(getGeneratorModelFamilyId('image-edit-standard'), 'flux');
 });
 
 test('changing Nano Banana version keeps image edit workflow and reference photos', () => {
@@ -65,8 +66,8 @@ test('model menu contains one Seedance 2.0 item and no workflow or resolution me
     'Seedance 2.0',
     'Nano Banana 2',
     'Nano Banana Pro',
-    'Text to Image · Fast',
-    'Image Editor · Standard',
+    'FLUX.1 Schnell',
+    'FLUX.2 Flash',
   ]);
   const selectedTextVideo = getGeneratorModel('text-to-video-standard');
   const seedance = getGeneratorModel('photo-to-video-standard');
@@ -110,4 +111,45 @@ test('Nano Banana model choices keep image generation/editing workflow separate'
   const choices = getGeneratorWorkflowChoices(models, nano);
   assert.deepEqual(choices.map(item => item.label), ['Text to Image', 'Image Edit']);
   assert.ok(choices.every(item => item.modelId === 'nano-banana-2'));
+});
+
+
+test('video tab shows actual enabled video model families only', () => {
+  const allModels = GENERATOR_MODELS;
+  const models = getGeneratorModelChoices(
+    allModels.filter(model => model.mediaType === 'video')
+  );
+  const groups = groupGeneratorModels(models);
+  assert.deepEqual(groups.map(group => group.label), ['Seedance']);
+  assert.deepEqual(models.map(generatorModelLabel), ['Seedance 2.0']);
+  // The H3 preview has unverified pricing, so it is not selectable in DEV.
+  assert.ok(!models.some(model => model.id === 'reference-to-video-pro'));
+  const workflowChoices = getGeneratorWorkflowChoices(allModels, models[0]);
+  assert.deepEqual(workflowChoices.map(item => item.label), [
+    'First Frame', 'Start & End', 'Text to Video', 'Multi-Image', 'All-in-One',
+  ]);
+});
+
+test('image tab lists Nano Banana and real FLUX models, not feature labels', () => {
+  const models = getGeneratorModelChoices(
+    GENERATOR_MODELS.filter(model => model.mediaType === 'image')
+  );
+  const groups = groupGeneratorModels(models);
+  assert.deepEqual(groups.map(group => group.label), ['Nano Banana', 'FLUX']);
+  assert.deepEqual(groups.map(group => group.models.map(generatorModelLabel)), [
+    ['Nano Banana 2', 'Nano Banana Pro'],
+    ['FLUX.1 Schnell', 'FLUX.2 Flash'],
+  ]);
+  assert.equal(models.every(model => model.mediaType === 'image'), true);
+  assert.equal(models.every(model => model.enabled), true);
+});
+
+test('future enabled MiniMax model appears under its real brand only', () => {
+  const h3 = GENERATOR_MODELS.find(model =>
+    model.id === 'reference-to-video-pro'
+  )!;
+  const families = groupGeneratorModels(
+    getGeneratorModelChoices([{ ...h3, enabled: true }])
+  );
+  assert.deepEqual(families.map(group => group.label), ['MiniMax']);
 });

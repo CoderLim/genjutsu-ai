@@ -18,8 +18,11 @@ export function getGeneratorModelFamilyId(modelId: string): string {
     modelId === 'multi-image-to-video' ||
     modelId === 'all-in-one-video'
   ) return 'seedance';
-  if (modelId === 'reference-to-video-pro') return 'video-preview';
-  return 'image-tools';
+  if (modelId === 'reference-to-video-pro') return 'minimax';
+  if (modelId === 'text-to-image-fast' || modelId === 'image-edit-standard')
+    return 'flux';
+  // Future models should never be mislabeled as a generic tool category.
+  return modelId;
 }
 
 const FAMILIES: Record<string, Pick<GeneratorModelFamily, 'label' | 'blurb' | 'badge'>> = {
@@ -31,17 +34,17 @@ const FAMILIES: Record<string, Pick<GeneratorModelFamily, 'label' | 'blurb' | 'b
     label: 'Nano Banana',
     blurb: 'Nano Banana 2 & Pro · Images',
   },
-  'image-tools': {
-    label: 'Image Tools',
-    blurb: 'Additional image models',
+  flux: {
+    label: 'FLUX',
+    blurb: 'FLUX.1 / FLUX.2',
   },
-  'video-preview': {
-    label: 'Video Preview',
-    blurb: 'Models under evaluation',
+  minimax: {
+    label: 'MiniMax',
+    blurb: 'MiniMax video models',
   },
 };
 
-const ORDER = ['seedance', 'nano-banana', 'image-tools', 'video-preview'];
+const ORDER = ['seedance', 'nano-banana', 'flux', 'minimax'];
 
 export function groupGeneratorModels(models: readonly GeneratorModel[]): GeneratorModelFamily[] {
   const map = new Map<string, GeneratorModel[]>();
@@ -54,7 +57,10 @@ export function groupGeneratorModels(models: readonly GeneratorModel[]): Generat
   return [...map.entries()]
     .sort(([a], [b]) => ORDER.indexOf(a) - ORDER.indexOf(b))
     .map(([id, familyModels]) => ({
-      id, ...(FAMILIES[id] ?? { label: 'Other Models', blurb: 'Available models' }),
+      id, ...(FAMILIES[id] ?? {
+        label: familyModels[0]?.name ?? id,
+        blurb: '',
+      }),
       models: familyModels,
     }));
 }
@@ -74,9 +80,16 @@ export type GeneratorWorkflowChoice = {
 export function getGeneratorModelChoices(
   models: readonly GeneratorModel[]
 ): GeneratorModel[] {
-  const seedance = models.filter(model => getGeneratorModelFamilyId(model.id) === 'seedance');
-  const representative = seedance.find(model => model.id === 'photo-to-video-standard') ?? seedance[0];
-  return models.filter(model =>
+  // An unverified/disabled model must not appear in either image or video
+  // selection, even when the form runs in development mode.
+  const enabledModels = models.filter(model => model.enabled);
+  const seedance = enabledModels.filter(
+    model => getGeneratorModelFamilyId(model.id) === 'seedance'
+  );
+  const representative = seedance.find(
+    model => model.id === 'photo-to-video-standard'
+  ) ?? seedance[0];
+  return enabledModels.filter(model =>
     getGeneratorModelFamilyId(model.id) !== 'seedance' ||
     model.id === representative?.id
   );
