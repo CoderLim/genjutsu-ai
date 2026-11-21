@@ -174,9 +174,10 @@ test('multi-image reference charges output seconds only and truncates extra phot
 test('reference video input charges input+output using provider-specific tariff', () => {
   const model = getGeneratorModel('all-in-one-video');
   const defaultDraft = createGeneratorState(model);
-  assert.throws(() => assertGeneratorReady({
+  // All-in-One accepts zero assets and routes to text-to-video.
+  assert.doesNotThrow(() => assertGeneratorReady({
     ...defaultDraft, prompt: 'Generate a running scene',
-  }, model), /At least one reference/);
+  }, model));
 
   const photos = updateGeneratorState(defaultDraft, model, {
     inputs: { ...defaultDraft.inputs, referenceImages: ['image-a'] },
