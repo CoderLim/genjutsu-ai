@@ -1,7 +1,7 @@
 # Unified AI Image / Video Generator — 技术设计与实施方案
 
 > Date: 2026-11-20  
-> Status: **Design approved for implementation; NOT implemented**  
+> Status: **Design approved for implementation; NOT implemented** (updated 2026-11-21: separate generation pipeline)  
 > Scope: Genjutsu AI 的新通用 AI Video Generator 和 AI Image Generator 内页  
 > Target: `main` 分支后续实施；本文仅是设计，不代表 API / 模型已可用。
 
@@ -13,7 +13,7 @@
 4. **积分与当前表单参数组合挂钩**：模型、模式、分辨率、时长、输出张数/条数、音频、参考素材数、质量/快速档等；并非每个字段对所有模型都收费。
 5. **前端本地即时计算**：普通表单切换不会调用报价 API；前后端共享确定性的价格规则。后端仍独立校验并最终计费。
 6. **移动端纵向平铺**：素材 → Prompt → Model → 参数项 → Generate；不是桌面紧凑工具栏里的多层弹窗。桌面保留紧凑 Composer 方向，二者共用状态和组件。
-7. **先做新内页，不改历史模板**：旧 `GeneratorPanel`、`image-to-video`、`hotel-lobby`、`h3-lab` 与已发布内页的生成行为不受本期变更影响。无需一开始就大规模迁移。
+7. **独立的新业务链路**：新 `/api/generator/*` + `src/modules/generator/*` 独立拥有生成任务编排、状态、适配器、上传封存、计费与恢复；不调用现有 `/api/genjutsu/*` 或 `src/modules/genjutsu/*` 业务流程。旧 `GeneratorPanel`、`image-to-video`、`hotel-lobby`、`h3-lab` 与已发布内页保持原样。
 
 ### 明确不做
 
@@ -23,18 +23,62 @@
 - 不直接向用户承诺所有模型都能做同一种模式；展示与 API 能力必须逐一核实。
 - 不在本次设计文档提交中修改业务代码、部署、修改支付配置或数据库。
 
+
+## 0.1 架构隔离：新生成器 ≠ Genjutsu API 扩展（2026-11-21 澄清）
+
+**“Genjutsu AI” 是网站/仓库名称；`genjutsu` 也是已有特定视频业务模块。新的通用 Image/Video Generator 是另一套业务系统，不因同在一个站点就复用旧 Genjutsu 生成入口。**
+
+~~~text
+旧链路（保持不变）：
+  老模板 / 首页 GeneratorPanel
+    -> /api/genjutsu/{attempt,upload-url,seal-inputs,generate,status,...}
+    -> src/modules/genjutsu/{workflow,billing,service,storage,...}
+    -> 旧业务专属 provider/model/template 流程
+
+新链路（独立实现）：
+  /ai-image-generator + /ai-video-generator
+    -> /api/generator/{models,upload-url,generate,status,result,...}
+    -> src/modules/generator/{registry,normalize,pricing,validation,storage,billing,service}
+    -> 新 GeneratorProviderAdapter (Fal / WaveSpeed / future)
+    -> 新 generation task、webhook/cron/reconcile、R2 result
+
+共用基础设施（不共用旧业务编排）：
+  Auth / Credits wallet & payments / DB connection & aiTask table / R2 client
+  / logging & rate limit / generic AI provider transport / My Creations entry
+~~~
+
+| 必须是新 generator 自己的业务模块 | 可以共用的基础设施 |
+| --- | --- |
+| model registry、workflow 能力、参数映射 | `core/auth` 账户会话 |
+| `/api/generator/*` API、上传签名/输入封存与任务查询 | `core/storage` / R2 底层客户端与 logical-key 解析函数 |
+| generator 的任务状态机、幂等 claim、提交/恢复/退款编排 | `modules/credits` 钱包扣减/撤销原语（非旧业务 `reserveGenjutsuCredits`） |
+| generator 的积分费率、表单合法性、模型 feature flags | `aiTask` 表和数据库连接（`scene = 'generic-generator'`） |
+| generator 自己的 provider adapters、webhook/定时补偿 | `core/ai` 中稳定、无旧业务语义的 SDK/HTTP transport |
+| generator 自己的任务结果持久化与 API response | `My Creations` 查询展示入口（要扩展新 scene） |
+
+禁止依赖：
+
+- 新页面/新 API **不得调用** `/api/genjutsu/*`、`/api/image-to-video/*`、`/api/h3-lab/*`、`/api/hotel-lobby/*` 等旧业务生成接口，也不把旧业务路由改成新系统的统一代理。
+- 新的 `modules/generator` 不调用或 import **旧业务任务编排函数**，例如 `createGenjutsuAttempt`、`reserveGenjutsuCredits`、`submitImageToVideo`、`claimHotelLobbySubmission`；旧业务状态机和参数约定仅作设计参考。
+- 新功能不依赖 `GENJUTSU_*` env/model/profile 路由、旧模板 allowlist、历史任务的 provider binding 或提示词绑定；使用独立 `GENERATOR_*` 配置、新 registry。
+- 即使新旧链路调用同一家供应商或 SDK，也保持独立 adapter、任务 ID 绑定、回调路由、恢复任务与计费快照。**新 webhook/cron 不处理旧 scene；旧任务恢复也不能接管新任务。**
+- 共用余额和数据库表是**基础资源共用**，不是共用旧业务 Service。积分流水记录新 generator scene + generationId，并且仅退回自身预扣；任务/结果查询按 userId + scene 隔离。
+- 可以抽取完全无业务语义的公共纯函数/低层库（如文件签名、图片预处理、R2 key utils、金额舍入），但不得为了“复用”直接依赖旧 `genjutsu/*/billing.ts`、`service.ts` 或包含旧模板语义的 helper。
+
+**独立性验收**：静态依赖检查加完整生成/失败/退款/定时补偿测试，确保新 API 和 `src/modules/generator` 不 import 旧业务 service/billing/workflow，不调用旧路由，且旧 API 契约与任务数据不变。
+
 ## 1. 仓库现状与复用边界（对照 2026-11-20 main）
 
 - 技术栈：TanStack Start、React 19、TypeScript、Tailwind、TanStack Query；组件层应沿用现有 UI 风格和 `@/lib/api-client`。
 - `src/components/landing/ModelPicker.tsx` 已有图片和视频模型列表与选型 UI，但组件内的部分展示信息是静态目录，**不等于对应模型已经真实接通后端**。需要拆分为“可用的模型注册表”和“展示内容”。
 - `src/components/landing/GeneratorPanel.tsx` 已实现上传、积分预估、任务恢复与轮询；抽取稳定能力，不要把整段页面代码挪到新组件。
-- `src/modules/image-to-video/*`：已有预扣、提交、状态轮询、`submission_unknown`、最终结果入 R2 和失败退款的实现，适合参考其幂等与恢复语义。
-- `src/modules/hotel-lobby/pricing.ts`、`service.ts` 与 `src/routes/api/h3-lab/*`：现有 `minimax/h3/reference-to-video` 支持 1 个参考视频及 1–9 张参考图片，代码限定时长 5–15 秒，并有独立价格公式；**这不是竞品所称 All-in-One Reference 的等价证明**。通用生成页只有在模型 endpoint 核实支持对应 workflow 后才开放。
-- `src/modules/genjutsu/model-config.ts`：Standard/Light 共用同一 Higgsfield provider，model id 不同；新系统必须区分 UI modelId、provider 和真实 providerModelId。
-- `src/modules/genjutsu/pricing.ts`：现有 Higgsfield 正式扣费可能需要 `POST /estimate/<model>` 的实时上游报价。不能用前端静态估价覆盖这种动态价格逻辑。
+- `src/modules/image-to-video/*`：已有预扣、提交、状态轮询、`submission_unknown`、最终结果入 R2 和失败退款的实现，仅用于**参考设计/测试思路**，新 generator 不调用其业务 service/billing。
+- `src/modules/hotel-lobby/pricing.ts`、`service.ts` 与 `src/routes/api/h3-lab/*`：仅供研究已验证的 API 参数与计费思路，新 generator 不调用其业务流程。现有 `minimax/h3/reference-to-video` 支持 1 个参考视频及 1–9 张参考图片，代码限定时长 5–15 秒，并有独立价格公式；**这不是竞品所称 All-in-One Reference 的等价证明**。通用生成页只有在模型 endpoint 核实支持对应 workflow 后才开放。
+- `src/modules/genjutsu/model-config.ts`：Standard/Light 共用同一 Higgsfield provider，model id 不同；仅作模型标识设计参考。新系统有**自己的 registry 与路由**，不能读取旧产品 pin/env 作为模型选择来源。
+- `src/modules/genjutsu/pricing.ts`：仅用于识别动态报价场景，新 generator 使用独立 pricing，不调用旧 Genjutsu 业务计费函数。现有 Higgsfield 正式扣费可能需要 `POST /estimate/<model>` 的实时上游报价。不能用前端静态估价覆盖这种动态价格逻辑。
 - `src/lib/ai-credits.ts`：目前有成本转积分的公用逻辑（provider cost × 100 × 1.7 后向上取整）。**内部供应商成本/利润加成不应作为公开模型目录直接返回前端**；前端采用不泄露内部成本的用户积分费率表。
 - `src/config/db/schema.postgres.ts` 中 `aiTask` 已包含 `mediaType/provider/model/options/status/taskId/taskInfo/taskResult/costCredits/scene/creditId`。优先复用现有表与 `credits` 模块；若开发发现现有字段、并发 CAS/索引无法表达多结果父子任务，则单独审查 migration，不在 V1 无依据扩表。
-- `src/modules/genjutsu/prompt-safety.ts` 存在现有服务端提示词扫描；新生成器应复用既定安全策略/开关，不把内容扫描写成浏览器逻辑。
+- `src/modules/genjutsu/prompt-safety.ts` 存在旧业务提示词扫描；新生成器直接接入 `src/core/content-safety/*` 的通用扫描能力或提取独立、无旧业务依赖的 wrapper，并使用 generator 侧明确的策略，不调用旧模块业务入口。
 
 ## 2. 概念与边界
 
@@ -287,7 +331,7 @@ src/hooks/use-generator-form.ts
 | matrix | 特定组合 | rate[workflow][duration][resolution] |
 | custom | 少量不可归入以上的模型 | 具名、纯函数、独立测试 |
 
-保留经过验证的现有 `estimateImageToVideoCredits`、`estimateH3LabCredits` 等策略依据，但新通用生成器使用自己的用户公开费率投影与一致的舍入规则；切勿改动旧产品扣费结果。
+可以**参考**已有 `estimateImageToVideoCredits`、`estimateH3LabCredits` 的测试样例与价格边界，但新通用生成器实现自己的公开费率投影和共享纯函数计算；不要 import 旧业务 calculator，更不能改动旧产品扣费结果。
 
 ~~~typescript
 type CreditContext = {
@@ -484,11 +528,12 @@ src/
 - [ ] 任务成功后持久化 R2，My Creations 可查询；无权限用户不能读结果。
 - [ ] Prompt 扫描沿用现有服务端策略；相关异常不泄露用户上传素材/敏感凭据。
 - [ ] R2 logical key 不叠前缀；存储失败可恢复；旧任务和当前模板生产链路回归通过。
+- [ ] 新 generator 服务/接口没有任何旧业务生成 route、billing、service、workflow、provider-binding 的依赖；新 webhook 和 cron 只处理 `scene = 'generic-generator'`。
 - [ ] `pnpm test`、`pnpm build`、可用的 typecheck 与格式检查通过；真实供应商沙盒/小额测试验证成本与记录。
 
 ## 11. 上线与回滚
 
-- 新接口和路由独立实现，不修改旧 `/api/genjutsu/*`、`/api/image-to-video/*`、`/api/h3-lab/*` 的请求契约。
+- 新接口、业务 Service、状态机、Adapter、Webhook/cron/reconcile 全部独立实现；不调用或修改旧 `/api/genjutsu/*`、`/api/image-to-video/*`、`/api/h3-lab/*`、`/api/hotel-lobby/*` 的生成流程。
 - 公开模型默认少量、逐个 allowlist，未验证 endpoint 不展示、不路由；缺 API key 不启用。
 - 监控 task：提交成功率、`submission_unknown` 时长、退款重复/漏退、前后端定价不一致、上传失败、实际 provider 成本偏差。
 - 回滚先关闭新页入口与对应模型 feature flag，**不能停止已提交任务的 webhook/cron/reconcile/退款**。
