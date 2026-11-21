@@ -304,16 +304,90 @@ export async function signGeneratorReadUrl(key: string) {
   return signed.url;
 }
 
-function safeProviderUrl(value: string): string {
+const PROVIDER_MEDIA_HOSTS = [
+  'fal.media',
+  'fal.ai',
+  'wavespeed.ai',
+  'wavespeedai.com',
+  'storage.googleapis.com',
+];
+const MAX_RESULT_VIDEO_BYTES = 300 * 1024 * 1024;
+const MAX_RESULT_IMAGE_BYTES = 30 * 1024 * 1024;
+
+/** Provider output URLs are not user-submitted URLs; enforce known CDN hosts. */
+export function safeGeneratorProviderUrl(value: string): string {
   const url = new URL(value);
+  const host = url.hostname.toLowerCase();
   if (url.protocol !== 'https:' || url.username || url.password ||
-    url.hostname === 'localhost' || url.hostname.endsWith('.local') ||
-    url.hostname.endsWith('.internal') ||
-    /^(?:127|10|0|169\.254|192\.168)\./.test(url.hostname) ||
-    url.hostname === '::1' || url.hostname.startsWith('[')) {
-    throw new Error('Invalid provider result URL');
+      (url.port !== '' && url.port !== '443') ||
+      !PROVIDER_MEDIA_HOSTS.some(domain => host === domain || host.endsWith('.' + domain))) {
+    throw new Error('Untrusted provider output URL');
   }
   return url.toString();
+}
+
+async function fetchTrustedProviderOutput(value: string, hops = 0): Promise<Response> {
+  if (hops > 3) throw new Error('Too many provider media redirects');
+  const response = await fetch(safeGeneratorProviderUrl(value), { redirect: 'manual' });
+  if (response.status >= 300 && response.status <= 399) {
+    const location = response.headers.get('location');
+    await response.body?.cancel();
+    if (!location) throw new Error('Provider media redirect is missing Location');
+    return fetchTrustedProviderOutput(new URL(location, value).toString(), hops + 1);
+  }
+  if (!response.ok || !response.body) {
+    throw new Error('Provider media download failed: HTTP ' + response.status);
+  }
+  return response;
+}
+
+/**
+ * Stream a trusted upstream response into the R2 Worker binding, with an
+ * enforced byte ceiling even if the provider omits Content-Length. This avoids
+ * buffering a potentially large video into the 128MB Workers memory limit.
+ */
+async function saveProviderOutput(input: {
+  url: string; key: string; contentType: string; maxBytes: number;
+}) {
+  const response = await fetchTrustedProviderOutput(input.url);
+  const declaredSize = response.headers.get('content-length');
+  if (declaredSize && Number(declaredSize) > input.maxBytes) {
+    await response.body?.cancel();
+    throw new Error('Provider result exceeds maximum file size');
+  }
+  let received = 0;
+  const limited = response.body!.pipeThrough(
+    new TransformStream<Uint8Array, Uint8Array>({
+      transform(chunk, controller) {
+        received += chunk.byteLength;
+        if (received > input.maxBytes) {
+          controller.error(new Error('Provider media exceeds maximum file size'));
+          return;
+        }
+        controller.enqueue(chunk);
+      },
+    })
+  );
+  const binding = bucketBinding();
+  if (binding) {
+    const cfg = await config();
+    await binding.put(resolveR2ObjectKey(cfg.uploadPath, input.key), limited, {
+      httpMetadata: { contentType: input.contentType },
+    });
+    return;
+  }
+  // Node/local fallback only; Workers without R2 binding must not buffer media.
+  if ((globalThis as any).__CF_ENV__ || (globalThis as any).__env__) {
+    throw new Error('R2_BUCKET binding missing for output persistence');
+  }
+  const storage = await getStorage();
+  if (!storage) throw new Error('R2 storage unavailable');
+  const body = new Uint8Array(await new Response(limited).arrayBuffer());
+  const uploaded = await storage.uploadFile({
+    key: input.key, body, contentType: input.contentType,
+    disposition: 'inline',
+  });
+  if (!uploaded.success) throw new Error(uploaded.error || 'R2 media save failed');
 }
 
 /** Save immutable provider result in our bucket before marking completed. */
@@ -331,13 +405,12 @@ export async function persistGeneratorResults(input: {
         : input.contentType === 'image/webp' ? 'image/webp' : 'image/jpeg';
     const key = getGeneratorResultKey(input.userId, input.generationId, index, type);
     if (!(await storage.exists({ key }))) {
-      const response = await storage.downloadAndUpload({
-        url: safeProviderUrl(input.outputUrls[index]),
-        key,
+      await saveProviderOutput({
+        url: input.outputUrls[index], key,
         contentType: type,
-        disposition: 'inline',
+        maxBytes: input.mediaType === 'video'
+          ? MAX_RESULT_VIDEO_BYTES : MAX_RESULT_IMAGE_BYTES,
       });
-      if (!response.success) throw new Error(response.error || 'R2 result save failed');
     }
     keys.push(key);
   }
