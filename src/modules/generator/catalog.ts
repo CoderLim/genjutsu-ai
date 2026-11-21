@@ -67,6 +67,25 @@ export const GENERATOR_MODELS: readonly GeneratorModel[] = [
     },
   },
   {
+    id: 'seedance-2-t2v',
+    name: 'Seedance 2.0 · Text to Video',
+    mediaType: 'video', providerName: 'WaveSpeed',
+    enabled: true,
+    defaultWorkflow: 'text-to-video',
+    pricing: {
+      version: '2026-11-21-v1',
+      precision: 'exact',
+      rule: { kind: 'per-second', rates: VIDEO_RATES },
+    },
+    workflows: {
+      'text-to-video': {
+        label: 'Text to Video',
+        slots: {},
+        fields: { ...baseVideoFields },
+      },
+    },
+  },
+  {
     id: 'seedance-2-reference',
     name: 'Seedance 2.0 · All-in-One',
     mediaType: 'video', providerName: 'WaveSpeed',

@@ -65,3 +65,19 @@ test('H3 video reference request is distinct from all-in-one workflow', () => {
     providerModelId: 'minimax/h3/reference-to-video',
   });
 });
+
+test('text-to-video sends no image field to WaveSpeed', () => {
+  const model = getGeneratorModel('seedance-2-t2v');
+  const state = updateGeneratorState(createGeneratorState(model), model, {
+    prompt: 'A summer storm over the sea',
+  });
+  const request = buildGeneratorProviderRequest(state, {
+    referenceImages: [], referenceVideos: [], referenceAudio: [],
+  });
+  assert.equal(request.image, undefined);
+  assert.equal(request.last_image, undefined);
+  assert.equal(request.duration, 5);
+  assert.equal(request.generate_audio, true);
+  assert.equal(getGeneratorProviderIdentity(state.modelId).providerModelId,
+    'bytedance/seedance-2.0/text-to-video');
+});

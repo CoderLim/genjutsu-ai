@@ -26,6 +26,10 @@ export type ProviderIdentity = {
 };
 
 const MODEL_IDENTITIES: Record<string, ProviderIdentity> = {
+  'seedance-2-t2v': {
+    provider: 'wavespeed',
+    providerModelId: 'bytedance/seedance-2.0/text-to-video',
+  },
   'seedance-2-i2v': {
     provider: 'wavespeed',
     providerModelId: 'bytedance/seedance-2.0/image-to-video',
@@ -81,6 +85,16 @@ export function buildGeneratorProviderRequest(
   media: MediaReadUrls
 ): Record<string, unknown> {
   const params = state.params;
+  if (state.modelId === 'seedance-2-t2v') {
+    return {
+      prompt: state.prompt,
+      duration: params.duration,
+      resolution: params.resolution,
+      aspect_ratio: params.aspectRatio,
+      generate_audio: params.generateAudio,
+    };
+  }
+
   if (state.modelId === 'seedance-2-i2v') {
     if (!media.startFrame) throw new Error('Start frame is required');
     return {

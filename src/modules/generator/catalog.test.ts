@@ -16,7 +16,7 @@ test('live catalog capabilities and price tables are valid', () => {
 test('public models omit unverified multimodal endpoints', () => {
   const ids = listGeneratorModels().map(x => x.id);
   assert.deepEqual(ids, [
-    'seedance-2-i2v', 'h3-reference', 'flux-schnell', 'flux2-flash-edit',
+    'seedance-2-i2v', 'seedance-2-t2v', 'h3-reference', 'flux-schnell', 'flux2-flash-edit',
   ]);
   assert.throws(() => getGeneratorModel('seedance-2-reference'), /not enabled/);
 });
@@ -135,4 +135,15 @@ test('H3 supports reference-video workflow but not All-in-One', () => {
     },
   });
   assert.equal(calculateGeneratorCredits(sixPhotos, h3).credits, 96);
+});
+
+test('text-to-video is priced without reference media', () => {
+  const model = getGeneratorModel('seedance-2-t2v');
+  const state = createGeneratorState(model);
+  assert.equal(state.workflow, 'text-to-video');
+  assert.deepEqual(Object.keys(model.workflows['text-to-video']!.slots), []);
+  assert.equal(calculateGeneratorCredits(state, model).credits, 204);
+  assert.doesNotThrow(() => assertGeneratorReady({
+    ...state, prompt: 'Mountain landscape, cinematic dolly shot',
+  }, model));
 });
