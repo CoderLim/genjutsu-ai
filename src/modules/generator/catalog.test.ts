@@ -19,7 +19,7 @@ test('public catalog lists completed reference workflows', () => {
     'photo-to-video-standard', 'text-to-video-standard', 'multi-image-to-video', 'all-in-one-video',
     'nano-banana-2', 'nano-banana-pro', 'text-to-image-fast', 'image-edit-standard',
     'seedance-2-fast', 'seedance-2-mini', 'seedance-2.5', 'seedance-2.5-flash',
-    'minimax-h3-max-turbo', 'minimax-h3-max',
+    'minimax-h3', 'minimax-h3-max-turbo', 'minimax-h3-max',
     'kling-4', 'kling-4-flash', 'kling-3-turbo', 'kling-3',
     'minimax-h3-image', 'minimax-h3-image-highspeed',
   ]);
@@ -324,4 +324,17 @@ test('H3 Image output and reference surcharges are charged for both variants', (
     });
     assert.equal(calculateGeneratorCredits(edited, m).credits, rates[2] + extra * 2);
   }
+});
+
+test('MiniMax H3 base has distinct 2K/4K price tiers and first/end workflow', () => {
+  const model = getGeneratorModel('minimax-h3');
+  const state = createGeneratorState(model);
+  for (const [resolution, rate] of [
+    ['480P',9], ['768P',11], ['2K',23], ['4K',28]
+  ] as const) {
+    const updated = updateGeneratorState(state, model, { params: { resolution } });
+    assert.equal(calculateGeneratorCredits(updated, model).credits, 5 * rate);
+  }
+  assert.ok(model.workflows['start-end']);
+  assert.ok(model.workflows['text-to-video']);
 });

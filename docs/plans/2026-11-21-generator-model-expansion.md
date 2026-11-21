@@ -24,7 +24,7 @@ internal workflow profiles. Additional variants are wired to **Fal**.
 | Seedance 2.5 | `bytedance/seedance-2.5/{text-to-video,image-to-video}` | Text, first, first + end | Yes: conservative customer tariff |
 | Seedance 2.5 Flash | `bytedance/seedance-2.5/flash/{text-to-video,image-to-video}` | Text, first, first + end | Yes: conservative customer tariff |
 | MiniMax H3 Turbo | No distinct verified Fal endpoint | UI/capability draft | No: do not alias to base H3 |
-| MiniMax H3 | `minimax/h3/reference-to-video` | Existing restricted reference workflow | No: prior estimate only |
+| MiniMax H3 | `minimax/h3/{text-to-video,image-to-video}` | Text, first frame, first+end (480P/768P/2K/4K) | Yes: conservative customer tariff; legacy reference workflow remains gated |
 | MiniMax H3 Max Turbo | `minimax/h3-max-turbo/{text-to-video,image-to-video}` | Text and first frame; 768P; 5–15s | Yes: 10 customer credits/sec |
 | MiniMax H3 Max | `minimax/h3-max/{text-to-video,image-to-video}` | Text and first frame; 768P; 5–15s | Yes: 16 customer credits/sec |
 | Kling 4.0 | `kling/v4/{text-to-video,image-to-video}` | Text, first, first + end | Yes: bounded customer tariff |

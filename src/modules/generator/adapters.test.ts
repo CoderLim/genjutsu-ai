@@ -142,6 +142,7 @@ test('each staged Fal video model resolves separate text and frame endpoints', (
     'seedance-2-mini': 'bytedance/seedance-2.0/mini',
     'seedance-2.5': 'bytedance/seedance-2.5',
     'seedance-2.5-flash': 'bytedance/seedance-2.5/flash',
+    'minimax-h3': 'minimax/h3',
     'minimax-h3-max-turbo': 'minimax/h3-max-turbo',
     'minimax-h3-max': 'minimax/h3-max',
     'kling-4': 'kling/v4',

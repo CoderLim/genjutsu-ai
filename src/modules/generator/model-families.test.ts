@@ -73,7 +73,7 @@ test('model menu contains one Seedance 2.0 item and no workflow or resolution me
     'FLUX.2 Flash',
     'Seedance 2.0 Fast', 'Seedance 2.0 Mini',
     'Seedance 2.5', 'Seedance 2.5 Flash',
-    'MiniMax H3 Max Turbo', 'MiniMax H3 Max',
+    'MiniMax H3', 'MiniMax H3 Max Turbo', 'MiniMax H3 Max',
     'Kling 4.0', 'Kling 4.0 Flash', 'Kling 3.0 Turbo', 'Kling 3.0',
     'MiniMax H3 Image', 'MiniMax H3 Image Highspeed',
   ]);
@@ -133,7 +133,7 @@ test('video tab shows actual enabled video model families only', () => {
     'Seedance 2.0',
     'Seedance 2.0 Fast', 'Seedance 2.0 Mini',
     'Seedance 2.5', 'Seedance 2.5 Flash',
-    'MiniMax H3 Max Turbo', 'MiniMax H3 Max',
+    'MiniMax H3', 'MiniMax H3 Max Turbo', 'MiniMax H3 Max',
     'Kling 4.0', 'Kling 4.0 Flash', 'Kling 3.0 Turbo', 'Kling 3.0',
   ]);
   // The H3 preview has unverified pricing, so it is not selectable in DEV.
