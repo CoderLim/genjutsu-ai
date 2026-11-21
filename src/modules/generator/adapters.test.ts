@@ -128,6 +128,21 @@ test('Nano Banana switches Fal endpoints by workflow, without changing user mode
 });
 
 
+test('Nano Banana accepts all aspect ratios advertised in the public model settings', () => {
+  for (const id of ['nano-banana-2', 'nano-banana-pro']) {
+    const model = getGeneratorModel(id);
+    for (const aspectRatio of model.workflows['text-to-image']!.fields.aspectRatio.options ?? []) {
+      const draft = updateGeneratorState(createGeneratorState(model), model, {
+        params: { aspectRatio },
+      });
+      const request = buildGeneratorProviderRequest(draft, {
+        referenceImages: [], referenceVideos: [], referenceAudio: [],
+      });
+      assert.equal(request.aspect_ratio, aspectRatio, id + ':' + aspectRatio);
+    }
+  }
+});
+
 const emptyMedia = { referenceImages: [], referenceVideos: [], referenceAudio: [] };
 
 function stagedModel(id: string) {
@@ -221,6 +236,25 @@ test('Fal image model editing swaps endpoints and uses bounded image sizes', () 
     assert.deepEqual(request.image_urls, ['https://example.test/ref.png']);
     assert.deepEqual(request.image_size, { width: 3840, height: 2176 });
     assert.equal(request.num_images, 3);
+    assert.equal(request.output_format, 'png');
     assert.equal(request.resolution, undefined);
+  }
+});
+
+test('MiniMax H3 Image 1K wide and portrait outputs meet Fal minimum pixel area', () => {
+  for (const id of ['minimax-h3-image', 'minimax-h3-image-highspeed']) {
+    const model = getGeneratorModel(id);
+    for (const aspectRatio of ['16:9', '9:16']) {
+      const state = updateGeneratorState(createGeneratorState(model), model, {
+        params: { resolution: '1K', aspectRatio, outputFormat: 'webp' },
+      });
+      const body = buildGeneratorProviderRequest(state, emptyMedia);
+      const size = body.image_size as { width: number; height: number };
+      assert.ok(size.width * size.height >= 655360, id + ':' + aspectRatio);
+      assert.ok(size.width * size.height <= 20000000, id + ':' + aspectRatio);
+      const [a, b] = aspectRatio.split(':').map(Number);
+      assert.ok(Math.abs(size.width / size.height - a / b) < 0.04);
+      assert.equal(body.output_format, 'webp');
+    }
   }
 });
