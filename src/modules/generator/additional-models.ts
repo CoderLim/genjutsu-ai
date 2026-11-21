@@ -188,11 +188,13 @@ export const ADDITIONAL_GENERATOR_MODELS: readonly GeneratorModel[] = [
   videoProfile({
     id: 'kling-3-turbo', name: 'Kling 3.0 Turbo',
     resolutions: ['720p'], duration: [3, 15],
+    aspectRatios: ['16:9', '9:16', '1:1'],
     startEnd: true,
   }),
   videoProfile({
     id: 'kling-3', name: 'Kling 3.0',
     resolutions: ['720p', '1080p'], duration: [3, 15], audio: true,
+    aspectRatios: ['16:9', '9:16', '1:1'],
     startEnd: true,
   }),
   minimaxImage('minimax-h3-image', 'MiniMax H3 Image'),
