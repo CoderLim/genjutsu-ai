@@ -61,10 +61,8 @@ function videoFields(options: VideoOptions): Record<string, FieldSpec> {
     fields.promptExpansionMode = {
       label: 'Prompt Expansion',
       default: 'balanced',
-      // H3 base additionally supports 'fast'; H3 Max variants do not.
-      options: options.id === 'minimax-h3'
-        ? ['disabled', 'fast', 'balanced', 'quality']
-        : ['disabled', 'balanced', 'quality'],
+      // The Fal H3 Max variants expose these three expansion modes.
+      options: ['disabled', 'balanced', 'quality'],
     };
   }
   return fields;
