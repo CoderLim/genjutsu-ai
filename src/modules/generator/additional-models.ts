@@ -14,7 +14,8 @@ const videoFrames = {
     min: 1, max: 1, accept: IMAGE_MIME, maxBytes: 12 * 1048576,
   },
 };
-const ASPECTS = ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'] as const;
+const ASPECTS = ['16:9', '9:16', '1:1', '4:3', '3:4'] as const;
+const VIDEO_ASPECTS = [...ASPECTS, '21:9'] as const;
 
 type VideoOptions = {
   id: string;
@@ -45,7 +46,7 @@ function videoFields(options: VideoOptions): Record<string, FieldSpec> {
     aspectRatio: {
       label: 'Aspect Ratio',
       default: options.aspectRatios?.[0] ?? '16:9',
-      options: options.aspectRatios ?? ASPECTS,
+      options: options.aspectRatios ?? VIDEO_ASPECTS,
     },
     outputCount: { label: 'Outputs', default: 1, options: [1] },
   };
