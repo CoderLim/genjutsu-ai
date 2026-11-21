@@ -13,7 +13,7 @@ type Props = {
   items: MixedReferenceItem[];
   accept: readonly string[];
   canAdd: boolean;
-  maxTotal: number;
+  limitLines: readonly string[];
   onFiles: (files: File[]) => void;
   onRemove: (slot: GeneratorReferenceSlot, url: string) => void;
 };
@@ -23,7 +23,7 @@ type Props = {
  * Each thumbnail still remembers its own provider media slot.
  */
 export function MixedReferenceUploader({
-  items, accept, canAdd, maxTotal, onFiles, onRemove,
+  items, accept, canAdd, limitLines, onFiles, onRemove,
 }: Props) {
   const inputId = useId();
 
@@ -38,18 +38,17 @@ export function MixedReferenceUploader({
       <div className="shrink-0">
         <label
           htmlFor={inputId}
-          aria-label="Add image, video or audio references"
+          aria-label={'Add references: ' + limitLines.join(', ')}
           className={cn(
-            'flex h-24 w-[82px] cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-[rgba(20,17,18,0.24)] bg-transparent px-1 text-center transition hover:border-[rgba(20,17,18,0.44)] hover:bg-[rgba(20,17,18,0.02)]',
+            'flex h-24 w-[86px] cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-[rgba(20,17,18,0.24)] bg-transparent px-1 text-center transition hover:border-[rgba(20,17,18,0.44)] hover:bg-[rgba(20,17,18,0.02)]',
             !canAdd && 'pointer-events-none opacity-50'
           )}
         >
           <Plus className="size-5 text-[rgba(18,15,16,0.5)]" strokeWidth={1.75} />
-          <span className="text-[10px] leading-tight font-medium text-[rgba(18,15,16,0.65)]">
-            Reference
-            <span className="mt-0.5 block text-[rgba(18,15,16,0.45)]">
-              {items.length}/{maxTotal} items
-            </span>
+          <span className="flex flex-col text-[10px] leading-tight font-medium text-[rgba(18,15,16,0.65)]">
+            {limitLines.map(line => (
+              <span key={line}>{line}</span>
+            ))}
           </span>
         </label>
         <input
