@@ -8,6 +8,7 @@ import {
   type WorkflowSpec,
 } from './types';
 import { assertGeneratorReady } from './validation';
+import { updateGeneratorState } from './normalize';
 
 function countSlot(inputs: GeneratorInputs, slot: MediaSlot): number {
   const value = inputs[slot];
@@ -40,6 +41,46 @@ export function getGeneratorSlotCapacity(
     available = Math.min(available, spec.maxCombinedReferences - total);
   }
   return Math.max(0, available);
+}
+
+export type GeneratorLocalFileMeta = { type: string; size: number };
+
+/**
+ * A model/workflow change can retain the same semantic image even though
+ * the destination only accepts different MIME types or smaller files.
+ * Filter browser-owned object URLs before the next quote / upload attempt.
+ * A missing lookup means the local file cannot be uploaded and is dropped.
+ */
+export function filterGeneratorLocalMedia(
+  state: GeneratorState,
+  model: GeneratorModel,
+  fileForUrl: (url: string) => GeneratorLocalFileMeta | undefined
+): GeneratorState {
+  const spec = getWorkflowSpec(model, state.workflow);
+  const accepts = (slot: MediaSlot, url: string): boolean => {
+    const limit = spec.slots[slot];
+    const file = fileForUrl(url);
+    return !!limit && !!file &&
+      limit.accept.includes(file.type) &&
+      Number.isFinite(file.size) && file.size >= 0 &&
+      (limit.maxBytes === undefined || file.size <= limit.maxBytes);
+  };
+  const inputs: GeneratorInputs = {
+    startFrame: state.inputs.startFrame &&
+      accepts('startFrame', state.inputs.startFrame) ? state.inputs.startFrame : null,
+    endFrame: state.inputs.endFrame &&
+      accepts('endFrame', state.inputs.endFrame) ? state.inputs.endFrame : null,
+    referenceImages: state.inputs.referenceImages.filter(
+      url => accepts('referenceImages', url)
+    ),
+    referenceVideos: state.inputs.referenceVideos.filter(
+      url => accepts('referenceVideos', url)
+    ),
+    referenceAudio: state.inputs.referenceAudio.filter(
+      url => accepts('referenceAudio', url)
+    ),
+  };
+  return updateGeneratorState(state, model, { inputs });
 }
 
 /** Optional slots must match validation, not the UI's visual mode. */
