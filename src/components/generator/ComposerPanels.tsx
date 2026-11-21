@@ -10,10 +10,12 @@ import {
   ArrowRight,
   AudioWaveform,
   Check,
+  Coins,
   ChevronDown,
   ChevronUp,
   Clock3,
   LayoutGrid,
+  Monitor,
 } from 'lucide-react';
 
 import type {
@@ -24,6 +26,7 @@ import type {
 import { cn } from '@/lib/utils';
 import {
   getGeneratorModelFamilyId,
+  getGeneratorModelHighlights,
   groupGeneratorModels,
   getGeneratorModelChoices,
   generatorModelLabel,
@@ -339,9 +342,9 @@ export function ComposerToolbar({
         <PanelShell
           open={open === 'model'}
           onClose={() => setOpen(null)}
-          className="w-[min(92vw,560px)]"
+          className="w-[min(94vw,640px)]"
         >
-          <div className="grid max-h-[min(70vh,420px)] grid-cols-[168px_minmax(0,1fr)]">
+          <div className="grid max-h-[min(70vh,440px)] grid-cols-[124px_minmax(0,1fr)] sm:grid-cols-[184px_minmax(0,1fr)]">
             <aside className="border-r border-[rgba(20,17,18,0.06)] bg-[rgba(20,17,18,0.02)] p-2">
               <p className="px-2 pt-1 pb-2 text-[10px] font-semibold tracking-[0.08em] text-[rgba(18,15,16,0.45)] uppercase">
                 Models
@@ -375,7 +378,9 @@ export function ComposerToolbar({
                             </span>
                           ) : null}
                         </span>
-
+                        <span className="mt-0.5 block text-[11px] leading-snug text-[rgba(18,15,16,0.55)]">
+                          {family.blurb}
+                        </span>
                       </span>
                     </button>
                   );
@@ -385,6 +390,7 @@ export function ComposerToolbar({
             <div className="space-y-2 overflow-y-auto p-2.5">
               {(activeFamily?.models ?? []).map((item) => {
                 const selected = isSameGeneratorModelChoice(item, model);
+                const highlights = getGeneratorModelHighlights(item);
                 return (
                   <button
                     key={item.id}
@@ -406,11 +412,31 @@ export function ComposerToolbar({
                     <span className="block pr-6 text-sm font-semibold text-[rgb(18,15,16)]">
                       {generatorModelLabel(item)}
                     </span>
-                    {!item.enabled ? (
-                      <span className="mt-1 block text-[11px] text-[rgba(18,15,16,0.55)]">
-                        Preview · Pricing pending
-                      </span>
-                    ) : null}
+                    <span className="mt-1 block text-[12px] leading-snug text-[rgba(18,15,16,0.58)]">
+                      {highlights.description}
+                    </span>
+                    <span className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-[rgba(18,15,16,0.58)]">
+                      {highlights.startingCredits !== null ? (
+                        <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                          <Coins className="size-3.5" />
+                          From {highlights.startingCredits} credits
+                        </span>
+                      ) : !item.enabled ? (
+                        <span>Preview · Pricing pending</span>
+                      ) : null}
+                      {highlights.capability ? (
+                        <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                          <Monitor className="size-3.5" />
+                          {highlights.capability}
+                        </span>
+                      ) : null}
+                      {highlights.maxDuration !== null ? (
+                        <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                          <Clock3 className="size-3.5" />
+                          Up to {highlights.maxDuration}s
+                        </span>
+                      ) : null}
+                    </span>
                   </button>
                 );
               })}
