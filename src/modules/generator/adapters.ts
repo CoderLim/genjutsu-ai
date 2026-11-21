@@ -222,6 +222,10 @@ function minimaxCustomImageSize(params: Record<string, string | number | boolean
     w = Math.ceil(w * scale / 32) * 32;
     h = Math.ceil(h * scale / 32) * 32;
   }
+  // Rounded dimensions must not exceed Fal's inclusive 3:1 / 1:3 bounds.
+  // E.g. a 2048px 3:1 output rounded to 2048x672 exceeds 3:1.
+  if (w > h * 3) h = Math.ceil(w / 3 / 32) * 32;
+  if (h > w * 3) w = Math.ceil(h / 3 / 32) * 32;
   return { width: w, height: h };
 }
 
