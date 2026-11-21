@@ -229,7 +229,7 @@ test('model highlights use configured maximum capabilities and actual minimum cr
     ['kling-4', 81, 'Up to 1080p', 30],
     ['kling-4-flash', 51, 'Up to 720p', 20],
     ['nano-banana-2.1', 12, 'Up to 4K', null],
-    ['nano-banana-2-lite', 11, 'Up to 14 refs', null],
+    ['nano-banana-2-lite', 11, 'Up to 1K', null],
     ['nano-banana-2', 14, 'Up to 4K', null],
     ['nano-banana-pro', 26, 'Up to 4K', null],
     ['minimax-h3-image', 8, 'Up to 4K', null],
