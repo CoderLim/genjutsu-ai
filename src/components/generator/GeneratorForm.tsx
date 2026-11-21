@@ -9,21 +9,18 @@ import {
   LoaderCircle,
 } from 'lucide-react';
 
+import { listGeneratorModels } from '@/modules/generator/catalog';
 import {
-  listGeneratorModels,
-} from '@/modules/generator/catalog';
-import {
-  getGeneratorSettingChoices,
   filterGeneratorLocalMedia,
-  getGeneratorExpansionControls,
-  generatorReadinessError,
-  getGeneratorSlotCapacity,
   GENERATOR_REFERENCE_SLOTS,
-  describeGeneratorMixedReferences,
+  generatorReadinessError,
+  getGeneratorExpansionControls,
   getGeneratorMixedReferenceTileLines,
-  planGeneratorMixedReferenceFiles,
+  getGeneratorSettingChoices,
+  getGeneratorSlotCapacity,
   isGeneratorJobActive,
   isGeneratorSlotOptional,
+  planGeneratorMixedReferenceFiles,
   shouldPollGeneratorJob,
 } from '@/modules/generator/form-state';
 import {
@@ -202,12 +199,19 @@ export function GeneratorForm({
   // including in local development. Server validation remains authoritative.
   const allModels = useMemo(() => listGeneratorModels(), []);
   const initialModel = useMemo(
-    () => allModels.find(item => item.id === initialModelId &&
-      item.mediaType === initialMediaType) ??
-      allModels.find(item => item.id === (
-        initialMediaType === 'image' ? 'nano-banana-2' : 'photo-to-video-standard'
-      )) ??
-      allModels.find(item => item.mediaType === initialMediaType),
+    () =>
+      allModels.find(
+        (item) =>
+          item.id === initialModelId && item.mediaType === initialMediaType
+      ) ??
+      allModels.find(
+        (item) =>
+          item.id ===
+          (initialMediaType === 'image'
+            ? 'nano-banana-2'
+            : 'photo-to-video-standard')
+      ) ??
+      allModels.find((item) => item.mediaType === initialMediaType),
     [allModels, initialMediaType, initialModelId]
   );
   const [draft, setDraft] = useState<GeneratorState | null>(() =>
@@ -320,9 +324,12 @@ export function GeneratorForm({
     });
   }
 
-  function retainCompatibleLocalMedia(next: GeneratorState, target: GeneratorModel) {
-    return filterGeneratorLocalMedia(
-      next, target, (url) => localFiles.current.get(url)
+  function retainCompatibleLocalMedia(
+    next: GeneratorState,
+    target: GeneratorModel
+  ) {
+    return filterGeneratorLocalMedia(next, target, (url) =>
+      localFiles.current.get(url)
     );
   }
 
@@ -349,7 +356,7 @@ export function GeneratorForm({
 
   function setWorkflow(modelId: string, workflow: Workflow) {
     if (busy || mediaReadLock.current || submitLock.current) return;
-    const nextModel = allModels.find(item => item.id === modelId);
+    const nextModel = allModels.find((item) => item.id === modelId);
     if (!nextModel || !nextModel.workflows[workflow]) return;
     setUploadError('');
     if (nextModel.id === model?.id) {
@@ -362,15 +369,16 @@ export function GeneratorForm({
     setMediaType(nextModel.mediaType);
     // One atomic state transition: mode and real backend profile change
     // together, so media/params and the displayed price stay consistent.
-    setDraft(prev => prev
-      ? syncReferenceQuote(
-          retainCompatibleLocalMedia(
-            normalizeGeneratorState(prev, nextModel, workflow),
+    setDraft((prev) =>
+      prev
+        ? syncReferenceQuote(
+            retainCompatibleLocalMedia(
+              normalizeGeneratorState(prev, nextModel, workflow),
+              nextModel
+            ),
             nextModel
-          ),
-          nextModel
-        )
-      : createGeneratorState(nextModel)
+          )
+        : createGeneratorState(nextModel)
     );
   }
 
@@ -392,11 +400,15 @@ export function GeneratorForm({
         ? syncReferenceQuote(
             retainCompatibleLocalMedia(
               normalizeGeneratorState(
-                prev, next,
+                prev,
+                next,
                 // Image has no mode selector. Preserve any compatible
                 // references, but always use its unified default workflow.
-                next.mediaType === 'image' ? next.defaultWorkflow : prev.workflow
-              ), next
+                next.mediaType === 'image'
+                  ? next.defaultWorkflow
+                  : prev.workflow
+              ),
+              next
             ),
             next
           )
@@ -410,14 +422,24 @@ export function GeneratorForm({
    * committing any browser URLs, metadata, or quote changes.
    */
   async function onMixedReferenceFiles(files: File[]) {
-    if (!spec || !form || !model || busy || mediaReadLock.current ||
-        submitLock.current || files.length === 0) return;
+    if (
+      !spec ||
+      !form ||
+      !model ||
+      busy ||
+      mediaReadLock.current ||
+      submitLock.current ||
+      files.length === 0
+    )
+      return;
 
     let assignments: ReturnType<typeof planGeneratorMixedReferenceFiles>;
     try {
       assignments = planGeneratorMixedReferenceFiles(spec, form.inputs, files);
     } catch (error) {
-      setUploadError(error instanceof Error ? error.message : 'Invalid reference file');
+      setUploadError(
+        error instanceof Error ? error.message : 'Invalid reference file'
+      );
       return;
     }
 
@@ -437,30 +459,38 @@ export function GeneratorForm({
         created.push({ url, slot, file });
         if (slot === 'referenceVideos' || slot === 'referenceAudio') {
           const seconds = await mediaDurationFromBlobUrl(url, slot);
-          if ((rule.minSeconds !== undefined && seconds < rule.minSeconds) ||
-              (rule.maxSeconds !== undefined && seconds > rule.maxSeconds)) {
-            throw new Error('Reference media duration exceeds model limits: ' + file.name);
+          if (
+            (rule.minSeconds !== undefined && seconds < rule.minSeconds) ||
+            (rule.maxSeconds !== undefined && seconds > rule.maxSeconds)
+          ) {
+            throw new Error(
+              'Reference media duration exceeds model limits: ' + file.name
+            );
           }
           durations.set(url, seconds);
         }
       }
 
-      const addedVideos = created.filter(item => item.slot === 'referenceVideos');
+      const addedVideos = created.filter(
+        (item) => item.slot === 'referenceVideos'
+      );
       if (addedVideos.length) {
         referenceVideoBillableSeconds([
           ...form.inputs.referenceVideos.map(
-            url => mediaDurations.current.get(url) ?? NaN
+            (url) => mediaDurations.current.get(url) ?? NaN
           ),
-          ...addedVideos.map(item => durations.get(item.url) ?? NaN),
+          ...addedVideos.map((item) => durations.get(item.url) ?? NaN),
         ]);
       }
-      const addedAudio = created.filter(item => item.slot === 'referenceAudio');
+      const addedAudio = created.filter(
+        (item) => item.slot === 'referenceAudio'
+      );
       if (addedAudio.length) {
         assertReferenceAudioDuration([
           ...form.inputs.referenceAudio.map(
-            url => mediaDurations.current.get(url) ?? NaN
+            (url) => mediaDurations.current.get(url) ?? NaN
           ),
-          ...addedAudio.map(item => durations.get(item.url) ?? NaN),
+          ...addedAudio.map((item) => durations.get(item.url) ?? NaN),
         ]);
       }
 
@@ -473,7 +503,7 @@ export function GeneratorForm({
       setPageError('');
       setPriceChange(null);
       setRetryAttempt(null);
-      setDraft(prev => {
+      setDraft((prev) => {
         if (!prev) return null;
         const inputs = {
           ...prev.inputs,
@@ -483,13 +513,16 @@ export function GeneratorForm({
         };
         for (const { url, slot } of created) inputs[slot].push(url);
         return syncReferenceQuote(
-          updateGeneratorState(prev, model, { inputs }), model
+          updateGeneratorState(prev, model, { inputs }),
+          model
         );
       });
     } catch (error) {
       for (const { url } of created) URL.revokeObjectURL(url);
       setUploadError(
-        error instanceof Error ? error.message : 'Could not read the uploaded media'
+        error instanceof Error
+          ? error.message
+          : 'Could not read the uploaded media'
       );
     } finally {
       mediaReadLock.current = false;
@@ -813,23 +846,28 @@ export function GeneratorForm({
     !isGeneratorJobActive(job);
   const activeSlots = INPUT_SLOTS.filter((slot) => !!spec.slots[slot]);
   const mixedReferenceSlots = GENERATOR_REFERENCE_SLOTS.filter(
-    slot => !!spec.slots[slot]
+    (slot) => !!spec.slots[slot]
   );
-  const showUnifiedReference = mediaType === 'video' &&
-    form.workflow === 'all-in-one-reference' && mixedReferenceSlots.length > 0;
-  const mixedItems = mixedReferenceSlots.flatMap(slot =>
-    form.inputs[slot].map(url => ({ url, slot }))
+  const showUnifiedReference =
+    mediaType === 'video' &&
+    form.workflow === 'all-in-one-reference' &&
+    mixedReferenceSlots.length > 0;
+  const mixedItems = mixedReferenceSlots.flatMap((slot) =>
+    form.inputs[slot].map((url) => ({ url, slot }))
   );
-  const mixedAccept = [...new Set(
-    mixedReferenceSlots.flatMap(slot => [...(spec.slots[slot]?.accept ?? [])])
-  )];
+  const mixedAccept = [
+    ...new Set(
+      mixedReferenceSlots.flatMap((slot) => [
+        ...(spec.slots[slot]?.accept ?? []),
+      ])
+    ),
+  ];
   const mixedLimitLines = showUnifiedReference
-    ? getGeneratorMixedReferenceTileLines(spec) : [];
+    ? getGeneratorMixedReferenceTileLines(spec)
+    : [];
   const mixedCanAdd = mixedReferenceSlots.some(
-    slot => getGeneratorSlotCapacity(spec, form.inputs, slot) > 0
+    (slot) => getGeneratorSlotCapacity(spec, form.inputs, slot) > 0
   );
-  const mixedReferenceHint = showUnifiedReference
-    ? describeGeneratorMixedReferences(spec) : '';
   const settingsFields = [
     ...SETTINGS_FIELD_KEYS.filter((key) => {
       const field = spec.fields[key];
@@ -931,9 +969,14 @@ export function GeneratorForm({
                       mediaType === type
                     )
                       return;
-                    const next = allModels.find(item => item.id ===
-                      (type === 'image' ? 'nano-banana-2' : 'photo-to-video-standard')) ??
-                      allModels.find(item => item.mediaType === type);
+                    const next =
+                      allModels.find(
+                        (item) =>
+                          item.id ===
+                          (type === 'image'
+                            ? 'nano-banana-2'
+                            : 'photo-to-video-standard')
+                      ) ?? allModels.find((item) => item.mediaType === type);
                     if (next) setModel(next.id);
                   }}
                   className={cn(
@@ -980,8 +1023,11 @@ export function GeneratorForm({
               {activeSlots.map((slot) => {
                 const limit = spec.slots[slot]!;
                 const optional = isGeneratorSlotOptional(spec, slot);
-                const isImageReference = mediaType === 'image' && slot === 'referenceImages';
-                const emptyLabel = isImageReference ? 'Reference' : SLOT_LABELS[slot];
+                const isImageReference =
+                  mediaType === 'image' && slot === 'referenceImages';
+                const emptyLabel = isImageReference
+                  ? 'Reference'
+                  : SLOT_LABELS[slot];
                 const capacity = getGeneratorSlotCapacity(
                   spec,
                   form.inputs,
@@ -1006,11 +1052,6 @@ export function GeneratorForm({
           ) : null}
 
           <div className="relative flex min-h-[96px] min-w-0 flex-1 flex-col">
-            {mixedReferenceHint ? (
-              <p className="mb-2 text-xs leading-relaxed text-[rgba(18,15,16,0.58)]">
-                {mixedReferenceHint}
-              </p>
-            ) : null}
             <label htmlFor="generator-prompt" className="sr-only">
               Prompt
             </label>
@@ -1043,7 +1084,7 @@ export function GeneratorForm({
         <div className="mt-1.5 flex flex-col gap-2 px-1 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 sm:gap-2">
             <ComposerToolbar
-              models={allModels.filter(item => item.mediaType === mediaType)}
+              models={allModels.filter((item) => item.mediaType === mediaType)}
               model={model}
               workflow={form.workflow}
               params={form.params}
@@ -1134,8 +1175,8 @@ export function GeneratorForm({
           {job.status === 'processing' ? (
             <p className="flex items-center gap-2 text-sm text-[rgba(18,15,16,0.55)]">
               <LoaderCircle className="size-4 animate-spin" />
-              Generating and saving your {job.mediaType}... You can also follow it
-              in My Creations.
+              Generating and saving your {job.mediaType}... You can also follow
+              it in My Creations.
             </p>
           ) : job.status === 'completed' ? (
             <div className="space-y-3">

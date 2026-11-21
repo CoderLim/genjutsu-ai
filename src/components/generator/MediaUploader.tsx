@@ -1,7 +1,11 @@
-import { useId, type ChangeEvent } from 'react';
+import { useId, useMemo, useState, type ChangeEvent } from 'react';
 import { ImagePlus, Plus, Trash2, Upload } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
+import {
+  MediaViewer,
+  type MediaItem,
+} from '@/components/ui/chatcn/media-gallery';
 
 type Props = {
   label: string;
@@ -16,6 +20,14 @@ type Props = {
   /** Visible secondary line for optional reference uploads (e.g. Up to 14). */
   hint?: string;
 };
+
+function mediaKindFromAccept(
+  accept: readonly string[]
+): 'image' | 'video' | 'audio' {
+  if (accept.some((type) => type.startsWith('video/'))) return 'video';
+  if (accept.some((type) => type.startsWith('audio/'))) return 'audio';
+  return 'image';
+}
 
 export function MediaUploader({
   label,
@@ -32,6 +44,23 @@ export function MediaUploader({
   // "Reference Optional" can appear for several slots at once. Labels must
   // always target their own file input, even with duplicate visible text.
   const inputId = useId();
+  const kind = mediaKindFromAccept(accept);
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
+
+  const viewerItems = useMemo<MediaItem[]>(() => {
+    if (kind === 'audio') return [];
+    return urls.map((src, index) => ({
+      id: `${label}:${index}:${src}`,
+      kind,
+      src,
+      alt: label,
+    }));
+  }, [kind, label, urls]);
+
+  function openPreview(url: string) {
+    const index = viewerItems.findIndex((item) => item.src === url);
+    if (index >= 0) setViewerIndex(index);
+  }
 
   function onInputChange(event: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files ?? []);
@@ -51,45 +80,68 @@ export function MediaUploader({
     />
   );
 
+  const viewer =
+    viewerIndex !== null && viewerItems.length > 0 ? (
+      <MediaViewer
+        items={viewerItems}
+        index={viewerIndex}
+        open
+        onIndexChange={setViewerIndex}
+        onOpenChange={(open) => {
+          if (!open) setViewerIndex(null);
+        }}
+      />
+    ) : null;
+
   if (variant === 'composer') {
     const preview = urls[0];
-    const isVideo = accept.some((type) => type.startsWith('video/'));
-    const isAudio = accept.some((type) => type.startsWith('audio/'));
 
     return (
       <div className="relative shrink-0">
         {preview ? (
           <div className="relative h-24 w-[68px] overflow-hidden rounded-lg border border-[rgba(20,17,18,0.086)] bg-[rgba(20,17,18,0.03)]">
-            {isVideo ? (
-              <video
-                src={preview}
-                className="h-full w-full object-cover"
-                preload="metadata"
-                muted
-              />
-            ) : isAudio ? (
+            {kind === 'audio' ? (
               <div className="flex h-full items-center justify-center p-1 text-center text-[10px] text-[rgba(18,15,16,0.55)]">
                 Audio
               </div>
             ) : (
-              <img
-                src={preview}
-                alt={label}
-                className="h-full w-full object-cover"
-              />
+              <button
+                type="button"
+                onClick={() => openPreview(preview)}
+                aria-label={`Preview ${label}`}
+                className="size-full cursor-zoom-in"
+              >
+                {kind === 'video' ? (
+                  <video
+                    src={preview}
+                    className="h-full w-full object-cover"
+                    preload="metadata"
+                    muted
+                  />
+                ) : (
+                  <img
+                    src={preview}
+                    alt={label}
+                    className="h-full w-full object-cover"
+                  />
+                )}
+              </button>
             )}
             <button
               type="button"
               aria-label={'Remove ' + label}
-              onClick={() => onRemove(preview)}
-              className="absolute top-1 right-1 rounded-full bg-black/70 p-1 text-white"
+              onClick={(event) => {
+                event.stopPropagation();
+                onRemove(preview);
+              }}
+              className="absolute top-1 right-1 z-10 rounded-full bg-black/70 p-1 text-white"
             >
               <Trash2 className="size-3" />
             </button>
             {canAdd && max > 1 ? (
               <label
                 htmlFor={inputId}
-                className="absolute inset-x-0 bottom-0 cursor-pointer bg-black/50 py-0.5 text-center text-[9px] font-medium text-white"
+                className="absolute inset-x-0 bottom-0 z-10 cursor-pointer bg-black/50 py-0.5 text-center text-[9px] font-medium text-white"
               >
                 +{max - urls.length}
               </label>
@@ -113,7 +165,11 @@ export function MediaUploader({
                   <span className="block">{label}</span>
                   <span className="mt-0.5 block">{hint}</span>
                 </>
-              ) : optional ? label + ' (optional)' : label}
+              ) : optional ? (
+                label + ' (optional)'
+              ) : (
+                label
+              )}
             </span>
           </label>
         )}
@@ -125,29 +181,41 @@ export function MediaUploader({
                 key={url}
                 className="relative size-8 overflow-hidden rounded border"
               >
-                {isVideo ? (
-                  <video
-                    src={url}
-                    className="h-full w-full object-cover"
-                    muted
-                    preload="metadata"
-                  />
-                ) : isAudio ? (
+                {kind === 'audio' ? (
                   <span className="flex size-full items-center justify-center text-[10px]">
                     Audio
                   </span>
                 ) : (
-                  <img
-                    src={url}
-                    alt=""
-                    className="h-full w-full object-cover"
-                  />
+                  <button
+                    type="button"
+                    onClick={() => openPreview(url)}
+                    aria-label={`Preview ${label}`}
+                    className="size-full cursor-zoom-in"
+                  >
+                    {kind === 'video' ? (
+                      <video
+                        src={url}
+                        className="h-full w-full object-cover"
+                        muted
+                        preload="metadata"
+                      />
+                    ) : (
+                      <img
+                        src={url}
+                        alt=""
+                        className="h-full w-full object-cover"
+                      />
+                    )}
+                  </button>
                 )}
                 <button
                   type="button"
                   aria-label="Remove"
-                  onClick={() => onRemove(url)}
-                  className="absolute inset-0 flex items-center justify-center bg-black/50 text-white opacity-0 transition hover:opacity-100"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onRemove(url);
+                  }}
+                  className="absolute inset-0 z-10 flex items-center justify-center bg-black/50 text-white opacity-0 transition hover:opacity-100"
                 >
                   <Trash2 className="size-3" />
                 </button>
@@ -155,6 +223,7 @@ export function MediaUploader({
             ))}
           </div>
         ) : null}
+        {viewer}
       </div>
     );
   }
@@ -175,29 +244,41 @@ export function MediaUploader({
             key={url}
             className="bg-muted relative aspect-square overflow-hidden rounded-xl border"
           >
-            {accept.some((type) => type.startsWith('video/')) ? (
-              <video
-                src={url}
-                className="h-full w-full object-cover"
-                preload="metadata"
-                muted
-              />
-            ) : accept.some((type) => type.startsWith('audio/')) ? (
+            {kind === 'audio' ? (
               <div className="flex h-full items-center justify-center p-2 text-center text-xs">
                 Audio reference
               </div>
             ) : (
-              <img
-                src={url}
-                alt={label + ' reference'}
-                className="h-full w-full object-cover"
-              />
+              <button
+                type="button"
+                onClick={() => openPreview(url)}
+                aria-label={`Preview ${label}`}
+                className="size-full cursor-zoom-in"
+              >
+                {kind === 'video' ? (
+                  <video
+                    src={url}
+                    className="h-full w-full object-cover"
+                    preload="metadata"
+                    muted
+                  />
+                ) : (
+                  <img
+                    src={url}
+                    alt={label + ' reference'}
+                    className="h-full w-full object-cover"
+                  />
+                )}
+              </button>
             )}
             <button
               type="button"
               aria-label={'Remove ' + label}
-              onClick={() => onRemove(url)}
-              className="absolute top-1 right-1 rounded-full bg-black/70 p-1.5 text-white"
+              onClick={(event) => {
+                event.stopPropagation();
+                onRemove(url);
+              }}
+              className="absolute top-1 right-1 z-10 rounded-full bg-black/70 p-1.5 text-white"
             >
               <Trash2 className="size-3.5" />
             </button>
@@ -218,6 +299,7 @@ export function MediaUploader({
         ) : null}
       </div>
       {fileInput}
+      {viewer}
     </section>
   );
 }
