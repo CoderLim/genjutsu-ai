@@ -255,7 +255,13 @@ export async function generateWithGenerator(input: {
         generationId, userId: input.userId, userEmail: input.userEmail,
         state: verifiedState, sealedState: { ...verifiedState, inputs: sealed.inputs },
         signature: requestedSignature, quote,
-        ...getGeneratorProviderIdentity(state.modelId, verifiedState.workflow),
+        ...getGeneratorProviderIdentity(
+          state.modelId,
+          verifiedState.workflow,
+          verifiedState.inputs.referenceImages.length > 0 ||
+            verifiedState.inputs.referenceVideos.length > 0 ||
+            verifiedState.inputs.referenceAudio.length > 0
+        ),
       });
       // A concurrent request can have won and bound different sealed keys.
       const retained = parseTaskJson(task.options).inputs as GeneratorInputs;
@@ -289,7 +295,13 @@ export async function generateWithGenerator(input: {
     params: snapshot.params,
     workflow: snapshot.workflow,
   };
-  const identity = getGeneratorProviderIdentity(state.modelId, sealedState.workflow);
+  const identity = getGeneratorProviderIdentity(
+    state.modelId,
+    sealedState.workflow,
+    sealedInputs.referenceImages.length > 0 ||
+      sealedInputs.referenceVideos.length > 0 ||
+      sealedInputs.referenceAudio.length > 0
+  );
 
   // Failures before any network submission are definitively refundable:
   // an expired R2 URL or invalid provider payload must never be parked as
