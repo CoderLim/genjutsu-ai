@@ -1,75 +1,79 @@
-# Unified generator form capability audit
+# Generator capability, workflow and Raphael comparison audit
 
 Branch: `feat/unified-ai-generator-20261121`  
-Scope: Video and Image composer menus, workflows, upload slots, controls, credit quote and provider request mapping.  
-Status: **Code corrected and contract tests added; no paid provider end-to-end run verified.**
+Reviewed: 2026-11-21  
+Status: **Model and form code updated, tests authored; paid API end-to-end and live browser interactions not yet verified.**
 
-## Principles
+## Evidence and scope
 
-- The **model** menu lists enabled model variants only; workflow/mode is a different control.
-- The **workflow** menu only lists actual supported modes. First Frame requires a start image; Start & End requires both images; Text to Video requires neither.
-- Switching models/workflows retains only semantically compatible assets/settings. Unsupported slots are dropped.
-- Settings are derived from the selected model and workflow, not shared blindly across brands.
-- Client pricing uses the same catalog calculator as the server. Rates are **product credit tariffs**, not provider USD costs.
-- Disabled/unpriced models are excluded even from development UI, not silently mapped to a different endpoint.
+The user-provided Raphael screenshot confirms the **three video intent choices** and the requirement that image uploads are optional in All-in-One Reference.
 
-## Video capabilities available in the composer
+The publicly indexed Raphael model catalog lists Seedance, MiniMax H3 and Kling variants, Nano Banana 2.1 / 2 Lite / 2 / Pro, etc. The dynamic `?mode=video` form does not expose its full conditional model schema through publicly accessible static HTML. Therefore this document does **not** claim an exact, visually verified clone of every Raphael interaction. Where dynamic details are unavailable, each control is bounded by the relevant Fal or WaveSpeed endpoint schema, rather than guessing.
 
-| Model | Workflows | Duration / resolution choices | Other inputs or switches |
-| --- | --- | --- | --- |
-| Seedance 2.0 | First Frame, Start & End, Text, Multi-Image, All-in-One (different WaveSpeed profiles collapsed in the model menu) | 4–15s / 480p, 720p, 1080p, 4k | Sound; mixed references in All-in-One, Web Search there |
-| Seedance 2.0 Fast | First Frame, Start & End, Text | 4–15s / 480p, 720p | Sound |
-| Seedance 2.0 Mini | First Frame, Start & End, Text | 4–15s / 480p, 720p | Sound |
-| Seedance 2.5 | First Frame, Start & End, Text | 4–30s / 480p, 720p | Sound |
-| Seedance 2.5 Flash | First Frame, Start & End, Text | 4–30s / 480p, 720p | Sound |
-| MiniMax H3 | First Frame, Start & End, Text | 5–15s / 480P, 768P, 2K, 4K | Prompt Expansion: disabled, fast, balanced, quality |
-| MiniMax H3 Max Turbo / H3 Max | First Frame, Start & End, Text | 5–15s / **768P only in this product tariff** | Prompt Expansion: disabled, balanced, quality; no Fast switch |
-| Kling 4.0 | First Frame, Start & End, Text | 3–30s / 720p, 1080p | 4k/HDR intentionally not exposed without approved pricing |
-| Kling 4.0 Flash | **First Frame, Text only** | 3–20s / 720p | Image-to-Video endpoint does not accept end frame |
-| Kling 3.0 Turbo | **First Frame, Text only** | 3–15s / fixed 720p | JPEG/PNG input; image-to-video uses `image_url`, no end image |
-| Kling 3.0 (Pro) | First Frame, Start & End, Text | 3–15s / fixed 1080p | Sound |
+## Video workflow dropdown
 
-MiniMax **H3 Turbo** is not MiniMax **H3 Max Turbo**. The former has no independently verified endpoint or approved pricing in this repository and is disabled/hidden; the latter is an enabled Fal integration.
+There are **at most three visible choices**. `Text to Video` and `Multi-Image` remain internal workflow/provider profiles where needed, not user-facing dropdown choices.
 
-For first-image workflows, the aspect ratio follows the supplied frame; the text-only workflow may expose a supported aspect-ratio setting.
+1. **First Frame**: start frame is required. End frame and reference lists are not shown.
+2. **Start & End**: both start and end images are required; hidden on versions that lack an end-image API field.
+3. **All-in-One Reference**: optional image reference uploader when the model has an actual reference endpoint; without any references the task is routed to the text-to-video endpoint. Providers without a supported reference API show a text-only All-in-One (no fake image uploader). Seedance 2.0 retains the mixed image/video/audio reference slots supported by its existing WaveSpeed provider.
 
-## Image capabilities
+Changing the selected model or mode retains only compatible uploaded media and parameters. Unpriced models are not shown even in development. The server independently seals reference media, calculates credits and chooses provider identity from the actual submitted reference presence.
 
-| Model | Workflows | Options | References |
-| --- | --- | --- | --- |
-| Nano Banana 2 / Pro | Text to Image, Image Edit | 1K/2K/4K; 1–4 outputs; PNG/JPEG/WebP; model-supported aspect ratios | 1–14 images in edit mode |
-| MiniMax H3 Image / Highspeed | Text to Image, Image Edit | 1K/2K/4K; 1–4 outputs; PNG/JPEG/WebP; constrained aspect ratios | 1–16 images in edit mode |
-| FLUX.1 Schnell | Text to Image | Aspect ratio; 1–4 outputs; PNG/JPEG | None |
-| FLUX.2 Flash | Image Edit | Aspect ratio; 1–4 outputs; PNG/JPEG | 1–4 images |
+## Video models (current **product** limits)
 
-MiniMax H3 Image custom sizes are normalized to the Fal minimum area of 655,360 pixels. Actual Fal usage is token-based and customer prices still need verification on account invoices.
+| Model | First | Start & End | All-in-One ref images | Exposed duration and resolution |
+| --- | --- | --- | --- | --- |
+| Seedance 2.0 (WaveSpeed) | Yes | Yes | Optional up to 9 images, 3 videos, 3 audio | 4–15s · 480p/720p/1080p/4k |
+| Seedance 2.0 Fast | Yes | Yes | Optional up to 9 images | 4–15s · 480p/720p |
+| Seedance 2.0 Mini | Yes | Yes | Optional up to 9 images | 4–15s · 480p/720p |
+| Seedance 2.5 | Yes | Yes | Optional up to 30 images | 4–30s · 480p/720p |
+| Seedance 2.5 Flash | Yes | Yes | Optional up to 10 images | 4–30s · 480p/720p |
+| MiniMax H3 | Yes | Yes | Optional up to 9 images | 5–15s · **768P/2K/4K** |
+| MiniMax H3 Max Turbo | Yes | Yes | Optional up to 9 images | 5–15s · priced at **768P only** |
+| MiniMax H3 Max | Yes | Yes | Optional up to 9 images | 5–15s · priced at **768P only** |
+| Kling 4.0 | Yes | Yes | Optional up to 10 images | 3–30s · 720p/1080p |
+| Kling 4.0 Flash | Yes | **No** | Optional up to 10 images | 3–20s · 720p |
+| Kling 3.0 Turbo | Yes | **No** | Text-only; no reference endpoint currently exposed | 3–15s · 720p |
+| Kling 3.0 Pro | Yes | Yes | Text-only; no reference endpoint currently exposed | 3–15s · 1080p |
 
-## Confirmed defects fixed in this audit
+Fal has additional video/audio reference capabilities on many of these reference endpoints. These are **not yet offered** in new-model All-in-One because token- and input-duration-based billing has not been reconciled with the customer credit formula. Unpriced reference combinations must not be opened just for visual parity.
 
-1. Do not show disabled MiniMax H3 Turbo or unpriced reference-preview models as normal selectable options during local development.
-2. Do not offer Start & End on Kling V3 Turbo Standard or Kling V4 Flash image-to-video. The former uses `image_url`, unlike Kling V3 Pro and V4 `start_image_url`.
-3. Only expose Fast prompt expansion when its allowed enum includes `fast`; H3 Max variants use disabled/balanced/quality only.
-4. Show the full Prompt Expansion enum in Settings so `quality` is accessible and can be selected without normalization undoing it.
-5. Scope image upload types to the selected provider (Kling V3 Turbo supports JPEG/PNG). Add 21:9 for text-video profiles where provider schemas permit it.
-6. Add an enabled-model × declared-workflow contract test covering form validation, calculated credits, provider routing and request payload construction.
+Disabled: **MiniMax H3 Turbo** (not H3 Max Turbo) and the old experimental H3 Reference-to-Video profile. Neither should appear as billable, selectable models.
 
-## Still unverified / intentionally out of scope
+Extra settings: sound only for configured sound-capable models; image-to-video aspect follows the uploaded frame; text-only aspect is exposed when supported; H3 base has no Prompt Expansion field, while the enabled H3 Max variants expose Disabled/Balanced/Quality. No invalid Fast switch should be shown for H3 Max.
 
-- No real Fal/WaveSpeed charge, complete/poll/R2 persistence, failure/refund, or Cloudflare deployment test has been run by this audit. Run controlled staging smoke tests before production.
-- The `/photo-to-video` route retains its dedicated heading even when the shared composer lets the user switch to text or image generation; this is a separate route/SEO product decision.
-- Provider-specific image dimension checks (e.g. Kling minimum 300px on each side) are currently enforced by the provider, not a client-side pixel-size validator.
-- Upper tiers beyond the specifically priced catalog (e.g. Kling V4 4K) are intentionally not selectable. Do not display unsupported price/availability promises.
-- Single-choice fixed outputs are still visible in the shared settings bar; this is informational rather than a user-selectable capability.
+## Image model variants
 
-## References
+| Family | Models in menu | Main per-model settings |
+| --- | --- | --- |
+| Nano Banana | **2.1, 2 Lite, 2, Pro** | 2.1: 1K/2K/4K, text/edit, up to 14 reference images. Lite: **fixed 1K**, text/edit, up to 14 reference images, no `resolution` API field. 2/Pro: existing 1K/2K/4K text/edit profiles |
+| MiniMax | H3 Image, H3 Image Highspeed | 1K/2K/4K, text/edit, up to 16 reference images |
+| FLUX | FLUX.1 Schnell, FLUX.2 Flash | Schnell text image; Flash edit; respective output and input caps |
 
-- https://fal.ai/models/fal-ai/kling-video/v3/turbo/standard/image-to-video/api
-- https://fal.ai/models/fal-ai/kling-video/v3/pro/image-to-video/api
-- https://fal.ai/models/kling/v4/flash/image-to-video/api
-- https://fal.ai/models/kling/v4/image-to-video/api
-- https://fal.ai/models/minimax/h3/image-to-video/api
-- https://fal.ai/models/minimax/h3-max/image-to-video/api
-- https://fal.ai/models/minimax/h3-max-turbo/image-to-video/api
-- https://fal.ai/models/minimax/h3-image/edit/api
-- https://fal.ai/models/fal-ai/nano-banana-2/edit/api
-- https://wavespeed.ai/docs/docs-api/bytedance/bytedance-seedance-2.0-text-to-video
+New Nano Banana 2.1 and Lite use `google/nano-banana-2.1[/edit]` and `google/nano-banana-lite[/edit]`. Both are token-billed by Fal, so the provisional customer credits and per-reference surcharges require **actual Fal invoice checks before production**. Do not present these product tariffs as exact upstream costs.
+
+## API and pricing handoff
+
+- `src/modules/generator/model-families.ts`: visible video mode and brand menu; capability highlights.
+- `src/modules/generator/catalog.ts` / `additional-models.ts`: model-specific slots, settings, price and enabled state.
+- `src/modules/generator/normalize.ts`: drop incompatible assets and settings.
+- `src/modules/generator/adapters.ts`: actual provider endpoints; ref/no-ref decides which endpoint to use.
+- `src/modules/generator/service.ts`: seal/quote/reserve; record provider identity after checking actual reference input.
+- `src/modules/generator/*.test.ts`: mode-menu assertions, provider schema, product pricing, model transitions, mandatory/optional uploads.
+
+**Release gate:** Run `pnpm test`, `pnpm build`, browser model-switch and form interactions, and real Fal/WaveSpeed smoke requests for each enabled model and each priced mode. Verify true upstream charges, refund behavior, R2 output persistence and My Creations. No production merge/deploy was performed by this audit.
+
+## Sources
+
+- Raphael model listing: https://raphael.app/ai-models
+- Raphael workspace static content: https://raphael.app/?mode=video
+- Seedance Fast: https://fal.ai/models/bytedance/seedance-2.0/fast/reference-to-video/api
+- Seedance Mini: https://fal.ai/models/bytedance/seedance-2.0/mini/reference-to-video/api
+- Seedance 2.5: https://fal.ai/models/bytedance/seedance-2.5/reference-to-video/api
+- MiniMax H3 base: https://fal.ai/models/minimax/h3/reference-to-video/api
+- H3 Max: https://fal.ai/models/minimax/h3-max/reference-to-video/api
+- Kling 4.0: https://fal.ai/models/kling/v4/reference-to-video/api
+- Kling 4.0 Flash: https://fal.ai/models/kling/v4/flash/reference-to-video/api
+- Nano Banana 2.1: https://fal.ai/models/google/nano-banana-2.1/api
+- Nano Banana Lite: https://fal.ai/models/google/nano-banana-lite/api
