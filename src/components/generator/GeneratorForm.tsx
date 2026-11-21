@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, CheckCircle2, Download, LoaderCircle, Sparkles } from 'lucide-react';
 
 import { apiGet, apiPost, ApiError } from '@/lib/api-client';
-import { listGeneratorModels } from '@/modules/generator/catalog';
+import { GENERATOR_MODELS, listGeneratorModels } from '@/modules/generator/catalog';
 import {
   createGeneratorState,
   normalizeGeneratorState,
@@ -84,7 +84,11 @@ export function GeneratorForm({
   mediaType: MediaType;
   initialModelId?: string;
 }) {
-  const models = useMemo(() => listGeneratorModels(mediaType), [mediaType]);
+  const models = useMemo(() => (
+    import.meta.env.DEV
+      ? GENERATOR_MODELS.filter(item => item.mediaType === mediaType)
+      : listGeneratorModels(mediaType)
+  ), [mediaType]);
   const preferredModel = useMemo(
     () => models.find(item => item.id === initialModelId) ?? models[0],
     [initialModelId, models]
@@ -369,7 +373,7 @@ export function GeneratorForm({
     );
   }
 
-  const canSubmit = !!form.prompt.trim() && !!quote && !busy;
+  const canSubmit = model.enabled && !!form.prompt.trim() && !!quote && !busy;
   return (
     <section className="bg-card rounded-2xl border p-4 sm:p-6">
       <nav aria-label="Generator type" className="mb-5 flex gap-2">
@@ -436,7 +440,7 @@ export function GeneratorForm({
             <label htmlFor="generator-model" className="text-sm font-semibold">Model</label>
             <select id="generator-model" className="bg-background w-full rounded-xl border p-3 text-sm"
               value={model.id} onChange={event => setModel(event.target.value)}>
-              {models.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+              {models.map(item => <option key={item.id} value={item.id}>{item.name}{!item.enabled ? ' · Preview only' : ''}</option>)}
             </select>
           </div>
 
@@ -495,12 +499,12 @@ export function GeneratorForm({
                   <span className="text-muted-foreground text-xs">Estimated</span>
                 ) : null}
               </div>
-              <span className="text-2xl font-bold tabular-nums">{quote ? quote.credits : '—'}</span>
+              <span className="text-2xl font-bold tabular-nums">{model.enabled && quote ? quote.credits : '—'}</span>
             </div>
             <button type="button" disabled={!canSubmit} onClick={onGenerate}
               className="bg-primary text-primary-foreground disabled:opacity-50 flex w-full items-center justify-center gap-2 rounded-xl px-5 py-3 font-semibold">
               {busy ? <LoaderCircle className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
-              {busy ? stage || 'Working...' : 'Generate · ' + (quote?.credits ?? '—') + ' Credits'}
+              {busy ? stage || 'Working...' : model.enabled ? 'Generate · ' + (quote?.credits ?? '—') + ' Credits' : 'Preview only · Model unavailable'}
             </button>
             {priceChange ? (
               <button type="button" disabled={busy} onClick={onConfirmPrice}
@@ -510,7 +514,9 @@ export function GeneratorForm({
             ) : null}
             {pageError ? <p role="alert" className="text-destructive text-xs">{pageError}</p> : null}
             <p className="text-muted-foreground text-center text-xs">
-              Credits are checked and reserved by the server before generation.
+              {model.enabled
+                ? 'Credits are checked and reserved by the server before generation.'
+                : 'The workflow is shown for development preview. Its pricing or provider limits are not verified yet.'}
             </p>
           </div>
         </div>
