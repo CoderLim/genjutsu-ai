@@ -14,6 +14,7 @@ import {
 } from '@/modules/generator/catalog';
 import {
   availableGeneratorFieldValues,
+  getGeneratorExpansionControls,
   generatorReadinessError,
   getGeneratorSlotCapacity,
   isGeneratorJobActive,
@@ -761,9 +762,9 @@ export function GeneratorForm({
     !!spec.fields.promptExpansionMode &&
     !spec.fields.promptExpansionMode.internal;
   const expansionOptions = spec.fields.promptExpansionMode?.options ?? [];
-  const showEnhance = hasPromptExpansion && expansionOptions.includes('disabled');
-  const showFast = hasFastMode ||
-    (hasPromptExpansion && expansionOptions.includes('fast'));
+  const expansionControls = getGeneratorExpansionControls(spec);
+  const showEnhance = hasPromptExpansion && expansionControls.enhance;
+  const showFast = hasFastMode || expansionControls.fast;
   const enhanceOn =
     hasPromptExpansion && form.params.promptExpansionMode !== 'disabled';
   const fastOn = hasFastMode
