@@ -193,6 +193,14 @@ test('Fal video requests use provider-specific image field names, never generic 
   const request = buildGeneratorProviderRequest(createGeneratorState(minimax), media);
   assert.equal(request.image_url, media.startFrame);
   assert.equal(request.resolution, '768P');
+  assert.equal(request.prompt_expansion_mode, 'balanced');
+  assert.equal(request.enable_safety_checker, true);
+  assert.equal(request.generate_audio, undefined);
+  const end = updateGeneratorState(createGeneratorState(minimax), minimax, {
+    workflow: 'start-end',
+  });
+  const endRequest = buildGeneratorProviderRequest(end, media);
+  assert.equal(endRequest.end_image_url, media.endFrame);
 });
 
 test('Fal image model editing swaps endpoints and uses bounded image sizes', () => {

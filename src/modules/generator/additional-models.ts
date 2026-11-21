@@ -26,6 +26,7 @@ type VideoOptions = {
   rateResolution?: string;
   audio?: boolean;
   startEnd?: boolean;
+  promptExpansion?: boolean;
 };
 
 function videoFields(options: VideoOptions): Record<string, FieldSpec> {
@@ -49,6 +50,13 @@ function videoFields(options: VideoOptions): Record<string, FieldSpec> {
   if (options.audio) {
     fields.generateAudio = {
       label: 'Sound', default: true, options: [true],
+    };
+  }
+  if (options.promptExpansion) {
+    fields.promptExpansionMode = {
+      label: 'Prompt Expansion',
+      default: 'balanced',
+      options: ['disabled', 'balanced', 'quality'],
     };
   }
   return fields;
@@ -168,12 +176,12 @@ export const ADDITIONAL_GENERATOR_MODELS: readonly GeneratorModel[] = [
   videoProfile({
     id: 'minimax-h3-max-turbo', name: 'MiniMax H3 Max Turbo',
     resolutions: ['768P'], duration: [5, 15],
-    rateResolution: '768P', rate: 10, audio: true,
+    rateResolution: '768P', rate: 10, startEnd: true, promptExpansion: true,
   }),
   videoProfile({
     id: 'minimax-h3-max', name: 'MiniMax H3 Max',
     resolutions: ['768P'], duration: [5, 15],
-    rateResolution: '768P', rate: 16, audio: true,
+    rateResolution: '768P', rate: 16, startEnd: true, promptExpansion: true,
   }),
   videoProfile({
     id: 'kling-4', name: 'Kling 4.0',
