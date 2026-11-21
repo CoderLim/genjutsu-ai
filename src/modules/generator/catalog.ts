@@ -4,17 +4,17 @@ const IMAGE_MIME = ['image/jpeg', 'image/png', 'image/webp'] as const;
 const VIDEO_MIME = ['video/mp4', 'video/quicktime'] as const;
 const AUDIO_MIME = ['audio/mp4', 'audio/wav'] as const;
 // Input+output reference-video per-second customer tariff.
-const VIDEO_REFERENCE_RATES = { '480p': 12.75, '720p': 25.5, '1080p': 63.75 };
+const VIDEO_REFERENCE_RATES = { '480p': 12.75, '720p': 25.5, '1080p': 63.75, '4k': 127.5 };
 
 // Public user-credit tariffs. These are product prices, NOT provider cost data.
 // Per-second Seedance rates are based on 170 customer credits / provider USD,
 // reviewed 2026-11-21; operators must recheck whenever upstream rates change.
-const VIDEO_RATES = { '480p': 20.4, '720p': 40.8, '1080p': 102 };
+const VIDEO_RATES = { '480p': 20.4, '720p': 40.8, '1080p': 102, '4k': 204 };
 
 const baseVideoFields = {
   duration: { label: 'Duration', default: 5, min: 4, max: 15, step: 1 },
   resolution: {
-    label: 'Resolution', default: '720p', options: ['480p', '720p', '1080p'],
+    label: 'Resolution', default: '720p', options: ['480p', '720p', '1080p', '4k'],
   },
   aspectRatio: {
     label: 'Aspect Ratio', default: '9:16',

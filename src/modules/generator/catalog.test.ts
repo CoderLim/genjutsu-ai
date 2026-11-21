@@ -198,3 +198,17 @@ test('audio reference without image or video is invalid', () => {
     ...initial, inputs: { ...initial.inputs, referenceAudio: ['audio-only'] },
   }, model), /require an image or video/);
 });
+
+test('4k Seedance pricing is derived from verified output rates', () => {
+  const model = getGeneratorModel('seedance-2-i2v');
+  const state = updateGeneratorState(createGeneratorState(model), model, {
+    params: { resolution: '4k', duration: 4 },
+  });
+  assert.equal(calculateGeneratorCredits(state, model).credits, 816);
+  const referenceModel = getGeneratorModel('seedance-2-reference');
+  const reference = updateGeneratorState(createGeneratorState(referenceModel), referenceModel, {
+    inputs: { ...createGeneratorState(referenceModel).inputs, referenceVideos: ['video'] },
+    params: { inputVideoSeconds: 5, resolution: '4k', duration: 4 },
+  });
+  assert.equal(calculateGeneratorCredits(reference, referenceModel).credits, 1148);
+});
