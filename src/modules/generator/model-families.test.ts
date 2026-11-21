@@ -26,7 +26,7 @@ test('model chooser lists Seedance and Nano Banana, not workflow categories', ()
     'seedance-2-fast', 'seedance-2-mini',
     'seedance-2.5', 'seedance-2.5-flash',
   ]);
-  assert.deepEqual(groups[1].models.map(m => m.id), ['nano-banana-2', 'nano-banana-pro']);
+  assert.deepEqual(groups[1].models.map(m => m.id), ['nano-banana-2.1', 'nano-banana-2-lite', 'nano-banana-2', 'nano-banana-pro']);
   assert.equal(getGeneratorModelFamilyId('nano-banana-pro'), 'nano-banana');
   assert.equal(getGeneratorModelFamilyId('reference-to-video-pro'), 'minimax');
   assert.equal(GENERATOR_MODELS.find(model => model.id === 'reference-to-video-pro')?.name, 'MiniMax H3');
@@ -71,6 +71,8 @@ test('model menu contains one Seedance 2.0 item and no workflow or resolution me
   const menu = getGeneratorModelChoices(models);
   assert.deepEqual(menu.map(generatorModelLabel), [
     'Seedance 2.0',
+    'Nano Banana 2.1',
+    'Nano Banana 2 Lite',
     'Nano Banana 2',
     'Nano Banana Pro',
     'FLUX.1 Schnell',
@@ -149,7 +151,7 @@ test('image tab lists Nano Banana and real FLUX models, not feature labels', () 
   const groups = groupGeneratorModels(models);
   assert.deepEqual(groups.map(group => group.label), ['Nano Banana', 'MiniMax', 'FLUX']);
   assert.deepEqual(groups.map(group => group.models.map(generatorModelLabel)), [
-    ['Nano Banana 2', 'Nano Banana Pro'],
+    ['Nano Banana 2.1', 'Nano Banana 2 Lite', 'Nano Banana 2', 'Nano Banana Pro'],
     ['MiniMax H3 Image', 'MiniMax H3 Image Highspeed'],
     ['FLUX.1 Schnell', 'FLUX.2 Flash'],
   ]);
@@ -226,6 +228,8 @@ test('model highlights use configured maximum capabilities and actual minimum cr
     ['minimax-h3-max', 80, 'Up to 768p', 15],
     ['kling-4', 81, 'Up to 1080p', 30],
     ['kling-4-flash', 51, 'Up to 720p', 20],
+    ['nano-banana-2.1', 12, 'Up to 4K', null],
+    ['nano-banana-2-lite', 11, 'Up to 14 refs', null],
     ['nano-banana-2', 14, 'Up to 4K', null],
     ['nano-banana-pro', 26, 'Up to 4K', null],
     ['minimax-h3-image', 8, 'Up to 4K', null],
