@@ -299,8 +299,10 @@ export function buildGeneratorProviderRequest(
             ? { end_image_url: media.endFrame }
             : {}),
         } : { aspect_ratio: params.aspectRatio }),
-        prompt_expansion_mode: params.promptExpansionMode,
-        enable_safety_checker: true,
+        ...(id === 'minimax-h3' ? {} : {
+          prompt_expansion_mode: params.promptExpansionMode,
+          enable_safety_checker: true,
+        }),
       };
     }
     // Seedance Fast/Mini/2.5 use fal's image_url, not WaveSpeed's
