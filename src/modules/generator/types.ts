@@ -53,6 +53,8 @@ export type MediaLimit = {
   maxBytes?: number;
   minSeconds?: number;
   maxSeconds?: number;
+  /** Sum across clips, when the upstream reference endpoint limits total duration. */
+  maxTotalSeconds?: number;
 };
 
 export type ConditionalFieldRule = {
