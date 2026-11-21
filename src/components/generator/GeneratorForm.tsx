@@ -661,8 +661,15 @@ export function GeneratorForm({
   }
 
   const readinessError = generatorReadinessError(form, model);
+  // A review state may represent an upstream-accepted task with no response.
+  // Never offer a new same-form submission while that task is unresolved.
   const canSubmit =
-    model.enabled && !!quote && !readinessError && !busy && !mediaBusy;
+    model.enabled &&
+    !!quote &&
+    !readinessError &&
+    !busy &&
+    !mediaBusy &&
+    job?.status !== 'review';
   const activeSlots = INPUT_SLOTS.filter((slot) => !!spec.slots[slot]);
   const workflows = Object.keys(model.workflows) as Workflow[];
   const settingsFields = [
