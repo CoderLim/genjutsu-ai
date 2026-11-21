@@ -17,11 +17,12 @@ import { isGeneratorRequestIdConflict } from '@/modules/generator/request-bindin
 import { respData, respErr } from '@/lib/resp';
 
 /**
- * Admin-only exception resolution, for ambiguous provider submission with no
- * request ID (cannot be resolved by public status polling or cron).
+ * Admin-only exception resolution: uncertain submissions and repeated
+ * provider query failures. The latter retain their upstream request IDs and
+ * reserved credits; neither state is proof that the provider did not run.
  *
  * Refund requires manual upstream billing/log verification by an operator.
- * Never automatically refund unknown submissions.
+ * Never automatically refund unknown submissions or query failures.
  */
 async function POST({ request }: { request: Request }) {
   const session = await getAuth().api.getSession({ headers: request.headers });
@@ -47,10 +48,36 @@ async function POST({ request }: { request: Request }) {
     if (action === 'reconcile') {
       return respData(await reconcileGeneratorTask(task));
     }
-    if (task.status !== 'submission_unknown') {
-      return respErr('Only uncertain submissions can be manually resolved', { status: 409 });
+    if (action === 'resume-query') {
+      if (task.status !== 'query_review' || !task.taskId) {
+        return respErr('Only a reviewed task with a provider ID can resume querying', {
+          status: 409,
+        });
+      }
+      await db().update(aiTask).set({
+        status: 'submitted', taskResult: null,
+      }).where(and(
+        eq(aiTask.id, generationId),
+        eq(aiTask.userId, userId),
+        eq(aiTask.scene, GENERATOR_SCENE),
+        eq(aiTask.status, 'query_review'),
+        eq(aiTask.taskId, task.taskId)
+      ));
+      const updated = await getGeneratorTask({ generationId, userId });
+      if (!updated || updated.status !== 'submitted') {
+        return respErr('Generation changed while resuming query', { status: 409 });
+      }
+      return respData(await reconcileGeneratorTask(updated));
+    }
+    if (task.status !== 'submission_unknown' && task.status !== 'query_review') {
+      return respErr('Only uncertain submissions and query reviews can be resolved', {
+        status: 409,
+      });
     }
     if (action === 'link-request') {
+      if (task.status !== 'submission_unknown') {
+        return respErr('Only uncertain submissions can link a request ID', { status: 409 });
+      }
       const requestId = body.requestId;
       if (typeof requestId !== 'string' || requestId.length < 6 || requestId.length > 256) {
         throw new Error('Valid upstream requestId required');
@@ -82,12 +109,16 @@ async function POST({ request }: { request: Request }) {
       }
       const refunded = await refundGeneratorTask({
         userId, generationId,
-        reason: 'Admin verified provider did not accept this request',
+        reason: task.status === 'query_review'
+          ? 'Admin verified the provider charge and approved a manual refund'
+          : 'Admin verified provider did not accept this request',
+        allowedStatuses: [task.status],
       });
+      if (!refunded) return respErr('Generation changed before refund', { status: 409 });
       return respData({
         generationId,
-        status: refunded?.status ?? 'unchanged',
-        credits: refunded?.costCredits ?? task.costCredits,
+        status: refunded.status,
+        credits: refunded.costCredits,
       });
     }
     throw new Error('Unknown resolution action');
