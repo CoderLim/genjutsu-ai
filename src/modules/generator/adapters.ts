@@ -248,10 +248,12 @@ export function buildGeneratorProviderRequest(
         prompt: state.prompt,
         duration: String(params.duration),
         ...(hasImage
-          ? {
-              start_image_url: media.startFrame,
-              ...(state.workflow === 'start-end' ? { end_image_url: media.endFrame } : {}),
-            }
+          ? id === 'kling-3-turbo'
+            ? { image_url: media.startFrame }
+            : {
+                start_image_url: media.startFrame,
+                ...(state.workflow === 'start-end' ? { end_image_url: media.endFrame } : {}),
+              }
           : { aspect_ratio: params.aspectRatio }),
         ...(id === 'kling-3' ? { generate_audio: params.generateAudio } : {}),
       };
