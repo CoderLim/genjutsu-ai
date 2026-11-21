@@ -56,7 +56,7 @@ const MODEL_IDENTITIES: Record<string, ProviderIdentity> = {
   },
   'image-edit-standard': {
     provider: 'fal',
-    providerModelId: 'fal-ai/flux-2/flash/edit',
+    providerModelId: 'fal-ai/flux-2/flash',
   },
 };
 
@@ -144,6 +144,8 @@ export function getGeneratorProviderIdentity(
   const extra = ADDITIONAL_FAL_ENDPOINTS[modelId];
   if (extra) {
     const apiWorkflow = workflow === 'start-end' ? 'first-frame'
+      : workflow === 'text-to-image' && hasReferences === true &&
+        extra['image-to-image'] ? 'image-to-image'
       : workflow === 'all-in-one-reference' &&
         (hasReferences === false || !extra['all-in-one-reference'])
         ? 'text-to-video'
@@ -161,8 +163,12 @@ export function getGeneratorProviderIdentity(
   if (!identity) throw new Error('Unknown generator adapter: ' + modelId);
   // Both UI workflows share one named model; Fal has separate queue endpoints
   // for generation and editing. The selected endpoint is sealed in task options.
-  if (['nano-banana-2.1', 'nano-banana-2-lite', 'nano-banana-2', 'nano-banana-pro'].includes(modelId)
-    && workflow === 'image-to-image') {
+  if (
+    (['nano-banana-2.1', 'nano-banana-2-lite', 'nano-banana-2', 'nano-banana-pro']
+      .includes(modelId) || modelId === 'image-edit-standard') &&
+    (workflow === 'image-to-image' ||
+      (workflow === 'text-to-image' && hasReferences === true))
+  ) {
     return { ...identity, providerModelId: identity.providerModelId + '/edit' };
   }
   return identity;
@@ -237,7 +243,7 @@ export function buildGeneratorProviderRequest(
         image_size: minimaxCustomImageSize(params),
         num_images: params.outputCount,
         output_format: params.outputFormat,
-        ...(state.workflow === 'image-to-image'
+        ...(media.referenceImages.length
           ? { image_urls: media.referenceImages } : {}),
       };
     }
@@ -394,7 +400,7 @@ export function buildGeneratorProviderRequest(
     }
     return {
       prompt: state.prompt,
-      ...(state.workflow === 'image-to-image' ? { image_urls: media.referenceImages } : {}),
+      ...(media.referenceImages.length ? { image_urls: media.referenceImages } : {}),
       aspect_ratio: params.aspectRatio,
       ...(state.modelId === 'nano-banana-2-lite' ? {} : { resolution: params.resolution }),
       num_images: params.outputCount,
@@ -422,9 +428,12 @@ export function buildGeneratorProviderRequest(
     };
   }
   if (state.modelId === 'image-edit-standard') {
+    if (state.workflow === 'image-to-image' && !media.referenceImages.length) {
+      throw new Error('At least one reference image is required');
+    }
     return {
       prompt: state.prompt,
-      image_urls: media.referenceImages,
+      ...(media.referenceImages.length ? { image_urls: media.referenceImages } : {}),
       image_size: size,
       num_images: params.outputCount,
       output_format: params.outputFormat,
