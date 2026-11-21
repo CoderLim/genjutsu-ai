@@ -408,7 +408,14 @@ export function GeneratorForm({
     setDraft((prev) =>
       prev
         ? syncReferenceQuote(
-            retainCompatibleLocalMedia(normalizeGeneratorState(prev, next), next),
+            retainCompatibleLocalMedia(
+              normalizeGeneratorState(
+                prev, next,
+                // Image has no mode selector. Preserve any compatible
+                // references, but always use its unified default workflow.
+                next.mediaType === 'image' ? next.defaultWorkflow : prev.workflow
+              ), next
+            ),
             next
           )
         : createGeneratorState(next)
@@ -881,7 +888,8 @@ export function GeneratorForm({
               {activeSlots.map((slot) => {
                 const limit = spec.slots[slot]!;
                 const optional = isGeneratorSlotOptional(spec, slot);
-                const emptyLabel = SLOT_LABELS[slot];
+                const isImageReference = mediaType === 'image' && slot === 'referenceImages';
+                const emptyLabel = isImageReference ? 'Reference' : SLOT_LABELS[slot];
                 const capacity = getGeneratorSlotCapacity(
                   spec,
                   form.inputs,
@@ -892,6 +900,7 @@ export function GeneratorForm({
                     key={slot}
                     variant="composer"
                     optional={optional}
+                    hint={isImageReference ? 'Up to ' + limit.max : undefined}
                     label={emptyLabel}
                     urls={slotUrls(form.inputs, slot)}
                     max={slotUrls(form.inputs, slot).length + capacity}
