@@ -95,7 +95,6 @@ export type GeneratorModel = {
   id: string;
   name: string;
   mediaType: MediaType;
-  providerName: string;
   maxPromptChars?: number;
   enabled: boolean;
   defaultWorkflow: Workflow;

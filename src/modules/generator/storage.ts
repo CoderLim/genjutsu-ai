@@ -10,6 +10,7 @@ import {
   type R2SigningConfig,
 } from '@/lib/r2-signing-config';
 import type { GeneratorInputs, MediaSlot } from './types';
+import { limitStagingUploadStream } from './upload-limits';
 
 export const GENERATOR_MAX_IMAGE_BYTES = 12 * 1024 * 1024;
 export const GENERATOR_MAX_VIDEO_BYTES = 80 * 1024 * 1024;
@@ -164,27 +165,53 @@ function bucketBinding() {
 
 /** Browser -> same-origin authenticated PUT -> Workers R2 binding or local S3. */
 export async function putGeneratorStaging(input: {
-  key: string; body: ReadableStream; contentType: string; contentLength: number;
+  key: string; body: ReadableStream<Uint8Array>; contentType: string; contentLength: number;
+  maxBytes?: number;
 }) {
   safeKey(input.key);
   if (!input.key.startsWith('generator/staging/')) throw new Error('Not a staging key');
   const contentType = normalizeUploadType(input.contentType);
   assertUploadSize(contentType, input.contentLength);
+  const globalLimit = contentType.startsWith('image/')
+    ? GENERATOR_MAX_IMAGE_BYTES
+    : contentType.startsWith('video/') ? GENERATOR_MAX_VIDEO_BYTES : GENERATOR_MAX_AUDIO_BYTES;
+  const maxBytes = Math.min(input.maxBytes ?? globalLimit, globalLimit);
   const ext = EXTENSIONS[contentType];
   if (!input.key.endsWith('.' + ext)) throw new Error('File extension mismatch');
+  const bounded = limitStagingUploadStream(input.body, {
+    expectedBytes: input.contentLength,
+    maxBytes,
+  });
   const binding = bucketBinding();
   if (binding) {
     const cfg = await config();
-    await binding.put(resolveR2ObjectKey(cfg.uploadPath, input.key), input.body, {
-      httpMetadata: { contentType },
-    });
+    const key = resolveR2ObjectKey(cfg.uploadPath, input.key);
+    // Cloudflare R2 requires a fixed-length stream, not an unbounded TransformStream.
+    const FixedLength = (globalThis as any).FixedLengthStream;
+    if (typeof FixedLength !== 'function') throw new Error('FixedLengthStream unavailable');
+    const fixed = new FixedLength(input.contentLength);
+    const abort = new AbortController();
+    const piping = bounded.pipeTo(fixed.writable, { signal: abort.signal });
+    const uploading = Promise.resolve().then(() =>
+      binding.put(key, fixed.readable, { httpMetadata: { contentType } }));
+    try {
+      await Promise.all([piping, uploading]);
+    } catch (error) {
+      abort.abort();
+      await Promise.allSettled([piping, uploading]);
+      // Delete any partially persisted staging object on a size mismatch.
+      if (typeof binding.delete === 'function') {
+        await Promise.resolve(binding.delete(key)).catch(() => undefined);
+      }
+      throw error;
+    }
     return;
   }
   if ((globalThis as any).__CF_ENV__ || (globalThis as any).__env__) {
     throw new Error('R2_BUCKET binding missing');
   }
-  const bytes = new Uint8Array(await new Response(input.body).arrayBuffer());
-  if (bytes.byteLength !== input.contentLength) throw new Error('Upload size mismatch');
+  // Local/S3 fallback is also bounded before materializing bytes.
+  const bytes = new Uint8Array(await new Response(bounded).arrayBuffer());
   const cfg = await config();
   const response = await client(cfg).fetch(
     new Request(objectUrl(cfg, input.key), {

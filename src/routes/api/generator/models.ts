@@ -13,7 +13,6 @@ async function GET({ request }: { request: Request }) {
     .map(model => ({
       id: model.id,
       name: model.name,
-      providerName: model.providerName,
       mediaType: model.mediaType,
       defaultWorkflow: model.defaultWorkflow,
       workflows: model.workflows,

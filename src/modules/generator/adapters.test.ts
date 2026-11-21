@@ -9,7 +9,7 @@ import { getGeneratorModel } from './catalog';
 import { createGeneratorState, updateGeneratorState } from './normalize';
 
 test('photo-to-video maps first frame without sending last_image', () => {
-  const model = getGeneratorModel('seedance-2-i2v');
+  const model = getGeneratorModel('photo-to-video-standard');
   const state = updateGeneratorState(createGeneratorState(model), model, {
     prompt: 'A cinematic shot',
   });
@@ -28,7 +28,7 @@ test('photo-to-video maps first frame without sending last_image', () => {
 });
 
 test('photo-to-video start-end passes two different role-specific URLs', () => {
-  const model = getGeneratorModel('seedance-2-i2v');
+  const model = getGeneratorModel('photo-to-video-standard');
   const state = updateGeneratorState(createGeneratorState(model), model, {
     workflow: 'start-end',
     prompt: 'A transformation',
@@ -43,7 +43,7 @@ test('photo-to-video start-end passes two different role-specific URLs', () => {
 });
 
 test('image editing maps up to four references without legacy Genjutsu fields', () => {
-  const model = getGeneratorModel('flux2-flash-edit');
+  const model = getGeneratorModel('image-edit-standard');
   const state = updateGeneratorState(createGeneratorState(model), model, {
     prompt: 'Remove blemishes',
     params: { outputCount: 3, aspectRatio: '16:9' },
@@ -60,14 +60,14 @@ test('image editing maps up to four references without legacy Genjutsu fields', 
 });
 
 test('H3 video reference request is distinct from all-in-one workflow', () => {
-  assert.deepEqual(getGeneratorProviderIdentity('h3-reference'), {
+  assert.deepEqual(getGeneratorProviderIdentity('reference-to-video-pro'), {
     provider: 'fal',
     providerModelId: 'minimax/h3/reference-to-video',
   });
 });
 
 test('text-to-video sends no image field to WaveSpeed', () => {
-  const model = getGeneratorModel('seedance-2-t2v');
+  const model = getGeneratorModel('text-to-video-standard');
   const state = updateGeneratorState(createGeneratorState(model), model, {
     prompt: 'A summer storm over the sea',
   });
@@ -83,7 +83,7 @@ test('text-to-video sends no image field to WaveSpeed', () => {
 });
 
 test('multi-image reference sends only reference_images and uses text-to-video rates', () => {
-  const model = getGeneratorModel('seedance-2-multiimage');
+  const model = getGeneratorModel('multi-image-to-video');
   const state = updateGeneratorState(createGeneratorState(model), model, {
     prompt: '@image1 runs through a meadow, @image2 follows',
   });

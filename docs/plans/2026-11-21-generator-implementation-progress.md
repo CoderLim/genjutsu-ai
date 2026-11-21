@@ -29,13 +29,13 @@ The new routes never call the old `/api/genjutsu/*`, `/api/image-to-video/*` or 
 
 | Internal ID | Provider endpoint | Workflow | Public credit tariff |
 | --- | --- | --- | --- |
-| `seedance-2-i2v` | WaveSpeed `bytedance/seedance-2.0/image-to-video` | First Frame / Start & End | 480p: 20.4 credits/s; 720p: 40.8 credits/s; 1080p: 102 credits/s, ceil once |
-| `seedance-2-multiimage` | WaveSpeed `bytedance/seedance-2.0/text-to-video` | Multi-Image Reference (1–9 image refs only) | same video tariff (output seconds only) |
-| `seedance-2-t2v` | WaveSpeed `bytedance/seedance-2.0/text-to-video` | Text-to-Video | same video tariff |
-| `seedance-2-reference` | WaveSpeed `bytedance/seedance-2.0/reference-to-video` | All-in-One: up to 9 images, 3 videos and 3 WAV/M4A audio inputs (12 total) | Without videos: output-only tariff. With videos: (output seconds + billable input seconds) × 480p:12.75 / 720p:25.5 / 1080p:63.75 credits/s; 2s per-clip input minimum, rounded up sum ≤15s |
-| `h3-reference` | Fal `minimax/h3/reference-to-video` | Reference-to-Video; 1 video (5-15s) + 1-9 images | 480P:8.5/s, 768P:10.2/s, 2K:22.1/s, 4K:27.2/s + 13.6/image after first 5 |
-| `flux-schnell` | Fal `fal-ai/flux-1/schnell` | Text-to-Image | 4 credits/output |
-| `flux2-flash-edit` | Fal `fal-ai/flux-2/flash/edit` | Image-to-Image, 1-4 refs | (9 + 2 × extra reference images) credits/output |
+| `photo-to-video-standard` | WaveSpeed `bytedance/seedance-2.0/image-to-video` | First Frame / Start & End | 480p: 20.4 credits/s; 720p: 40.8 credits/s; 1080p: 102 credits/s, ceil once |
+| `multi-image-to-video` | WaveSpeed `bytedance/seedance-2.0/text-to-video` | Multi-Image Reference (1–9 image refs only) | same video tariff (output seconds only) |
+| `text-to-video-standard` | WaveSpeed `bytedance/seedance-2.0/text-to-video` | Text-to-Video | same video tariff |
+| `all-in-one-video` | WaveSpeed `bytedance/seedance-2.0/reference-to-video` | All-in-One: up to 9 images, 3 videos and 3 WAV/M4A audio inputs (12 total) | Without videos: output-only tariff. With videos: (output seconds + billable input seconds) × 480p:12.75 / 720p:25.5 / 1080p:63.75 credits/s; 2s per-clip input minimum, rounded up sum ≤15s |
+| `reference-to-video-pro` | Fal `minimax/h3/reference-to-video` | Reference-to-Video; 1 video (5-15s) + 1-9 images | 480P:8.5/s, 768P:10.2/s, 2K:22.1/s, 4K:27.2/s + 13.6/image after first 5 |
+| `text-to-image-fast` | Fal `fal-ai/flux-1/schnell` | Text-to-Image | 4 credits/output |
+| `image-edit-standard` | Fal `fal-ai/flux-2/flash/edit` | Image-to-Image, 1-4 refs | (9 + 2 × extra reference images) credits/output |
 
 Prices above are **new product decisions**, not automatic reproduction of upstream billed USD or confirmation of actual merchant margins. Frontend calculates customer credits synchronously (no quote requests); server recalculates and reserves; publishing prices requires owner/provider verification. `GENERATOR_MODELS` is the independent catalog. Old Genjutsu pricing is unchanged.
 
@@ -43,7 +43,7 @@ Prices above are **new product decisions**, not automatic reproduction of upstre
 
 - All-in-One is implemented and enabled in this test branch. The browser reads local video/audio duration for instantaneous credit display. The backend independently probes **sealed** R2 reference media to determine actual billable seconds, checks 15s input limits and prevents any extra deduction without price confirmation.
 - Browser/internal `inputVideoSeconds` is never trusted for billing. Only WAV and M4A audio references are currently enabled (server duration parser supports these formats).
-- Audio-only references are rejected; images and/or videos are required. H3 is a separate, narrower workflow: 1 reference video + 1–9 images, not the All-in-One model. H3 credits are still an estimate until real usage is verified.
+- Audio-only references are rejected; images and/or videos are required. H3 is disabled pending verified exact pricing. The planned workflow is 1 reference video + 1–9 images, separate from All-in-One. H3 credits are still an estimate until real usage is verified.
 - New routes remain `noindex, nofollow` during staged testing.
 
 ## Architecture and operational protections
@@ -105,3 +105,10 @@ Live provider generation, actual charged USD/tokens and Cloudflare D1/R2 runtime
 - WaveSpeed Reference-to-Video: https://wavespeed.ai/docs/docs-api/bytedance/seedance-2.0/reference-to-video
 - fal FLUX.2 Flash Edit: https://fal.ai/models/fal-ai/flux-2/flash/edit/api
 - fal MiniMax H3: https://fal.ai/minimax-h3
+
+## High-priority review fixes
+
+- The estimated-price reference-to-video model is disabled for customer billing until verified exact rates are approved.
+- Customer-facing model IDs/names are product labels; the upstream provider mapping remains private to the server adapter.
+- R2 staging uploads validate streamed byte count, declared length and model-specific upload caps before completing writes.
+- Admin request-ID recovery rejects request IDs already linked to a different generator task (HTTP 409).

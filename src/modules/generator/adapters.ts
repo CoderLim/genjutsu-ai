@@ -26,31 +26,31 @@ export type ProviderIdentity = {
 };
 
 const MODEL_IDENTITIES: Record<string, ProviderIdentity> = {
-  'seedance-2-multiimage': {
+  'multi-image-to-video': {
     provider: 'wavespeed',
     providerModelId: 'bytedance/seedance-2.0/text-to-video',
   },
-  'seedance-2-t2v': {
+  'text-to-video-standard': {
     provider: 'wavespeed',
     providerModelId: 'bytedance/seedance-2.0/text-to-video',
   },
-  'seedance-2-i2v': {
+  'photo-to-video-standard': {
     provider: 'wavespeed',
     providerModelId: 'bytedance/seedance-2.0/image-to-video',
   },
-  'seedance-2-reference': {
+  'all-in-one-video': {
     provider: 'wavespeed',
     providerModelId: 'bytedance/seedance-2.0/reference-to-video',
   },
-  'h3-reference': {
+  'reference-to-video-pro': {
     provider: 'fal',
     providerModelId: 'minimax/h3/reference-to-video',
   },
-  'flux-schnell': {
+  'text-to-image-fast': {
     provider: 'fal',
     providerModelId: 'fal-ai/flux-1/schnell',
   },
-  'flux2-flash-edit': {
+  'image-edit-standard': {
     provider: 'fal',
     providerModelId: 'fal-ai/flux-2/flash/edit',
   },
@@ -58,7 +58,7 @@ const MODEL_IDENTITIES: Record<string, ProviderIdentity> = {
 
 export class GeneratorProviderNotConfiguredError extends Error {
   constructor(provider: string) {
-    super(provider + ' API key is not configured');
+    super('Generation service is temporarily unavailable');
     this.name = 'GeneratorProviderNotConfiguredError';
   }
 }
@@ -99,7 +99,7 @@ export function buildGeneratorProviderRequest(
   media: MediaReadUrls
 ): Record<string, unknown> {
   const params = state.params;
-  if (state.modelId === 'seedance-2-multiimage') {
+  if (state.modelId === 'multi-image-to-video') {
     if (media.referenceImages.length < 1) throw new Error('Reference images required');
     if (media.referenceVideos.length || media.referenceAudio.length) {
       throw new Error('This model accepts images only; mixed references require verified billing');
@@ -114,7 +114,7 @@ export function buildGeneratorProviderRequest(
     };
   }
 
-  if (state.modelId === 'seedance-2-t2v') {
+  if (state.modelId === 'text-to-video-standard') {
     return {
       prompt: state.prompt,
       duration: params.duration,
@@ -124,7 +124,7 @@ export function buildGeneratorProviderRequest(
     };
   }
 
-  if (state.modelId === 'seedance-2-i2v') {
+  if (state.modelId === 'photo-to-video-standard') {
     if (!media.startFrame) throw new Error('Start frame is required');
     return {
       image: media.startFrame,
@@ -137,7 +137,7 @@ export function buildGeneratorProviderRequest(
     };
   }
 
-  if (state.modelId === 'seedance-2-reference') {
+  if (state.modelId === 'all-in-one-video') {
     if (
       state.workflow === 'all-in-one-reference' &&
       !media.referenceImages.length &&
@@ -159,7 +159,7 @@ export function buildGeneratorProviderRequest(
     };
   }
 
-  if (state.modelId === 'h3-reference') {
+  if (state.modelId === 'reference-to-video-pro') {
     if (media.referenceVideos.length !== 1 ||
         media.referenceImages.length < 1) {
       throw new Error('H3 requires one video and at least one image');
@@ -185,7 +185,7 @@ export function buildGeneratorProviderRequest(
   };
   const size = sizeByAspectRatio[String(params.aspectRatio)];
   if (!size) throw new Error('Unsupported image aspect ratio');
-  if (state.modelId === 'flux-schnell') {
+  if (state.modelId === 'text-to-image-fast') {
     return {
       prompt: state.prompt,
       image_size: size,
@@ -194,7 +194,7 @@ export function buildGeneratorProviderRequest(
       enable_safety_checker: true,
     };
   }
-  if (state.modelId === 'flux2-flash-edit') {
+  if (state.modelId === 'image-edit-standard') {
     return {
       prompt: state.prompt,
       image_urls: media.referenceImages,
@@ -298,7 +298,7 @@ export async function queryGeneratorProvider(input: {
     }
     return {
       status: 'failed', providerStatus, outputUrls: [],
-      error: String(result.taskInfo?.errorMessage || 'Fal generation failed'),
+      error: String(result.taskInfo?.errorMessage || 'Generation failed'),
     };
   }
   return { status: 'processing', providerStatus, outputUrls: [] };

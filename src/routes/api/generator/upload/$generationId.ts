@@ -58,6 +58,7 @@ async function PUT({ request, params }: {
     if (!request.body) throw new Error('Missing upload bytes');
     await putGeneratorStaging({
       key, contentType, contentLength: length, body: request.body,
+      maxBytes: limit.maxBytes,
     });
     return new Response(null, { status: 204, headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {

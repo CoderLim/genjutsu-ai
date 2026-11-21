@@ -16,13 +16,15 @@ test('live catalog capabilities and price tables are valid', () => {
 test('public catalog lists completed reference workflows', () => {
   const ids = listGeneratorModels().map(x => x.id);
   assert.deepEqual(ids, [
-    'seedance-2-i2v', 'seedance-2-t2v', 'seedance-2-multiimage', 'seedance-2-reference', 'h3-reference', 'flux-schnell', 'flux2-flash-edit',
+    'photo-to-video-standard', 'text-to-video-standard', 'multi-image-to-video', 'all-in-one-video', 'text-to-image-fast', 'image-edit-standard',
   ]);
-  assert.equal(getGeneratorModel('seedance-2-reference').enabled, true);
+  assert.equal(getGeneratorModel('all-in-one-video').enabled, true);
+  assert.throws(() => getGeneratorModel('reference-to-video-pro'), /not enabled/);
+  assert.equal(GENERATOR_MODELS.find(x => x.id === 'reference-to-video-pro')?.enabled, false);
 });
 
 test('photo-to-video offers verified first-frame and start-end only', () => {
-  const model = getGeneratorModel('seedance-2-i2v');
+  const model = getGeneratorModel('photo-to-video-standard');
   assert.deepEqual(Object.keys(model.workflows), ['first-frame', 'start-end']);
   assert.equal(model.workflows['start-end']!.slots.endFrame!.max, 1);
   assert.equal(model.workflows['first-frame']!.slots.startFrame!.min, 1);
@@ -30,7 +32,7 @@ test('photo-to-video offers verified first-frame and start-end only', () => {
 });
 
 test('photo-to-video workflow retains start and drops end when switching', () => {
-  const model = getGeneratorModel('seedance-2-i2v');
+  const model = getGeneratorModel('photo-to-video-standard');
   const start = createGeneratorState(model);
   const full = updateGeneratorState(start, model, {
     workflow: 'start-end',
@@ -43,7 +45,7 @@ test('photo-to-video workflow retains start and drops end when switching', () =>
 });
 
 test('photo-to-video credits are synchronous across duration and resolution', () => {
-  const model = getGeneratorModel('seedance-2-i2v');
+  const model = getGeneratorModel('photo-to-video-standard');
   const base = createGeneratorState(model);
   assert.equal(calculateGeneratorCredits(base, model).credits, 204);
   assert.equal(
@@ -72,7 +74,7 @@ test('photo-to-video credits are synchronous across duration and resolution', ()
 });
 
 test('image pricing multiplies output count and reference image surcharges', () => {
-  const textModel = getGeneratorModel('flux-schnell');
+  const textModel = getGeneratorModel('text-to-image-fast');
   const text = createGeneratorState(textModel);
   assert.equal(calculateGeneratorCredits(text, textModel).credits, 4);
   assert.equal(
@@ -83,7 +85,7 @@ test('image pricing multiplies output count and reference image surcharges', () 
     12
   );
 
-  const editModel = getGeneratorModel('flux2-flash-edit');
+  const editModel = getGeneratorModel('image-edit-standard');
   const edit = updateGeneratorState(createGeneratorState(editModel), editModel, {
     inputs: {
       ...createGeneratorState(editModel).inputs,
@@ -96,7 +98,7 @@ test('image pricing multiplies output count and reference image surcharges', () 
 });
 
 test('server validation rejects manipulated cost and unsupported modes', () => {
-  const model = getGeneratorModel('seedance-2-i2v');
+  const model = getGeneratorModel('photo-to-video-standard');
   const state = createGeneratorState(model);
   assert.throws(
     () => assertGeneratorDraft({
@@ -120,7 +122,7 @@ test('server validation rejects manipulated cost and unsupported modes', () => {
 });
 
 test('H3 supports reference-video workflow but not All-in-One', () => {
-  const h3 = getGeneratorModel('h3-reference');
+  const h3 = GENERATOR_MODELS.find(x => x.id === 'reference-to-video-pro')!;
   assert.deepEqual(Object.keys(h3.workflows), ['reference-to-video']);
   const spec = h3.workflows['reference-to-video']!;
   assert.equal(spec.slots.referenceVideos?.min, 1);
@@ -138,7 +140,7 @@ test('H3 supports reference-video workflow but not All-in-One', () => {
 });
 
 test('text-to-video is priced without reference media', () => {
-  const model = getGeneratorModel('seedance-2-t2v');
+  const model = getGeneratorModel('text-to-video-standard');
   const state = createGeneratorState(model);
   assert.equal(state.workflow, 'text-to-video');
   assert.deepEqual(Object.keys(model.workflows['text-to-video']!.slots), []);
@@ -149,7 +151,7 @@ test('text-to-video is priced without reference media', () => {
 });
 
 test('multi-image reference charges output seconds only and truncates extra photos', () => {
-  const model = getGeneratorModel('seedance-2-multiimage');
+  const model = getGeneratorModel('multi-image-to-video');
   const state = createGeneratorState(model);
   assert.equal(state.workflow, 'all-in-one-reference');
   assert.equal(model.workflows['all-in-one-reference']!.slots.referenceImages?.max, 9);
@@ -165,7 +167,7 @@ test('multi-image reference charges output seconds only and truncates extra phot
 });
 
 test('reference video input charges input+output using provider-specific tariff', () => {
-  const model = getGeneratorModel('seedance-2-reference');
+  const model = getGeneratorModel('all-in-one-video');
   const defaultDraft = createGeneratorState(model);
   assert.throws(() => assertGeneratorReady({
     ...defaultDraft, prompt: 'Generate a running scene',
@@ -192,7 +194,7 @@ test('reference video input charges input+output using provider-specific tariff'
   ), /duration is not ready/);
 });
 test('audio reference without image or video is invalid', () => {
-  const model = getGeneratorModel('seedance-2-reference');
+  const model = getGeneratorModel('all-in-one-video');
   const initial = createGeneratorState(model);
   assert.throws(() => assertGeneratorDraft({
     ...initial, inputs: { ...initial.inputs, referenceAudio: ['audio-only'] },
@@ -200,15 +202,23 @@ test('audio reference without image or video is invalid', () => {
 });
 
 test('4k Seedance pricing is derived from verified output rates', () => {
-  const model = getGeneratorModel('seedance-2-i2v');
+  const model = getGeneratorModel('photo-to-video-standard');
   const state = updateGeneratorState(createGeneratorState(model), model, {
     params: { resolution: '4k', duration: 4 },
   });
   assert.equal(calculateGeneratorCredits(state, model).credits, 816);
-  const referenceModel = getGeneratorModel('seedance-2-reference');
+  const referenceModel = getGeneratorModel('all-in-one-video');
   const reference = updateGeneratorState(createGeneratorState(referenceModel), referenceModel, {
     inputs: { ...createGeneratorState(referenceModel).inputs, referenceVideos: ['video'] },
     params: { inputVideoSeconds: 5, resolution: '4k', duration: 4 },
   });
   assert.equal(calculateGeneratorCredits(reference, referenceModel).credits, 1148);
+});
+
+test('public catalog never reveals upstream brands or enabled estimated models', () => {
+  const publicModels = listGeneratorModels();
+  const serialized = JSON.stringify(publicModels);
+  assert.doesNotMatch(serialized, /wavespeed|fal|seedance|minimax|flux|h3-reference/i);
+  assert.ok(publicModels.every(m => m.pricing.precision === 'exact'));
+  assert.ok(publicModels.every(m => m.enabled));
 });

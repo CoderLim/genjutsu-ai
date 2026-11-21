@@ -18,7 +18,7 @@ function PhotoToVideoPage() {
           Start &amp; End to guide both frames. Your credit estimate updates
           immediately as the video settings change.
         </p>
-        <GeneratorForm mediaType="video" initialModelId="seedance-2-i2v" />
+        <GeneratorForm mediaType="video" initialModelId="photo-to-video-standard" />
       </main>
       <SiteFooter />
     </div>

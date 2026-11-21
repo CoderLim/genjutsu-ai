@@ -40,9 +40,9 @@ const IMAGE_FIELDS = {
 // Avoid reusing the legacy Genjutsu model/product routing and env pins.
 export const GENERATOR_MODELS: readonly GeneratorModel[] = [
   {
-    id: 'seedance-2-i2v',
-    name: 'Seedance 2.0 · Photo to Video',
-    mediaType: 'video', providerName: 'WaveSpeed',
+    id: 'photo-to-video-standard',
+    name: 'Photo to Video · Standard',
+    mediaType: 'video',
     enabled: true,
     defaultWorkflow: 'first-frame',
     pricing: {
@@ -69,9 +69,9 @@ export const GENERATOR_MODELS: readonly GeneratorModel[] = [
     },
   },
   {
-    id: 'seedance-2-t2v',
-    name: 'Seedance 2.0 · Text to Video',
-    mediaType: 'video', providerName: 'WaveSpeed',
+    id: 'text-to-video-standard',
+    name: 'Text to Video · Standard',
+    mediaType: 'video',
     enabled: true,
     defaultWorkflow: 'text-to-video',
     pricing: {
@@ -88,9 +88,9 @@ export const GENERATOR_MODELS: readonly GeneratorModel[] = [
     },
   },
   {
-    id: 'seedance-2-multiimage',
-    name: 'Seedance 2.0 · Multi-Image Reference',
-    mediaType: 'video', providerName: 'WaveSpeed',
+    id: 'multi-image-to-video',
+    name: 'Multi-Image to Video',
+    mediaType: 'video',
     enabled: true,
     defaultWorkflow: 'all-in-one-reference',
     // Image-only reference subset. Adding reference videos changes billing to
@@ -113,9 +113,9 @@ export const GENERATOR_MODELS: readonly GeneratorModel[] = [
     },
   },
   {
-    id: 'seedance-2-reference',
-    name: 'Seedance 2.0 · All-in-One',
-    mediaType: 'video', providerName: 'WaveSpeed',
+    id: 'all-in-one-video',
+    name: 'All-in-One Video',
+    mediaType: 'video',
     enabled: true,
     defaultWorkflow: 'all-in-one-reference',
     pricing: {
@@ -147,11 +147,11 @@ export const GENERATOR_MODELS: readonly GeneratorModel[] = [
     },
   },
   {
-    id: 'h3-reference',
-    name: 'MiniMax H3 · Reference to Video',
-    mediaType: 'video', providerName: 'Fal',
+    id: 'reference-to-video-pro',
+    name: 'Reference to Video · Pro',
+    mediaType: 'video',
     maxPromptChars: 7000,
-    enabled: true,
+    enabled: false,
     defaultWorkflow: 'reference-to-video',
     pricing: {
       version: '2026-11-21-h3-draft',
@@ -190,9 +190,9 @@ export const GENERATOR_MODELS: readonly GeneratorModel[] = [
     },
   },
   {
-    id: 'flux-schnell',
-    name: 'FLUX.1 Schnell · Text to Image',
-    mediaType: 'image', providerName: 'Fal',
+    id: 'text-to-image-fast',
+    name: 'Text to Image · Fast',
+    mediaType: 'image',
     enabled: true,
     defaultWorkflow: 'text-to-image',
     pricing: {
@@ -207,9 +207,9 @@ export const GENERATOR_MODELS: readonly GeneratorModel[] = [
     },
   },
   {
-    id: 'flux2-flash-edit',
-    name: 'FLUX.2 Flash · Image Edit',
-    mediaType: 'image', providerName: 'Fal',
+    id: 'image-edit-standard',
+    name: 'Image Editor · Standard',
+    mediaType: 'image',
     enabled: true,
     defaultWorkflow: 'image-to-image',
     pricing: {

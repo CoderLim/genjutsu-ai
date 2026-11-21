@@ -9,9 +9,11 @@ import {
   GENERATOR_SCENE,
   refundGeneratorTask,
   getGeneratorTask,
+  getGeneratorTaskByRequestId,
 } from '@/modules/generator/billing';
 import { reconcileGeneratorTask } from '@/modules/generator/service';
 import { assertGenerationId } from '@/modules/generator/storage';
+import { isGeneratorRequestIdConflict } from '@/modules/generator/request-binding';
 import { respData, respErr } from '@/lib/resp';
 
 /**
@@ -53,6 +55,12 @@ async function POST({ request }: { request: Request }) {
       if (typeof requestId !== 'string' || requestId.length < 6 || requestId.length > 256) {
         throw new Error('Valid upstream requestId required');
       }
+      const linked = await getGeneratorTaskByRequestId(requestId);
+      if (isGeneratorRequestIdConflict(linked, generationId)) {
+        return respErr('Provider request ID is already linked to another generation', {
+          status: 409,
+        });
+      }
       await db().update(aiTask).set({
         taskId: requestId, status: 'submitted', taskResult: null,
       }).where(and(
@@ -63,6 +71,9 @@ async function POST({ request }: { request: Request }) {
       ));
       const updated = await getGeneratorTask({ generationId, userId });
       if (!updated) return respErr('Generation missing after update', { status: 500 });
+      if (updated.taskId !== requestId || updated.status === 'submission_unknown') {
+        return respErr('Generation changed while linking the request', { status: 409 });
+      }
       return respData(await reconcileGeneratorTask(updated));
     }
     if (action === 'refund') {
