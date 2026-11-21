@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   buildGeneratorProviderRequest,
   getGeneratorProviderIdentity,
+  getGeneratorQueryIdentity,
 } from './adapters';
 import { GENERATOR_MODELS, getGeneratorModel } from './catalog';
 import { createGeneratorState, updateGeneratorState } from './normalize';
@@ -315,7 +316,9 @@ test('model-specific workflows match documented Fal frame and expansion support'
   for (const id of ['kling-3-turbo', 'kling-4-flash']) {
     const model = getGeneratorModel(id);
     assert.deepEqual(Object.keys(model.workflows),
-      ['first-frame', 'all-in-one-reference', 'text-to-video'], id);
+      id === 'kling-4-flash'
+        ? ['first-frame', 'all-in-one-reference', 'text-to-video']
+        : ['first-frame', 'text-to-video'], id);
     assert.equal(model.workflows['start-end'], undefined, id);
   }
   for (const id of ['kling-3', 'kling-4', 'minimax-h3']) {
@@ -394,7 +397,6 @@ test('All-in-One routes text-only and reference-image input to different verifie
     ['seedance-2-mini', 'bytedance/seedance-2.0/mini/reference-to-video', 'image_urls'],
     ['seedance-2.5', 'bytedance/seedance-2.5/reference-to-video', 'image_urls'],
     ['seedance-2.5-flash', 'bytedance/seedance-2.5/flash/reference-to-video', 'image_urls'],
-    ['minimax-h3', 'minimax/h3/reference-to-video', 'reference_image_urls'],
     ['minimax-h3-max', 'minimax/h3-max/reference-to-video', 'reference_image_urls'],
     ['minimax-h3-max-turbo', 'minimax/h3-max-turbo/reference-to-video', 'reference_image_urls'],
     ['kling-4', 'kling/v4/reference-to-video', 'image_urls'],
@@ -437,13 +439,10 @@ test('All-in-One routes text-only and reference-image input to different verifie
     'bytedance/seedance-2.0/reference-to-video');
 });
 
-test('text-only All-in-One on models without reference endpoint has no fake upload slot', () => {
-  for (const id of ['kling-3', 'kling-3-turbo']) {
+test('modes without reference capability never advertise fake All-in-One', () => {
+  for (const id of ['minimax-h3', 'kling-3', 'kling-3-turbo']) {
     const model = getGeneratorModel(id);
-    const spec = model.workflows['all-in-one-reference']!;
-    assert.deepEqual(Object.keys(spec.slots), [], id);
-    assert.equal(getGeneratorProviderIdentity(id, 'all-in-one-reference').providerModelId,
-      getGeneratorProviderIdentity(id, 'text-to-video').providerModelId);
+    assert.equal(model.workflows['all-in-one-reference'], undefined, id);
   }
 });
 
@@ -480,4 +479,48 @@ test('Nano Banana 2.1 and Lite use independent Fal endpoints and only supported 
     assert.deepEqual(request.image_urls, ['https://example.test/photo.png']);
     assert.equal(request.resolution, resolution);
   }
+});
+
+test('reconcile always uses the provider endpoint saved on the generation record', () => {
+  const modelId = 'seedance-2.5';
+  const workflow = 'all-in-one-reference' as const;
+  const textEndpoint = getGeneratorProviderIdentity(modelId, workflow, false).providerModelId;
+  const refEndpoint = getGeneratorProviderIdentity(modelId, workflow, true).providerModelId;
+  assert.notEqual(textEndpoint, refEndpoint);
+  assert.equal(getGeneratorQueryIdentity({
+    modelId, workflow, providerModelId: textEndpoint,
+  }).providerModelId, textEndpoint);
+  assert.equal(getGeneratorQueryIdentity({
+    modelId, workflow, providerModelId: refEndpoint,
+  }).providerModelId, refEndpoint);
+
+  const base = getGeneratorModel('all-in-one-video');
+  const wavTextEndpoint = getGeneratorProviderIdentity(base.id, workflow, false).providerModelId;
+  assert.equal(getGeneratorQueryIdentity({
+    modelId: base.id, workflow, providerModelId: wavTextEndpoint,
+  }).providerModelId, wavTextEndpoint);
+});
+
+test('H3 base exposes only two Raphael modes and does not promise non-existent Fal options', () => {
+  const model = getGeneratorModel('minimax-h3');
+  assert.deepEqual(Object.keys(model.workflows),
+    ['first-frame', 'start-end', 'text-to-video']);
+  for (const mode of ['first-frame', 'start-end'] as const) {
+    const spec = model.workflows[mode]!;
+    assert.deepEqual(spec.fields.resolution.options, ['768P', '2K', '4K']);
+    assert.equal(spec.fields.duration.min, 5);
+    assert.equal(spec.fields.duration.max, 15);
+    assert.equal(spec.fields.generateAudio, undefined);
+    assert.equal(spec.fields.promptExpansionMode, undefined);
+  }
+  const state = updateGeneratorState(createGeneratorState(model), model, {
+    prompt: 'A long tracking shot',
+  });
+  const body = buildGeneratorProviderRequest(state, {
+    ...emptyMedia,
+    startFrame: 'https://example.test/start.jpg',
+  });
+  assert.equal(body.generate_audio, undefined);
+  assert.equal(body.prompt_expansion_mode, undefined);
+  assert.equal(body.enable_safety_checker, undefined);
 });
