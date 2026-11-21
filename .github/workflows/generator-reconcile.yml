@@ -1,0 +1,47 @@
+name: Reconcile Unified Generator Jobs
+
+# This workflow is installed with the feature branch. Scheduled triggers only
+# start once it is merged into the repository's default branch. Deploy the
+# generator API first; enable the repository variable only after smoke tests.
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: generator-reconcile
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    if: vars.GENERATOR_RECONCILE_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Validate environment
+        env:
+          GENERATOR_CRON_SECRET: \${{ secrets.GENERATOR_CRON_SECRET }}
+          GENERATOR_SITE_URL: \${{ vars.GENERATOR_SITE_URL }}
+        shell: bash
+        run: |
+          test -n "$GENERATOR_CRON_SECRET"
+          test -n "$GENERATOR_SITE_URL"
+          case "$GENERATOR_SITE_URL" in
+            https://*) ;;
+            *) exit 1 ;;
+          esac
+
+      - name: Reconcile pending generation jobs
+        env:
+          GENERATOR_CRON_SECRET: \${{ secrets.GENERATOR_CRON_SECRET }}
+          GENERATOR_SITE_URL: \${{ vars.GENERATOR_SITE_URL }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail-with-body --silent --show-error --max-time 90 \\
+            -X POST \\
+            -H "Authorization: Bearer $GENERATOR_CRON_SECRET" \\
+            "$GENERATOR_SITE_URL/api/cron/generator/reconcile"
