@@ -96,6 +96,19 @@ export function availableGeneratorFieldValues(
   );
 }
 
+/**
+ * MiniMax H3 supports a Fast expansion mode, while Max variants expose only
+ * disabled/balanced/quality. The UI must not render a switch that normalizes
+ * every click back to the previous value.
+ */
+export function getGeneratorExpansionControls(spec: WorkflowSpec) {
+  const modes = spec.fields.promptExpansionMode?.options ?? [];
+  return {
+    enhance: modes.includes('disabled') && modes.includes('balanced'),
+    fast: modes.includes('fast'),
+  };
+}
+
 /** Avoid accidental double charging with a fresh ID during a pending job. */
 export function isGeneratorJobActive(job: {
   status: 'processing' | 'completed' | 'failed' | 'review';
