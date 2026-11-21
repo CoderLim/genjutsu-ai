@@ -256,20 +256,24 @@ export function getGeneratorWorkflowChoices(
     const choices: GeneratorWorkflowChoice[] = [
       { modelId: 'photo-to-video-standard', workflow: 'first-frame', label: 'First Frame' },
       { modelId: 'photo-to-video-standard', workflow: 'start-end', label: 'Start & End' },
-      { modelId: 'text-to-video-standard', workflow: 'text-to-video', label: 'Text to Video' },
-      { modelId: 'multi-image-to-video', workflow: 'all-in-one-reference', label: 'Multi-Image' },
-      { modelId: 'all-in-one-video', workflow: 'all-in-one-reference', label: 'All-in-One' },
+      { modelId: 'all-in-one-video', workflow: 'all-in-one-reference', label: 'All-in-One Reference' },
     ];
     return choices.filter(choice => {
       const model = models.find(item => item.id === choice.modelId);
       return !!model?.workflows[choice.workflow];
     });
   }
-  return Object.entries(active.workflows)
+  // Raphael-style video picker offers at most three intent modes. Text-only
+  // generation lives in All-in-One Reference with optional media.
+  const videoModes: Workflow[] = ['first-frame', 'start-end', 'all-in-one-reference'];
+  const supported = active.mediaType === 'video'
+    ? videoModes.map(workflow => [workflow, active.workflows[workflow]] as const)
+    : Object.entries(active.workflows);
+  return supported
     .filter((entry): entry is [Workflow, NonNullable<typeof entry[1]>] => !!entry[1])
     .map(([workflow, spec]) => ({
       modelId: active.id,
       workflow,
-      label: spec.label,
+      label: workflow === 'all-in-one-reference' ? 'All-in-One Reference' : spec.label,
     }));
 }
