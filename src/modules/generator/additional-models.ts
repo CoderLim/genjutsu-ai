@@ -126,20 +126,20 @@ function videoProfile(options: VideoOptions): GeneratorModel {
           fields: frameFields,
         },
       } : {}),
-      // Text only is allowed in All-in-One. References are optional and
-      // rendered only for versions with a documented reference endpoint.
-      'all-in-one-reference': {
-        label: 'All-in-One Reference',
-        slots: options.referenceImageLimit
-          ? {
-              referenceImages: {
-                min: 0, max: options.referenceImageLimit,
-                accept: IMAGE_MIME, maxBytes: 12 * 1048576,
-              },
-            }
-          : {},
-        fields,
-      },
+      // Only models with a product-supported reference workflow get this
+      // menu entry. A text-only fallback is NOT itself "All-in-One".
+      ...(options.referenceImageLimit ? {
+        'all-in-one-reference': {
+          label: 'All-in-One Reference',
+          slots: {
+            referenceImages: {
+              min: 0, max: options.referenceImageLimit,
+              accept: IMAGE_MIME, maxBytes: 12 * 1048576,
+            },
+          },
+          fields,
+        },
+      } : {}),
       // Retain internal text mode for existing task snapshots; no separate
       // Text to Video entry is shown in the user-facing mode picker.
       'text-to-video': textToVideo,
@@ -221,7 +221,9 @@ export const ADDITIONAL_GENERATOR_MODELS: readonly GeneratorModel[] = [
     // Base H3 endpoints accept 768P / 2K / 4K; there is no 480P tier.
     resolutions: ['768P', '2K', '4K'], duration: [5, 15],
     rates: { '768P': 11, '2K': 23, '4K': 28 },
-    startEnd: true, referenceImageLimit: 9,
+    // Raphael H3 exposes First Frame and Start & End only. Its separate Fal
+    // reference-to-video endpoint is not part of this product form.
+    startEnd: true,
   }),
   // Fal has a base H3 endpoint but no verified, distinct H3 Turbo endpoint.
   // Do not misroute requests to the base H3 while calling it Turbo.
