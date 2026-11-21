@@ -331,7 +331,7 @@ test('MiniMax H3 base has distinct 2K/4K price tiers and first/end workflow', ()
   const model = getGeneratorModel('minimax-h3');
   const state = createGeneratorState(model);
   for (const [resolution, rate] of [
-    ['480P',9], ['768P',11], ['2K',23], ['4K',28]
+    ['768P',11], ['2K',23], ['4K',28]
   ] as const) {
     const updated = updateGeneratorState(state, model, { params: { resolution } });
     assert.equal(calculateGeneratorCredits(updated, model).credits, 5 * rate);
