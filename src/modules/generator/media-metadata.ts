@@ -73,3 +73,40 @@ export async function probeGeneratorVideoDuration(url: string): Promise<number> 
   }
   return seconds;
 }
+
+/** Parse little-endian PCM WAV duration from RIFF header (before streaming data). */
+export function parseGeneratorWavDuration(bytes: Uint8Array): number | null {
+  if (bytes.length < 44 || String.fromCharCode(...bytes.slice(0,4)) !== 'RIFF' ||
+      String.fromCharCode(...bytes.slice(8,12)) !== 'WAVE') return null;
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  let position = 12;
+  let bytesPerSecond = 0;
+  let dataBytes = 0;
+  while (position + 8 <= bytes.length) {
+    const chunk = String.fromCharCode(...bytes.slice(position, position + 4));
+    const size = view.getUint32(position + 4, true);
+    if (chunk === 'fmt ' && size >= 16 && position + 16 <= bytes.length) {
+      bytesPerSecond = view.getUint32(position + 16, true);
+    }
+    if (chunk === 'data') {
+      dataBytes = size;
+      break;
+    }
+    // The data chunk's payload need not be downloaded.
+    position += 8 + size + (size % 2);
+    if (position > bytes.length) break;
+  }
+  if (!bytesPerSecond || !dataBytes) return null;
+  const seconds = dataBytes / bytesPerSecond;
+  return Number.isFinite(seconds) && seconds > 0 ? seconds : null;
+}
+
+export async function probeGeneratorAudioDuration(url: string, key: string): Promise<number> {
+  if (key.endsWith('.m4a')) return probeGeneratorVideoDuration(url);
+  if (key.endsWith('.wav')) {
+    const first = await range(url, 'bytes=0-65535');
+    const seconds = parseGeneratorWavDuration(first.bytes);
+    if (seconds) return seconds;
+  }
+  throw new Error('Cannot read reference audio duration; upload M4A or PCM WAV');
+}
