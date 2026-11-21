@@ -113,12 +113,21 @@ test('Seedance mode choices select the real provider profile, not extra model ca
   assert.equal(calculateGeneratorCredits(full, nextAllModel).credits, 204);
 });
 
-test('Nano Banana model choices keep image generation/editing workflow separate', () => {
+test('image composer does not expose text/image-edit mode selection', () => {
   const models = listGeneratorModels();
-  const nano = getGeneratorModel('nano-banana-2');
-  const choices = getGeneratorWorkflowChoices(models, nano);
-  assert.deepEqual(choices.map(item => item.label), ['Text to Image', 'Image Edit']);
-  assert.ok(choices.every(item => item.modelId === 'nano-banana-2'));
+  for (const model of models.filter(item => item.mediaType === 'image')) {
+    const choices = getGeneratorWorkflowChoices(models, model);
+    assert.deepEqual(choices, [], model.id);
+    // Dual-purpose models show one optional uploader in their default
+    // text workflow. The edit workflow remains for legacy task snapshots.
+    const text = model.workflows['text-to-image'];
+    assert.ok(text, model.id);
+    if (model.workflows['image-to-image']) {
+      assert.equal(text.slots.referenceImages?.min, 0, model.id);
+      assert.equal(text.slots.referenceImages?.max,
+        model.workflows['image-to-image']!.slots.referenceImages!.max, model.id);
+    }
+  }
 });
 
 
