@@ -26,6 +26,10 @@ export type ProviderIdentity = {
 };
 
 const MODEL_IDENTITIES: Record<string, ProviderIdentity> = {
+  'seedance-2-multiimage': {
+    provider: 'wavespeed',
+    providerModelId: 'bytedance/seedance-2.0/text-to-video',
+  },
   'seedance-2-t2v': {
     provider: 'wavespeed',
     providerModelId: 'bytedance/seedance-2.0/text-to-video',
@@ -85,6 +89,21 @@ export function buildGeneratorProviderRequest(
   media: MediaReadUrls
 ): Record<string, unknown> {
   const params = state.params;
+  if (state.modelId === 'seedance-2-multiimage') {
+    if (media.referenceImages.length < 1) throw new Error('Reference images required');
+    if (media.referenceVideos.length || media.referenceAudio.length) {
+      throw new Error('This model accepts images only; mixed references require verified billing');
+    }
+    return {
+      prompt: state.prompt,
+      reference_images: media.referenceImages,
+      duration: params.duration,
+      resolution: params.resolution,
+      aspect_ratio: params.aspectRatio,
+      generate_audio: params.generateAudio,
+    };
+  }
+
   if (state.modelId === 'seedance-2-t2v') {
     return {
       prompt: state.prompt,

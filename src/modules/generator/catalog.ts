@@ -86,6 +86,31 @@ export const GENERATOR_MODELS: readonly GeneratorModel[] = [
     },
   },
   {
+    id: 'seedance-2-multiimage',
+    name: 'Seedance 2.0 · Multi-Image Reference',
+    mediaType: 'video', providerName: 'WaveSpeed',
+    enabled: true,
+    defaultWorkflow: 'all-in-one-reference',
+    // Image-only reference subset. Adding reference videos changes billing to
+    // output+input seconds, so mixed video/audio stays preview-only.
+    pricing: {
+      version: '2026-11-21-v1',
+      precision: 'exact',
+      rule: { kind: 'per-second', rates: VIDEO_RATES },
+    },
+    workflows: {
+      'all-in-one-reference': {
+        label: 'Multi-Image Reference',
+        slots: {
+          referenceImages: {
+            min: 1, max: 9, accept: IMAGE_MIME, maxBytes: 12 * 1048576,
+          },
+        },
+        fields: { ...baseVideoFields },
+      },
+    },
+  },
+  {
     id: 'seedance-2-reference',
     name: 'Seedance 2.0 · All-in-One',
     mediaType: 'video', providerName: 'WaveSpeed',

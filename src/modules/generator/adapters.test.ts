@@ -81,3 +81,20 @@ test('text-to-video sends no image field to WaveSpeed', () => {
   assert.equal(getGeneratorProviderIdentity(state.modelId).providerModelId,
     'bytedance/seedance-2.0/text-to-video');
 });
+
+test('multi-image reference sends only reference_images and uses text-to-video rates', () => {
+  const model = getGeneratorModel('seedance-2-multiimage');
+  const state = updateGeneratorState(createGeneratorState(model), model, {
+    prompt: '@image1 runs through a meadow, @image2 follows',
+  });
+  const body = buildGeneratorProviderRequest(state, {
+    referenceImages: ['https://test.example/1.png', 'https://test.example/2.png'],
+    referenceVideos: [], referenceAudio: [],
+  });
+  assert.deepEqual(body.reference_images, [
+    'https://test.example/1.png', 'https://test.example/2.png',
+  ]);
+  assert.equal(body.reference_videos, undefined);
+  assert.equal(getGeneratorProviderIdentity(state.modelId).providerModelId,
+    'bytedance/seedance-2.0/text-to-video');
+});

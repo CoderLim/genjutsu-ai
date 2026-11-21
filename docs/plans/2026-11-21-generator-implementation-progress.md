@@ -29,6 +29,7 @@ The new routes never call the old `/api/genjutsu/*`, `/api/image-to-video/*` or 
 | Internal ID | Provider endpoint | Workflow | Public credit tariff |
 | --- | --- | --- | --- |
 | `seedance-2-i2v` | WaveSpeed `bytedance/seedance-2.0/image-to-video` | First Frame / Start & End | 480p: 20.4 credits/s; 720p: 40.8 credits/s; 1080p: 102 credits/s, ceil once |
+| `seedance-2-multiimage` | WaveSpeed `bytedance/seedance-2.0/text-to-video` | Multi-Image Reference (1–9 image refs only) | same video tariff (output seconds only) |
 | `seedance-2-t2v` | WaveSpeed `bytedance/seedance-2.0/text-to-video` | Text-to-Video | same video tariff |
 | `h3-reference` | Fal `minimax/h3/reference-to-video` | Reference-to-Video; 1 video (5-15s) + 1-9 images | 480P:8.5/s, 768P:10.2/s, 2K:22.1/s, 4K:27.2/s + 13.6/image after first 5 |
 | `flux-schnell` | Fal `fal-ai/flux-1/schnell` | Text-to-Image | 4 credits/output |
@@ -79,4 +80,4 @@ The branch has a self-contained CI `.github/workflows/generator-feature-ci.yml` 
 
 ## Current caveats
 
-No claim of live provider generation or external payment testing is made; the GitHub CI does not have production API keys or a deployed Cloudflare Worker. All-in-One mixed references remains preview-only until precise source-video cost and duration logic can be tested. These are release blockers, **not** implicit promises to deliver results asynchronously. 
+No claim of live provider generation or external payment testing is made; the GitHub CI does not have production API keys or a deployed Cloudflare Worker. Mixed video/audio All-in-One references remain preview-only until precise source-video cost and duration logic can be tested. A safe image-only multi-reference mode is available. These are release blockers, **not** implicit promises to deliver results asynchronously. 

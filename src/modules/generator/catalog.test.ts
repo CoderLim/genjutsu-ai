@@ -16,7 +16,7 @@ test('live catalog capabilities and price tables are valid', () => {
 test('public models omit unverified multimodal endpoints', () => {
   const ids = listGeneratorModels().map(x => x.id);
   assert.deepEqual(ids, [
-    'seedance-2-i2v', 'seedance-2-t2v', 'h3-reference', 'flux-schnell', 'flux2-flash-edit',
+    'seedance-2-i2v', 'seedance-2-t2v', 'seedance-2-multiimage', 'h3-reference', 'flux-schnell', 'flux2-flash-edit',
   ]);
   assert.throws(() => getGeneratorModel('seedance-2-reference'), /not enabled/);
 });
@@ -146,4 +146,20 @@ test('text-to-video is priced without reference media', () => {
   assert.doesNotThrow(() => assertGeneratorReady({
     ...state, prompt: 'Mountain landscape, cinematic dolly shot',
   }, model));
+});
+
+test('multi-image reference charges output seconds only and truncates extra photos', () => {
+  const model = getGeneratorModel('seedance-2-multiimage');
+  const state = createGeneratorState(model);
+  assert.equal(state.workflow, 'all-in-one-reference');
+  assert.equal(model.workflows['all-in-one-reference']!.slots.referenceImages?.max, 9);
+  assert.equal(model.workflows['all-in-one-reference']!.slots.referenceVideos, undefined);
+  const draft = updateGeneratorState(state, model, {
+    inputs: {
+      ...state.inputs,
+      referenceImages: Array.from({ length: 12 }, (_, index) => 'image-' + index),
+    },
+  });
+  assert.equal(draft.inputs.referenceImages.length, 9);
+  assert.equal(calculateGeneratorCredits(draft, model).credits, 204);
 });
