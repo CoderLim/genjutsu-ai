@@ -9,34 +9,35 @@ import {
   type ReactNode,
   type RefObject,
 } from 'react';
-import { createPortal } from 'react-dom';
 import {
   ArrowRight,
   Check,
-  Coins,
   ChevronDown,
   ChevronUp,
   Clock3,
+  Coins,
   LayoutGrid,
   Monitor,
   Sparkles,
 } from 'lucide-react';
+import { createPortal } from 'react-dom';
 
+import {
+  generatorModelLabel,
+  getGeneratorModelChoices,
+  getGeneratorModelFamilyId,
+  getGeneratorModelHighlights,
+  getGeneratorWorkflowChoices,
+  groupGeneratorModels,
+  isSameGeneratorModelChoice,
+} from '@/modules/generator/model-families';
 import type {
   FieldValue,
   GeneratorModel,
   Workflow,
 } from '@/modules/generator/types';
 import { cn } from '@/lib/utils';
-import {
-  getGeneratorModelFamilyId,
-  getGeneratorModelHighlights,
-  groupGeneratorModels,
-  getGeneratorModelChoices,
-  generatorModelLabel,
-  getGeneratorWorkflowChoices,
-  isSameGeneratorModelChoice,
-} from '@/modules/generator/model-families';
+import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 
 const ACCENT = '#b04845';
@@ -61,17 +62,36 @@ function ModelBrandLogo({
       aria-hidden="true"
       className={cn(
         'inline-flex shrink-0 items-center justify-center rounded-xl bg-white shadow-sm ring-1 ring-[rgba(20,17,18,0.06)]',
-        size === 'large' ? 'size-9' :
-        size === 'toolbar' ? 'size-5 rounded-md shadow-none' : 'size-7 rounded-lg'
+        size === 'large'
+          ? 'size-9'
+          : size === 'toolbar'
+            ? 'size-5 rounded-md shadow-none'
+            : 'size-7 rounded-lg'
       )}
     >
-      <svg viewBox="0 0 32 32" className={size === 'large' ? 'size-6' : 'size-5'} fill="none">
+      <svg
+        viewBox="0 0 32 32"
+        className={size === 'large' ? 'size-6' : 'size-5'}
+        fill="none"
+      >
         {familyId === 'nano-banana' ? (
           <>
-            <path d="M27.1 16.3c0-.88-.08-1.72-.23-2.54H16v4.57h6.22a5.3 5.3 0 0 1-2.31 3.48v3.02h3.93c2.3-2.11 3.26-5.17 3.26-8.53Z" fill="#4285F4" />
-            <path d="M16 27.5c3.14 0 5.78-1.04 7.71-2.67l-3.8-3.02c-1.06.72-2.41 1.15-3.91 1.15-3 0-5.55-2.02-6.46-4.75H5.5v3.07A11.5 11.5 0 0 0 16 27.5Z" fill="#34A853" />
-            <path d="M9.54 18.21a6.98 6.98 0 0 1 0-4.42v-3.07H5.5a11.5 11.5 0 0 0 0 10.56l4.04-3.07Z" fill="#FBBC05" />
-            <path d="M16 9.04c1.69 0 3.21.58 4.4 1.73l3.5-3.5A10.94 10.94 0 0 0 16 4.5 11.5 11.5 0 0 0 5.5 10.72l4.04 3.07c.91-2.73 3.46-4.75 6.46-4.75Z" fill="#EA4335" />
+            <path
+              d="M27.1 16.3c0-.88-.08-1.72-.23-2.54H16v4.57h6.22a5.3 5.3 0 0 1-2.31 3.48v3.02h3.93c2.3-2.11 3.26-5.17 3.26-8.53Z"
+              fill="#4285F4"
+            />
+            <path
+              d="M16 27.5c3.14 0 5.78-1.04 7.71-2.67l-3.8-3.02c-1.06.72-2.41 1.15-3.91 1.15-3 0-5.55-2.02-6.46-4.75H5.5v3.07A11.5 11.5 0 0 0 16 27.5Z"
+              fill="#34A853"
+            />
+            <path
+              d="M9.54 18.21a6.98 6.98 0 0 1 0-4.42v-3.07H5.5a11.5 11.5 0 0 0 0 10.56l4.04-3.07Z"
+              fill="#FBBC05"
+            />
+            <path
+              d="M16 9.04c1.69 0 3.21.58 4.4 1.73l3.5-3.5A10.94 10.94 0 0 0 16 4.5 11.5 11.5 0 0 0 5.5 10.72l4.04 3.07c.91-2.73 3.46-4.75 6.46-4.75Z"
+              fill="#EA4335"
+            />
           </>
         ) : familyId === 'seedance' ? (
           <>
@@ -82,21 +102,34 @@ function ModelBrandLogo({
           </>
         ) : familyId === 'minimax' ? (
           <>
-            <path d="M5 13v6M9 8v16M13 12v8M17 4v24M21 11v10M25 8v16M29 13v6"
-              stroke="#F93F7A" strokeWidth="2.35" strokeLinecap="round" />
+            <path
+              d="M5 13v6M9 8v16M13 12v8M17 4v24M21 11v10M25 8v16M29 13v6"
+              stroke="#F93F7A"
+              strokeWidth="2.35"
+              strokeLinecap="round"
+            />
           </>
         ) : familyId === 'kling' ? (
           <>
             <rect x="4" y="4" width="24" height="24" rx="7" fill="#1A1A25" />
-            <path d="M11 10v12M21 10l-9 7 9 5"
-              stroke="white" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
+            <path
+              d="M11 10v12M21 10l-9 7 9 5"
+              stroke="white"
+              strokeWidth="3.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
             <circle cx="22" cy="9" r="2.1" fill="#C1B9FF" />
           </>
         ) : familyId === 'flux' ? (
           <>
             <rect x="4" y="4" width="24" height="24" rx="7" fill="#171719" />
-            <path d="M11 10h11M11 16h9M11 10v12"
-              stroke="#FAFAFA" strokeWidth="3.1" strokeLinecap="square" />
+            <path
+              d="M11 10h11M11 16h9M11 10v12"
+              stroke="#FAFAFA"
+              strokeWidth="3.1"
+              strokeLinecap="square"
+            />
           </>
         ) : (
           <circle cx="16" cy="16" r="9" stroke="#7B7580" strokeWidth="3" />
@@ -150,9 +183,15 @@ function AspectRatioGlyph({
   active: boolean;
 }) {
   if (ratio === 'auto') {
-    return <Sparkles aria-hidden="true" className={cn(
-      'size-4', active ? 'text-[rgb(18,15,16)]' : 'text-[rgba(18,15,16,0.45)]'
-    )} />;
+    return (
+      <Sparkles
+        aria-hidden="true"
+        className={cn(
+          'size-4',
+          active ? 'text-[rgb(18,15,16)]' : 'text-[rgba(18,15,16,0.45)]'
+        )}
+      />
+    );
   }
   const [w, h] = ratio.split(':').map(Number);
   const safeW = Number.isFinite(w) && w > 0 ? w : 1;
@@ -174,7 +213,7 @@ function AspectRatioGlyph({
 
 /**
  * Shared Raphael-style segmented control.
- * Used for Output Number, Resolution, Output Format, Video Length, Quality —
+ * Used for Output Number, Resolution, Output Format, Quality —
  * identical chrome in Image and Video modes.
  */
 function ComposerSegmentedField({
@@ -215,6 +254,106 @@ function ComposerSegmentedField({
             </button>
           );
         })}
+      </div>
+    </section>
+  );
+}
+
+/** Discrete duration steps as a slider (e.g. 4s–12s). Falls back to chips if fewer than 2 values. */
+function ComposerDurationField({
+  label,
+  values,
+  current,
+  onSelect,
+}: {
+  label: string;
+  values: FieldValue[];
+  current: FieldValue;
+  onSelect: (value: FieldValue) => void;
+}) {
+  const steps = useMemo(() => {
+    const nums = values
+      .map((value) => ({
+        raw: value,
+        n: typeof value === 'number' ? value : Number(value),
+      }))
+      .filter((item) => Number.isFinite(item.n));
+    nums.sort((a, b) => a.n - b.n);
+    return nums;
+  }, [values]);
+
+  if (steps.length < 2) {
+    return (
+      <ComposerSegmentedField
+        label={label}
+        values={values}
+        current={current}
+        format={(value) => formatFieldValue('duration', value)}
+        onSelect={onSelect}
+      />
+    );
+  }
+
+  const min = steps[0]!.n;
+  const max = steps[steps.length - 1]!.n;
+  const currentNum = typeof current === 'number' ? current : Number(current);
+  const active =
+    steps.find((item) => item.n === currentNum) ??
+    steps.reduce((best, item) =>
+      Math.abs(item.n - currentNum) < Math.abs(best.n - currentNum)
+        ? item
+        : best
+    );
+  const stepGap =
+    steps.length >= 2
+      ? (steps.slice(1).reduce(
+          (gap, item, index) => {
+            const delta = item.n - steps[index]!.n;
+            return gap === null || delta < gap ? delta : gap;
+          },
+          null as number | null
+        ) ?? 1)
+      : 1;
+
+  const snapToStep = (n: number) =>
+    steps.reduce((best, item) =>
+      Math.abs(item.n - n) < Math.abs(best.n - n) ? item : best
+    );
+
+  return (
+    <section className="p-0.5">
+      <div className="mb-1.5 flex items-center justify-between gap-2 px-1">
+        <span className="text-[10px] font-medium text-[rgb(102,92,95)]">
+          {label}
+        </span>
+        <span className="text-[11px] font-semibold text-[rgb(18,15,16)] tabular-nums">
+          {formatFieldValue('duration', active.raw)}
+        </span>
+      </div>
+      <div className="rounded-[11px] bg-[rgb(245,243,243)] px-3 py-3">
+        <Slider
+          min={min}
+          max={max}
+          step={stepGap}
+          value={[active.n]}
+          onValueChange={(next) => {
+            const n = Array.isArray(next) ? next[0] : next;
+            if (typeof n !== 'number' || !Number.isFinite(n)) return;
+            onSelect(snapToStep(n).raw);
+          }}
+          aria-label={label}
+          className={cn(
+            '**:data-[slot=slider-track]:h-1.5 **:data-[slot=slider-track]:bg-[rgba(20,17,18,0.1)]',
+            '**:data-[slot=slider-range]:bg-[#b04845]',
+            '**:data-[slot=slider-thumb]:size-4 **:data-[slot=slider-thumb]:border-[#b04845] **:data-[slot=slider-thumb]:shadow-sm'
+          )}
+        />
+        <div className="mt-1.5 flex justify-between px-0.5 text-[10px] text-[rgba(18,15,16,0.45)] tabular-nums">
+          <span>{formatFieldValue('duration', steps[0]!.raw)}</span>
+          <span>
+            {formatFieldValue('duration', steps[steps.length - 1]!.raw)}
+          </span>
+        </div>
       </div>
     </section>
   );
@@ -305,7 +444,10 @@ function PanelShell({
       const edgeGap = 12;
       const triggerGap = 8;
       const above = Math.max(0, bounds.top - edgeGap - triggerGap);
-      const below = Math.max(0, viewportHeight - bounds.bottom - edgeGap - triggerGap);
+      const below = Math.max(
+        0,
+        viewportHeight - bounds.bottom - edgeGap - triggerGap
+      );
       const placeBelow = above < 200 && below > above;
       const maxHeight = Math.min(440, placeBelow ? below : above);
       const panelWidth = ref.current?.getBoundingClientRect().width ?? 0;
@@ -438,14 +580,16 @@ export function ComposerToolbar({
   onSetParam: (name: string, value: FieldValue) => void;
   onFastChange: (checked: boolean) => void;
 }) {
-  const families = useMemo(() =>
-    groupGeneratorModels(getGeneratorModelChoices(models)), [models]);
+  const families = useMemo(
+    () => groupGeneratorModels(getGeneratorModelChoices(models)),
+    [models]
+  );
   const workflowChoices = useMemo(
     () => getGeneratorWorkflowChoices(models, model),
     [models, model]
   );
   const selectedWorkflow = workflowChoices.find(
-    item => item.modelId === model.id && item.workflow === workflow
+    (item) => item.modelId === model.id && item.workflow === workflow
   );
   const currentFamilyId = getGeneratorModelFamilyId(model.id);
   const [open, setOpen] = useState<OpenPanel>(null);
@@ -576,7 +720,10 @@ export function ComposerToolbar({
                       <Check className="absolute top-3 right-3 size-4 text-[var(--composer-accent,#b04845)]" />
                     ) : null}
                     <span className="flex items-start gap-2.5">
-                      <ModelBrandLogo familyId={getGeneratorModelFamilyId(item.id)} size="large" />
+                      <ModelBrandLogo
+                        familyId={getGeneratorModelFamilyId(item.id)}
+                        size="large"
+                      />
                       <span className="min-w-0 flex-1">
                         <span className="block pr-6 text-sm font-semibold text-[rgb(18,15,16)]">
                           {generatorModelLabel(item)}
@@ -703,16 +850,13 @@ export function ComposerToolbar({
               ) : null}
 
               {durationField ? (
-                <ComposerSegmentedField
+                <ComposerDurationField
                   label={fieldDisplayLabel(
                     durationField.name,
                     durationField.label
                   )}
                   values={durationField.values}
                   current={params[durationField.name]}
-                  format={(value) =>
-                    formatFieldValue(durationField.name, value)
-                  }
                   onSelect={(value) => onSetParam(durationField.name, value)}
                 />
               ) : null}
@@ -769,7 +913,11 @@ export function ComposerToolbar({
             onClick={() => toggle('workflow')}
             className={pillClass}
           >
-            <span>{selectedWorkflow?.label ?? model.workflows[workflow]?.label ?? workflow}</span>
+            <span>
+              {selectedWorkflow?.label ??
+                model.workflows[workflow]?.label ??
+                workflow}
+            </span>
             {open === 'workflow' ? (
               <ChevronUp className="size-3.5 opacity-60" />
             ) : (
@@ -784,7 +932,8 @@ export function ComposerToolbar({
           >
             <div className="space-y-1">
               {workflowChoices.map((item) => {
-                const active = item.modelId === model.id && item.workflow === workflow;
+                const active =
+                  item.modelId === model.id && item.workflow === workflow;
                 return (
                   <button
                     key={item.modelId + ':' + item.workflow}
