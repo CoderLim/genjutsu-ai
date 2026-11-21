@@ -94,7 +94,13 @@ function nanoVariantWorkflows(
 ) {
   return {
     'text-to-image': {
-      label: 'Text to Image', slots: {}, fields: { ...fields },
+      label: 'Text to Image',
+      // One optional uploader in the composer. With references the Fal
+      // adapter selects the edit endpoint; without them it selects text.
+      slots: {
+        referenceImages: { min: 0, max: 14, accept: IMAGE_MIME, maxBytes: 12 * 1048576 },
+      },
+      fields: { ...fields },
     },
     'image-to-image': {
       label: 'Image Edit',
@@ -109,7 +115,11 @@ function nanoVariantWorkflows(
 function nanoWorkflows() {
   return {
     'text-to-image': {
-      label: 'Text to Image', slots: {}, fields: { ...NANO_BASE_FIELDS },
+      label: 'Text to Image',
+      slots: {
+        referenceImages: { min: 0, max: 14, accept: IMAGE_MIME, maxBytes: 12 * 1048576 },
+      },
+      fields: { ...NANO_BASE_FIELDS },
     },
     'image-to-image': {
       label: 'Image Edit',
@@ -357,7 +367,7 @@ export const GENERATOR_MODELS: readonly GeneratorModel[] = [
     name: 'FLUX.2 Flash',
     mediaType: 'image',
     enabled: true,
-    defaultWorkflow: 'image-to-image',
+    defaultWorkflow: 'text-to-image',
     pricing: {
       version: '2026-11-21-v1',
       precision: 'exact',
@@ -366,6 +376,14 @@ export const GENERATOR_MODELS: readonly GeneratorModel[] = [
       extraReferenceImageCredits: 2,
     },
     workflows: {
+      'text-to-image': {
+        label: 'Text to Image',
+        slots: {
+          referenceImages: { min: 0, max: 4, accept: IMAGE_MIME, maxBytes: 12 * 1048576 },
+        },
+        fields: IMAGE_FIELDS,
+      },
+      // Keep explicit edit mode for older persisted jobs.
       'image-to-image': {
         label: 'Image to Image',
         slots: {
