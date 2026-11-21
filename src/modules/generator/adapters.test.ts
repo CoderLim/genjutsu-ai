@@ -446,3 +446,38 @@ test('text-only All-in-One on models without reference endpoint has no fake uplo
       getGeneratorProviderIdentity(id, 'text-to-video').providerModelId);
   }
 });
+
+test('Nano Banana 2.1 and Lite use independent Fal endpoints and only supported controls', () => {
+  const cases = [
+    { id: 'nano-banana-2.1', endpoint: 'google/nano-banana-2.1',
+      defaultPrice: 12, resolution: '1K' },
+    { id: 'nano-banana-2-lite', endpoint: 'google/nano-banana-lite',
+      defaultPrice: 11, resolution: undefined },
+  ] as const;
+  for (const { id, endpoint, defaultPrice, resolution } of cases) {
+    const model = getGeneratorModel(id);
+    assert.equal(getGeneratorProviderIdentity(id, 'text-to-image').providerModelId, endpoint);
+    assert.equal(getGeneratorProviderIdentity(id, 'image-to-image').providerModelId, endpoint + '/edit');
+    const text = updateGeneratorState(createGeneratorState(model), model, {
+      prompt: 'A golden retriever enjoying the beach',
+    });
+    const textPayload = buildGeneratorProviderRequest(text, emptyMedia);
+    assert.equal(textPayload.resolution, resolution);
+    assert.equal(textPayload.aspect_ratio, 'auto');
+    assert.equal(textPayload.num_images, 1);
+    assert.equal(textPayload.output_format, 'png');
+    assert.equal(textPayload.image_urls, undefined);
+    assert.equal(calculateGeneratorCredits(text, model).credits, defaultPrice);
+
+    const edited = updateGeneratorState(text, model, {
+      workflow: 'image-to-image',
+      inputs: { ...text.inputs, referenceImages: ['https://example.test/photo.png'] },
+    });
+    assert.doesNotThrow(() => assertGeneratorReady(edited, model));
+    const request = buildGeneratorProviderRequest(edited, {
+      ...emptyMedia, referenceImages: ['https://example.test/photo.png'],
+    });
+    assert.deepEqual(request.image_urls, ['https://example.test/photo.png']);
+    assert.equal(request.resolution, resolution);
+  }
+});
