@@ -14,9 +14,11 @@ const videoFrames = {
     min: 1, max: 1, accept: IMAGE_MIME, maxBytes: 12 * 1048576,
   },
 };
-const ASPECTS = ['16:9', '9:16', '1:1', '4:3', '3:4'] as const;
-// Fal Seedance text/reference endpoints also support automatic aspect ratio.
-const VIDEO_ASPECTS = ['auto', '21:9', '16:9', '4:3', '1:1', '3:4', '9:16'] as const;
+// Use only ratios allowed by each model's actual text-video endpoint.
+// First/last-frame API variants derive canvas from the uploaded image.
+const SEEDANCE_VIDEO_ASPECTS = ['auto', '21:9', '16:9', '4:3', '1:1', '3:4', '9:16'] as const;
+const H3_VIDEO_ASPECTS = ['16:9', '21:9', '4:3', '1:1', '3:4', '9:16'] as const;
+const KLING_VIDEO_ASPECTS = ['16:9', '9:16', '1:1'] as const;
 // MiniMax H3 Image accepts custom sizes within 1:3..3:1. Raphael advertises
 // 15 common ratios; every preset below stays inside the Fal output boundary.
 const MINIMAX_IMAGE_ASPECTS = [
@@ -42,6 +44,12 @@ type VideoOptions = {
 };
 
 function videoFields(options: VideoOptions): Record<string, FieldSpec> {
+  const ratios = options.aspectRatios ??
+    (options.id.startsWith('seedance-')
+      ? SEEDANCE_VIDEO_ASPECTS
+      : options.id.startsWith('minimax-')
+        ? H3_VIDEO_ASPECTS
+        : KLING_VIDEO_ASPECTS);
   const fields: Record<string, FieldSpec> = {
     duration: {
       label: 'Duration', default: Math.max(5, options.duration[0]),
@@ -54,8 +62,8 @@ function videoFields(options: VideoOptions): Record<string, FieldSpec> {
     },
     aspectRatio: {
       label: 'Aspect Ratio',
-      default: options.aspectRatios?.[0] ?? 'auto',
-      options: options.aspectRatios ?? VIDEO_ASPECTS,
+      default: ratios[0],
+      options: ratios,
     },
     outputCount: { label: 'Outputs', default: 1, options: [1] },
   };
