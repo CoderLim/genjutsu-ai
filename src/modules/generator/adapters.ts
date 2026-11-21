@@ -58,6 +58,65 @@ const MODEL_IDENTITIES: Record<string, ProviderIdentity> = {
   },
 };
 
+
+/**
+ * Fal endpoints are selected by workflow, *not* by a client-provided endpoint.
+ * A missing endpoint deliberately blocks submission instead of silently
+ * substituting a different model (notably H3 Turbo, still unverified).
+ */
+export const ADDITIONAL_FAL_ENDPOINTS: Record<
+  string, Partial<Record<'text-to-video' | 'first-frame' | 'text-to-image' | 'image-to-image', string>>
+> = {
+  'seedance-2-fast': {
+    'text-to-video': 'bytedance/seedance-2.0/fast/text-to-video',
+    'first-frame': 'bytedance/seedance-2.0/fast/image-to-video',
+  },
+  'seedance-2-mini': {
+    'text-to-video': 'bytedance/seedance-2.0/mini/text-to-video',
+    'first-frame': 'bytedance/seedance-2.0/mini/image-to-video',
+  },
+  'seedance-2.5': {
+    'text-to-video': 'bytedance/seedance-2.5/text-to-video',
+    'first-frame': 'bytedance/seedance-2.5/image-to-video',
+  },
+  'seedance-2.5-flash': {
+    'text-to-video': 'bytedance/seedance-2.5/flash/text-to-video',
+    'first-frame': 'bytedance/seedance-2.5/flash/image-to-video',
+  },
+  'minimax-h3-max-turbo': {
+    'text-to-video': 'minimax/h3-max-turbo/text-to-video',
+    'first-frame': 'minimax/h3-max-turbo/image-to-video',
+  },
+  'minimax-h3-max': {
+    'text-to-video': 'minimax/h3-max/text-to-video',
+    'first-frame': 'minimax/h3-max/image-to-video',
+  },
+  'kling-4': {
+    'text-to-video': 'kling/v4/text-to-video',
+    'first-frame': 'kling/v4/image-to-video',
+  },
+  'kling-4-flash': {
+    'text-to-video': 'kling/v4/flash/text-to-video',
+    'first-frame': 'kling/v4/flash/image-to-video',
+  },
+  'kling-3-turbo': {
+    'text-to-video': 'fal-ai/kling-video/v3/turbo/standard/text-to-video',
+    'first-frame': 'fal-ai/kling-video/v3/turbo/standard/image-to-video',
+  },
+  'kling-3': {
+    'text-to-video': 'fal-ai/kling-video/v3/pro/text-to-video',
+    'first-frame': 'fal-ai/kling-video/v3/pro/image-to-video',
+  },
+  'minimax-h3-image': {
+    'text-to-image': 'minimax/h3-image/text-to-image',
+    'image-to-image': 'minimax/h3-image/edit',
+  },
+  'minimax-h3-image-highspeed': {
+    'text-to-image': 'minimax/h3-image/highspeed/text-to-image',
+    'image-to-image': 'minimax/h3-image/highspeed/edit',
+  },
+};
+
 export class GeneratorProviderNotConfiguredError extends Error {
   constructor(provider: string) {
     super('Generation service is temporarily unavailable');
@@ -68,6 +127,12 @@ export class GeneratorProviderNotConfiguredError extends Error {
 export function getGeneratorProviderIdentity(
   modelId: string, workflow?: Workflow
 ): ProviderIdentity {
+  const extra = ADDITIONAL_FAL_ENDPOINTS[modelId];
+  if (extra) {
+    const endpoint = workflow ? extra[workflow as keyof typeof extra] : extra['first-frame'] ?? extra['text-to-image'];
+    if (!endpoint) throw new Error('Unsupported Fal model/workflow endpoint');
+    return { provider: 'fal', providerModelId: endpoint };
+  }
   const identity = MODEL_IDENTITIES[modelId];
   if (!identity) throw new Error('Unknown generator adapter: ' + modelId);
   // Both UI workflows share one named model; Fal has separate queue endpoints
@@ -104,11 +169,86 @@ export type MediaReadUrls = {
   referenceAudio: string[];
 };
 
+
+function minimaxCustomImageSize(params: Record<string, string | number | boolean>) {
+  const dimensions: Record<string, number> = { '1K': 1024, '2K': 2048, '4K': 3840 };
+  const width = dimensions[String(params.resolution)];
+  if (!width) throw new Error('Invalid image resolution');
+  const aspect = String(params.aspectRatio).split(':').map(Number);
+  if (aspect.length !== 2 || aspect.some(x => !Number.isFinite(x) || x <= 0)) {
+    throw new Error('Invalid image aspect ratio');
+  }
+  // For 4K landscape, use the conventional width; rotate for portrait.
+  let w = width, h = Math.round(width * aspect[1] / aspect[0] / 32) * 32;
+  if (h > width) {
+    h = width;
+    w = Math.round(width * aspect[0] / aspect[1] / 32) * 32;
+  }
+  return { width: w, height: h };
+}
+
 export function buildGeneratorProviderRequest(
   state: GeneratorState,
   media: MediaReadUrls
 ): Record<string, unknown> {
   const params = state.params;
+  if (ADDITIONAL_FAL_ENDPOINTS[state.modelId]) {
+    const id = state.modelId;
+    if (id.startsWith('minimax-h3-image')) {
+      if (state.workflow === 'image-to-image' && !media.referenceImages.length) {
+        throw new Error('Reference image required');
+      }
+      return {
+        prompt: state.prompt,
+        image_size: minimaxCustomImageSize(params),
+        num_images: params.outputCount,
+        ...(state.workflow === 'image-to-image'
+          ? { image_urls: media.referenceImages } : {}),
+      };
+    }
+    const hasImage = state.workflow === 'first-frame';
+    if (hasImage && !media.startFrame) throw new Error('Start frame required');
+    const base = {
+      prompt: state.prompt,
+      duration: params.duration,
+      resolution: params.resolution,
+    };
+    if (id.startsWith('kling-4')) {
+      return {
+        ...base,
+        ...(hasImage
+          ? { start_image_url: media.startFrame }
+          : { aspect_ratio: params.aspectRatio }),
+        // Kling 4 uses its own per-shot defaults. Do not send WaveSpeed keys.
+      };
+    }
+    if (id.startsWith('kling-3')) {
+      return {
+        prompt: state.prompt,
+        duration: String(params.duration),
+        ...(hasImage
+          ? { start_image_url: media.startFrame }
+          : { aspect_ratio: params.aspectRatio }),
+        ...(id === 'kling-3' ? { generate_audio: params.generateAudio } : {}),
+      };
+    }
+    if (id.startsWith('minimax-h3-max')) {
+      return {
+        ...base,
+        aspect_ratio: params.aspectRatio,
+        ...(hasImage ? { image_url: media.startFrame } : {}),
+        generate_audio: true,
+      };
+    }
+    // Seedance Fast/Mini/2.5 use fal's image_url, not WaveSpeed's
+    // legacy image property.
+    return {
+      ...base,
+      ...(hasImage ? { image_url: media.startFrame } : { aspect_ratio: params.aspectRatio }),
+      generate_audio: params.generateAudio,
+    };
+  }
+
   if (state.modelId === 'multi-image-to-video') {
     if (media.referenceImages.length < 1) throw new Error('Reference images required');
     if (media.referenceVideos.length || media.referenceAudio.length) {

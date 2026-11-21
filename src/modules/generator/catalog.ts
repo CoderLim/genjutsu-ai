@@ -1,4 +1,5 @@
 import type { GeneratorModel, MediaType } from './types';
+import { ADDITIONAL_GENERATOR_MODELS } from './additional-models';
 
 const IMAGE_MIME = ['image/jpeg', 'image/png', 'image/webp'] as const;
 const VIDEO_MIME = ['video/mp4', 'video/quicktime'] as const;
@@ -294,6 +295,7 @@ export const GENERATOR_MODELS: readonly GeneratorModel[] = [
       },
     },
   },
+  ...ADDITIONAL_GENERATOR_MODELS,
 ];
 
 /** Public catalog includes only launch-ready, server-wired models. */
