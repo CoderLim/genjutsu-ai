@@ -5,7 +5,7 @@ import {
   buildGeneratorProviderRequest,
   getGeneratorProviderIdentity,
 } from './adapters';
-import { getGeneratorModel } from './catalog';
+import { GENERATOR_MODELS, getGeneratorModel } from './catalog';
 import { createGeneratorState, updateGeneratorState } from './normalize';
 
 test('photo-to-video maps first frame without sending last_image', () => {
@@ -124,5 +124,94 @@ test('Nano Banana switches Fal endpoints by workflow, without changing user mode
     assert.deepEqual(editBody.image_urls, media.referenceImages);
     assert.equal(editBody.output_format, 'png');
     assert.equal(editBody.num_images, 1);
+  }
+});
+
+
+const emptyMedia = { referenceImages: [], referenceVideos: [], referenceAudio: [] };
+
+function stagedModel(id: string) {
+  const model = GENERATOR_MODELS.find(item => item.id === id);
+  assert.ok(model, 'Missing staged model ' + id);
+  return model;
+}
+
+test('each staged Fal video model resolves separate text and frame endpoints', () => {
+  const models: Record<string, string> = {
+    'seedance-2-fast': 'bytedance/seedance-2.0/fast',
+    'seedance-2-mini': 'bytedance/seedance-2.0/mini',
+    'seedance-2.5': 'bytedance/seedance-2.5',
+    'seedance-2.5-flash': 'bytedance/seedance-2.5/flash',
+    'minimax-h3-max-turbo': 'minimax/h3-max-turbo',
+    'minimax-h3-max': 'minimax/h3-max',
+    'kling-4': 'kling/v4',
+    'kling-4-flash': 'kling/v4/flash',
+    'kling-3-turbo': 'fal-ai/kling-video/v3/turbo/standard',
+    'kling-3': 'fal-ai/kling-video/v3/pro',
+  };
+  for (const [id, base] of Object.entries(models)) {
+    assert.equal(getGeneratorProviderIdentity(id, 'text-to-video').providerModelId,
+      base + '/text-to-video', id);
+    assert.equal(getGeneratorProviderIdentity(id, 'first-frame').providerModelId,
+      base + '/image-to-video', id);
+    assert.equal(getGeneratorProviderIdentity(id, 'start-end').providerModelId,
+      base + '/image-to-video', id);
+  }
+  assert.throws(
+    () => getGeneratorProviderIdentity('minimax-h3-turbo', 'text-to-video'),
+    /Unknown generator adapter/
+  );
+});
+
+test('Fal video requests use provider-specific image field names, never generic WaveSpeed image', () => {
+  const media = {
+    ...emptyMedia,
+    startFrame: 'https://example.test/start.png',
+    endFrame: 'https://example.test/end.png',
+  };
+  for (const id of ['seedance-2-fast', 'seedance-2-mini', 'seedance-2.5', 'seedance-2.5-flash']) {
+    const model = stagedModel(id);
+    const state = updateGeneratorState(createGeneratorState(model), model, {
+      workflow: 'start-end', prompt: 'A smooth transition',
+    });
+    const request = buildGeneratorProviderRequest(state, media);
+    assert.equal(request.image_url, media.startFrame);
+    assert.equal(request.end_image_url, media.endFrame);
+    assert.equal(request.image, undefined);
+  }
+  for (const id of ['kling-4', 'kling-4-flash', 'kling-3-turbo', 'kling-3']) {
+    const model = stagedModel(id);
+    const state = updateGeneratorState(createGeneratorState(model), model, {
+      workflow: 'start-end', prompt: 'A smooth transition',
+    });
+    const request = buildGeneratorProviderRequest(state, media);
+    assert.equal(request.start_image_url, media.startFrame);
+    assert.equal(request.end_image_url, media.endFrame);
+    assert.equal(request.image_url, undefined);
+  }
+  const minimax = getGeneratorModel('minimax-h3-max');
+  const request = buildGeneratorProviderRequest(createGeneratorState(minimax), media);
+  assert.equal(request.image_url, media.startFrame);
+  assert.equal(request.resolution, '768P');
+});
+
+test('Fal image model editing swaps endpoints and uses bounded image sizes', () => {
+  for (const id of ['minimax-h3-image', 'minimax-h3-image-highspeed']) {
+    const model = stagedModel(id);
+    const base = getGeneratorProviderIdentity(id, 'text-to-image');
+    assert.equal(base.provider, 'fal');
+    assert.ok(base.providerModelId.endsWith('/text-to-image'));
+    assert.ok(getGeneratorProviderIdentity(id, 'image-to-image').providerModelId.endsWith('/edit'));
+    const state = updateGeneratorState(createGeneratorState(model), model, {
+      workflow: 'image-to-image',
+      params: { resolution: '4K', aspectRatio: '16:9', outputCount: 3 },
+    });
+    const request = buildGeneratorProviderRequest(state, {
+      ...emptyMedia, referenceImages: ['https://example.test/ref.png'],
+    });
+    assert.deepEqual(request.image_urls, ['https://example.test/ref.png']);
+    assert.deepEqual(request.image_size, { width: 3840, height: 2176 });
+    assert.equal(request.num_images, 3);
+    assert.equal(request.resolution, undefined);
   }
 });

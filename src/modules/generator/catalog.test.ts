@@ -245,3 +245,36 @@ test('Nano Banana 2 and Pro publish exact tiered credits for both modes', () => 
     assert.doesNotThrow(() => assertGeneratorReady({ ...edit, prompt: 'Change the sky' }, model));
   }
 });
+
+
+test('new MiniMax H3 Max models have bounded exact customer rates', () => {
+  for (const [id, rate] of [
+    ['minimax-h3-max-turbo', 10],
+    ['minimax-h3-max', 16],
+  ] as const) {
+    const model = getGeneratorModel(id);
+    assert.equal(model.enabled, true);
+    assert.equal(model.pricing.precision, 'exact');
+    const state = createGeneratorState(model);
+    assert.equal(state.params.resolution, '768P');
+    assert.equal(calculateGeneratorCredits(state, model).credits, 5 * rate);
+    assert.doesNotThrow(() => assertGeneratorReady({
+      ...state, prompt: 'A storm gathers above the mountain',
+      inputs: { ...state.inputs, startFrame: 'start' },
+    }, model));
+  }
+});
+
+test('unpriced new models are impossible to charge through the public model lookup', () => {
+  const pending = GENERATOR_MODELS.filter(model =>
+    (model.id.startsWith('seedance-2-') && model.id !== 'seedance-2.0') ||
+    model.id.startsWith('kling-') ||
+    model.id.startsWith('minimax-h3-image')
+  );
+  assert.ok(pending.length >= 10);
+  for (const model of pending) {
+    assert.equal(model.enabled, false, model.id);
+    assert.equal(model.pricing.precision, 'estimate', model.id);
+    assert.throws(() => getGeneratorModel(model.id), /not enabled/, model.id);
+  }
+});
