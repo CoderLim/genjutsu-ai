@@ -192,3 +192,29 @@ test('all advertised H3 prompt expansion options survive form normalization', ()
     }
   }
 });
+
+test('switching from a reference model to H3 preserves only a compatible first frame', () => {
+  const seedance = getGeneratorModel('seedance-2.5');
+  const h3 = getGeneratorModel('minimax-h3');
+  const reference = updateGeneratorState(createGeneratorState(seedance), seedance, {
+    workflow: 'all-in-one-reference',
+    prompt: 'A dancer performing on a stage',
+    inputs: { ...createGeneratorState(seedance).inputs,
+      referenceImages: ['reference-1', 'reference-2'] },
+    params: { duration: 4, resolution: '720p', generateAudio: true },
+  });
+  const converted = normalizeGeneratorState(reference, h3);
+  assert.equal(converted.workflow, 'first-frame');
+  assert.equal(converted.inputs.startFrame, 'reference-1');
+  assert.deepEqual(converted.inputs.referenceImages, []);
+  assert.equal(converted.params.duration, 5);
+  assert.equal(converted.params.resolution, '768P');
+  assert.equal(converted.params.generateAudio, undefined);
+  assert.equal(converted.params.aspectRatio, undefined);
+  assert.equal(converted.prompt, reference.prompt);
+
+  const startEnd = updateGeneratorState(converted, h3, { workflow: 'start-end' });
+  assert.equal(startEnd.inputs.startFrame, 'reference-1');
+  assert.equal(startEnd.inputs.endFrame, null);
+  assert.match(generatorReadinessError(startEnd, h3) ?? '', /endFrame/);
+});
