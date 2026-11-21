@@ -38,7 +38,7 @@ import {
   sealGeneratorInputs,
   signGeneratorReadUrl,
 } from './storage';
-import { getWorkflowSpec, type GeneratorInputs, type GeneratorState } from './types';
+import { generatorResultContentType, getWorkflowSpec, type GeneratorInputs, type GeneratorState } from './types';
 import { assertGeneratorReady } from './validation';
 
 export class GeneratorPriceChangedError extends Error {
@@ -422,10 +422,10 @@ export async function reconcileGeneratorTask(task: GeneratorTask) {
   }
 
   try {
-    const type = task.mediaType === 'image'
-      ? String(options.params?.outputFormat) === 'png'
-        ? 'image/png' : 'image/jpeg'
-      : 'video/mp4';
+    const type = generatorResultContentType(
+      task.mediaType as 'image' | 'video',
+      options.params?.outputFormat
+    );
     const keys = await persistGeneratorResults({
       ...identity,
       outputUrls: provider.outputUrls,
