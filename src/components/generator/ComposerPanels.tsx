@@ -52,29 +52,29 @@ function modelTitleParts(name: string) {
 }
 
 function modelFamilyId(model: GeneratorModel) {
-  if (model.id.startsWith('seedance')) return 'seedance';
-  if (model.id.startsWith('h3') || model.name.toLowerCase().includes('minimax'))
-    return 'minimax';
-  if (model.id.startsWith('flux')) return 'flux';
-  return model.providerName.toLowerCase().replace(/\s+/g, '-');
+  if (model.mediaType === 'image') return 'image-tools';
+  if (model.workflows['first-frame'] || model.workflows['start-end'])
+    return 'photo-to-video';
+  if (model.workflows['all-in-one-reference'] || model.workflows['reference-to-video'])
+    return 'reference-video';
+  if (model.workflows['text-to-video']) return 'text-to-video';
+  return 'video-tools';
 }
 
 function familyMeta(
   id: string
 ): Pick<ModelFamily, 'label' | 'blurb' | 'badge'> {
   switch (id) {
-    case 'seedance':
-      return {
-        label: 'Seedance',
-        blurb: 'Photo / text / reference video',
-        badge: 'HOT',
-      };
-    case 'minimax':
-      return { label: 'MiniMax', blurb: 'Native stereo audio', badge: '-70%' };
-    case 'flux':
-      return { label: 'FLUX', blurb: 'Image generation & edit' };
+    case 'photo-to-video':
+      return { label: 'Photo to Video', blurb: 'Animate photos and guide keyframes' };
+    case 'text-to-video':
+      return { label: 'Text to Video', blurb: 'Create video from a prompt' };
+    case 'reference-video':
+      return { label: 'Reference Video', blurb: 'Combine images and motion references' };
+    case 'image-tools':
+      return { label: 'AI Image', blurb: 'Generate and edit images' };
     default:
-      return { label: id, blurb: 'Generation model' };
+      return { label: 'Video Tools', blurb: 'Video generation workflows' };
   }
 }
 
