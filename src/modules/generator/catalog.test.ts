@@ -16,7 +16,11 @@ test('live catalog capabilities and price tables are valid', () => {
 test('public catalog lists completed reference workflows', () => {
   const ids = listGeneratorModels().map(x => x.id);
   assert.deepEqual(ids, [
-    'photo-to-video-standard', 'text-to-video-standard', 'multi-image-to-video', 'all-in-one-video', 'nano-banana-2', 'nano-banana-pro', 'text-to-image-fast', 'image-edit-standard', 'minimax-h3-max-turbo', 'minimax-h3-max',
+    'photo-to-video-standard', 'text-to-video-standard', 'multi-image-to-video', 'all-in-one-video',
+    'nano-banana-2', 'nano-banana-pro', 'text-to-image-fast', 'image-edit-standard',
+    'seedance-2-fast', 'seedance-2-mini', 'seedance-2.5', 'seedance-2.5-flash',
+    'minimax-h3-max-turbo', 'minimax-h3-max',
+    'kling-4', 'kling-4-flash', 'kling-3-turbo', 'kling-3',
   ]);
   assert.equal(getGeneratorModel('all-in-one-video').enabled, true);
   assert.throws(() => getGeneratorModel('reference-to-video-pro'), /not enabled/);
@@ -267,14 +271,36 @@ test('new MiniMax H3 Max models have bounded exact customer rates', () => {
 
 test('unpriced new models are impossible to charge through the public model lookup', () => {
   const pending = GENERATOR_MODELS.filter(model =>
-    model.id.startsWith('seedance-2') ||
-    model.id.startsWith('kling-') ||
+    model.id === 'minimax-h3-turbo' ||
     model.id.startsWith('minimax-h3-image')
   );
-  assert.ok(pending.length >= 10);
+  assert.equal(pending.length, 3);
   for (const model of pending) {
     assert.equal(model.enabled, false, model.id);
     assert.equal(model.pricing.precision, 'estimate', model.id);
     assert.throws(() => getGeneratorModel(model.id), /not enabled/, model.id);
+  }
+});
+
+test('customer tariff covers every enabled Fal video resolution', () => {
+  const expected: Record<string, Record<string, number>> = {
+    'seedance-2-fast': { '480p': 19, '720p': 42 },
+    'seedance-2-mini': { '480p': 13, '720p': 27 },
+    'seedance-2.5': { '480p': 38, '720p': 81 },
+    'seedance-2.5-flash': { '480p': 25, '720p': 53 },
+    'kling-4': { '720p': 27, '1080p': 40 },
+    'kling-4-flash': { '720p': 17 },
+    'kling-3-turbo': { '720p': 20 },
+    'kling-3': { '1080p': 29 },
+  };
+  for (const [id, rateTable] of Object.entries(expected)) {
+    const model = getGeneratorModel(id);
+    const state = createGeneratorState(model);
+    assert.equal(model.pricing.precision, 'exact');
+    for (const [resolution, rate] of Object.entries(rateTable)) {
+      const draft = updateGeneratorState(state, model, { params: { resolution } });
+      assert.equal(calculateGeneratorCredits(draft, model).credits,
+        Number(draft.params.duration) * rate, id + ':' + resolution);
+    }
   }
 });

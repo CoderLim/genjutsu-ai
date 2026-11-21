@@ -15,7 +15,9 @@ import { calculateGeneratorCredits } from './pricing';
 
 test('model chooser lists Seedance and Nano Banana, not workflow categories', () => {
   const groups = groupGeneratorModels(listGeneratorModels());
-  assert.deepEqual(groups.map(g => g.label), ['Seedance', 'Nano Banana', 'MiniMax', 'FLUX']);
+  assert.deepEqual(groups.map(g => g.label), [
+    'Seedance', 'Nano Banana', 'MiniMax', 'Kling', 'FLUX',
+  ]);
   assert.deepEqual(groups[0].models.map(m => m.id), [
     'photo-to-video-standard', 'text-to-video-standard',
     'multi-image-to-video', 'all-in-one-video',
@@ -69,8 +71,10 @@ test('model menu contains one Seedance 2.0 item and no workflow or resolution me
     'Nano Banana Pro',
     'FLUX.1 Schnell',
     'FLUX.2 Flash',
-    'MiniMax H3 Max Turbo',
-    'MiniMax H3 Max',
+    'Seedance 2.0 Fast', 'Seedance 2.0 Mini',
+    'Seedance 2.5', 'Seedance 2.5 Flash',
+    'MiniMax H3 Max Turbo', 'MiniMax H3 Max',
+    'Kling 4.0', 'Kling 4.0 Flash', 'Kling 3.0 Turbo', 'Kling 3.0',
   ]);
   const selectedTextVideo = getGeneratorModel('text-to-video-standard');
   const seedance = getGeneratorModel('photo-to-video-standard');
@@ -123,9 +127,13 @@ test('video tab shows actual enabled video model families only', () => {
     allModels.filter(model => model.mediaType === 'video')
   );
   const groups = groupGeneratorModels(models);
-  assert.deepEqual(groups.map(group => group.label), ['Seedance', 'MiniMax']);
+  assert.deepEqual(groups.map(group => group.label), ['Seedance', 'MiniMax', 'Kling']);
   assert.deepEqual(models.map(generatorModelLabel), [
-    'Seedance 2.0', 'MiniMax H3 Max Turbo', 'MiniMax H3 Max',
+    'Seedance 2.0',
+    'Seedance 2.0 Fast', 'Seedance 2.0 Mini',
+    'Seedance 2.5', 'Seedance 2.5 Flash',
+    'MiniMax H3 Max Turbo', 'MiniMax H3 Max',
+    'Kling 4.0', 'Kling 4.0 Flash', 'Kling 3.0 Turbo', 'Kling 3.0',
   ]);
   // The H3 preview has unverified pricing, so it is not selectable in DEV.
   assert.ok(!models.some(model => model.id === 'reference-to-video-pro'));
@@ -180,7 +188,8 @@ test('development previews list requested versions but cannot bill unpriced mode
   assert.deepEqual(video.filter(x => x.id.startsWith('kling-')).map(x => x.name), [
     'Kling 4.0', 'Kling 4.0 Flash', 'Kling 3.0 Turbo', 'Kling 3.0',
   ]);
-  assert.equal(video.filter(x => x.id.startsWith('kling-')).every(x => !x.enabled), true);
+  assert.equal(video.filter(x => x.id.startsWith('kling-')).every(x => x.enabled), true);
+  assert.ok(video.filter(x => x.id.startsWith('seedance-2')).every(x => x.enabled));
   assert.equal(image.filter(x => x.id.startsWith('minimax-h3-image')).length, 2);
   assert.equal(image.filter(x => x.id.startsWith('minimax-h3-image')).every(x => !x.enabled), true);
 });
