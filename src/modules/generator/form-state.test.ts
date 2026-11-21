@@ -2,12 +2,14 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  availableGeneratorFieldValues,
   generatorReadinessError,
   getGeneratorSlotCapacity,
   isGeneratorSlotOptional,
   shouldPollGeneratorJob,
 } from './form-state';
 import { getGeneratorModel, GENERATOR_MODELS } from './catalog';
+import { getPreviewModel } from './registry';
 import { createGeneratorState, normalizeGeneratorState, updateGeneratorState } from './normalize';
 
 test('photo-to-video requires a start frame in the new composer', () => {
@@ -99,4 +101,24 @@ test('unverified preview model cannot generate', () => {
   const disabled = GENERATOR_MODELS.find(m => m.id === 'reference-to-video-pro')!;
   const state = createGeneratorState(disabled);
   assert.match(generatorReadinessError(state, disabled) ?? '', /not enabled/);
+});
+
+test('settings present only options valid under model constraints', () => {
+  const model = getPreviewModel('video');
+  const state = createGeneratorState(model);
+  const spec = model.workflows['first-frame']!;
+  const choices = [...(spec.fields.duration.options ?? [])];
+  assert.deepEqual(
+    availableGeneratorFieldValues(spec, state.params, 'duration', choices),
+    [4, 6, 8, 10]
+  );
+  const high = updateGeneratorState(state, model, { params: { resolution: '720p' } });
+  assert.deepEqual(
+    availableGeneratorFieldValues(spec, high.params, 'duration', choices),
+    [4, 6]
+  );
+  assert.deepEqual(
+    availableGeneratorFieldValues(spec, high.params, 'aspectRatio', ['16:9','9:16']),
+    ['16:9','9:16']
+  );
 });

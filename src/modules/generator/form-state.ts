@@ -3,6 +3,7 @@ import {
   type GeneratorInputs,
   type GeneratorModel,
   type GeneratorState,
+  type FieldValue,
   type MediaSlot,
   type WorkflowSpec,
 } from './types';
@@ -74,4 +75,23 @@ export function shouldPollGeneratorJob(job: {
 
 export function workflowAcceptsAnyReference(model: GeneratorModel, workflow: GeneratorState['workflow']) {
   return getWorkflowSpec(model, workflow).requiresAnyReference === true;
+}
+
+/**
+ * Hide incompatible choices in a capability-driven settings panel instead of
+ * showing options that the normalizer will immediately reject.
+ */
+export function availableGeneratorFieldValues(
+  spec: WorkflowSpec,
+  params: Record<string, FieldValue>,
+  fieldName: string,
+  choices: readonly FieldValue[]
+): FieldValue[] {
+  return choices.filter(choice =>
+    (spec.constraints ?? []).every(rule =>
+      rule.field !== fieldName ||
+      params[rule.when.field] !== rule.when.equals ||
+      rule.allowedValues.includes(choice)
+    )
+  );
 }

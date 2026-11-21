@@ -20,6 +20,7 @@ import {
 } from '@/modules/generator/normalize';
 import { calculateGeneratorCredits } from '@/modules/generator/pricing';
 import {
+  availableGeneratorFieldValues,
   generatorReadinessError,
   getGeneratorSlotCapacity,
   isGeneratorSlotOptional,
@@ -681,7 +682,12 @@ export function GeneratorForm({
       return {
         name,
         label: field.label,
-        values: fieldValues(field),
+        values: availableGeneratorFieldValues(
+          spec,
+          form.params,
+          name,
+          fieldValues(field)
+        ),
         kind: name as 'aspectRatio' | 'duration' | 'resolution' | 'outputCount',
       };
     }),
@@ -702,7 +708,12 @@ export function GeneratorForm({
       .map(([name, field]) => ({
         name,
         label: field.label,
-        values: fieldValues(field),
+        values: availableGeneratorFieldValues(
+          spec,
+          form.params,
+          name,
+          fieldValues(field)
+        ),
         kind: 'other' as const,
       })),
   ].filter((field) => field.values.length > 0);
