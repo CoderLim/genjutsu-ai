@@ -398,6 +398,9 @@ export async function reconcileGeneratorTask(task: GeneratorTask) {
       modelId, requestId: task.taskId,
       mediaType: task.mediaType as 'image' | 'video',
       workflow: options.workflow as GeneratorState['workflow'],
+      // Reference and text-only paths use different provider endpoints.
+      // Read the immutable endpoint recorded at task reservation.
+      providerModelId: task.model,
     });
   } catch (error) {
     console.warn('[generator] status query failed', { id: task.id, error });
