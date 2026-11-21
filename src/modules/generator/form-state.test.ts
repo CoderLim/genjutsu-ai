@@ -7,6 +7,8 @@ import {
   generatorReadinessError,
   getGeneratorExpansionControls,
   getGeneratorSlotCapacity,
+  describeGeneratorMixedReferences,
+  planGeneratorMixedReferenceFiles,
   isGeneratorSlotOptional,
   isGeneratorJobActive,
   shouldPollGeneratorJob,
@@ -364,4 +366,102 @@ test('switching between reference-capable image models keeps uploads without ope
   const schnell = getGeneratorModel('text-to-image-fast');
   assert.deepEqual(normalizeGeneratorState(flux, schnell, schnell.defaultWorkflow)
     .inputs.referenceImages, []);
+});
+
+test('All-in-One describes only real reference counts, supported formats, and total seconds', () => {
+  const seedance = getGeneratorModel('all-in-one-video');
+  const spec = seedance.workflows['all-in-one-reference']!;
+  assert.equal(describeGeneratorMixedReferences(spec),
+    'Up to 12 items total: 9 images (JPG / PNG / WebP) · 3 videos (MP4 / MOV), 15s total · 3 audio (M4A / WAV), 15s total');
+  assert.equal(spec.slots.referenceVideos?.maxTotalSeconds, 15);
+  assert.equal(spec.slots.referenceAudio?.maxTotalSeconds, 15);
+
+  const flash = getGeneratorModel('seedance-2.5-flash');
+  assert.equal(describeGeneratorMixedReferences(
+    flash.workflows['all-in-one-reference']!
+  ), 'Up to 10 images (JPG / PNG / WebP)');
+});
+
+test('one mixed input sorts images, videos, and audio into the correct provider slots', () => {
+  const model = getGeneratorModel('all-in-one-video');
+  const state = createGeneratorState(model);
+  const spec = model.workflows['all-in-one-reference']!;
+  const plan = planGeneratorMixedReferenceFiles(spec, state.inputs, [
+    { name: 'reference.webp', type: 'image/webp', size: 1024 },
+    { name: 'clip.mp4', type: 'video/mp4', size: 1024 },
+    { name: 'speech.wav', type: 'audio/wav', size: 1024 },
+    { name: 'second.png', type: 'image/png', size: 1024 },
+    { name: 'clip.mov', type: 'video/quicktime', size: 1024 },
+    { name: 'music.m4a', type: 'audio/mp4', size: 1024 },
+  ]);
+  assert.deepEqual(plan.map(x => x.slot), [
+    'referenceImages', 'referenceVideos', 'referenceAudio',
+    'referenceImages', 'referenceVideos', 'referenceAudio',
+  ]);
+  assert.deepEqual(plan.map(x => x.index), [0, 1, 2, 3, 4, 5]);
+
+  // The combined uploader changes only the presentation. The existing
+  // request still receives three separate typed arrays.
+  const staged = updateGeneratorState(state, model, {
+    inputs: {
+      ...state.inputs,
+      referenceImages: ['image1', 'image2'],
+      referenceVideos: ['video1', 'video2'],
+      referenceAudio: ['audio1', 'audio2'],
+    },
+    params: { inputVideoSeconds: 5 },
+  });
+  assert.deepEqual(staged.inputs.referenceImages, ['image1', 'image2']);
+  assert.deepEqual(staged.inputs.referenceVideos, ['video1', 'video2']);
+  assert.deepEqual(staged.inputs.referenceAudio, ['audio1', 'audio2']);
+});
+
+test('mixed reference batch rejects over-limit items without silently truncating', () => {
+  const model = getGeneratorModel('all-in-one-video');
+  const spec = model.workflows['all-in-one-reference']!;
+  const state = createGeneratorState(model);
+  const many = Array.from({length: 10}, (_, i) => ({
+    name: 'pic-' + i + '.jpg', type: 'image/jpeg', size: 50,
+  }));
+  assert.throws(() => planGeneratorMixedReferenceFiles(spec, state.inputs, many),
+    /Maximum 9 images/);
+  assert.equal(state.inputs.referenceImages.length, 0);
+
+  const almostFull = updateGeneratorState(state, model, {
+    inputs: {
+      ...state.inputs,
+      referenceImages: Array.from({length: 9}, (_, i) => 'img' + i),
+      referenceVideos: ['video-1', 'video-2'],
+    },
+    params: { inputVideoSeconds: 4 },
+  });
+  assert.deepEqual(planGeneratorMixedReferenceFiles(spec, almostFull.inputs, [
+    { name: 'clip.mov', type: 'video/quicktime', size: 256 },
+  ]), [{ index: 0, slot: 'referenceVideos' }]);
+  assert.throws(() => planGeneratorMixedReferenceFiles(spec, almostFull.inputs, [
+    { name: 'clip.mov', type: 'video/quicktime', size: 256 },
+    { name: 'music.wav', type: 'audio/wav', size: 256 },
+  ]), /Maximum 12 reference items/);
+});
+
+test('mixed reference picker rejects unsupported MIME, oversized media and unsupported slots', () => {
+  const all = getGeneratorModel('all-in-one-video');
+  const spec = all.workflows['all-in-one-reference']!;
+  const empty = createGeneratorState(all).inputs;
+  assert.throws(() => planGeneratorMixedReferenceFiles(spec, empty, [
+    { name: 'unknown.heic', type: 'image/heic', size: 123 },
+  ]), /Unsupported reference file type/);
+  assert.throws(() => planGeneratorMixedReferenceFiles(spec, empty, [
+    { name: 'huge.mp4', type: 'video/mp4', size: 81 * 1048576 },
+  ]), /size limit/);
+  const flash = getGeneratorModel('seedance-2.5-flash');
+  const flashSpec = flash.workflows['all-in-one-reference']!;
+  assert.throws(() => planGeneratorMixedReferenceFiles(flashSpec,
+    createGeneratorState(flash).inputs, [
+      { name: 'audio.wav', type: 'audio/wav', size: 1024 },
+    ]), /Unsupported reference file type/);
+  assert.deepEqual(planGeneratorMixedReferenceFiles(flashSpec,
+    createGeneratorState(flash).inputs, [
+      { name: 'img.png', type: 'image/png', size: 1024 },
+    ]), [{ index: 0, slot: 'referenceImages' }]);
 });
