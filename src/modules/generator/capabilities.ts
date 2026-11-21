@@ -21,6 +21,9 @@ export function assertGeneratorModelConfig(model: GeneratorModel): void {
 
     if (model.pricing.rule.kind === 'per-second') {
       assertRateCoverage(model, spec, 'resolution', model.pricing.rule.rates);
+      if (model.pricing.referenceVideoRates && spec.slots.referenceVideos) {
+        assertRateCoverage(model, spec, 'resolution', model.pricing.referenceVideoRates);
+      }
       if (!spec.fields.duration) {
         throw new Error('Per-second model lacks duration: ' + model.id);
       }

@@ -2,7 +2,9 @@ import type { GeneratorModel, MediaType } from './types';
 
 const IMAGE_MIME = ['image/jpeg', 'image/png', 'image/webp'] as const;
 const VIDEO_MIME = ['video/mp4', 'video/quicktime'] as const;
-const AUDIO_MIME = ['audio/mpeg', 'audio/mp4', 'audio/wav'] as const;
+const AUDIO_MIME = ['audio/mp4', 'audio/wav'] as const;
+// Input+output reference-video per-second customer tariff.
+const VIDEO_REFERENCE_RATES = { '480p': 12.75, '720p': 25.5, '1080p': 63.75 };
 
 // Public user-credit tariffs. These are product prices, NOT provider cost data.
 // Per-second Seedance rates are based on 170 customer credits / provider USD,
@@ -114,13 +116,12 @@ export const GENERATOR_MODELS: readonly GeneratorModel[] = [
     id: 'seedance-2-reference',
     name: 'Seedance 2.0 · All-in-One',
     mediaType: 'video', providerName: 'WaveSpeed',
-    // Reference video/audio pricing and server-side duration probes are not
-    // yet release-gated; keep disabled to avoid misquoting video-reference costs.
-    enabled: false,
+    enabled: true,
     defaultWorkflow: 'all-in-one-reference',
     pricing: {
-      version: '2026-11-21-reference-draft',
-      precision: 'estimate',
+      version: '2026-11-21-reference-video-v2',
+      precision: 'exact',
+      referenceVideoRates: VIDEO_REFERENCE_RATES,
       rule: { kind: 'per-second', rates: VIDEO_RATES },
     },
     workflows: {
@@ -128,11 +129,12 @@ export const GENERATOR_MODELS: readonly GeneratorModel[] = [
         label: 'All-in-One Reference',
         slots: {
           referenceImages: { min: 0, max: 9, accept: IMAGE_MIME, maxBytes: 12 * 1048576 },
-          referenceVideos: { min: 0, max: 3, accept: VIDEO_MIME, maxBytes: 80 * 1048576 },
-          referenceAudio: { min: 0, max: 3, accept: AUDIO_MIME, maxBytes: 20 * 1048576 },
+          referenceVideos: { min: 0, max: 3, accept: VIDEO_MIME, maxBytes: 80 * 1048576, minSeconds: 0.1, maxSeconds: 15 },
+          referenceAudio: { min: 0, max: 3, accept: AUDIO_MIME, maxBytes: 20 * 1048576, minSeconds: 0.1, maxSeconds: 15 },
         },
         fields: {
           ...baseVideoFields,
+          inputVideoSeconds: { label: 'Input video duration', default: 0, internal: true, min: 0, max: 15, step: 1 },
           webSearch: { label: 'Web Search', default: false, options: [false, true] },
         },
       },

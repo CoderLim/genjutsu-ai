@@ -473,6 +473,7 @@ export function GeneratorForm({
           </div>
 
           {Object.entries(spec.fields)
+            .filter(([, field]) => !field.internal)
             .sort(([left], [right]) => {
               const l = FIELD_ORDER.indexOf(left), r = FIELD_ORDER.indexOf(right);
               return (l < 0 ? 100 : l) - (r < 0 ? 100 : r);

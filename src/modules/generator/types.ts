@@ -24,6 +24,8 @@ export type FieldValue = string | number | boolean;
 
 export type FieldSpec = {
   label: string;
+  /** Derived from uploaded media; not directly user-editable. */
+  internal?: boolean;
   default: FieldValue;
   // For segmented controls, selectors and exact-value number choices.
   options?: readonly FieldValue[];
@@ -77,6 +79,8 @@ export type PricingRule =
 
 export type PublicPricing = {
   version: string;
+  /** Input-video tariffs can differ from output-only rates. */
+  referenceVideoRates?: Record<string, number>;
   precision: 'exact' | 'estimate';
   rule: PricingRule;
   // All surcharges are customer credits, never provider costs.

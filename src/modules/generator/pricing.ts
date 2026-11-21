@@ -40,7 +40,19 @@ export function calculateGeneratorCredits(
       if (typeof duration !== 'number') throw new Error('Missing duration');
       const rate = pricing.rule.rates[getKey(params.resolution, 'resolution')];
       if (rate === undefined) throw new Error('Unsupported resolution rate');
-      base = duration * rate;
+      const referenceRateTable = pricing.referenceVideoRates;
+      if (referenceRateTable && state.inputs.referenceVideos.length) {
+        const seconds = params.inputVideoSeconds;
+        if (typeof seconds !== 'number' || !Number.isSafeInteger(seconds) ||
+            seconds < state.inputs.referenceVideos.length * 2 || seconds > 15) {
+          throw new Error('Reference video duration is not ready');
+        }
+        const videoRate = referenceRateTable[getKey(params.resolution, 'resolution')];
+        if (videoRate === undefined) throw new Error('Unsupported reference-video rate');
+        base = (duration + seconds) * videoRate;
+      } else {
+        base = duration * rate;
+      }
       break;
     }
     case 'per-image': {
