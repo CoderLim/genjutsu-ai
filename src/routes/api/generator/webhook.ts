@@ -1,11 +1,21 @@
 import { createFileRoute } from '@tanstack/react-router';
 
+import { envConfigs } from '@/config';
+
 import { getGeneratorTaskByRequestId } from '@/modules/generator/billing';
 import { reconcileGeneratorTask } from '@/modules/generator/service';
 import { enforceMinIntervalRateLimit } from '@/lib/rate-limit';
-import { respOk } from '@/lib/resp';
+import { respOk, respErr } from '@/lib/resp';
 
 async function POST({ request }: { request: Request }) {
+  // This route is a protected reconciliation notification, not a public Fal
+  // webhook receiver. Real provider callback signatures must be verified
+  // before accepting upstream-initiated notifications in a future integration.
+  const secret = envConfigs.cron_secret?.trim();
+  if (!secret) return respErr('Webhook verification not configured', { status: 503 });
+  const supplied = request.headers.get('x-cron-secret');
+  if (supplied !== secret) return respErr('Unauthorized', { status: 401 });
+
   const limited = enforceMinIntervalRateLimit(request, {
     intervalMs: 1000, keyPrefix: 'generator-webhook',
   });
