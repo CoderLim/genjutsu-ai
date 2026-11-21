@@ -127,6 +127,8 @@ export const GENERATOR_MODELS: readonly GeneratorModel[] = [
     workflows: {
       'all-in-one-reference': {
         label: 'All-in-One Reference',
+        requiresAnyReference: true,
+        maxCombinedReferences: 12,
         slots: {
           referenceImages: { min: 0, max: 9, accept: IMAGE_MIME, maxBytes: 12 * 1048576 },
           referenceVideos: { min: 0, max: 3, accept: VIDEO_MIME, maxBytes: 80 * 1048576, minSeconds: 0.1, maxSeconds: 15 },

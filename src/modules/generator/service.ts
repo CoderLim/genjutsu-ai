@@ -27,7 +27,8 @@ import {
   type GeneratorTask,
 } from './billing';
 import { getGeneratorModel, GENERATOR_MODELS } from './catalog';
-import { probeGeneratorVideoDuration } from './media-metadata';
+import { probeGeneratorVideoDuration, probeGeneratorAudioDuration } from './media-metadata';
+import { referenceVideoBillableSeconds, assertReferenceAudioDuration } from './reference-metadata';
 import { calculateGeneratorCredits } from './pricing';
 import {
   assertGenerationId,
@@ -190,13 +191,9 @@ export async function generateWithGenerator(input: {
   if (task) {
     assertGeneratorTaskSignature(task, requestedSignature);
   } else {
-    const quote = calculateGeneratorCredits(state, model);
-    if (input.pricingVersion !== quote.pricingVersion ||
-      !Number.isSafeInteger(input.maxAcceptedCredits) ||
-      input.maxAcceptedCredits < quote.credits) {
-      throw new GeneratorPriceChangedError(quote.credits, quote.pricingVersion);
+    if (!Number.isSafeInteger(input.maxAcceptedCredits) || input.maxAcceptedCredits < 0) {
+      throw new Error('Invalid maximum accepted credits');
     }
-
     await checkGeneratorPrompt(state.prompt);
     const spec = getWorkflowSpec(model, state.workflow);
     const sealed = await sealGeneratorInputs({
@@ -206,22 +203,49 @@ export async function generateWithGenerator(input: {
       slots: spec.slots,
     });
     try {
-      // Verify duration of all bounded reference videos before consuming credits.
-      for (const slot of ['referenceVideos'] as const) {
-        const limit = spec.slots[slot];
-        if (!limit || (limit.minSeconds === undefined && limit.maxSeconds === undefined)) continue;
-        for (const key of sealed.inputs[slot]) {
-          const seconds = await probeGeneratorVideoDuration(await signGeneratorReadUrl(key));
-          if ((limit.minSeconds !== undefined && seconds < limit.minSeconds) ||
-              (limit.maxSeconds !== undefined && seconds > limit.maxSeconds)) {
-            throw new Error('Reference video must be between ' +
-              limit.minSeconds + ' and ' + limit.maxSeconds + ' seconds');
-          }
+      // Charge from *measured sealed objects*, never the client-provided
+      // inputVideoSeconds. The client only supplies a synchronous estimate.
+      const videoSeconds: number[] = [];
+      const audioSeconds: number[] = [];
+      for (const key of sealed.inputs.referenceVideos) {
+        const duration = await probeGeneratorVideoDuration(await signGeneratorReadUrl(key));
+        const limit = spec.slots.referenceVideos;
+        if (limit && ((limit.minSeconds !== undefined && duration < limit.minSeconds) ||
+          (limit.maxSeconds !== undefined && duration > limit.maxSeconds))) {
+          throw new Error('Reference video duration is out of range');
         }
+        videoSeconds.push(duration);
+      }
+      for (const key of sealed.inputs.referenceAudio) {
+        const duration = await probeGeneratorAudioDuration(await signGeneratorReadUrl(key), key);
+        const limit = spec.slots.referenceAudio;
+        if (limit && ((limit.minSeconds !== undefined && duration < limit.minSeconds) ||
+          (limit.maxSeconds !== undefined && duration > limit.maxSeconds))) {
+          throw new Error('Reference audio duration is out of range');
+        }
+        audioSeconds.push(duration);
+      }
+
+      const videoInputSeconds = referenceVideoBillableSeconds(videoSeconds);
+      assertReferenceAudioDuration(audioSeconds);
+      const verifiedState: GeneratorState = {
+        ...state,
+        params: {
+          ...state.params,
+          ...(spec.fields.inputVideoSeconds ? { inputVideoSeconds: videoInputSeconds } : {}),
+        },
+      };
+      // All generation prices are recomputed by the server, including dynamic
+      // reference video billing. Re-check the user's price ceiling *before*
+      // any wallet debit or provider submission.
+      const quote = calculateGeneratorCredits(verifiedState, model);
+      if (input.pricingVersion !== quote.pricingVersion ||
+        input.maxAcceptedCredits < quote.credits) {
+        throw new GeneratorPriceChangedError(quote.credits, quote.pricingVersion);
       }
       task = await reserveGeneratorTask({
         generationId, userId: input.userId, userEmail: input.userEmail,
-        state, sealedState: { ...state, inputs: sealed.inputs },
+        state: verifiedState, sealedState: { ...verifiedState, inputs: sealed.inputs },
         signature: requestedSignature, quote,
         ...getGeneratorProviderIdentity(state.modelId),
       });

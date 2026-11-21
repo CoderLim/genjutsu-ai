@@ -56,6 +56,7 @@ export type WorkflowSpec = {
   fields: Record<string, FieldSpec>;
   constraints?: readonly ConditionalFieldRule[];
   maxCombinedReferences?: number;
+  requiresAnyReference?: boolean;
 };
 
 export type PricingRule =

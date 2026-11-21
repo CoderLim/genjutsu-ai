@@ -62,6 +62,13 @@ export function assertGeneratorDraft(
   if (spec.maxCombinedReferences !== undefined && count > spec.maxCombinedReferences) {
     throw new Error('Too many combined references');
   }
+  if (spec.requiresAnyReference && count === 0) {
+    throw new Error('At least one reference image or video is required');
+  }
+  if (state.inputs.referenceAudio.length > 0 &&
+      !state.inputs.referenceImages.length && !state.inputs.referenceVideos.length) {
+    throw new Error('Audio references require an image or video reference');
+  }
 }
 
 export function assertGeneratorReady(
