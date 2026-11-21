@@ -170,8 +170,10 @@ test('each staged Fal video model resolves separate text and frame endpoints', (
       base + '/text-to-video', id);
     assert.equal(getGeneratorProviderIdentity(id, 'first-frame').providerModelId,
       base + '/image-to-video', id);
-    assert.equal(getGeneratorProviderIdentity(id, 'start-end').providerModelId,
-      base + '/image-to-video', id);
+    if (stagedModel(id).workflows['start-end']) {
+      assert.equal(getGeneratorProviderIdentity(id, 'start-end').providerModelId,
+        base + '/image-to-video', id);
+    }
   }
   assert.throws(
     () => getGeneratorProviderIdentity('minimax-h3-turbo', 'text-to-video'),
@@ -195,7 +197,7 @@ test('Fal video requests use provider-specific image field names, never generic 
     assert.equal(request.end_image_url, media.endFrame);
     assert.equal(request.image, undefined);
   }
-  for (const id of ['kling-4', 'kling-4-flash', 'kling-3-turbo', 'kling-3']) {
+  for (const id of ['kling-4', 'kling-3']) {
     const model = stagedModel(id);
     const state = updateGeneratorState(createGeneratorState(model), model, {
       workflow: 'start-end', prompt: 'A smooth transition',
@@ -205,6 +207,25 @@ test('Fal video requests use provider-specific image field names, never generic 
     assert.equal(request.end_image_url, media.endFrame);
     assert.equal(request.image_url, undefined);
   }
+  const turbo = stagedModel('kling-3-turbo');
+  assert.equal(turbo.workflows['start-end'], undefined);
+  const turboRequest = buildGeneratorProviderRequest(
+    updateGeneratorState(createGeneratorState(turbo), turbo, {
+      prompt: 'A camera dolly move',
+    }),
+    media
+  );
+  assert.equal(turboRequest.image_url, media.startFrame);
+  assert.equal(turboRequest.start_image_url, undefined);
+  assert.equal(turboRequest.end_image_url, undefined);
+  assert.equal(turboRequest.generate_audio, undefined);
+
+  const flash = stagedModel('kling-4-flash');
+  assert.equal(flash.workflows['start-end'], undefined);
+  const flashRequest = buildGeneratorProviderRequest(createGeneratorState(flash), media);
+  assert.equal(flashRequest.start_image_url, media.startFrame);
+  assert.equal(flashRequest.end_image_url, undefined);
+
   const minimax = getGeneratorModel('minimax-h3-max');
   const request = buildGeneratorProviderRequest(createGeneratorState(minimax), media);
   assert.equal(request.image_url, media.startFrame);
@@ -284,5 +305,24 @@ test('MiniMax H3 Image 1K wide and portrait outputs meet Fal minimum pixel area'
       assert.ok(Math.abs(size.width / size.height - a / b) < 0.04);
       assert.equal(body.output_format, 'webp');
     }
+  }
+});
+
+test('model-specific workflows match documented Fal frame and expansion support', () => {
+  for (const id of ['kling-3-turbo', 'kling-4-flash']) {
+    const model = getGeneratorModel(id);
+    assert.deepEqual(Object.keys(model.workflows), ['first-frame', 'text-to-video'], id);
+    assert.equal(model.workflows['start-end'], undefined, id);
+  }
+  for (const id of ['kling-3', 'kling-4', 'minimax-h3']) {
+    assert.ok(getGeneratorModel(id).workflows['start-end'], id);
+  }
+  const h3 = getGeneratorModel('minimax-h3');
+  assert.ok(h3.workflows['text-to-video']?.fields.promptExpansionMode.options?.includes('fast'));
+  for (const id of ['minimax-h3-max', 'minimax-h3-max-turbo']) {
+    const mode = getGeneratorModel(id).workflows['text-to-video']?.fields.promptExpansionMode;
+    assert.ok(mode);
+    assert.equal(mode.options?.includes('fast'), false, id);
+    assert.deepEqual(mode.options, ['disabled', 'balanced', 'quality'], id);
   }
 });
