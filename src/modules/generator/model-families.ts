@@ -174,7 +174,7 @@ export function getGeneratorModelHighlights(model: GeneratorModel) {
     (spec) => spec?.fields.resolution?.options?.map(String) ?? []
   );
   const resolutionScore = (resolution: string) => {
-    const match = /^(\\d+(?:\\.\\d+)?)(k|p)$/i.exec(resolution);
+    const match = /^(\d+(?:\.\d+)?)(k|p)$/i.exec(resolution);
     return match ? Number(match[1]) * (match[2].toLowerCase() === 'k' ? 1000 : 1) : -1;
   };
   const maxResolution = resolutions.sort((a, b) => resolutionScore(b) - resolutionScore(a))[0] ?? null;
