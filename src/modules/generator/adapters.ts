@@ -190,6 +190,14 @@ function minimaxCustomImageSize(params: Record<string, string | number | boolean
     h = width;
     w = Math.round(width * aspect[0] / aspect[1] / 32) * 32;
   }
+  // Fal requires at least 655,360 pixels. At 1K, 16:9 and 9:16 would
+  // otherwise be only 1024 x 576, so increase both sides together.
+  const minPixels = 655360;
+  if (w * h < minPixels) {
+    const scale = Math.sqrt(minPixels / (w * h));
+    w = Math.ceil(w * scale / 32) * 32;
+    h = Math.ceil(h * scale / 32) * 32;
+  }
   return { width: w, height: h };
 }
 
@@ -208,6 +216,7 @@ export function buildGeneratorProviderRequest(
         prompt: state.prompt,
         image_size: minimaxCustomImageSize(params),
         num_images: params.outputCount,
+        output_format: params.outputFormat,
         ...(state.workflow === 'image-to-image'
           ? { image_urls: media.referenceImages } : {}),
       };
@@ -349,15 +358,6 @@ export function buildGeneratorProviderRequest(
     };
   }
 
-  const sizeByAspectRatio: Record<string, string> = {
-    '1:1': 'square_hd',
-    '4:3': 'landscape_4_3',
-    '3:4': 'portrait_4_3',
-    '16:9': 'landscape_16_9',
-    '9:16': 'portrait_16_9',
-  };
-  const size = sizeByAspectRatio[String(params.aspectRatio)];
-  if (!size) throw new Error('Unsupported image aspect ratio');
   if (state.modelId === 'nano-banana-2' || state.modelId === 'nano-banana-pro') {
     if (state.workflow === 'image-to-image' && !media.referenceImages.length) {
       throw new Error('At least one reference image is required');
@@ -373,6 +373,15 @@ export function buildGeneratorProviderRequest(
       // included in the exact customer credit schedule.
     };
   }
+  const sizeByAspectRatio: Record<string, string> = {
+    '1:1': 'square_hd',
+    '4:3': 'landscape_4_3',
+    '3:4': 'portrait_4_3',
+    '16:9': 'landscape_16_9',
+    '9:16': 'portrait_16_9',
+  };
+  const size = sizeByAspectRatio[String(params.aspectRatio)];
+  if (!size) throw new Error('Unsupported image aspect ratio');
   if (state.modelId === 'text-to-image-fast') {
     return {
       prompt: state.prompt,
