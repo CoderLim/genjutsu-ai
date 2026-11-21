@@ -7,6 +7,9 @@ import {
 } from './adapters';
 import { GENERATOR_MODELS, getGeneratorModel } from './catalog';
 import { createGeneratorState, updateGeneratorState } from './normalize';
+import { calculateGeneratorCredits } from './pricing';
+import { assertGeneratorReady } from './validation';
+import type { GeneratorInputs, Workflow } from './types';
 
 test('photo-to-video maps first frame without sending last_image', () => {
   const model = getGeneratorModel('photo-to-video-standard');
@@ -325,4 +328,54 @@ test('model-specific workflows match documented Fal frame and expansion support'
     assert.equal(mode.options?.includes('fast'), false, id);
     assert.deepEqual(mode.options, ['disabled', 'balanced', 'quality'], id);
   }
+});
+
+test('every enabled model/workflow has valid form defaults, billable quote, endpoint and payload', () => {
+  const selectedIds = new Set<string>();
+  for (const model of GENERATOR_MODELS.filter(item => item.enabled)) {
+    for (const [workflowName, spec] of Object.entries(model.workflows)) {
+      if (!spec) continue;
+      const workflow = workflowName as Workflow;
+      const count = (slot: keyof GeneratorInputs) => {
+        const min = spec.slots[slot]?.min ?? 0;
+        return slot === 'referenceImages' &&
+          spec.requiresAnyReference && min === 0 ? 1 : min;
+      };
+      const inputs: GeneratorInputs = {
+        startFrame: count('startFrame') ? 'start' : null,
+        endFrame: count('endFrame') ? 'end' : null,
+        referenceImages: Array.from({length: count('referenceImages')}, (_, i) => 'img' + i),
+        referenceVideos: Array.from({length: count('referenceVideos')}, (_, i) => 'video' + i),
+        referenceAudio: Array.from({length: count('referenceAudio')}, (_, i) => 'audio' + i),
+      };
+      const draft = updateGeneratorState(createGeneratorState(model), model, {
+        workflow,
+        prompt: 'A calm cinematic camera movement',
+        inputs,
+      });
+      assert.equal(draft.workflow, workflow, model.id + '/' + workflow);
+      assert.doesNotThrow(() => assertGeneratorReady(draft, model), model.id + '/' + workflow);
+      const price = calculateGeneratorCredits(draft, model);
+      assert.ok(price.credits > 0, model.id + '/' + workflow);
+      const identity = getGeneratorProviderIdentity(model.id, workflow);
+      assert.ok(identity.providerModelId.length > 0, model.id + '/' + workflow);
+      const media = {
+        startFrame: inputs.startFrame ?? undefined,
+        endFrame: inputs.endFrame ?? undefined,
+        referenceImages: inputs.referenceImages,
+        referenceVideos: inputs.referenceVideos,
+        referenceAudio: inputs.referenceAudio,
+      };
+      const payload = buildGeneratorProviderRequest(draft, media);
+      assert.equal(payload.prompt, draft.prompt, model.id + '/' + workflow);
+      selectedIds.add(model.id);
+    }
+  }
+  assert.equal(selectedIds.size, GENERATOR_MODELS.filter(item => item.enabled).length);
+});
+
+test('Kling Turbo only accepts documented JPEG/PNG first-frame formats', () => {
+  const turbo = getGeneratorModel('kling-3-turbo');
+  const supported = turbo.workflows['first-frame']?.slots.startFrame?.accept;
+  assert.deepEqual(supported, ['image/png', 'image/jpeg']);
 });
