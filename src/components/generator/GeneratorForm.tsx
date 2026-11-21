@@ -14,6 +14,7 @@ import {
 } from '@/modules/generator/catalog';
 import {
   availableGeneratorFieldValues,
+  filterGeneratorLocalMedia,
   getGeneratorExpansionControls,
   generatorReadinessError,
   getGeneratorSlotCapacity,
@@ -337,6 +338,12 @@ export function GeneratorForm({
     });
   }
 
+  function retainCompatibleLocalMedia(next: GeneratorState, target: GeneratorModel) {
+    return filterGeneratorLocalMedia(
+      next, target, (url) => localFiles.current.get(url)
+    );
+  }
+
   function mutate(
     patch: Partial<Omit<GeneratorState, 'modelId' | 'mediaType'>>,
     nextModel?: GeneratorModel
@@ -348,7 +355,10 @@ export function GeneratorForm({
     setDraft((prev) =>
       prev && (nextModel ?? model)
         ? syncReferenceQuote(
-            updateGeneratorState(prev, nextModel ?? model!, patch),
+            retainCompatibleLocalMedia(
+              updateGeneratorState(prev, nextModel ?? model!, patch),
+              nextModel ?? model!
+            ),
             nextModel ?? model!
           )
         : prev
@@ -371,7 +381,13 @@ export function GeneratorForm({
     // One atomic state transition: mode and real backend profile change
     // together, so media/params and the displayed price stay consistent.
     setDraft(prev => prev
-      ? syncReferenceQuote(normalizeGeneratorState(prev, nextModel, workflow), nextModel)
+      ? syncReferenceQuote(
+          retainCompatibleLocalMedia(
+            normalizeGeneratorState(prev, nextModel, workflow),
+            nextModel
+          ),
+          nextModel
+        )
       : createGeneratorState(nextModel)
     );
   }
@@ -391,7 +407,10 @@ export function GeneratorForm({
     setMediaType(next.mediaType);
     setDraft((prev) =>
       prev
-        ? syncReferenceQuote(normalizeGeneratorState(prev, next), next)
+        ? syncReferenceQuote(
+            retainCompatibleLocalMedia(normalizeGeneratorState(prev, next), next),
+            next
+          )
         : createGeneratorState(next)
     );
   }
@@ -1009,7 +1028,7 @@ export function GeneratorForm({
           {job.status === 'processing' ? (
             <p className="flex items-center gap-2 text-sm text-[rgba(18,15,16,0.55)]">
               <LoaderCircle className="size-4 animate-spin" />
-              Generating and saving your {mediaType}... You can also follow it
+              Generating and saving your {job.mediaType}... You can also follow it
               in My Creations.
             </p>
           ) : job.status === 'completed' ? (
@@ -1024,7 +1043,7 @@ export function GeneratorForm({
                     key={url}
                     className="overflow-hidden rounded-xl border border-[rgba(20,17,18,0.086)]"
                   >
-                    {mediaType === 'video' ? (
+                    {job.mediaType === 'video' ? (
                       <video
                         controls
                         playsInline
