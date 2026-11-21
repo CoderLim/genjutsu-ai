@@ -1,0 +1,102 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+
+import {
+  generatorReadinessError,
+  getGeneratorSlotCapacity,
+  isGeneratorSlotOptional,
+  shouldPollGeneratorJob,
+} from './form-state';
+import { getGeneratorModel, GENERATOR_MODELS } from './catalog';
+import { createGeneratorState, normalizeGeneratorState, updateGeneratorState } from './normalize';
+
+test('photo-to-video requires a start frame in the new composer', () => {
+  const model = getGeneratorModel('photo-to-video-standard');
+  const spec = model.workflows['first-frame']!;
+  const state = updateGeneratorState(createGeneratorState(model), model, {
+    prompt: 'A person turns toward the camera',
+  });
+
+  assert.equal(isGeneratorSlotOptional(spec, 'startFrame'), false);
+  assert.match(generatorReadinessError(state, model) ?? '', /startFrame/);
+  assert.equal(
+    generatorReadinessError(updateGeneratorState(state, model, {
+      inputs: { ...state.inputs, startFrame: 'local-start' },
+    }), model),
+    null
+  );
+});
+
+test('first-to-start-end retains first image, end-to-first drops end', () => {
+  const model = getGeneratorModel('photo-to-video-standard');
+  const start = createGeneratorState(model);
+  const withStart = updateGeneratorState(start, model, {
+    inputs: { ...start.inputs, startFrame: 'first' },
+  });
+  const pair = updateGeneratorState(withStart, model, { workflow: 'start-end' });
+  assert.equal(pair.inputs.startFrame, 'first');
+  assert.equal(pair.inputs.endFrame, null);
+  const uploaded = updateGeneratorState(pair, model, {
+    inputs: { ...pair.inputs, endFrame: 'last' },
+  });
+  const solo = updateGeneratorState(uploaded, model, { workflow: 'first-frame' });
+  assert.equal(solo.inputs.startFrame, 'first');
+  assert.equal(solo.inputs.endFrame, null);
+});
+
+test('model switching retains semantic first photo, drops unsupported settings', () => {
+  const first = getGeneratorModel('photo-to-video-standard');
+  const ref = getGeneratorModel('multi-image-to-video');
+  const image = getGeneratorModel('text-to-image-fast');
+  const from = updateGeneratorState(createGeneratorState(first), first, {
+    prompt: 'Product spins slowly',
+    inputs: { ...createGeneratorState(first).inputs, startFrame: 'photo' },
+    params: { resolution: '4k', duration: 12 },
+  });
+  const toRef = normalizeGeneratorState(from, ref);
+  assert.equal(toRef.workflow, 'all-in-one-reference');
+  assert.deepEqual(toRef.inputs.referenceImages, ['photo']);
+  assert.equal(toRef.prompt, from.prompt);
+  const toImage = normalizeGeneratorState(toRef, image);
+  assert.equal(toImage.workflow, 'text-to-image');
+  assert.deepEqual(toImage.inputs.referenceImages, []);
+  assert.equal(toImage.params.duration, undefined);
+  assert.equal(toImage.prompt, from.prompt);
+});
+
+test('combined reference cap is shared across images, videos and audio', () => {
+  const model = getGeneratorModel('all-in-one-video');
+  const spec = model.workflows['all-in-one-reference']!;
+  const state = createGeneratorState(model);
+  assert.equal(isGeneratorSlotOptional(spec, 'referenceImages'), true);
+  assert.equal(getGeneratorSlotCapacity(spec, state.inputs, 'referenceImages'), 9);
+  const full = updateGeneratorState(state, model, {
+    inputs: {
+      ...state.inputs,
+      referenceImages: Array.from({length: 9}, (_, i) => 'img' + i),
+      referenceVideos: ['v1', 'v2', 'v3'],
+    },
+    params: { inputVideoSeconds: 6 },
+  });
+  assert.equal(getGeneratorSlotCapacity(spec, full.inputs, 'referenceAudio'), 0);
+  assert.equal(getGeneratorSlotCapacity(spec, full.inputs, 'referenceImages'), 0);
+  const reduced = updateGeneratorState(full, model, {
+    inputs: { ...full.inputs, referenceImages: full.inputs.referenceImages.slice(1) },
+  });
+  assert.equal(getGeneratorSlotCapacity(spec, reduced.inputs, 'referenceAudio'), 1);
+});
+
+test('review status only polls if provider request ID exists', () => {
+  assert.equal(shouldPollGeneratorJob({status: 'processing'}), true);
+  assert.equal(shouldPollGeneratorJob({status: 'review', pollable: true}), true);
+  assert.equal(shouldPollGeneratorJob({status: 'review', pollable: false}), false);
+  assert.equal(shouldPollGeneratorJob({status: 'completed'}), false);
+  assert.equal(shouldPollGeneratorJob({status: 'failed'}), false);
+  assert.equal(shouldPollGeneratorJob(null), false);
+});
+
+test('unverified preview model cannot generate', () => {
+  const disabled = GENERATOR_MODELS.find(m => m.id === 'reference-to-video-pro')!;
+  const state = createGeneratorState(disabled);
+  assert.match(generatorReadinessError(state, disabled) ?? '', /not enabled/);
+});

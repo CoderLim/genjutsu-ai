@@ -20,6 +20,12 @@ import {
 } from '@/modules/generator/normalize';
 import { calculateGeneratorCredits } from '@/modules/generator/pricing';
 import {
+  generatorReadinessError,
+  getGeneratorSlotCapacity,
+  isGeneratorSlotOptional,
+  shouldPollGeneratorJob,
+} from '@/modules/generator/form-state';
+import {
   assertReferenceAudioDuration,
   referenceVideoBillableSeconds,
 } from '@/modules/generator/reference-metadata';
@@ -108,6 +114,7 @@ const INPUT_SLOTS: MediaSlot[] = [
 type JobInfo = {
   generationId: string;
   status: 'processing' | 'completed' | 'failed' | 'review';
+  pollable?: boolean;
   taskStatus: string;
   credits: number;
   mediaType: MediaType;
@@ -276,7 +283,7 @@ export function GeneratorForm({
 
   // The result is always fetched from an authenticated, scene-scoped route.
   useEffect(() => {
-    if (!job || job.status !== 'processing') return;
+    if (!shouldPollGeneratorJob(job)) return;
     let canceled = false;
     const handle = setInterval(async () => {
       try {
@@ -296,7 +303,7 @@ export function GeneratorForm({
       canceled = true;
       clearInterval(handle);
     };
-  }, [job?.generationId, job?.status]);
+  }, [job?.generationId, job?.status, job?.pollable]);
 
   function syncReferenceQuote(
     next: GeneratorState,
@@ -362,8 +369,11 @@ export function GeneratorForm({
       return;
     const rule = spec.slots[slot];
     if (!rule) return;
-    const available = rule.max - slotUrls(form.inputs, slot).length;
-    if (available <= 0) return;
+    const available = getGeneratorSlotCapacity(spec, form.inputs, slot);
+    if (available <= 0) {
+      setUploadError('The reference upload limit has been reached.');
+      return;
+    }
     const accepted = files.slice(0, available);
     const invalid = accepted.find(
       (file) =>
@@ -650,8 +660,9 @@ export function GeneratorForm({
     );
   }
 
+  const readinessError = generatorReadinessError(form, model);
   const canSubmit =
-    model.enabled && !!form.prompt.trim() && !!quote && !busy && !mediaBusy;
+    model.enabled && !!quote && !readinessError && !busy && !mediaBusy;
   const activeSlots = INPUT_SLOTS.filter((slot) => !!spec.slots[slot]);
   const workflows = Object.keys(model.workflows) as Workflow[];
   const settingsFields = [
@@ -761,9 +772,7 @@ export function GeneratorForm({
               <Clapperboard className="size-4 opacity-80" strokeWidth={1.75} />
               Video
               {mediaType === 'video' ? (
-                <span className="-ms-1 mt-1.5 self-start rounded bg-[var(--composer-accent,#b04845)] px-1 py-0.5 text-[9px] font-bold tracking-wide text-white uppercase">
-                  Free
-                </span>
+
               ) : null}
             </a>
           </nav>
@@ -787,23 +796,19 @@ export function GeneratorForm({
           {activeSlots.length > 0 ? (
             <ComposerFrameSlots showArrow={isStartEnd}>
               {activeSlots.map((slot) => {
-                const limit = spec.slots[slot]!;
-                const emptyLabel =
-                  form.workflow === 'first-frame' && slot === 'startFrame'
-                    ? 'Reference Optional'
-                    : slot === 'startFrame' || slot === 'endFrame'
-                      ? SLOT_LABELS[slot]
-                      : limit.min === 0
-                        ? 'Reference Optional'
-                        : SLOT_LABELS[slot];
+                const optional = isGeneratorSlotOptional(spec, slot);
+                const emptyLabel = optional
+                  ? 'Reference Optional'
+                  : SLOT_LABELS[slot];
+                const capacity = getGeneratorSlotCapacity(spec, form.inputs, slot);
                 return (
                   <MediaUploader
                     key={slot}
                     variant="composer"
-                    optional={emptyLabel === 'Reference Optional'}
+                    optional={optional}
                     label={emptyLabel}
                     urls={slotUrls(form.inputs, slot)}
-                    max={limit.max}
+                    max={slotUrls(form.inputs, slot).length + capacity}
                     accept={limit.accept}
                     onFiles={(files) => onFiles(slot, files)}
                     onRemove={(url) => removeFile(slot, url)}
@@ -920,6 +925,10 @@ export function GeneratorForm({
           <p role="alert" className="px-1 pt-2 text-xs text-red-600">
             {pageError}
           </p>
+        ) : readinessError && model.enabled && form.prompt.trim() ? (
+          <p className="px-1 pt-2 text-xs text-[rgba(18,15,16,0.55)]">
+            {readinessError}
+          </p>
         ) : null}
       </section>
 
@@ -979,7 +988,9 @@ export function GeneratorForm({
           ) : (
             <p role="alert" className="text-sm">
               {job.status === 'review'
-                ? 'The provider submission needs review. Do not retry with the same inputs.'
+                ? job.pollable
+                  ? 'Checking the existing generation. Do not start another task.'
+                  : 'Submission needs support review. Do not start a new generation for this request.'
                 : 'Generation failed. Reserved credits were returned.'}
               {job.error ? ' ' + job.error : ''}
             </p>

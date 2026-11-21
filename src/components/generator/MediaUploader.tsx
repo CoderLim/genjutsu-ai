@@ -1,4 +1,4 @@
-import type { ChangeEvent } from 'react';
+import { useId, type ChangeEvent } from 'react';
 import { ImagePlus, Plus, Trash2, Upload } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -26,8 +26,9 @@ export function MediaUploader({
   optional = false,
 }: Props) {
   const canAdd = urls.length < max;
-  const inputId =
-    'media-upload-' + label.replace(/[^a-z0-9]+/gi, '-').toLowerCase();
+  // "Reference Optional" can appear for several slots at once. Labels must
+  // always target their own file input, even with duplicate visible text.
+  const inputId = useId();
 
   function onInputChange(event: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files ?? []);
@@ -123,13 +124,17 @@ export function MediaUploader({
                     muted
                     preload="metadata"
                   />
+                ) : isAudio ? (
+                  <span className="flex size-full items-center justify-center text-[10px]">
+                    Audio
+                  </span>
                 ) : (
                   <img
                     src={url}
                     alt=""
                     className="h-full w-full object-cover"
                   />
-                )}
+                )
                 <button
                   type="button"
                   aria-label="Remove"

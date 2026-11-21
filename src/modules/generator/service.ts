@@ -161,6 +161,10 @@ export function publicGeneratorTask(task: GeneratorTask) {
   return {
     generationId: task.id,
     status,
+    // When the provider request ID is known, a review state is queryable.
+    // Uncertain submissions without an ID must NOT be retried automatically.
+    pollable: status === 'processing' ||
+      (task.status === 'submission_unknown' && !!task.taskId),
     taskStatus: task.status,
     credits: task.costCredits,
     mediaType: task.mediaType,
