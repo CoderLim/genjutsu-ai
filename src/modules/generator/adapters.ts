@@ -46,6 +46,8 @@ const MODEL_IDENTITIES: Record<string, ProviderIdentity> = {
     provider: 'fal',
     providerModelId: 'minimax/h3/reference-to-video',
   },
+  'nano-banana-2.1': { provider: 'fal', providerModelId: 'google/nano-banana-2.1' },
+  'nano-banana-2-lite': { provider: 'fal', providerModelId: 'google/nano-banana-lite' },
   'nano-banana-2': { provider: 'fal', providerModelId: 'fal-ai/nano-banana-2' },
   'nano-banana-pro': { provider: 'fal', providerModelId: 'fal-ai/nano-banana-pro' },
   'text-to-image-fast': {
@@ -160,7 +162,7 @@ export function getGeneratorProviderIdentity(
   if (!identity) throw new Error('Unknown generator adapter: ' + modelId);
   // Both UI workflows share one named model; Fal has separate queue endpoints
   // for generation and editing. The selected endpoint is sealed in task options.
-  if ((modelId === 'nano-banana-2' || modelId === 'nano-banana-pro')
+  if (['nano-banana-2.1', 'nano-banana-2-lite', 'nano-banana-2', 'nano-banana-pro'].includes(modelId)
     && workflow === 'image-to-image') {
     return { ...identity, providerModelId: identity.providerModelId + '/edit' };
   }
@@ -385,7 +387,7 @@ export function buildGeneratorProviderRequest(
     };
   }
 
-  if (state.modelId === 'nano-banana-2' || state.modelId === 'nano-banana-pro') {
+  if (['nano-banana-2.1', 'nano-banana-2-lite', 'nano-banana-2', 'nano-banana-pro'].includes(state.modelId)) {
     if (state.workflow === 'image-to-image' && !media.referenceImages.length) {
       throw new Error('At least one reference image is required');
     }
@@ -393,7 +395,7 @@ export function buildGeneratorProviderRequest(
       prompt: state.prompt,
       ...(state.workflow === 'image-to-image' ? { image_urls: media.referenceImages } : {}),
       aspect_ratio: params.aspectRatio,
-      resolution: params.resolution,
+      ...(state.modelId === 'nano-banana-2-lite' ? {} : { resolution: params.resolution }),
       num_images: params.outputCount,
       output_format: params.outputFormat,
       // Omit optional web search and thinking: their incremental cost is not
