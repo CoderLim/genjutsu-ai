@@ -20,6 +20,7 @@ import {
   getGeneratorSlotCapacity,
   GENERATOR_REFERENCE_SLOTS,
   describeGeneratorMixedReferences,
+  getGeneratorMixedReferenceTileLines,
   planGeneratorMixedReferenceFiles,
   isGeneratorJobActive,
   isGeneratorSlotOptional,
@@ -822,8 +823,8 @@ export function GeneratorForm({
   const mixedAccept = [...new Set(
     mixedReferenceSlots.flatMap(slot => [...(spec.slots[slot]?.accept ?? [])])
   )];
-  const mixedMaxTotal = spec.maxCombinedReferences ??
-    mixedReferenceSlots.reduce((sum, slot) => sum + (spec.slots[slot]?.max ?? 0), 0);
+  const mixedLimitLines = showUnifiedReference
+    ? getGeneratorMixedReferenceTileLines(spec) : [];
   const mixedCanAdd = mixedReferenceSlots.some(
     slot => getGeneratorSlotCapacity(spec, form.inputs, slot) > 0
   );
@@ -970,7 +971,7 @@ export function GeneratorForm({
               items={mixedItems}
               accept={mixedAccept}
               canAdd={mixedCanAdd}
-              maxTotal={mixedMaxTotal}
+              limitLines={mixedLimitLines}
               onFiles={onMixedReferenceFiles}
               onRemove={removeFile}
             />
