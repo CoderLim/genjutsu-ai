@@ -253,6 +253,9 @@ export function getGeneratorWorkflowChoices(
   models: readonly GeneratorModel[],
   active: GeneratorModel
 ): GeneratorWorkflowChoice[] {
+  // Image has one composer with an optional reference upload. Its underlying
+  // text/edit API selection is implicit and must not appear as a user mode.
+  if (active.mediaType === 'image') return [];
   if (SEEDANCE_BASE_IDS.has(active.id)) {
     const choices: GeneratorWorkflowChoice[] = [
       { modelId: 'photo-to-video-standard', workflow: 'first-frame', label: 'First Frame' },
