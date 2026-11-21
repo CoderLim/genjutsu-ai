@@ -712,7 +712,7 @@ export function GeneratorForm({
   const fastOn = hasFastMode
     ? form.params.fastMode === true
     : form.params.promptExpansionMode === 'fast';
-  const creditLabel = model.enabled && quote ? quote.credits : 0;
+  const creditLabel = model.enabled && quote ? quote.credits : '—';
   const isStartEnd =
     activeSlots.includes('startFrame') && activeSlots.includes('endFrame');
 
@@ -797,9 +797,7 @@ export function GeneratorForm({
             <ComposerFrameSlots showArrow={isStartEnd}>
               {activeSlots.map((slot) => {
                 const optional = isGeneratorSlotOptional(spec, slot);
-                const emptyLabel = optional
-                  ? 'Reference Optional'
-                  : SLOT_LABELS[slot];
+                const emptyLabel = SLOT_LABELS[slot];
                 const capacity = getGeneratorSlotCapacity(spec, form.inputs, slot);
                 return (
                   <MediaUploader

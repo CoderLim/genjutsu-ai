@@ -105,7 +105,7 @@ export function MediaUploader({
               strokeWidth={1.75}
             />
             <span className="px-1 text-[10px] leading-tight font-medium text-[rgba(18,15,16,0.55)]">
-              {optional ? 'Reference Optional' : label}
+              {optional ? label + ' (optional)' : label}
             </span>
           </label>
         )}
