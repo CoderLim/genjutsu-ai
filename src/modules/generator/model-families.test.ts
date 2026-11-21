@@ -2,7 +2,14 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { GENERATOR_MODELS, listGeneratorModels, getGeneratorModel } from './catalog';
-import { getGeneratorModelFamilyId, groupGeneratorModels } from './model-families';
+import {
+  getGeneratorModelFamilyId,
+  groupGeneratorModels,
+  getGeneratorModelChoices,
+  getGeneratorWorkflowChoices,
+  generatorModelLabel,
+  isSameGeneratorModelChoice,
+} from './model-families';
 import { createGeneratorState, normalizeGeneratorState, updateGeneratorState } from './normalize';
 import { calculateGeneratorCredits } from './pricing';
 
@@ -48,4 +55,59 @@ test('switching between image/video families clears incompatible fields', () => 
   assert.equal(image.inputs.startFrame, null);
   assert.equal(image.params.duration, undefined);
   assert.equal(image.prompt, photo.prompt);
+});
+
+
+test('model menu contains one Seedance 2.0 item and no workflow or resolution metadata', () => {
+  const models = listGeneratorModels();
+  const menu = getGeneratorModelChoices(models);
+  assert.deepEqual(menu.map(generatorModelLabel), [
+    'Seedance 2.0',
+    'Nano Banana 2',
+    'Nano Banana Pro',
+    'Text to Image · Fast',
+    'Image Editor · Standard',
+  ]);
+  const selectedTextVideo = getGeneratorModel('text-to-video-standard');
+  const seedance = getGeneratorModel('photo-to-video-standard');
+  assert.equal(isSameGeneratorModelChoice(seedance, selectedTextVideo), true);
+  assert.equal(isSameGeneratorModelChoice(
+    getGeneratorModel('nano-banana-2'), selectedTextVideo
+  ), false);
+});
+
+test('Seedance mode choices select the real provider profile, not extra model cards', () => {
+  const models = listGeneratorModels();
+  const photo = getGeneratorModel('photo-to-video-standard');
+  const choices = getGeneratorWorkflowChoices(models, photo);
+  assert.deepEqual(choices.map(item => item.label), [
+    'First Frame', 'Start & End', 'Text to Video', 'Multi-Image', 'All-in-One',
+  ]);
+  const start = updateGeneratorState(createGeneratorState(photo), photo, {
+    prompt: 'A tracking shot',
+    inputs: { ...createGeneratorState(photo).inputs, startFrame: 'photo' },
+  });
+  const multi = choices.find(item => item.label === 'Multi-Image')!;
+  const multiModel = getGeneratorModel(multi.modelId);
+  const next = normalizeGeneratorState(start, multiModel, multi.workflow);
+  assert.equal(next.modelId, 'multi-image-to-video');
+  assert.equal(next.workflow, 'all-in-one-reference');
+  assert.deepEqual(next.inputs.referenceImages, ['photo']);
+  assert.equal(next.inputs.startFrame, null);
+  assert.equal(next.prompt, 'A tracking shot');
+  assert.equal(calculateGeneratorCredits(next, multiModel).credits, 204);
+  const all = choices.find(item => item.label === 'All-in-One')!;
+  const nextAllModel = getGeneratorModel(all.modelId);
+  const full = normalizeGeneratorState(next, nextAllModel, all.workflow);
+  assert.equal(full.modelId, 'all-in-one-video');
+  assert.deepEqual(full.inputs.referenceImages, ['photo']);
+  assert.equal(calculateGeneratorCredits(full, nextAllModel).credits, 204);
+});
+
+test('Nano Banana model choices keep image generation/editing workflow separate', () => {
+  const models = listGeneratorModels();
+  const nano = getGeneratorModel('nano-banana-2');
+  const choices = getGeneratorWorkflowChoices(models, nano);
+  assert.deepEqual(choices.map(item => item.label), ['Text to Image', 'Image Edit']);
+  assert.ok(choices.every(item => item.modelId === 'nano-banana-2'));
 });

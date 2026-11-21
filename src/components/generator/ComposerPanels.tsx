@@ -13,9 +13,7 @@ import {
   ChevronDown,
   ChevronUp,
   Clock3,
-  Film,
   LayoutGrid,
-  Ratio,
 } from 'lucide-react';
 
 import type {
@@ -24,7 +22,14 @@ import type {
   Workflow,
 } from '@/modules/generator/types';
 import { cn } from '@/lib/utils';
-import { getGeneratorModelFamilyId, groupGeneratorModels } from '@/modules/generator/model-families';
+import {
+  getGeneratorModelFamilyId,
+  groupGeneratorModels,
+  getGeneratorModelChoices,
+  generatorModelLabel,
+  getGeneratorWorkflowChoices,
+  isSameGeneratorModelChoice,
+} from '@/modules/generator/model-families';
 import { Switch } from '@/components/ui/switch';
 
 const ACCENT = '#b04845';
@@ -34,15 +39,6 @@ const accentSwitchClass =
   'data-checked:bg-[#b04845] data-unchecked:bg-[rgba(20,17,18,0.14)] h-4 w-7 data-[size=default]:h-4 data-[size=default]:w-7';
 
 type OpenPanel = 'model' | 'settings' | 'workflow' | null;
-
-function shortModelName(name: string) {
-  return name.replace(/\s*·\s*.*$/, '').trim();
-}
-
-function modelTitleParts(name: string) {
-  const [brand, ...rest] = name.split(/\s*·\s*/);
-  return { brand: brand?.trim() || name, variant: rest.join(' · ').trim() };
-}
 
 /** Selected chip elevation — shared by aspect tiles and segmented options. */
 const selectedChipShadow =
@@ -248,33 +244,10 @@ function PanelShell({
   );
 }
 
-function modelBlurb(model: GeneratorModel) {
-  const workflow = model.workflows[model.defaultWorkflow];
-  const slots = workflow?.slots ?? {};
-  if (slots.startFrame && slots.endFrame)
-    return 'Guide motion with start and end frames';
-  if (slots.startFrame) return 'Animate a photo into video';
-  if (slots.referenceImages && slots.referenceVideos)
-    return 'Multimodal references with audio options';
-  if (slots.referenceImages) return 'Multi-image reference control';
-  if (Object.keys(slots).length === 0) return model.mediaType === 'image' ? 'Create an image from a text prompt' : 'Create a video from a text prompt';
-  return 'Generation model';
-}
-
-function modelMetaLine(model: GeneratorModel) {
-  const fields = model.workflows[model.defaultWorkflow]?.fields ?? {};
-  const resolution = fields.resolution?.options?.join(' / ') ?? '—';
-  const duration = fields.duration
-    ? `${fields.duration.min ?? fields.duration.default}-${fields.duration.max ?? fields.duration.default}s`
-    : '—';
-  return { resolution, duration };
-}
-
 export function ComposerToolbar({
   models,
   model,
   workflow,
-  workflows,
   params,
   settingsFields,
   hasGenerateAudio,
@@ -288,7 +261,6 @@ export function ComposerToolbar({
   models: GeneratorModel[];
   model: GeneratorModel;
   workflow: Workflow;
-  workflows: Workflow[];
   params: Record<string, FieldValue>;
   settingsFields: Array<{
     name: string;
@@ -300,11 +272,19 @@ export function ComposerToolbar({
   showFast: boolean;
   fastOn: boolean;
   onSelectModel: (id: string) => void;
-  onSelectWorkflow: (workflow: Workflow) => void;
+  onSelectWorkflow: (modelId: string, workflow: Workflow) => void;
   onSetParam: (name: string, value: FieldValue) => void;
   onFastChange: (checked: boolean) => void;
 }) {
-  const families = useMemo(() => groupGeneratorModels(models), [models]);
+  const families = useMemo(() =>
+    groupGeneratorModels(getGeneratorModelChoices(models)), [models]);
+  const workflowChoices = useMemo(
+    () => getGeneratorWorkflowChoices(models, model),
+    [models, model]
+  );
+  const selectedWorkflow = workflowChoices.find(
+    item => item.modelId === model.id && item.workflow === workflow
+  );
   const currentFamilyId = getGeneratorModelFamilyId(model.id);
   const [open, setOpen] = useState<OpenPanel>(null);
   const [familyId, setFamilyId] = useState(currentFamilyId);
@@ -348,7 +328,7 @@ export function ComposerToolbar({
         >
           <AudioWaveform className="size-3.5 text-[#e36c9a]" strokeWidth={2} />
           <span className="max-w-[150px] truncate">
-            {shortModelName(model.name)}
+            {generatorModelLabel(model)}
           </span>
           {open === 'model' ? (
             <ChevronUp className="size-3.5 opacity-60" />
@@ -395,9 +375,7 @@ export function ComposerToolbar({
                             </span>
                           ) : null}
                         </span>
-                        <span className="mt-0.5 block truncate text-[11px] text-[rgba(18,15,16,0.5)]">
-                          {family.blurb}
-                        </span>
+
                       </span>
                     </button>
                   );
@@ -406,15 +384,13 @@ export function ComposerToolbar({
             </aside>
             <div className="space-y-2 overflow-y-auto p-2.5">
               {(activeFamily?.models ?? []).map((item) => {
-                const selected = item.id === model.id;
-                const meta = modelMetaLine(item);
-                const title = modelTitleParts(item.name);
+                const selected = isSameGeneratorModelChoice(item, model);
                 return (
                   <button
                     key={item.id}
                     type="button"
                     onClick={() => {
-                      onSelectModel(item.id);
+                      if (!selected) onSelectModel(item.id);
                       setOpen(null);
                     }}
                     className={cn(
@@ -427,39 +403,9 @@ export function ComposerToolbar({
                     {selected ? (
                       <Check className="absolute top-3 right-3 size-4 text-[var(--composer-accent,#b04845)]" />
                     ) : null}
-                    <div className="flex flex-wrap items-center gap-2 pr-6">
-                      <span className="text-sm font-semibold text-[rgb(18,15,16)]">
-                        {title.brand}
-                      </span>
-                      {title.variant ? (
-                        <span className="text-xs font-medium text-[rgba(18,15,16,0.55)]">
-                          {title.variant}
-                        </span>
-                      ) : null}
-                      {!item.enabled ? (
-                        <span className="rounded bg-[rgba(20,17,18,0.75)] px-1.5 py-0.5 text-[9px] font-bold text-white">
-                          PREVIEW
-                        </span>
-                      ) : (
-                        <span className="rounded bg-[var(--composer-accent,#b04845)] px-1.5 py-0.5 text-[9px] font-bold text-white">
-                          READY
-                        </span>
-                      )}
-                    </div>
-                    <p className="mt-1 text-xs text-[rgba(18,15,16,0.55)]">
-                      {modelBlurb(item)}
-                    </p>
-                    <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-[rgba(18,15,16,0.45)]">
-                      <span className="inline-flex items-center gap-1">
-                        <Ratio className="size-3" /> {meta.resolution}
-                      </span>
-                      <span className="inline-flex items-center gap-1">
-                        <Film className="size-3" /> {meta.duration}
-                      </span>
-                      <span className="inline-flex items-center gap-1">
-                        <Clock3 className="size-3" /> ~30–60s
-                      </span>
-                    </div>
+                    <span className="block pr-6 text-sm font-semibold text-[rgb(18,15,16)]">
+                      {generatorModelLabel(item)}
+                    </span>
                   </button>
                 );
               })}
@@ -608,7 +554,7 @@ export function ComposerToolbar({
       ) : null}
 
       {/* Workflow */}
-      {workflows.length > 1 ? (
+      {workflowChoices.length > 1 ? (
         <div className="relative">
           <button
             type="button"
@@ -618,7 +564,7 @@ export function ComposerToolbar({
             onClick={() => toggle('workflow')}
             className={pillClass}
           >
-            <span>{model.workflows[workflow]?.label ?? workflow}</span>
+            <span>{selectedWorkflow?.label ?? model.workflows[workflow]?.label ?? workflow}</span>
             {open === 'workflow' ? (
               <ChevronUp className="size-3.5 opacity-60" />
             ) : (
@@ -631,14 +577,14 @@ export function ComposerToolbar({
             className="min-w-[160px] p-1.5"
           >
             <div className="space-y-1">
-              {workflows.map((item) => {
-                const active = item === workflow;
+              {workflowChoices.map((item) => {
+                const active = item.modelId === model.id && item.workflow === workflow;
                 return (
                   <button
-                    key={item}
+                    key={item.modelId + ':' + item.workflow}
                     type="button"
                     onClick={() => {
-                      onSelectWorkflow(item);
+                      onSelectWorkflow(item.modelId, item.workflow);
                       setOpen(null);
                     }}
                     className={cn(
@@ -648,7 +594,7 @@ export function ComposerToolbar({
                         : 'border border-transparent bg-[rgba(20,17,18,0.04)] text-[rgba(18,15,16,0.8)] hover:bg-[rgba(20,17,18,0.07)]'
                     )}
                   >
-                    {model.workflows[item]?.label ?? item}
+                    {item.label}
                   </button>
                 );
               })}

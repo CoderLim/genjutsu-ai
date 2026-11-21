@@ -1,4 +1,4 @@
-import type { GeneratorModel } from './types';
+import type { GeneratorModel, Workflow } from './types';
 
 export type GeneratorModelFamily = {
   id: string;
@@ -56,5 +56,74 @@ export function groupGeneratorModels(models: readonly GeneratorModel[]): Generat
     .map(([id, familyModels]) => ({
       id, ...(FAMILIES[id] ?? { label: 'Other Models', blurb: 'Available models' }),
       models: familyModels,
+    }));
+}
+
+
+export type GeneratorWorkflowChoice = {
+  modelId: string;
+  workflow: Workflow;
+  label: string;
+};
+
+/**
+ * A model entry selects a model, not a particular generation mode.
+ * Seedance currently uses multiple backend catalog profiles; collapse them to
+ * one visual model while retaining their original API and pricing boundaries.
+ */
+export function getGeneratorModelChoices(
+  models: readonly GeneratorModel[]
+): GeneratorModel[] {
+  const seedance = models.filter(model => getGeneratorModelFamilyId(model.id) === 'seedance');
+  const representative = seedance.find(model => model.id === 'photo-to-video-standard') ?? seedance[0];
+  return models.filter(model =>
+    getGeneratorModelFamilyId(model.id) !== 'seedance' ||
+    model.id === representative?.id
+  );
+}
+
+export function generatorModelLabel(model: GeneratorModel): string {
+  return getGeneratorModelFamilyId(model.id) === 'seedance'
+    ? 'Seedance 2.0'
+    : model.name;
+}
+
+export function isSameGeneratorModelChoice(
+  candidate: GeneratorModel,
+  selected: GeneratorModel
+): boolean {
+  if (getGeneratorModelFamilyId(candidate.id) === 'seedance') {
+    return getGeneratorModelFamilyId(selected.id) === 'seedance';
+  }
+  return candidate.id === selected.id;
+}
+
+/**
+ * A workflow selection can change internal backend profile without changing
+ * the visible model. The UI submits the resolved modelId/workflow together.
+ */
+export function getGeneratorWorkflowChoices(
+  models: readonly GeneratorModel[],
+  active: GeneratorModel
+): GeneratorWorkflowChoice[] {
+  if (getGeneratorModelFamilyId(active.id) === 'seedance') {
+    const choices: GeneratorWorkflowChoice[] = [
+      { modelId: 'photo-to-video-standard', workflow: 'first-frame', label: 'First Frame' },
+      { modelId: 'photo-to-video-standard', workflow: 'start-end', label: 'Start & End' },
+      { modelId: 'text-to-video-standard', workflow: 'text-to-video', label: 'Text to Video' },
+      { modelId: 'multi-image-to-video', workflow: 'all-in-one-reference', label: 'Multi-Image' },
+      { modelId: 'all-in-one-video', workflow: 'all-in-one-reference', label: 'All-in-One' },
+    ];
+    return choices.filter(choice => {
+      const model = models.find(item => item.id === choice.modelId);
+      return !!model?.workflows[choice.workflow];
+    });
+  }
+  return Object.entries(active.workflows)
+    .filter((entry): entry is [Workflow, NonNullable<typeof entry[1]>] => !!entry[1])
+    .map(([workflow, spec]) => ({
+      modelId: active.id,
+      workflow,
+      label: spec.label,
     }));
 }

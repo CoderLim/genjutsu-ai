@@ -356,9 +356,25 @@ export function GeneratorForm({
     );
   }
 
-  function setWorkflow(workflow: Workflow) {
+  function setWorkflow(modelId: string, workflow: Workflow) {
+    if (busy || mediaReadLock.current || submitLock.current) return;
+    const nextModel = allModels.find(item => item.id === modelId);
+    if (!nextModel || !nextModel.workflows[workflow]) return;
     setUploadError('');
-    mutate({ workflow });
+    if (nextModel.id === model?.id) {
+      mutate({ workflow });
+      return;
+    }
+    setPageError('');
+    setPriceChange(null);
+    setRetryAttempt(null);
+    setMediaType(nextModel.mediaType);
+    // One atomic state transition: mode and real backend profile change
+    // together, so media/params and the displayed price stay consistent.
+    setDraft(prev => prev
+      ? syncReferenceQuote(normalizeGeneratorState(prev, nextModel, workflow), nextModel)
+      : createGeneratorState(nextModel)
+    );
   }
 
   function setParam(name: string, value: FieldValue) {
@@ -696,7 +712,6 @@ export function GeneratorForm({
     !mediaBusy &&
     !isGeneratorJobActive(job);
   const activeSlots = INPUT_SLOTS.filter((slot) => !!spec.slots[slot]);
-  const workflows = Object.keys(model.workflows) as Workflow[];
   const settingsFields = [
     ...SETTINGS_FIELD_KEYS.filter((key) => {
       const field = spec.fields[key];
@@ -906,7 +921,6 @@ export function GeneratorForm({
               models={allModels}
               model={model}
               workflow={form.workflow}
-              workflows={workflows}
               params={form.params}
               settingsFields={settingsFields}
               hasGenerateAudio={hasGenerateAudio}
