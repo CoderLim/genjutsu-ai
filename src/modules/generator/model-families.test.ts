@@ -253,12 +253,20 @@ test('model highlights use configured maximum capabilities and actual minimum cr
   }
 });
 
-test('video intent choices are a subset of the three user-visible modes', () => {
+test('video modes are model-specific, not a universal three-choice dropdown', () => {
   const allowed = ['First Frame', 'Start & End', 'All-in-One Reference'];
   for (const model of getGeneratorModelChoices(listGeneratorModels('video'))) {
     const labels = getGeneratorWorkflowChoices(listGeneratorModels(), model).map(x => x.label);
     assert.ok(labels.length <= 3, model.id);
     assert.deepEqual(labels, allowed.filter(x => labels.includes(x)), model.id);
-    assert.ok(labels.includes('All-in-One Reference'), model.id);
+    if (model.id === 'minimax-h3' || model.id === 'kling-3') {
+      assert.deepEqual(labels, ['First Frame', 'Start & End'], model.id);
+    } else if (model.id === 'kling-3-turbo') {
+      assert.deepEqual(labels, ['First Frame'], model.id);
+    } else if (model.id === 'kling-4-flash') {
+      assert.deepEqual(labels, ['First Frame', 'All-in-One Reference'], model.id);
+    } else {
+      assert.deepEqual(labels, allowed, model.id);
+    }
   }
 });
