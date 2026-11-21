@@ -76,6 +76,11 @@ const NANO_LITE_FIELDS = {
   aspectRatio: {
     label: 'Aspect Ratio', default: 'auto', options: NANO_NEW_ASPECTS,
   },
+  // Fixed 1K output capability: display it, but do not send an unsupported
+  // resolution parameter to the Lite fal endpoint.
+  resolution: {
+    label: 'Resolution', default: '1K', options: ['1K'],
+  },
   outputCount: {
     label: 'Outputs', default: 1, options: [1, 2, 3, 4],
   },
