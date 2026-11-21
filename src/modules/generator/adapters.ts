@@ -90,7 +90,6 @@ export const ADDITIONAL_FAL_ENDPOINTS: Record<
     'first-frame': 'bytedance/seedance-2.5/flash/image-to-video',
   },
   'minimax-h3': {
-    'all-in-one-reference': 'minimax/h3/reference-to-video',
     'text-to-video': 'minimax/h3/text-to-video',
     'first-frame': 'minimax/h3/image-to-video',
   },
@@ -471,11 +470,27 @@ export function classifyGeneratorSubmitError(
   );
 }
 
+/** Query the immutable endpoint saved when the provider accepted the task.
+ * Optional reference uploads can change the actual Fal/WaveSpeed endpoint,
+ * so reconstructing one from the model menu is not sufficient.
+ */
+export function getGeneratorQueryIdentity(input: {
+  modelId: string;
+  workflow?: Workflow;
+  providerModelId?: string;
+}): ProviderIdentity {
+  const identity = getGeneratorProviderIdentity(input.modelId, input.workflow);
+  return input.providerModelId
+    ? { ...identity, providerModelId: input.providerModelId }
+    : identity;
+}
+
 export async function queryGeneratorProvider(input: {
   modelId: string; requestId: string; mediaType: 'image' | 'video';
   workflow?: Workflow;
+  providerModelId?: string;
 }): Promise<ProviderResult> {
-  const identity = getGeneratorProviderIdentity(input.modelId, input.workflow);
+  const identity = getGeneratorQueryIdentity(input);
   if (identity.provider === 'wavespeed') {
     const result = await getWavespeedPredictionStatus(input.requestId);
     if (result.status === 'completed') {
