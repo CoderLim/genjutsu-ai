@@ -14,7 +14,7 @@ const videoFrames = {
     min: 1, max: 1, accept: IMAGE_MIME, maxBytes: 12 * 1048576,
   },
 };
-const ASPECTS = ['16:9', '9:16', '1:1', '4:3', '3:4'] as const;
+const ASPECTS = ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'] as const;
 
 type VideoOptions = {
   id: string;
@@ -28,6 +28,7 @@ type VideoOptions = {
   audio?: boolean;
   startEnd?: boolean;
   promptExpansion?: boolean;
+  frameMime?: readonly string[];
 };
 
 function videoFields(options: VideoOptions): Record<string, FieldSpec> {
@@ -68,6 +69,12 @@ function videoFields(options: VideoOptions): Record<string, FieldSpec> {
 
 function videoProfile(options: VideoOptions): GeneratorModel {
   const fields = videoFields(options);
+  const frameSlots = {
+    startFrame: {
+      ...videoFrames.startFrame,
+      accept: options.frameMime ?? IMAGE_MIME,
+    },
+  };
   // Image-to-video follows the uploaded frame's canvas. Fal ignores any
   // manually selected aspect ratio for those workflows.
   const frameFields = { ...fields };
@@ -76,7 +83,7 @@ function videoProfile(options: VideoOptions): GeneratorModel {
     label: 'Text to Video', slots: {}, fields,
   };
   const firstFrame: WorkflowSpec = {
-    label: 'First Frame', slots: videoFrames, fields: frameFields,
+    label: 'First Frame', slots: frameSlots, fields: frameFields,
   };
   const pricedRates = options.rates ??
     (options.rate !== undefined && options.rateResolution
@@ -108,7 +115,7 @@ function videoProfile(options: VideoOptions): GeneratorModel {
         'start-end': {
           label: 'Start & End',
           slots: {
-            ...videoFrames,
+            ...frameSlots,
             endFrame: {
               min: 1, max: 1, accept: IMAGE_MIME, maxBytes: 12 * 1048576,
             },
@@ -228,6 +235,7 @@ export const ADDITIONAL_GENERATOR_MODELS: readonly GeneratorModel[] = [
     id: 'kling-3-turbo', name: 'Kling 3.0 Turbo',
     resolutions: ['720p'], duration: [3, 15],
     aspectRatios: ['16:9', '9:16', '1:1'],
+    frameMime: ['image/png', 'image/jpeg'],
     rates: { '720p': 20 }, // Fal V3 Turbo Standard accepts one image only.
   }),
   videoProfile({
