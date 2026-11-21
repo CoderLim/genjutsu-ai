@@ -22,6 +22,17 @@ export type MediaSlot =
 
 export type FieldValue = string | number | boolean;
 
+/** Output metadata must match the selected image format (including WebP). */
+export function generatorResultContentType(
+  mediaType: MediaType,
+  outputFormat: FieldValue | undefined
+): string {
+  if (mediaType === 'video') return 'video/mp4';
+  if (outputFormat === 'webp') return 'image/webp';
+  if (outputFormat === 'jpeg') return 'image/jpeg';
+  return 'image/png';
+}
+
 export type FieldSpec = {
   label: string;
   /** Derived from uploaded media; not directly user-editable. */
