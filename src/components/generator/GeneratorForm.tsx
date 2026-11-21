@@ -1073,9 +1073,11 @@ export function GeneratorForm({
           ) : (
             <p role="alert" className="text-sm">
               {job.status === 'review'
-                ? job.pollable
-                  ? 'Checking the existing generation. Do not start another task.'
-                  : 'Submission needs support review. Do not start a new generation for this request.'
+                ? job.taskStatus === 'query_review'
+                  ? 'We could not verify the provider result. Support will review this task; credits are still reserved.'
+                  : job.pollable
+                    ? 'Checking the existing generation. Do not start another task.'
+                    : 'Submission needs support review. Do not start a new generation for this request.'
                 : 'Generation failed. Reserved credits were returned.'}
               {job.error ? ' ' + job.error : ''}
             </p>
