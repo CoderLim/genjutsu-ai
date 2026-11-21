@@ -30,6 +30,8 @@ type VideoOptions = {
   startEnd?: boolean;
   promptExpansion?: boolean;
   frameMime?: readonly string[];
+  // Only expose references with a separately documented provider endpoint.
+  referenceImageLimit?: number;
 };
 
 function videoFields(options: VideoOptions): Record<string, FieldSpec> {
@@ -109,7 +111,9 @@ function videoProfile(options: VideoOptions): GeneratorModel {
     maxPromptChars: 3000,
     enabled: pricedRates !== null,
     defaultWorkflow: 'first-frame',
-    pricing,
+    pricing: options.id === 'minimax-h3'
+      ? { ...pricing, includedReferenceImages: 5, extraReferenceImageCredits: 14 }
+      : pricing,
     workflows: {
       'first-frame': firstFrame,
       ...(options.startEnd ? {
@@ -124,6 +128,22 @@ function videoProfile(options: VideoOptions): GeneratorModel {
           fields: frameFields,
         },
       } : {}),
+      // Text only is allowed in All-in-One. References are optional and
+      // rendered only for versions with a documented reference endpoint.
+      'all-in-one-reference': {
+        label: 'All-in-One Reference',
+        slots: options.referenceImageLimit
+          ? {
+              referenceImages: {
+                min: 0, max: options.referenceImageLimit,
+                accept: IMAGE_MIME, maxBytes: 12 * 1048576,
+              },
+            }
+          : {},
+        fields,
+      },
+      // Retain internal text mode for existing task snapshots; no separate
+      // Text to Video entry is shown in the user-facing mode picker.
       'text-to-video': textToVideo,
     },
   };
@@ -181,28 +201,28 @@ export const ADDITIONAL_GENERATOR_MODELS: readonly GeneratorModel[] = [
   videoProfile({
     id: 'seedance-2-fast', name: 'Seedance 2.0 Fast',
     resolutions: ['480p', '720p'], duration: [4, 15], audio: true,
-    rates: { '480p': 19, '720p': 42 }, startEnd: true,
+    rates: { '480p': 19, '720p': 42 }, startEnd: true, referenceImageLimit: 9,
   }),
   videoProfile({
     id: 'seedance-2-mini', name: 'Seedance 2.0 Mini',
     resolutions: ['480p', '720p'], duration: [4, 15], audio: true,
-    rates: { '480p': 13, '720p': 27 }, startEnd: true,
+    rates: { '480p': 13, '720p': 27 }, startEnd: true, referenceImageLimit: 9,
   }),
   videoProfile({
     id: 'seedance-2.5', name: 'Seedance 2.5',
     resolutions: ['480p', '720p'], duration: [4, 30], audio: true,
-    rates: { '480p': 38, '720p': 81 }, startEnd: true,
+    rates: { '480p': 38, '720p': 81 }, startEnd: true, referenceImageLimit: 30,
   }),
   videoProfile({
     id: 'seedance-2.5-flash', name: 'Seedance 2.5 Flash',
     resolutions: ['480p', '720p'], duration: [4, 30], audio: true,
-    rates: { '480p': 25, '720p': 53 }, startEnd: true,
+    rates: { '480p': 25, '720p': 53 }, startEnd: true, referenceImageLimit: 10,
   }),
   videoProfile({
     id: 'minimax-h3', name: 'MiniMax H3',
     resolutions: ['480P', '768P', '2K', '4K'], duration: [5, 15],
     rates: { '480P': 9, '768P': 11, '2K': 23, '4K': 28 },
-    promptExpansion: true, startEnd: true,
+    promptExpansion: true, startEnd: true, referenceImageLimit: 9,
   }),
   // Fal has a base H3 endpoint but no verified, distinct H3 Turbo endpoint.
   // Do not misroute requests to the base H3 while calling it Turbo.
@@ -216,21 +236,23 @@ export const ADDITIONAL_GENERATOR_MODELS: readonly GeneratorModel[] = [
     id: 'minimax-h3-max-turbo', name: 'MiniMax H3 Max Turbo',
     resolutions: ['768P'], duration: [5, 15],
     rateResolution: '768P', rate: 10, startEnd: true, promptExpansion: true,
+    referenceImageLimit: 9,
   }),
   videoProfile({
     id: 'minimax-h3-max', name: 'MiniMax H3 Max',
     resolutions: ['768P'], duration: [5, 15],
     rateResolution: '768P', rate: 16, startEnd: true, promptExpansion: true,
+    referenceImageLimit: 9,
   }),
   videoProfile({
     id: 'kling-4', name: 'Kling 4.0',
     resolutions: ['720p', '1080p'], duration: [3, 30],
-    rates: { '720p': 27, '1080p': 40 }, startEnd: true,
+    rates: { '720p': 27, '1080p': 40 }, startEnd: true, referenceImageLimit: 10,
   }),
   videoProfile({
     id: 'kling-4-flash', name: 'Kling 4.0 Flash',
     resolutions: ['720p'], duration: [3, 20],
-    rates: { '720p': 17 }, // Fal 4.0 Flash does not accept an end frame.
+    rates: { '720p': 17 }, referenceImageLimit: 10, // Fal 4.0 Flash does not accept an end frame.
   }),
   videoProfile({
     id: 'kling-3-turbo', name: 'Kling 3.0 Turbo',
