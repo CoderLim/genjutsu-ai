@@ -94,24 +94,18 @@ test('Seedance mode choices select the real provider profile, not extra model ca
   const photo = getGeneratorModel('photo-to-video-standard');
   const choices = getGeneratorWorkflowChoices(models, photo);
   assert.deepEqual(choices.map(item => item.label), [
-    'First Frame', 'Start & End', 'Text to Video', 'Multi-Image', 'All-in-One',
+    'First Frame', 'Start & End', 'All-in-One Reference',
   ]);
   const start = updateGeneratorState(createGeneratorState(photo), photo, {
     prompt: 'A tracking shot',
     inputs: { ...createGeneratorState(photo).inputs, startFrame: 'photo' },
   });
-  const multi = choices.find(item => item.label === 'Multi-Image')!;
-  const multiModel = getGeneratorModel(multi.modelId);
-  const next = normalizeGeneratorState(start, multiModel, multi.workflow);
-  assert.equal(next.modelId, 'multi-image-to-video');
-  assert.equal(next.workflow, 'all-in-one-reference');
-  assert.deepEqual(next.inputs.referenceImages, ['photo']);
-  assert.equal(next.inputs.startFrame, null);
-  assert.equal(next.prompt, 'A tracking shot');
-  assert.equal(calculateGeneratorCredits(next, multiModel).credits, 204);
-  const all = choices.find(item => item.label === 'All-in-One')!;
+  const all = choices.find(item => item.label === 'All-in-One Reference')!;
   const nextAllModel = getGeneratorModel(all.modelId);
-  const full = normalizeGeneratorState(next, nextAllModel, all.workflow);
+  const full = normalizeGeneratorState(start, nextAllModel, all.workflow);
+  assert.equal(full.workflow, 'all-in-one-reference');
+  assert.equal(full.inputs.startFrame, null);
+  assert.equal(full.prompt, start.prompt);
   assert.equal(full.modelId, 'all-in-one-video');
   assert.deepEqual(full.inputs.referenceImages, ['photo']);
   assert.equal(calculateGeneratorCredits(full, nextAllModel).credits, 204);
@@ -144,7 +138,7 @@ test('video tab shows actual enabled video model families only', () => {
   assert.ok(!models.some(model => model.id === 'reference-to-video-pro'));
   const workflowChoices = getGeneratorWorkflowChoices(allModels, models[0]);
   assert.deepEqual(workflowChoices.map(item => item.label), [
-    'First Frame', 'Start & End', 'Text to Video', 'Multi-Image', 'All-in-One',
+    'First Frame', 'Start & End', 'All-in-One Reference',
   ]);
 });
 
@@ -203,7 +197,8 @@ test('development previews list requested versions but cannot bill unpriced mode
 test('Seedance Fast workflows use Fast endpoints, not original Seedance profiles', () => {
   const fast = GENERATOR_MODELS.find(x => x.id === 'seedance-2-fast')!;
   const choices = getGeneratorWorkflowChoices(GENERATOR_MODELS, fast);
-  assert.deepEqual(choices.map(x => x.label), ['First Frame', 'Start & End', 'Text to Video']);
+  assert.deepEqual(choices.map(x => x.label),
+    ['First Frame', 'Start & End', 'All-in-One Reference']);
   assert.ok(choices.every(x => x.modelId === fast.id));
   const old = GENERATOR_MODELS.find(x => x.id === 'photo-to-video-standard')!;
   assert.equal(isSameGeneratorModelChoice(old, fast), false);
@@ -251,5 +246,15 @@ test('model highlights use configured maximum capabilities and actual minimum cr
   assert.equal(getGeneratorModelHighlights(disabled).capability, 'Up to 768p');
   for (const model of getGeneratorModelChoices(listGeneratorModels())) {
     assert.ok((getGeneratorStartingCredits(model) ?? 0) > 0, model.id);
+  }
+});
+
+test('video intent choices are a subset of the three user-visible modes', () => {
+  const allowed = ['First Frame', 'Start & End', 'All-in-One Reference'];
+  for (const model of getGeneratorModelChoices(listGeneratorModels('video'))) {
+    const labels = getGeneratorWorkflowChoices(listGeneratorModels(), model).map(x => x.label);
+    assert.ok(labels.length <= 3, model.id);
+    assert.deepEqual(labels, allowed.filter(x => labels.includes(x)), model.id);
+    assert.ok(labels.includes('All-in-One Reference'), model.id);
   }
 });
