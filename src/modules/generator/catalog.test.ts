@@ -1,0 +1,121 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+
+import { assertGeneratorModelConfig } from './capabilities';
+import { GENERATOR_MODELS, getGeneratorModel, listGeneratorModels } from './catalog';
+import { createGeneratorState, updateGeneratorState } from './normalize';
+import { calculateGeneratorCredits } from './pricing';
+import { assertGeneratorDraft, assertGeneratorReady } from './validation';
+
+test('live catalog capabilities and price tables are valid', () => {
+  for (const model of GENERATOR_MODELS) {
+    assert.doesNotThrow(() => assertGeneratorModelConfig(model), model.id);
+  }
+});
+
+test('public models omit unverified multimodal endpoints', () => {
+  const ids = listGeneratorModels().map(x => x.id);
+  assert.deepEqual(ids, [
+    'seedance-2-i2v', 'flux-schnell', 'flux2-flash-edit',
+  ]);
+  assert.throws(() => getGeneratorModel('seedance-2-reference'), /not enabled/);
+  assert.throws(() => getGeneratorModel('h3-reference'), /not enabled/);
+});
+
+test('photo-to-video offers verified first-frame and start-end only', () => {
+  const model = getGeneratorModel('seedance-2-i2v');
+  assert.deepEqual(Object.keys(model.workflows), ['first-frame', 'start-end']);
+  assert.equal(model.workflows['start-end']!.slots.endFrame!.max, 1);
+  assert.equal(model.workflows['first-frame']!.slots.startFrame!.min, 1);
+  assert.ok(!model.workflows['all-in-one-reference']);
+});
+
+test('photo-to-video workflow retains start and drops end when switching', () => {
+  const model = getGeneratorModel('seedance-2-i2v');
+  const start = createGeneratorState(model);
+  const full = updateGeneratorState(start, model, {
+    workflow: 'start-end',
+    inputs: { ...start.inputs, startFrame: 'first', endFrame: 'last' },
+  });
+  const single = updateGeneratorState(full, model, { workflow: 'first-frame' });
+  assert.equal(single.inputs.startFrame, 'first');
+  assert.equal(single.inputs.endFrame, null);
+  assert.equal(single.params.generateAudio, true);
+});
+
+test('photo-to-video credits are synchronous across duration and resolution', () => {
+  const model = getGeneratorModel('seedance-2-i2v');
+  const base = createGeneratorState(model);
+  assert.equal(calculateGeneratorCredits(base, model).credits, 204);
+  assert.equal(
+    calculateGeneratorCredits(
+      updateGeneratorState(base, model, { params: { resolution: '480p' } }),
+      model
+    ).credits,
+    102
+  );
+  assert.equal(
+    calculateGeneratorCredits(
+      updateGeneratorState(base, model, {
+        params: { resolution: '1080p', duration: 10 },
+      }),
+      model
+    ).credits,
+    1020
+  );
+  assert.equal(
+    calculateGeneratorCredits(
+      updateGeneratorState(base, model, { params: { generateAudio: false } }),
+      model
+    ).credits,
+    204
+  );
+});
+
+test('image pricing multiplies output count and reference image surcharges', () => {
+  const textModel = getGeneratorModel('flux-schnell');
+  const text = createGeneratorState(textModel);
+  assert.equal(calculateGeneratorCredits(text, textModel).credits, 4);
+  assert.equal(
+    calculateGeneratorCredits(
+      updateGeneratorState(text, textModel, { params: { outputCount: 3 } }),
+      textModel
+    ).credits,
+    12
+  );
+
+  const editModel = getGeneratorModel('flux2-flash-edit');
+  const edit = updateGeneratorState(createGeneratorState(editModel), editModel, {
+    inputs: {
+      ...createGeneratorState(editModel).inputs,
+      referenceImages: ['image1', 'image2', 'image3'],
+    },
+    params: { outputCount: 2 },
+  });
+  // Base 9 plus 2 extra images * 2 credits = 13 per output.
+  assert.equal(calculateGeneratorCredits(edit, editModel).credits, 26);
+});
+
+test('server validation rejects manipulated cost and unsupported modes', () => {
+  const model = getGeneratorModel('seedance-2-i2v');
+  const state = createGeneratorState(model);
+  assert.throws(
+    () => assertGeneratorDraft({
+      ...state, params: { ...state.params, costCredits: 1 },
+    }, model),
+    /Unsupported generator parameter/
+  );
+  assert.throws(
+    () => assertGeneratorDraft({
+      ...state, workflow: 'all-in-one-reference',
+    }, model),
+    /Unsupported workflow/
+  );
+  assert.throws(() => assertGeneratorReady({
+    ...state, prompt: 'Make waves',
+  }, model), /startFrame/);
+  assert.doesNotThrow(() => assertGeneratorReady({
+    ...state, prompt: 'Make waves',
+    inputs: { ...state.inputs, startFrame: 'sealed-storage-key' },
+  }, model));
+});
