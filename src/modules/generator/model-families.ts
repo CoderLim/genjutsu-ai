@@ -12,8 +12,7 @@ export type GeneratorModelFamily = {
 
 /** Product model families; workflow (image/video/reference) is a separate control. */
 export function getGeneratorModelFamilyId(modelId: string): string {
-  if (modelId === 'nano-banana-2' || modelId === 'nano-banana-pro')
-    return 'nano-banana';
+  if (modelId.startsWith('nano-banana-')) return 'nano-banana';
   if (
     modelId === 'photo-to-video-standard' ||
     modelId === 'text-to-video-standard' ||
@@ -91,6 +90,8 @@ const MODEL_SUMMARIES: Record<string, string> = {
   'kling-4-flash': 'Fast cinematic video creation',
   'kling-3-turbo': 'Quick text & image to video',
   'kling-3': 'Video creation with optional sound',
+  'nano-banana-2.1': 'Accurate text & multi-image edits',
+  'nano-banana-2-lite': 'Fast, lightweight image creation',
   'nano-banana-2': 'Multi-reference generation & edits',
   'nano-banana-pro': 'High-resolution image creation & edits',
   'minimax-h3-image': 'High-resolution generation & editing',
