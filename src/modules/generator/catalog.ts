@@ -241,8 +241,8 @@ export const GENERATOR_MODELS: readonly GeneratorModel[] = [
         maxCombinedReferences: 12,
         slots: {
           referenceImages: { min: 0, max: 9, accept: IMAGE_MIME, maxBytes: 12 * 1048576 },
-          referenceVideos: { min: 0, max: 3, accept: VIDEO_MIME, maxBytes: 80 * 1048576, minSeconds: 0.1, maxSeconds: 15 },
-          referenceAudio: { min: 0, max: 3, accept: AUDIO_MIME, maxBytes: 20 * 1048576, minSeconds: 0.1, maxSeconds: 15 },
+          referenceVideos: { min: 0, max: 3, accept: VIDEO_MIME, maxBytes: 80 * 1048576, minSeconds: 0.1, maxSeconds: 15, maxTotalSeconds: 15 },
+          referenceAudio: { min: 0, max: 3, accept: AUDIO_MIME, maxBytes: 20 * 1048576, minSeconds: 0.1, maxSeconds: 15, maxTotalSeconds: 15 },
         },
         fields: {
           ...baseVideoFields,
