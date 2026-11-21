@@ -340,3 +340,42 @@ test('MiniMax H3 base has distinct 2K/4K price tiers and first/end workflow', ()
   assert.ok(model.workflows['start-end']);
   assert.ok(model.workflows['text-to-video']);
 });
+
+test('single image composer calculates credits with or without optional references', () => {
+  for (const [id, extra] of [
+    ['nano-banana-2.1', 5],
+    ['nano-banana-2-lite', 4],
+    ['minimax-h3-image', 5],
+    ['minimax-h3-image-highspeed', 8],
+    ['image-edit-standard', 2],
+  ] as const) {
+    const model = getGeneratorModel(id);
+    const base = updateGeneratorState(createGeneratorState(model), model, {
+      prompt: 'A bright apartment with Scandinavian furniture',
+    });
+    const baseCredits = calculateGeneratorCredits(base, model).credits;
+    assert.doesNotThrow(() => assertGeneratorReady(base, model), id);
+    const twoReferences = updateGeneratorState(base, model, {
+      inputs: { ...base.inputs, referenceImages: ['first', 'second'] },
+    });
+    assert.equal(twoReferences.workflow, 'text-to-image', id);
+    assert.doesNotThrow(() => assertGeneratorReady(twoReferences, model), id);
+    assert.equal(calculateGeneratorCredits(twoReferences, model).credits,
+      baseCredits + extra, id);
+    const none = updateGeneratorState(twoReferences, model, {
+      inputs: { ...twoReferences.inputs, referenceImages: [] },
+    });
+    assert.equal(calculateGeneratorCredits(none, model).credits, baseCredits, id);
+  }
+});
+
+test('image text-only models cannot silently accept unsupported reference uploads', () => {
+  const model = getGeneratorModel('text-to-image-fast');
+  const base = createGeneratorState(model);
+  assert.equal(base.workflow, 'text-to-image');
+  assert.equal(base.inputs.referenceImages.length, 0);
+  assert.throws(() => assertGeneratorDraft({
+    ...base,
+    inputs: { ...base.inputs, referenceImages: ['reference'] },
+  }, model), /Unsupported input slot: referenceImages/);
+});
