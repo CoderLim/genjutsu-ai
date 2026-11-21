@@ -7,6 +7,8 @@ import {
   type MediaItem,
 } from '@/components/ui/chatcn/media-gallery';
 
+import { VideoThumbPreview } from './VideoThumbPreview';
+
 type Props = {
   label: string;
   urls: string[];
@@ -112,12 +114,7 @@ export function MediaUploader({
                 className="size-full cursor-zoom-in"
               >
                 {kind === 'video' ? (
-                  <video
-                    src={preview}
-                    className="h-full w-full object-cover"
-                    preload="metadata"
-                    muted
-                  />
+                  <VideoThumbPreview src={preview} />
                 ) : (
                   <img
                     src={preview}
@@ -193,12 +190,7 @@ export function MediaUploader({
                     className="size-full cursor-zoom-in"
                   >
                     {kind === 'video' ? (
-                      <video
-                        src={url}
-                        className="h-full w-full object-cover"
-                        muted
-                        preload="metadata"
-                      />
+                      <VideoThumbPreview src={url} />
                     ) : (
                       <img
                         src={url}
@@ -256,12 +248,7 @@ export function MediaUploader({
                 className="size-full cursor-zoom-in"
               >
                 {kind === 'video' ? (
-                  <video
-                    src={url}
-                    className="h-full w-full object-cover"
-                    preload="metadata"
-                    muted
-                  />
+                  <VideoThumbPreview src={url} />
                 ) : (
                   <img
                     src={url}

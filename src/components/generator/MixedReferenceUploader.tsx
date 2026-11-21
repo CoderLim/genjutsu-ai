@@ -2,11 +2,13 @@ import { useId, useMemo, useState, type ChangeEvent } from 'react';
 import { Music2, Plus, Trash2 } from 'lucide-react';
 
 import type { GeneratorReferenceSlot } from '@/modules/generator/form-state';
+import { cn } from '@/lib/utils';
 import {
   MediaViewer,
   type MediaItem,
 } from '@/components/ui/chatcn/media-gallery';
-import { cn } from '@/lib/utils';
+
+import { VideoThumbPreview } from './VideoThumbPreview';
 
 export type MixedReferenceItem = {
   url: string;
@@ -123,12 +125,7 @@ export function MixedReferenceUploader({
                   className="size-full cursor-zoom-in"
                 >
                   {slot === 'referenceVideos' ? (
-                    <video
-                      src={url}
-                      preload="metadata"
-                      muted
-                      className="size-full object-cover"
-                    />
+                    <VideoThumbPreview src={url} />
                   ) : (
                     <img
                       src={url}
