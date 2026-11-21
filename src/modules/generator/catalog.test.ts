@@ -16,7 +16,7 @@ test('live catalog capabilities and price tables are valid', () => {
 test('public catalog lists completed reference workflows', () => {
   const ids = listGeneratorModels().map(x => x.id);
   assert.deepEqual(ids, [
-    'photo-to-video-standard', 'text-to-video-standard', 'multi-image-to-video', 'all-in-one-video', 'text-to-image-fast', 'image-edit-standard',
+    'photo-to-video-standard', 'text-to-video-standard', 'multi-image-to-video', 'all-in-one-video', 'nano-banana-2', 'nano-banana-pro', 'text-to-image-fast', 'image-edit-standard',
   ]);
   assert.equal(getGeneratorModel('all-in-one-video').enabled, true);
   assert.throws(() => getGeneratorModel('reference-to-video-pro'), /not enabled/);
@@ -218,8 +218,30 @@ test('4k Seedance pricing is derived from verified output rates', () => {
 test('public catalog never reveals upstream brands or enabled estimated models', () => {
   const publicModels = listGeneratorModels();
   const customerLabels = publicModels.map(m => m.id + ' ' + m.name).join(' ');
-  assert.doesNotMatch(customerLabels, /wavespeed|fal|seedance|minimax|flux|h3-reference/i);
+  assert.doesNotMatch(customerLabels, /wavespeed|fal|h3-reference/i);
   assert.ok(publicModels.every(m => !('providerName' in m)));
   assert.ok(publicModels.every(m => m.pricing.precision === 'exact'));
   assert.ok(publicModels.every(m => m.enabled));
+});
+
+test('Nano Banana 2 and Pro publish exact tiered credits for both modes', () => {
+  for (const [id, expected] of [
+    ['nano-banana-2', [14, 21, 28]],
+    ['nano-banana-pro', [26, 26, 51]],
+  ] as const) {
+    const model = getGeneratorModel(id);
+    assert.deepEqual(Object.keys(model.workflows), ['text-to-image', 'image-to-image']);
+    for (const [index, resolution] of ['1K', '2K', '4K'].entries()) {
+      const draft = updateGeneratorState(createGeneratorState(model), model, {
+        params: { resolution, outputCount: 2 },
+      });
+      assert.equal(calculateGeneratorCredits(draft, model).credits, expected[index] * 2);
+    }
+    const edit = updateGeneratorState(createGeneratorState(model), model, {
+      workflow: 'image-to-image',
+      inputs: { ...createGeneratorState(model).inputs, referenceImages: ['photo'] },
+    });
+    assert.equal(calculateGeneratorCredits(edit, model).credits, expected[0]);
+    assert.doesNotThrow(() => assertGeneratorReady({ ...edit, prompt: 'Change the sky' }, model));
+  }
 });

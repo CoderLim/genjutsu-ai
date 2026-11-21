@@ -11,7 +11,7 @@ import {
 } from '@/core/ai/wavespeed';
 import { envConfigs } from '@/config';
 import { getConfig } from '@/modules/config/service';
-import type { GeneratorState } from './types';
+import type { GeneratorState, Workflow } from './types';
 
 export type ProviderResult = {
   status: 'processing' | 'completed' | 'failed' | 'query-error';
@@ -46,6 +46,8 @@ const MODEL_IDENTITIES: Record<string, ProviderIdentity> = {
     provider: 'fal',
     providerModelId: 'minimax/h3/reference-to-video',
   },
+  'nano-banana-2': { provider: 'fal', providerModelId: 'fal-ai/nano-banana-2' },
+  'nano-banana-pro': { provider: 'fal', providerModelId: 'fal-ai/nano-banana-pro' },
   'text-to-image-fast': {
     provider: 'fal',
     providerModelId: 'fal-ai/flux-1/schnell',
@@ -63,9 +65,17 @@ export class GeneratorProviderNotConfiguredError extends Error {
   }
 }
 
-export function getGeneratorProviderIdentity(modelId: string): ProviderIdentity {
+export function getGeneratorProviderIdentity(
+  modelId: string, workflow?: Workflow
+): ProviderIdentity {
   const identity = MODEL_IDENTITIES[modelId];
   if (!identity) throw new Error('Unknown generator adapter: ' + modelId);
+  // Both UI workflows share one named model; Fal has separate queue endpoints
+  // for generation and editing. The selected endpoint is sealed in task options.
+  if ((modelId === 'nano-banana-2' || modelId === 'nano-banana-pro')
+    && workflow === 'image-to-image') {
+    return { ...identity, providerModelId: identity.providerModelId + '/edit' };
+  }
   return identity;
 }
 
@@ -185,6 +195,21 @@ export function buildGeneratorProviderRequest(
   };
   const size = sizeByAspectRatio[String(params.aspectRatio)];
   if (!size) throw new Error('Unsupported image aspect ratio');
+  if (state.modelId === 'nano-banana-2' || state.modelId === 'nano-banana-pro') {
+    if (state.workflow === 'image-to-image' && !media.referenceImages.length) {
+      throw new Error('At least one reference image is required');
+    }
+    return {
+      prompt: state.prompt,
+      ...(state.workflow === 'image-to-image' ? { image_urls: media.referenceImages } : {}),
+      aspect_ratio: params.aspectRatio,
+      resolution: params.resolution,
+      num_images: params.outputCount,
+      output_format: params.outputFormat,
+      // Omit optional web search and thinking: their incremental cost is not
+      // included in the exact customer credit schedule.
+    };
+  }
   if (state.modelId === 'text-to-image-fast') {
     return {
       prompt: state.prompt,
@@ -211,7 +236,7 @@ export async function submitGeneratorProvider(
   state: GeneratorState,
   media: MediaReadUrls
 ) {
-  const identity = getGeneratorProviderIdentity(state.modelId);
+  const identity = getGeneratorProviderIdentity(state.modelId, state.workflow);
   const body = buildGeneratorProviderRequest(state, media);
   if (identity.provider === 'wavespeed') {
     await assertWavespeedConfigured();
@@ -243,8 +268,9 @@ export function classifyGeneratorSubmitError(
 
 export async function queryGeneratorProvider(input: {
   modelId: string; requestId: string; mediaType: 'image' | 'video';
+  workflow?: Workflow;
 }): Promise<ProviderResult> {
-  const identity = getGeneratorProviderIdentity(input.modelId);
+  const identity = getGeneratorProviderIdentity(input.modelId, input.workflow);
   if (identity.provider === 'wavespeed') {
     const result = await getWavespeedPredictionStatus(input.requestId);
     if (result.status === 'completed') {

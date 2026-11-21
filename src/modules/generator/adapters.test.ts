@@ -98,3 +98,31 @@ test('multi-image reference sends only reference_images and uses text-to-video r
   assert.equal(getGeneratorProviderIdentity(state.modelId).providerModelId,
     'bytedance/seedance-2.0/text-to-video');
 });
+
+test('Nano Banana switches Fal endpoints by workflow, without changing user model ID', () => {
+  for (const id of ['nano-banana-2', 'nano-banana-pro']) {
+    const model = getGeneratorModel(id);
+    const textState = createGeneratorState(model);
+    const textIdentity = getGeneratorProviderIdentity(id, 'text-to-image');
+    const editIdentity = getGeneratorProviderIdentity(id, 'image-to-image');
+    assert.equal(textIdentity.provider, 'fal');
+    assert.equal(editIdentity.providerModelId, textIdentity.providerModelId + '/edit');
+
+    const media = {
+      referenceImages: ['https://test.example/photo.png'],
+      referenceVideos: [], referenceAudio: [],
+    };
+    const textBody = buildGeneratorProviderRequest(textState, media);
+    assert.equal(textBody.image_urls, undefined);
+    assert.equal(textBody.resolution, '1K');
+    assert.equal(textBody.aspect_ratio, '1:1');
+    assert.equal(textBody.enable_web_search, undefined);
+    assert.equal(textBody.thinking_level, undefined);
+
+    const editState = updateGeneratorState(textState, model, { workflow: 'image-to-image' });
+    const editBody = buildGeneratorProviderRequest(editState, media);
+    assert.deepEqual(editBody.image_urls, media.referenceImages);
+    assert.equal(editBody.output_format, 'png');
+    assert.equal(editBody.num_images, 1);
+  }
+});

@@ -255,7 +255,7 @@ export async function generateWithGenerator(input: {
         generationId, userId: input.userId, userEmail: input.userEmail,
         state: verifiedState, sealedState: { ...verifiedState, inputs: sealed.inputs },
         signature: requestedSignature, quote,
-        ...getGeneratorProviderIdentity(state.modelId),
+        ...getGeneratorProviderIdentity(state.modelId, verifiedState.workflow),
       });
       // A concurrent request can have won and bound different sealed keys.
       const retained = parseTaskJson(task.options).inputs as GeneratorInputs;
@@ -289,7 +289,7 @@ export async function generateWithGenerator(input: {
     params: snapshot.params,
     workflow: snapshot.workflow,
   };
-  const identity = getGeneratorProviderIdentity(state.modelId);
+  const identity = getGeneratorProviderIdentity(state.modelId, sealedState.workflow);
 
   // Failures before any network submission are definitively refundable:
   // an expired R2 URL or invalid provider payload must never be parked as
@@ -385,6 +385,7 @@ export async function reconcileGeneratorTask(task: GeneratorTask) {
     provider = await queryGeneratorProvider({
       modelId, requestId: task.taskId,
       mediaType: task.mediaType as 'image' | 'video',
+      workflow: options.workflow as GeneratorState['workflow'],
     });
   } catch (error) {
     console.warn('[generator] status query failed', { id: task.id, error });

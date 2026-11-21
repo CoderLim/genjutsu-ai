@@ -37,11 +37,50 @@ const IMAGE_FIELDS = {
   },
 } as const;
 
+
+// Nano Banana 2 / Pro public customer tariffs. Underlying Fal prices are
+// $0.08/0.12/0.16 and $0.15/0.15/0.30 per output at 1K/2K/4K.
+// Price * 170 customer credits/USD (rounded up) with no search/thinking extras.
+const NANO_2_CREDITS = { '1K': 14, '2K': 21, '4K': 28 };
+const NANO_PRO_CREDITS = { '1K': 26, '2K': 26, '4K': 51 };
+const NANO_BASE_FIELDS = {
+  aspectRatio: {
+    label: 'Aspect Ratio', default: '1:1',
+    options: ['1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3', '21:9'],
+  },
+  resolution: {
+    label: 'Resolution', default: '1K', options: ['1K', '2K', '4K'],
+  },
+  outputCount: {
+    label: 'Outputs', default: 1, options: [1, 2, 3, 4],
+  },
+  outputFormat: {
+    label: 'Format', default: 'png', options: ['png', 'jpeg', 'webp'],
+  },
+} as const;
+
+function nanoWorkflows() {
+  return {
+    'text-to-image': {
+      label: 'Text to Image', slots: {}, fields: { ...NANO_BASE_FIELDS },
+    },
+    'image-to-image': {
+      label: 'Image Edit',
+      slots: {
+        referenceImages: {
+          min: 1, max: 14, accept: IMAGE_MIME, maxBytes: 12 * 1048576,
+        },
+      },
+      fields: { ...NANO_BASE_FIELDS },
+    },
+  } as const;
+}
+
 // Avoid reusing the legacy Genjutsu model/product routing and env pins.
 export const GENERATOR_MODELS: readonly GeneratorModel[] = [
   {
     id: 'photo-to-video-standard',
-    name: 'Photo to Video · Standard',
+    name: 'Seedance 2.0 · Photo to Video',
     mediaType: 'video',
     enabled: true,
     defaultWorkflow: 'first-frame',
@@ -70,7 +109,7 @@ export const GENERATOR_MODELS: readonly GeneratorModel[] = [
   },
   {
     id: 'text-to-video-standard',
-    name: 'Text to Video · Standard',
+    name: 'Seedance 2.0 · Text to Video',
     mediaType: 'video',
     enabled: true,
     defaultWorkflow: 'text-to-video',
@@ -89,7 +128,7 @@ export const GENERATOR_MODELS: readonly GeneratorModel[] = [
   },
   {
     id: 'multi-image-to-video',
-    name: 'Multi-Image to Video',
+    name: 'Seedance 2.0 · Multi-Image',
     mediaType: 'video',
     enabled: true,
     defaultWorkflow: 'all-in-one-reference',
@@ -114,7 +153,7 @@ export const GENERATOR_MODELS: readonly GeneratorModel[] = [
   },
   {
     id: 'all-in-one-video',
-    name: 'All-in-One Video',
+    name: 'Seedance 2.0 · All-in-One',
     mediaType: 'video',
     enabled: true,
     defaultWorkflow: 'all-in-one-reference',
@@ -188,6 +227,32 @@ export const GENERATOR_MODELS: readonly GeneratorModel[] = [
         },
       },
     },
+  },
+  {
+    id: 'nano-banana-2',
+    name: 'Nano Banana 2',
+    mediaType: 'image',
+    enabled: true,
+    defaultWorkflow: 'text-to-image',
+    pricing: {
+      version: '2026-11-21-nano2-1',
+      precision: 'exact',
+      rule: { kind: 'matrix', fields: ['resolution'], creditsByCombination: NANO_2_CREDITS },
+    },
+    workflows: nanoWorkflows(),
+  },
+  {
+    id: 'nano-banana-pro',
+    name: 'Nano Banana Pro',
+    mediaType: 'image',
+    enabled: true,
+    defaultWorkflow: 'text-to-image',
+    pricing: {
+      version: '2026-11-21-nanopro-1',
+      precision: 'exact',
+      rule: { kind: 'matrix', fields: ['resolution'], creditsByCombination: NANO_PRO_CREDITS },
+    },
+    workflows: nanoWorkflows(),
   },
   {
     id: 'text-to-image-fast',
