@@ -220,9 +220,10 @@ export const ADDITIONAL_GENERATOR_MODELS: readonly GeneratorModel[] = [
   }),
   videoProfile({
     id: 'minimax-h3', name: 'MiniMax H3',
-    resolutions: ['480P', '768P', '2K', '4K'], duration: [5, 15],
-    rates: { '480P': 9, '768P': 11, '2K': 23, '4K': 28 },
-    promptExpansion: true, startEnd: true, referenceImageLimit: 9,
+    // Base H3 endpoints accept 768P / 2K / 4K; there is no 480P tier.
+    resolutions: ['768P', '2K', '4K'], duration: [5, 15],
+    rates: { '768P': 11, '2K': 23, '4K': 28 },
+    startEnd: true, referenceImageLimit: 9,
   }),
   // Fal has a base H3 endpoint but no verified, distinct H3 Turbo endpoint.
   // Do not misroute requests to the base H3 while calling it Turbo.
