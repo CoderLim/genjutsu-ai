@@ -219,6 +219,34 @@ test('Fal video requests use provider-specific image field names, never generic 
   assert.equal(endRequest.end_image_url, media.endFrame);
 });
 
+test('Fal frame workflows hide an ignored aspect setting; sound toggles are sent', () => {
+  const models = [
+    'seedance-2-fast', 'seedance-2-mini', 'seedance-2.5',
+    'seedance-2.5-flash', 'minimax-h3', 'minimax-h3-max',
+    'kling-4', 'kling-4-flash', 'kling-3-turbo', 'kling-3',
+  ];
+  for (const id of models) {
+    const model = stagedModel(id);
+    assert.equal(model.workflows['first-frame']?.fields.aspectRatio, undefined, id);
+    assert.ok(model.workflows['text-to-video']?.fields.aspectRatio, id);
+    assert.equal(model.workflows['start-end']?.fields.aspectRatio, undefined, id);
+  }
+  for (const id of [
+    'seedance-2-fast', 'seedance-2-mini', 'seedance-2.5',
+    'seedance-2.5-flash', 'kling-3',
+  ]) {
+    const model = stagedModel(id);
+    assert.deepEqual(model.workflows['first-frame']?.fields.generateAudio?.options,
+      [true, false], id);
+    const state = updateGeneratorState(createGeneratorState(model), model, {
+      params: { generateAudio: false },
+    });
+    assert.equal(buildGeneratorProviderRequest(state, {
+      ...emptyMedia, startFrame: 'https://example.test/start.png',
+    }).generate_audio, false, id);
+  }
+});
+
 test('Fal image model editing swaps endpoints and uses bounded image sizes', () => {
   for (const id of ['minimax-h3-image', 'minimax-h3-image-highspeed']) {
     const model = stagedModel(id);
