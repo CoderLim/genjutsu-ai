@@ -152,10 +152,10 @@ export function isFieldValueValid(value: unknown, field: FieldSpec): boolean {
     if (
       field.step !== undefined &&
       field.step > 0 &&
-      !Number.isInteger(
-        Math.round((value - (field.min ?? 0)) / field.step) -
-          (value - (field.min ?? 0)) / field.step
-      )
+      Math.abs(
+        (value - (field.min ?? 0)) / field.step -
+          Math.round((value - (field.min ?? 0)) / field.step)
+      ) > 1e-9
     ) return false;
   }
   return true;
