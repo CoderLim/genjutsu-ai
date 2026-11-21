@@ -15,7 +15,14 @@ const videoFrames = {
   },
 };
 const ASPECTS = ['16:9', '9:16', '1:1', '4:3', '3:4'] as const;
-const VIDEO_ASPECTS = [...ASPECTS, '21:9'] as const;
+// Fal Seedance text/reference endpoints also support automatic aspect ratio.
+const VIDEO_ASPECTS = ['auto', '21:9', '16:9', '4:3', '1:1', '3:4', '9:16'] as const;
+// MiniMax H3 Image accepts custom sizes within 1:3..3:1. Raphael advertises
+// 15 common ratios; every preset below stays inside the Fal output boundary.
+const MINIMAX_IMAGE_ASPECTS = [
+  '1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3', '5:4', '4:5',
+  '21:9', '9:21', '2:1', '1:2', '3:1', '1:3',
+] as const;
 
 type VideoOptions = {
   id: string;
@@ -47,7 +54,7 @@ function videoFields(options: VideoOptions): Record<string, FieldSpec> {
     },
     aspectRatio: {
       label: 'Aspect Ratio',
-      default: options.aspectRatios?.[0] ?? '16:9',
+      default: options.aspectRatios?.[0] ?? 'auto',
       options: options.aspectRatios ?? VIDEO_ASPECTS,
     },
     outputCount: { label: 'Outputs', default: 1, options: [1] },
@@ -149,7 +156,7 @@ function videoProfile(options: VideoOptions): GeneratorModel {
 
 const MINIMAX_IMAGE_FIELDS: Record<string, FieldSpec> = {
   aspectRatio: {
-    label: 'Aspect Ratio', default: '1:1', options: ASPECTS,
+    label: 'Aspect Ratio', default: '1:1', options: MINIMAX_IMAGE_ASPECTS,
   },
   resolution: {
     label: 'Resolution', default: '1K', options: ['1K', '2K', '4K'],
