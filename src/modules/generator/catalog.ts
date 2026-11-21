@@ -44,10 +44,17 @@ const IMAGE_FIELDS = {
 // Price * 170 customer credits/USD (rounded up) with no search/thinking extras.
 const NANO_2_CREDITS = { '1K': 14, '2K': 21, '4K': 28 };
 const NANO_PRO_CREDITS = { '1K': 26, '2K': 26, '4K': 51 };
+const NANO_2_ASPECTS = [
+  'auto', '21:9', '16:9', '3:2', '4:3', '5:4', '1:1',
+  '4:5', '3:4', '2:3', '9:16', '4:1', '1:4', '8:1', '1:8',
+] as const;
+const NANO_PRO_ASPECTS = [
+  'auto', '21:9', '16:9', '3:2', '4:3', '5:4', '1:1',
+  '4:5', '3:4', '2:3', '9:16',
+] as const;
 const NANO_BASE_FIELDS = {
   aspectRatio: {
-    label: 'Aspect Ratio', default: '1:1',
-    options: ['1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3', '21:9'],
+    label: 'Aspect Ratio', default: '1:1', options: NANO_2_ASPECTS,
   },
   resolution: {
     label: 'Resolution', default: '1K', options: ['1K', '2K', '4K'],
@@ -112,14 +119,14 @@ function nanoVariantWorkflows(
   } as const;
 }
 
-function nanoWorkflows() {
+function nanoWorkflows(fields: typeof NANO_BASE_FIELDS = NANO_BASE_FIELDS) {
   return {
     'text-to-image': {
       label: 'Text to Image',
       slots: {
         referenceImages: { min: 0, max: 14, accept: IMAGE_MIME, maxBytes: 12 * 1048576 },
       },
-      fields: { ...NANO_BASE_FIELDS },
+      fields: { ...fields },
     },
     'image-to-image': {
       label: 'Image Edit',
@@ -128,7 +135,7 @@ function nanoWorkflows() {
           min: 1, max: 14, accept: IMAGE_MIME, maxBytes: 12 * 1048576,
         },
       },
-      fields: { ...NANO_BASE_FIELDS },
+      fields: { ...fields },
     },
   } as const;
 }
@@ -343,7 +350,10 @@ export const GENERATOR_MODELS: readonly GeneratorModel[] = [
       precision: 'exact',
       rule: { kind: 'matrix', fields: ['resolution'], creditsByCombination: NANO_PRO_CREDITS },
     },
-    workflows: nanoWorkflows(),
+    workflows: nanoWorkflows({
+      ...NANO_BASE_FIELDS,
+      aspectRatio: { ...NANO_BASE_FIELDS.aspectRatio, options: NANO_PRO_ASPECTS },
+    }),
   },
   {
     id: 'text-to-image-fast',
