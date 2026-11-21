@@ -129,7 +129,9 @@ export function getGeneratorProviderIdentity(
 ): ProviderIdentity {
   const extra = ADDITIONAL_FAL_ENDPOINTS[modelId];
   if (extra) {
-    const endpoint = workflow ? extra[workflow as keyof typeof extra] : extra['first-frame'] ?? extra['text-to-image'];
+    const apiWorkflow = workflow === 'start-end' ? 'first-frame' : workflow;
+    const endpoint = apiWorkflow ? extra[apiWorkflow as keyof typeof extra]
+      : extra['first-frame'] ?? extra['text-to-image'];
     if (!endpoint) throw new Error('Unsupported Fal model/workflow endpoint');
     return { provider: 'fal', providerModelId: endpoint };
   }
@@ -206,8 +208,11 @@ export function buildGeneratorProviderRequest(
           ? { image_urls: media.referenceImages } : {}),
       };
     }
-    const hasImage = state.workflow === 'first-frame';
+    const hasImage = state.workflow === 'first-frame' || state.workflow === 'start-end';
     if (hasImage && !media.startFrame) throw new Error('Start frame required');
+    if (state.workflow === 'start-end' && !media.endFrame) {
+      throw new Error('End frame required');
+    }
     const base = {
       prompt: state.prompt,
       duration: params.duration,
@@ -217,7 +222,10 @@ export function buildGeneratorProviderRequest(
       return {
         ...base,
         ...(hasImage
-          ? { start_image_url: media.startFrame }
+          ? {
+              start_image_url: media.startFrame,
+              ...(state.workflow === 'start-end' ? { end_image_url: media.endFrame } : {}),
+            }
           : { aspect_ratio: params.aspectRatio }),
         // Kling 4 uses its own per-shot defaults. Do not send WaveSpeed keys.
       };
@@ -227,7 +235,10 @@ export function buildGeneratorProviderRequest(
         prompt: state.prompt,
         duration: String(params.duration),
         ...(hasImage
-          ? { start_image_url: media.startFrame }
+          ? {
+              start_image_url: media.startFrame,
+              ...(state.workflow === 'start-end' ? { end_image_url: media.endFrame } : {}),
+            }
           : { aspect_ratio: params.aspectRatio }),
         ...(id === 'kling-3' ? { generate_audio: params.generateAudio } : {}),
       };
@@ -244,7 +255,10 @@ export function buildGeneratorProviderRequest(
     // legacy image property.
     return {
       ...base,
-      ...(hasImage ? { image_url: media.startFrame } : { aspect_ratio: params.aspectRatio }),
+      ...(hasImage ? {
+        image_url: media.startFrame,
+        ...(state.workflow === 'start-end' ? { end_image_url: media.endFrame } : {}),
+      } : { aspect_ratio: params.aspectRatio }),
       generate_audio: params.generateAudio,
     };
   }

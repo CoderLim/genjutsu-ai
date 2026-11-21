@@ -25,6 +25,7 @@ type VideoOptions = {
   rate?: number; // exact customer credits/second, not the Fal unit price
   rateResolution?: string;
   audio?: boolean;
+  startEnd?: boolean;
 };
 
 function videoFields(options: VideoOptions): Record<string, FieldSpec> {
@@ -83,6 +84,18 @@ function videoProfile(options: VideoOptions): GeneratorModel {
     pricing,
     workflows: {
       'first-frame': firstFrame,
+      ...(options.startEnd ? {
+        'start-end': {
+          label: 'Start & End',
+          slots: {
+            ...videoFrames,
+            endFrame: {
+              min: 1, max: 1, accept: IMAGE_MIME, maxBytes: 12 * 1048576,
+            },
+          },
+          fields,
+        },
+      } : {}),
       'text-to-video': textToVideo,
     },
   };
@@ -127,18 +140,22 @@ export const ADDITIONAL_GENERATOR_MODELS: readonly GeneratorModel[] = [
   videoProfile({
     id: 'seedance-2-fast', name: 'Seedance 2.0 Fast',
     resolutions: ['480p', '720p'], duration: [4, 15], audio: true,
+    startEnd: true,
   }),
   videoProfile({
     id: 'seedance-2-mini', name: 'Seedance 2.0 Mini',
     resolutions: ['480p', '720p'], duration: [4, 15], audio: true,
+    startEnd: true,
   }),
   videoProfile({
     id: 'seedance-2.5', name: 'Seedance 2.5',
     resolutions: ['480p', '720p'], duration: [4, 30], audio: true,
+    startEnd: true,
   }),
   videoProfile({
     id: 'seedance-2.5-flash', name: 'Seedance 2.5 Flash',
     resolutions: ['480p', '720p'], duration: [4, 30], audio: true,
+    startEnd: true,
   }),
   // Fal has a base H3 endpoint but no verified, distinct H3 Turbo endpoint.
   // Do not misroute requests to the base H3 while calling it Turbo.
@@ -161,18 +178,22 @@ export const ADDITIONAL_GENERATOR_MODELS: readonly GeneratorModel[] = [
   videoProfile({
     id: 'kling-4', name: 'Kling 4.0',
     resolutions: ['720p', '1080p'], duration: [3, 30], audio: true,
+    startEnd: true,
   }),
   videoProfile({
     id: 'kling-4-flash', name: 'Kling 4.0 Flash',
     resolutions: ['720p'], duration: [3, 20], audio: true,
+    startEnd: true,
   }),
   videoProfile({
     id: 'kling-3-turbo', name: 'Kling 3.0 Turbo',
     resolutions: ['720p'], duration: [3, 15],
+    startEnd: true,
   }),
   videoProfile({
     id: 'kling-3', name: 'Kling 3.0',
     resolutions: ['720p', '1080p'], duration: [3, 15], audio: true,
+    startEnd: true,
   }),
   minimaxImage('minimax-h3-image', 'MiniMax H3 Image'),
   minimaxImage('minimax-h3-image-highspeed', 'MiniMax H3 Image Highspeed'),

@@ -188,7 +188,7 @@ test('development previews list requested versions but cannot bill unpriced mode
 test('Seedance Fast workflows use Fast endpoints, not original Seedance profiles', () => {
   const fast = GENERATOR_MODELS.find(x => x.id === 'seedance-2-fast')!;
   const choices = getGeneratorWorkflowChoices(GENERATOR_MODELS, fast);
-  assert.deepEqual(choices.map(x => x.label), ['First Frame', 'Text to Video']);
+  assert.deepEqual(choices.map(x => x.label), ['First Frame', 'Start & End', 'Text to Video']);
   assert.ok(choices.every(x => x.modelId === fast.id));
   const old = GENERATOR_MODELS.find(x => x.id === 'photo-to-video-standard')!;
   assert.equal(isSameGeneratorModelChoice(old, fast), false);
