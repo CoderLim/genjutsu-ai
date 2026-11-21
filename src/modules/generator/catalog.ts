@@ -102,8 +102,7 @@ export const GENERATOR_MODELS: readonly GeneratorModel[] = [
     id: 'h3-reference',
     name: 'MiniMax H3 · Reference to Video',
     mediaType: 'video', providerName: 'Fal',
-    // Video duration/output probes and real upstream charge checks required.
-    enabled: false,
+    enabled: true,
     defaultWorkflow: 'reference-to-video',
     pricing: {
       version: '2026-11-21-h3-draft',
@@ -120,7 +119,7 @@ export const GENERATOR_MODELS: readonly GeneratorModel[] = [
         label: 'Reference to Video',
         slots: {
           referenceImages: { min: 1, max: 9, accept: IMAGE_MIME, maxBytes: 12 * 1048576 },
-          referenceVideos: { min: 1, max: 1, accept: VIDEO_MIME, maxBytes: 80 * 1048576 },
+          referenceVideos: { min: 1, max: 1, accept: VIDEO_MIME, maxBytes: 80 * 1048576, minSeconds: 5, maxSeconds: 15 },
         },
         fields: {
           duration: { label: 'Duration', default: 8, min: 5, max: 15, step: 1 },
