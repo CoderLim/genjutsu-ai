@@ -180,7 +180,15 @@ function minimaxImage(id: string, name: string): GeneratorModel {
     },
     workflows: {
       'text-to-image': {
-        label: 'Text to Image', slots: {}, fields: MINIMAX_IMAGE_FIELDS,
+        label: 'Text to Image',
+        slots: {
+          // References are optional in the composer. When present, the
+          // provider resolver uses the matching H3 Image edit endpoint.
+          referenceImages: {
+            min: 0, max: 16, accept: IMAGE_MIME, maxBytes: 12 * 1048576,
+          },
+        },
+        fields: MINIMAX_IMAGE_FIELDS,
       },
       'image-to-image': {
         label: 'Image Edit',
