@@ -2,6 +2,7 @@ import { scanPromptWithWaffo } from '@/core/content-safety/waffo-scan';
 import { getAllConfigs } from '@/modules/config/service';
 
 import {
+  buildGeneratorProviderRequest,
   classifyGeneratorSubmitError,
   getGeneratorProviderIdentity,
   queryGeneratorProvider,
@@ -257,10 +258,26 @@ export async function generateWithGenerator(input: {
     workflow: snapshot.workflow,
   };
   const identity = getGeneratorProviderIdentity(state.modelId);
-  let requestId: string | undefined;
 
+  // Failures before any network submission are definitively refundable:
+  // an expired R2 URL or invalid provider payload must never be parked as
+  // submission_unknown with the user's credits held.
+  let readUrls: MediaReadUrls;
   try {
-    const readUrls = await readInputUrls(sealedInputs);
+    readUrls = await readInputUrls(sealedInputs);
+    buildGeneratorProviderRequest(sealedState, readUrls);
+  } catch (error) {
+    await refundGeneratorTask({
+      generationId, userId: input.userId,
+      reason: error instanceof Error ? error.message : 'Unable to prepare provider inputs',
+    });
+    return publicGeneratorTask((await getGeneratorTask({
+      generationId, userId: input.userId,
+    }))!);
+  }
+
+  let requestId: string | undefined;
+  try {
     const started = await submitGeneratorProvider(sealedState, readUrls);
     requestId = started.requestId;
     if (!requestId) throw new Error('Provider returned no request ID');
