@@ -153,7 +153,8 @@ export function getGeneratorProviderIdentity(
     return { provider: 'fal', providerModelId: endpoint };
   }
   const resolvedModelId = modelId === 'all-in-one-video' &&
-    workflow === 'all-in-one-reference' && hasReferences === false
+    (workflow === 'text-to-video' ||
+      (workflow === 'all-in-one-reference' && hasReferences === false))
     ? 'text-to-video-standard' : modelId;
   const identity = MODEL_IDENTITIES[resolvedModelId];
   if (!identity) throw new Error('Unknown generator adapter: ' + modelId);
