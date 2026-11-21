@@ -20,6 +20,16 @@ There are **at most three visible choices**, but **each specific model has its o
 
 Changing the selected model or mode retains only compatible uploaded media and parameters. Unpriced models are not shown even in development. The server independently seals reference media, calculates credits and chooses provider identity from the actual submitted reference presence.
 
+### Unified All-in-One reference upload (UI only)
+
+The Video `All-in-One Reference` composer now shows **one shared Reference upload tile** for all supported media formats, rather than separate image/video/audio tiles. A descriptive line above the prompt lists the actual **current model** limits, including total items, per-type media counts and aggregate duration caps when configured.
+
+The upload planner checks every selected file by MIME, maximum per-file bytes, available per-type capacity and total combined capacity, rejecting the entire batch on any violation. The browser reads audio/video metadata and checks cumulative durations before adding the batch. Once accepted, the files are still stored in distinct `referenceImages`, `referenceVideos`, `referenceAudio` arrays so the existing signed-upload API, pricing, reference-duration validation and Fal/WaveSpeed adapter payloads remain unchanged. Previews show all media together with individual remove controls.
+
+**Important difference from Raphael:** Seedance 2.0's currently implemented and priced limit is **12 combined items**, up to **9 images / 3 videos / 3 audio**, with **15 seconds total** of reference video and **15 seconds total** of reference audio. This is *not* Raphael's screenshot claim of 20 combined / 10 images / 30-second videos/audio. Do not raise provider limits based solely on the reference UI. Other Seedance reference modes that support images only also show one tile but accept only images; the description only lists supported formats.
+
+Regression coverage: `form-state.test.ts` checks mixed batches, typed slot classification, MIME and bytes validation, per-type and shared caps, exact limits description, and rejection without silent truncation. No browser or live provider upload has yet been verified.
+
 ## Video models (current **product** limits)
 
 | Model | First | Start & End | All-in-One ref images | Exposed duration and resolution |
