@@ -8,6 +8,7 @@ import {
   generationMediaBasePath,
   LISTABLE_GENERATION_SCENES,
 } from '@/modules/generations/scenes';
+import { GENERATOR_SCENE } from '@/modules/generator/billing';
 import { HOTEL_LOBBY_SCENE } from '@/modules/hotel-lobby/billing';
 import { getLiveSessionHistory } from '@/modules/live-face-swap/history';
 import { LIVE_FACE_SWAP_SCENE } from '@/modules/live-face-swap/pricing';
@@ -63,6 +64,7 @@ async function GET({ request }: { request: Request }) {
       .select({
         id: aiTask.id,
         scene: aiTask.scene,
+        mediaType: aiTask.mediaType,
         prompt: aiTask.prompt,
         status: aiTask.status,
         options: aiTask.options,
@@ -90,6 +92,7 @@ async function GET({ request }: { request: Request }) {
         return {
           id: row.id,
           scene: LIVE_FACE_SWAP_SCENE,
+          mediaType: 'video',
           prompt: '',
           status: row.status,
           mode: null,
@@ -112,20 +115,30 @@ async function GET({ request }: { request: Request }) {
         row.scene === HOTEL_LOBBY_SCENE
           ? displayNameForHotelLobbyPresetId(options?.presetId) || 'Hotel Lobby'
           : null;
-      const mode =
-        typeof options?.mode === 'string' ? options.mode : presetDisplayName;
+      const isGenerator = row.scene === GENERATOR_SCENE;
+      const generatorParams = isGenerator ? options?.params : null;
+      const mode = isGenerator && typeof options?.workflow === 'string'
+        ? options.workflow
+        : typeof options?.mode === 'string' ? options.mode : presetDisplayName;
       return {
         id: row.id,
         scene: row.scene,
+        mediaType: row.mediaType,
         prompt: row.prompt,
         status: row.status,
         mode,
         resolution:
-          typeof options?.resolution === 'string' ? options.resolution : null,
+          typeof generatorParams?.resolution === 'string'
+            ? generatorParams.resolution
+            : typeof options?.resolution === 'string' ? options.resolution : null,
         aspectRatio:
-          typeof options?.aspectRatio === 'string' ? options.aspectRatio : null,
+          typeof generatorParams?.aspectRatio === 'string'
+            ? generatorParams.aspectRatio
+            : typeof options?.aspectRatio === 'string' ? options.aspectRatio : null,
         duration:
-          typeof options?.duration === 'number' ? options.duration : null,
+          typeof generatorParams?.duration === 'number'
+            ? generatorParams.duration
+            : typeof options?.duration === 'number' ? options.duration : null,
         costCredits: row.costCredits,
         sourceVideoUrl: hasSourceVideo
           ? `${mediaBase}/source/${encodeURIComponent(row.id)}`
