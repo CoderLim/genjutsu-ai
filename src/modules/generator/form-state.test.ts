@@ -227,3 +227,35 @@ test('saved output MIME matches the supported image format, not always JPEG', ()
   assert.equal(generatorResultContentType('image', undefined), 'image/png');
   assert.equal(generatorResultContentType('video', 'webp'), 'video/mp4');
 });
+
+test('image model forms have consistent text/edit modes, reference limits and formats', () => {
+  for (const [id, editMax] of [
+    ['nano-banana-2.1', 14],
+    ['nano-banana-2-lite', 14],
+    ['nano-banana-2', 14],
+    ['nano-banana-pro', 14],
+    ['minimax-h3-image', 16],
+    ['minimax-h3-image-highspeed', 16],
+    ['image-edit-standard', 4],
+  ] as const) {
+    const model = getGeneratorModel(id);
+    const edit = model.workflows['image-to-image']!;
+    assert.equal(edit.slots.referenceImages?.min, 1, id);
+    assert.equal(edit.slots.referenceImages?.max, editMax, id);
+    assert.ok(edit.fields.outputFormat.options?.includes('png'), id);
+    const draft = updateGeneratorState(createGeneratorState(model), model, {
+      workflow: 'image-to-image', prompt: 'Update this photo',
+    });
+    assert.match(generatorReadinessError(draft, model) ?? '',
+      /referenceImages/, id);
+    const withPhoto = updateGeneratorState(draft, model, {
+      inputs: { ...draft.inputs, referenceImages: ['reference'] },
+    });
+    assert.equal(generatorReadinessError(withPhoto, model), null, id);
+  }
+  const schnell = getGeneratorModel('text-to-image-fast');
+  assert.equal(schnell.workflows['image-to-image'], undefined);
+  const lite = getGeneratorModel('nano-banana-2-lite');
+  assert.deepEqual(lite.workflows['text-to-image']!.fields.resolution.options, ['1K']);
+  assert.deepEqual(lite.workflows['image-to-image']!.fields.resolution.options, ['1K']);
+});
