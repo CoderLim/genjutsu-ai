@@ -811,6 +811,24 @@ export function GeneratorForm({
     !mediaBusy &&
     !isGeneratorJobActive(job);
   const activeSlots = INPUT_SLOTS.filter((slot) => !!spec.slots[slot]);
+  const mixedReferenceSlots = GENERATOR_REFERENCE_SLOTS.filter(
+    slot => !!spec.slots[slot]
+  );
+  const showUnifiedReference = mediaType === 'video' &&
+    form.workflow === 'all-in-one-reference' && mixedReferenceSlots.length > 0;
+  const mixedItems = mixedReferenceSlots.flatMap(slot =>
+    form.inputs[slot].map(url => ({ url, slot }))
+  );
+  const mixedAccept = [...new Set(
+    mixedReferenceSlots.flatMap(slot => [...(spec.slots[slot]?.accept ?? [])])
+  )];
+  const mixedMaxTotal = spec.maxCombinedReferences ??
+    mixedReferenceSlots.reduce((sum, slot) => sum + (spec.slots[slot]?.max ?? 0), 0);
+  const mixedCanAdd = mixedReferenceSlots.some(
+    slot => getGeneratorSlotCapacity(spec, form.inputs, slot) > 0
+  );
+  const mixedReferenceHint = showUnifiedReference
+    ? describeGeneratorMixedReferences(spec) : '';
   const settingsFields = [
     ...SETTINGS_FIELD_KEYS.filter((key) => {
       const field = spec.fields[key];
@@ -947,7 +965,16 @@ export function GeneratorForm({
 
         {/* Body: reference + prompt */}
         <div className="mt-1 flex flex-col gap-3 px-1 sm:flex-row sm:items-stretch">
-          {activeSlots.length > 0 ? (
+          {showUnifiedReference ? (
+            <MixedReferenceUploader
+              items={mixedItems}
+              accept={mixedAccept}
+              canAdd={mixedCanAdd}
+              maxTotal={mixedMaxTotal}
+              onFiles={onMixedReferenceFiles}
+              onRemove={removeFile}
+            />
+          ) : activeSlots.length > 0 ? (
             <ComposerFrameSlots showArrow={isStartEnd}>
               {activeSlots.map((slot) => {
                 const limit = spec.slots[slot]!;
@@ -977,7 +1004,12 @@ export function GeneratorForm({
             </ComposerFrameSlots>
           ) : null}
 
-          <div className="relative min-h-[96px] min-w-0 flex-1">
+          <div className="relative flex min-h-[96px] min-w-0 flex-1 flex-col">
+            {mixedReferenceHint ? (
+              <p className="mb-2 text-xs leading-relaxed text-[rgba(18,15,16,0.58)]">
+                {mixedReferenceHint}
+              </p>
+            ) : null}
             <label htmlFor="generator-prompt" className="sr-only">
               Prompt
             </label>
@@ -990,7 +1022,7 @@ export function GeneratorForm({
               }
               value={form.prompt}
               onChange={(event) => mutate({ prompt: event.target.value })}
-              className="h-full min-h-[96px] w-full resize-none border-0 bg-transparent p-0 text-sm leading-6 text-[rgb(18,15,16)] outline-none placeholder:px-0.5 placeholder:text-[rgba(18,15,16,0.38)] focus-visible:ring-0"
+              className="min-h-[72px] w-full flex-1 resize-none border-0 bg-transparent p-0 text-sm leading-6 text-[rgb(18,15,16)] outline-none placeholder:px-0.5 placeholder:text-[rgba(18,15,16,0.38)] focus-visible:ring-0"
             />
           </div>
         </div>
