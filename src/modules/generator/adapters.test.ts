@@ -314,7 +314,8 @@ test('MiniMax H3 Image 1K wide and portrait outputs meet Fal minimum pixel area'
 test('model-specific workflows match documented Fal frame and expansion support', () => {
   for (const id of ['kling-3-turbo', 'kling-4-flash']) {
     const model = getGeneratorModel(id);
-    assert.deepEqual(Object.keys(model.workflows), ['first-frame', 'text-to-video'], id);
+    assert.deepEqual(Object.keys(model.workflows),
+      ['first-frame', 'all-in-one-reference', 'text-to-video'], id);
     assert.equal(model.workflows['start-end'], undefined, id);
   }
   for (const id of ['kling-3', 'kling-4', 'minimax-h3']) {
@@ -378,4 +379,68 @@ test('Kling Turbo only accepts documented JPEG/PNG first-frame formats', () => {
   const turbo = getGeneratorModel('kling-3-turbo');
   const supported = turbo.workflows['first-frame']?.slots.startFrame?.accept;
   assert.deepEqual(supported, ['image/png', 'image/jpeg']);
+});
+
+test('All-in-One routes text-only and reference-image input to different verified provider endpoints', () => {
+  const noMedia = { referenceImages: [], referenceVideos: [], referenceAudio: [] };
+  const refMedia = {
+    ...noMedia,
+    referenceImages: ['https://example.test/ref-1.png'],
+  };
+  for (const [modelId, refEndpoint, refField] of [
+    ['seedance-2-fast', 'bytedance/seedance-2.0/fast/reference-to-video', 'image_urls'],
+    ['seedance-2-mini', 'bytedance/seedance-2.0/mini/reference-to-video', 'image_urls'],
+    ['seedance-2.5', 'bytedance/seedance-2.5/reference-to-video', 'image_urls'],
+    ['seedance-2.5-flash', 'bytedance/seedance-2.5/flash/reference-to-video', 'image_urls'],
+    ['minimax-h3', 'minimax/h3/reference-to-video', 'reference_image_urls'],
+    ['minimax-h3-max', 'minimax/h3-max/reference-to-video', 'reference_image_urls'],
+    ['minimax-h3-max-turbo', 'minimax/h3-max-turbo/reference-to-video', 'reference_image_urls'],
+    ['kling-4', 'kling/v4/reference-to-video', 'image_urls'],
+    ['kling-4-flash', 'kling/v4/flash/reference-to-video', 'image_urls'],
+  ] as const) {
+    const model = getGeneratorModel(modelId);
+    const spec = model.workflows['all-in-one-reference']!;
+    assert.ok(spec, modelId);
+    assert.equal(spec.slots.referenceImages?.min, 0);
+    assert.ok((spec.slots.referenceImages?.max ?? 0) > 0);
+    const draft = updateGeneratorState(createGeneratorState(model), model, {
+      workflow: 'all-in-one-reference',
+      prompt: 'A character walks across the courtyard',
+    });
+    assert.doesNotThrow(() => assertGeneratorReady(draft, model));
+    assert.equal(getGeneratorProviderIdentity(modelId, 'all-in-one-reference', false)
+      .providerModelId, getGeneratorProviderIdentity(modelId, 'text-to-video').providerModelId);
+    const textBody = buildGeneratorProviderRequest(draft, noMedia);
+    assert.equal(textBody[refField], undefined, modelId);
+    const mediaDraft = updateGeneratorState(draft, model, {
+      inputs: { ...draft.inputs, referenceImages: ['photo'] },
+    });
+    assert.equal(getGeneratorProviderIdentity(modelId, 'all-in-one-reference', true)
+      .providerModelId, refEndpoint);
+    assert.deepEqual(buildGeneratorProviderRequest(mediaDraft, refMedia)[refField],
+      refMedia.referenceImages, modelId);
+  }
+
+  const seedance = getGeneratorModel('all-in-one-video');
+  const draft = updateGeneratorState(createGeneratorState(seedance), seedance, {
+    prompt: 'A bicycle moves across the frame',
+  });
+  assert.doesNotThrow(() => assertGeneratorReady(draft, seedance));
+  assert.equal(getGeneratorProviderIdentity(seedance.id, draft.workflow, false).providerModelId,
+    'bytedance/seedance-2.0/text-to-video');
+  const payload = buildGeneratorProviderRequest(draft, noMedia);
+  assert.equal(payload.reference_images, undefined);
+  assert.equal(payload.reference_videos, undefined);
+  assert.equal(getGeneratorProviderIdentity(seedance.id, draft.workflow, true).providerModelId,
+    'bytedance/seedance-2.0/reference-to-video');
+});
+
+test('text-only All-in-One on models without reference endpoint has no fake upload slot', () => {
+  for (const id of ['kling-3', 'kling-3-turbo']) {
+    const model = getGeneratorModel(id);
+    const spec = model.workflows['all-in-one-reference']!;
+    assert.deepEqual(Object.keys(spec.slots), [], id);
+    assert.equal(getGeneratorProviderIdentity(id, 'all-in-one-reference').providerModelId,
+      getGeneratorProviderIdentity(id, 'text-to-video').providerModelId);
+  }
 });
