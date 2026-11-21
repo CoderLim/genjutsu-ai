@@ -222,7 +222,7 @@ test('model highlights use configured maximum capabilities and actual minimum cr
     ['seedance-2-mini', 52, 'Up to 720p', 15],
     ['seedance-2.5', 152, 'Up to 720p', 30],
     ['seedance-2.5-flash', 100, 'Up to 720p', 30],
-    ['minimax-h3', 45, 'Up to 4K', 15],
+    ['minimax-h3', 55, 'Up to 4K', 15],
     ['minimax-h3-max', 80, 'Up to 768p', 15],
     ['kling-4', 81, 'Up to 1080p', 30],
     ['kling-4-flash', 51, 'Up to 720p', 20],
