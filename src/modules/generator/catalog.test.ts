@@ -16,10 +16,9 @@ test('live catalog capabilities and price tables are valid', () => {
 test('public models omit unverified multimodal endpoints', () => {
   const ids = listGeneratorModels().map(x => x.id);
   assert.deepEqual(ids, [
-    'seedance-2-i2v', 'flux-schnell', 'flux2-flash-edit',
+    'seedance-2-i2v', 'h3-reference', 'flux-schnell', 'flux2-flash-edit',
   ]);
   assert.throws(() => getGeneratorModel('seedance-2-reference'), /not enabled/);
-  assert.throws(() => getGeneratorModel('h3-reference'), /not enabled/);
 });
 
 test('photo-to-video offers verified first-frame and start-end only', () => {
@@ -118,4 +117,22 @@ test('server validation rejects manipulated cost and unsupported modes', () => {
     ...state, prompt: 'Make waves',
     inputs: { ...state.inputs, startFrame: 'sealed-storage-key' },
   }, model));
+});
+
+test('H3 supports reference-video workflow but not All-in-One', () => {
+  const h3 = getGeneratorModel('h3-reference');
+  assert.deepEqual(Object.keys(h3.workflows), ['reference-to-video']);
+  const spec = h3.workflows['reference-to-video']!;
+  assert.equal(spec.slots.referenceVideos?.min, 1);
+  assert.equal(spec.slots.referenceVideos?.maxSeconds, 15);
+  assert.equal(spec.slots.referenceImages?.max, 9);
+  const initial = createGeneratorState(h3);
+  assert.equal(calculateGeneratorCredits(initial, h3).credits, 82);
+  const sixPhotos = updateGeneratorState(initial, h3, {
+    inputs: {
+      ...initial.inputs,
+      referenceImages: ['1','2','3','4','5','6'],
+    },
+  });
+  assert.equal(calculateGeneratorCredits(sixPhotos, h3).credits, 96);
 });
