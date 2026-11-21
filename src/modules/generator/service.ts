@@ -14,6 +14,7 @@ import {
   assertGeneratorTaskSignature,
   claimGeneratorCompletion,
   claimGeneratorSubmission,
+  clearGeneratorQueryFailures,
   completeGeneratorTask,
   GENERATOR_SCENE,
   generatorRequestSignature,
@@ -22,6 +23,7 @@ import {
   markGeneratorSubmitted,
   markGeneratorSubmissionUnknown,
   parseTaskJson,
+  recordGeneratorQueryFailure,
   recoverStaleGeneratorTask,
   refundGeneratorTask,
   reserveGeneratorTask,
@@ -156,7 +158,8 @@ export function publicGeneratorTask(task: GeneratorTask) {
   const status = task.status === 'completed' ? 'completed'
     : task.status === 'refunded' || task.status === 'failed_preflight'
       ? 'failed'
-      : task.status === 'submission_unknown' ? 'review' : 'processing';
+      : task.status === 'submission_unknown' || task.status === 'query_review'
+        ? 'review' : 'processing';
 
   return {
     generationId: task.id,
@@ -415,6 +418,20 @@ export async function reconcileGeneratorTask(task: GeneratorTask) {
     return publicGeneratorTask((await getGeneratorTask(identity))!);
   }
 
+  if (provider.status === 'query-error') {
+    // Query/result transport failures do not prove a failed generation.
+    // Escalate consecutive failures to an admin-only review without refund.
+    const updated = await recordGeneratorQueryFailure({
+      ...identity,
+      providerStatus: provider.providerStatus,
+      message: provider.error,
+    });
+    return publicGeneratorTask(updated ?? task);
+  }
+  if (provider.status === 'processing') {
+    const updated = await clearGeneratorQueryFailures(identity);
+    return publicGeneratorTask(updated ?? task);
+  }
   if (provider.status !== 'completed') return publicGeneratorTask(task);
   const claimed = await claimGeneratorCompletion(identity);
   if (!claimed) {
