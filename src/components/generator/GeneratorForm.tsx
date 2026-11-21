@@ -1,14 +1,28 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertCircle, CheckCircle2, Download, LoaderCircle, Sparkles } from 'lucide-react';
+import {
+  AlertCircle,
+  CheckCircle2,
+  Clapperboard,
+  Coins,
+  Download,
+  Image as ImageIcon,
+  LoaderCircle,
+} from 'lucide-react';
 
-import { apiGet, apiPost, ApiError, uploadToSignedUrl } from '@/lib/api-client';
-import { GENERATOR_MODELS, listGeneratorModels } from '@/modules/generator/catalog';
+import {
+  GENERATOR_MODELS,
+  listGeneratorModels,
+} from '@/modules/generator/catalog';
 import {
   createGeneratorState,
   normalizeGeneratorState,
   updateGeneratorState,
 } from '@/modules/generator/normalize';
 import { calculateGeneratorCredits } from '@/modules/generator/pricing';
+import {
+  assertReferenceAudioDuration,
+  referenceVideoBillableSeconds,
+} from '@/modules/generator/reference-metadata';
 import {
   getWorkflowSpec,
   type FieldValue,
@@ -20,14 +34,60 @@ import {
   type Workflow,
 } from '@/modules/generator/types';
 import { assertGeneratorReady } from '@/modules/generator/validation';
-import { referenceVideoBillableSeconds, assertReferenceAudioDuration } from '@/modules/generator/reference-metadata';
+import { ApiError, apiGet, apiPost, uploadToSignedUrl } from '@/lib/api-client';
+import { cn } from '@/lib/utils';
+import { Switch } from '@/components/ui/switch';
+
+import { ComposerFrameSlots, ComposerToolbar } from './ComposerPanels';
 import { MediaUploader } from './MediaUploader';
 
 const FIELD_ORDER = [
-  'aspectRatio', 'duration', 'resolution', 'outputCount', 'quality',
-  'style', 'outputFormat', 'promptExpansionMode', 'generateAudio',
-  'fastMode', 'webSearch',
+  'aspectRatio',
+  'duration',
+  'resolution',
+  'outputCount',
+  'quality',
+  'style',
+  'outputFormat',
+  'promptExpansionMode',
+  'generateAudio',
+  'fastMode',
+  'webSearch',
 ];
+
+const SETTINGS_FIELD_KEYS = [
+  'aspectRatio',
+  'duration',
+  'resolution',
+  'outputCount',
+] as const;
+
+const COMPOSER_ACCENT = '#b04845';
+const accentSwitchClass =
+  'data-checked:bg-[#b04845] data-unchecked:bg-[rgba(20,17,18,0.14)] h-4 w-7 data-[size=default]:h-4 data-[size=default]:w-7';
+
+function fieldValues(field: {
+  options?: readonly FieldValue[];
+  default: FieldValue;
+  min?: number;
+  max?: number;
+  step?: number;
+}): FieldValue[] {
+  if (field.options?.length) return [...field.options];
+  if (
+    typeof field.default === 'number' &&
+    field.min !== undefined &&
+    field.max !== undefined
+  ) {
+    const step = field.step ?? 1;
+    const values: number[] = [];
+    for (let value = field.min; value <= field.max + 1e-9; value += step) {
+      values.push(Number(value.toFixed(6)));
+    }
+    return values;
+  }
+  return [];
+}
 
 const SLOT_LABELS: Record<MediaSlot, string> = {
   startFrame: 'Start Frame',
@@ -38,7 +98,11 @@ const SLOT_LABELS: Record<MediaSlot, string> = {
 };
 
 const INPUT_SLOTS: MediaSlot[] = [
-  'startFrame', 'endFrame', 'referenceImages', 'referenceVideos', 'referenceAudio',
+  'startFrame',
+  'endFrame',
+  'referenceImages',
+  'referenceVideos',
+  'referenceAudio',
 ];
 
 type JobInfo = {
@@ -67,21 +131,32 @@ type UploadDescriptor = {
 
 function activeUrls(inputs: GeneratorInputs): string[] {
   return [
-    inputs.startFrame, inputs.endFrame,
-    ...inputs.referenceImages, ...inputs.referenceVideos, ...inputs.referenceAudio,
+    inputs.startFrame,
+    inputs.endFrame,
+    ...inputs.referenceImages,
+    ...inputs.referenceVideos,
+    ...inputs.referenceAudio,
   ].filter((value): value is string => typeof value === 'string');
 }
 
 function slotUrls(inputs: GeneratorInputs, slot: MediaSlot): string[] {
   const value = inputs[slot];
-  return typeof value === 'string' ? [value]
-    : Array.isArray(value) ? value : [];
+  return typeof value === 'string'
+    ? [value]
+    : Array.isArray(value)
+      ? value
+      : [];
 }
 
 /** Browser metadata is for instant quote only; server rechecks sealed inputs. */
-function mediaDurationFromBlobUrl(url: string, slot: MediaSlot): Promise<number> {
+function mediaDurationFromBlobUrl(
+  url: string,
+  slot: MediaSlot
+): Promise<number> {
   return new Promise((resolve, reject) => {
-    const element = document.createElement(slot === 'referenceVideos' ? 'video' : 'audio');
+    const element = document.createElement(
+      slot === 'referenceVideos' ? 'video' : 'audio'
+    );
     element.preload = 'metadata';
     let settled = false;
     const cleanup = () => {
@@ -95,13 +170,18 @@ function mediaDurationFromBlobUrl(url: string, slot: MediaSlot): Promise<number>
       const seconds = element.duration;
       cleanup();
       if (Number.isFinite(seconds) && seconds > 0) resolve(seconds);
-      else reject(new Error('Unable to read media duration; use MP4, MOV, WAV or M4A'));
+      else
+        reject(
+          new Error('Unable to read media duration; use MP4, MOV, WAV or M4A')
+        );
     };
     const failure = () => {
       if (settled) return;
       settled = true;
       cleanup();
-      reject(new Error('Unable to read media duration; use MP4, MOV, WAV or M4A'));
+      reject(
+        new Error('Unable to read media duration; use MP4, MOV, WAV or M4A')
+      );
     };
     const timer = setTimeout(failure, 12000);
     element.addEventListener('loadedmetadata', success, { once: true });
@@ -118,13 +198,15 @@ export function GeneratorForm({
   mediaType: MediaType;
   initialModelId?: string;
 }) {
-  const models = useMemo(() => (
-    import.meta.env.DEV
-      ? GENERATOR_MODELS.filter(item => item.mediaType === mediaType)
-      : listGeneratorModels(mediaType)
-  ), [mediaType]);
+  const models = useMemo(
+    () =>
+      import.meta.env.DEV
+        ? GENERATOR_MODELS.filter((item) => item.mediaType === mediaType)
+        : listGeneratorModels(mediaType),
+    [mediaType]
+  );
   const preferredModel = useMemo(
-    () => models.find(item => item.id === initialModelId) ?? models[0],
+    () => models.find((item) => item.id === initialModelId) ?? models[0],
     [initialModelId, models]
   );
   const [draft, setDraft] = useState<GeneratorState | null>(() =>
@@ -145,9 +227,14 @@ export function GeneratorForm({
 
   const localFiles = useRef(new Map<string, File>());
 
-  const model = models.find(item => item.id === draft?.modelId) ?? preferredModel;
-  const form = model && draft?.modelId === model.id
-    ? draft : model ? createGeneratorState(model) : null;
+  const model =
+    models.find((item) => item.id === draft?.modelId) ?? preferredModel;
+  const form =
+    model && draft?.modelId === model.id
+      ? draft
+      : model
+        ? createGeneratorState(model)
+        : null;
 
   useEffect(() => {
     setDraft(preferredModel ? createGeneratorState(preferredModel) : null);
@@ -168,11 +255,14 @@ export function GeneratorForm({
     }
   }, [draft]);
 
-  useEffect(() => () => {
-    for (const url of localFiles.current.keys()) URL.revokeObjectURL(url);
-    localFiles.current.clear();
-    mediaDurations.current.clear();
-  }, []);
+  useEffect(
+    () => () => {
+      for (const url of localFiles.current.keys()) URL.revokeObjectURL(url);
+      localFiles.current.clear();
+      mediaDurations.current.clear();
+    },
+    []
+  );
 
   const spec = model && form ? getWorkflowSpec(model, form.workflow) : null;
   const quote = useMemo(() => {
@@ -191,27 +281,38 @@ export function GeneratorForm({
     const handle = setInterval(async () => {
       try {
         const status = await apiGet<JobInfo>(
-          '/api/generator/status?generationId=' + encodeURIComponent(job.generationId)
+          '/api/generator/status?generationId=' +
+            encodeURIComponent(job.generationId)
         );
-        if (!canceled) setJob(current =>
-          current?.generationId === status.generationId ? status : current
-        );
+        if (!canceled)
+          setJob((current) =>
+            current?.generationId === status.generationId ? status : current
+          );
       } catch (error) {
         if (!canceled) console.warn('Generator status retry', error);
       }
     }, 4500);
-    return () => { canceled = true; clearInterval(handle); };
+    return () => {
+      canceled = true;
+      clearInterval(handle);
+    };
   }, [job?.generationId, job?.status]);
 
-  function syncReferenceQuote(next: GeneratorState, target: GeneratorModel): GeneratorState {
+  function syncReferenceQuote(
+    next: GeneratorState,
+    target: GeneratorModel
+  ): GeneratorState {
     if (!target.workflows[next.workflow]?.fields.inputVideoSeconds) return next;
-    const durations = next.inputs.referenceVideos.map(url => {
+    const durations = next.inputs.referenceVideos.map((url) => {
       const seconds = mediaDurations.current.get(url);
-      if (seconds === undefined) throw new Error('Missing reference video duration');
+      if (seconds === undefined)
+        throw new Error('Missing reference video duration');
       return seconds;
     });
     const billable = referenceVideoBillableSeconds(durations);
-    return updateGeneratorState(next, target, { params: { inputVideoSeconds: billable } });
+    return updateGeneratorState(next, target, {
+      params: { inputVideoSeconds: billable },
+    });
   }
 
   function mutate(
@@ -222,9 +323,13 @@ export function GeneratorForm({
     setPageError('');
     setPriceChange(null);
     setRetryAttempt(null);
-    setDraft(prev => prev && (nextModel ?? model)
-      ? syncReferenceQuote(updateGeneratorState(prev, nextModel ?? model!, patch), nextModel ?? model!)
-      : prev
+    setDraft((prev) =>
+      prev && (nextModel ?? model)
+        ? syncReferenceQuote(
+            updateGeneratorState(prev, nextModel ?? model!, patch),
+            nextModel ?? model!
+          )
+        : prev
     );
   }
 
@@ -239,28 +344,31 @@ export function GeneratorForm({
 
   function setModel(modelId: string) {
     if (busy || mediaReadLock.current || submitLock.current) return;
-    const next = models.find(item => item.id === modelId);
+    const next = models.find((item) => item.id === modelId);
     if (!next) return;
     setUploadError('');
     setPageError('');
     setPriceChange(null);
     setRetryAttempt(null);
-    setDraft(prev => prev
-      ? syncReferenceQuote(normalizeGeneratorState(prev, next), next)
-      : createGeneratorState(next)
+    setDraft((prev) =>
+      prev
+        ? syncReferenceQuote(normalizeGeneratorState(prev, next), next)
+        : createGeneratorState(next)
     );
   }
 
   async function onFiles(slot: MediaSlot, files: File[]) {
-    if (!spec || !form || busy || mediaReadLock.current || submitLock.current) return;
+    if (!spec || !form || busy || mediaReadLock.current || submitLock.current)
+      return;
     const rule = spec.slots[slot];
     if (!rule) return;
     const available = rule.max - slotUrls(form.inputs, slot).length;
     if (available <= 0) return;
     const accepted = files.slice(0, available);
-    const invalid = accepted.find(file =>
-      !rule.accept.includes(file.type) ||
-      (rule.maxBytes !== undefined && file.size > rule.maxBytes)
+    const invalid = accepted.find(
+      (file) =>
+        !rule.accept.includes(file.type) ||
+        (rule.maxBytes !== undefined && file.size > rule.maxBytes)
     );
     if (invalid) {
       setUploadError('Unsupported file type or size: ' + invalid.name);
@@ -277,8 +385,10 @@ export function GeneratorForm({
         urls.push(url);
         if (slot === 'referenceVideos' || slot === 'referenceAudio') {
           const seconds = await mediaDurationFromBlobUrl(url, slot);
-          if ((rule.minSeconds !== undefined && seconds < rule.minSeconds) ||
-              (rule.maxSeconds !== undefined && seconds > rule.maxSeconds)) {
+          if (
+            (rule.minSeconds !== undefined && seconds < rule.minSeconds) ||
+            (rule.maxSeconds !== undefined && seconds > rule.maxSeconds)
+          ) {
             throw new Error('Reference media duration exceeds model limits');
           }
           durations.set(url, seconds);
@@ -287,14 +397,18 @@ export function GeneratorForm({
       // Validate combined durations before adding the files to the form.
       if (slot === 'referenceVideos') {
         referenceVideoBillableSeconds([
-          ...form.inputs.referenceVideos.map(url => mediaDurations.current.get(url) ?? NaN),
-          ...urls.map(url => durations.get(url) ?? NaN),
+          ...form.inputs.referenceVideos.map(
+            (url) => mediaDurations.current.get(url) ?? NaN
+          ),
+          ...urls.map((url) => durations.get(url) ?? NaN),
         ]);
       }
       if (slot === 'referenceAudio') {
         assertReferenceAudioDuration([
-          ...form.inputs.referenceAudio.map(url => mediaDurations.current.get(url) ?? NaN),
-          ...urls.map(url => durations.get(url) ?? NaN),
+          ...form.inputs.referenceAudio.map(
+            (url) => mediaDurations.current.get(url) ?? NaN
+          ),
+          ...urls.map((url) => durations.get(url) ?? NaN),
         ]);
       }
       for (let i = 0; i < urls.length; i++) {
@@ -307,7 +421,7 @@ export function GeneratorForm({
       setPageError('');
       setPriceChange(null);
       setRetryAttempt(null);
-      setDraft(prev => {
+      setDraft((prev) => {
         if (!prev) return null;
         const inputs = { ...prev.inputs };
         if (slot === 'startFrame' || slot === 'endFrame') {
@@ -315,11 +429,18 @@ export function GeneratorForm({
         } else {
           inputs[slot] = [...inputs[slot], ...urls];
         }
-        return syncReferenceQuote(updateGeneratorState(prev, model!, { inputs }), model!);
+        return syncReferenceQuote(
+          updateGeneratorState(prev, model!, { inputs }),
+          model!
+        );
       });
     } catch (error) {
       for (const url of urls) URL.revokeObjectURL(url);
-      setUploadError(error instanceof Error ? error.message : 'Could not read the uploaded media');
+      setUploadError(
+        error instanceof Error
+          ? error.message
+          : 'Could not read the uploaded media'
+      );
     } finally {
       mediaReadLock.current = false;
       setMediaBusy(false);
@@ -333,31 +454,39 @@ export function GeneratorForm({
         ...form!.inputs,
         ...(slot === 'startFrame' || slot === 'endFrame'
           ? { [slot]: null }
-          : { [slot]: slotUrls(form!.inputs, slot).filter(x => x !== url) }),
+          : { [slot]: slotUrls(form!.inputs, slot).filter((x) => x !== url) }),
       },
     });
   }
 
   async function uploadAssets(state: GeneratorState, generationId: string) {
     const inputs: GeneratorInputs = {
-      startFrame: null, endFrame: null,
-      referenceImages: [], referenceVideos: [], referenceAudio: [],
+      startFrame: null,
+      endFrame: null,
+      referenceImages: [],
+      referenceVideos: [],
+      referenceAudio: [],
     };
     let lastUploadDescriptorAt = 0;
     for (const slot of INPUT_SLOTS) {
       const uploaded: string[] = [];
       for (const url of slotUrls(state.inputs, slot)) {
         const file = localFiles.current.get(url);
-        if (!file) throw new Error('Reference media is missing. Please upload it again.');
+        if (!file)
+          throw new Error(
+            'Reference media is missing. Please upload it again.'
+          );
         // The upload preflight API rate-limits per user/path; space rapid
         // multi-image uploads while retaining retryable signed uploads.
         const gap = 360 - (Date.now() - lastUploadDescriptorAt);
-        if (gap > 0) await new Promise(resolve => setTimeout(resolve, gap));
+        if (gap > 0) await new Promise((resolve) => setTimeout(resolve, gap));
         const descriptor = await apiPost<UploadDescriptor>(
-          '/api/generator/upload-url', {
+          '/api/generator/upload-url',
+          {
             modelId: state.modelId,
             workflow: state.workflow,
-            slot, generationId,
+            slot,
+            generationId,
             contentType: file.type,
             contentLength: file.size,
           }
@@ -370,33 +499,53 @@ export function GeneratorForm({
         });
         uploaded.push(descriptor.storageKey);
       }
-      if (slot === 'startFrame' || slot === 'endFrame') inputs[slot] = uploaded[0] ?? null;
+      if (slot === 'startFrame' || slot === 'endFrame')
+        inputs[slot] = uploaded[0] ?? null;
       else inputs[slot] = uploaded;
     }
     return { ...state, inputs };
   }
 
-  async function submitGeneration(generationId: string, state: GeneratorState, credits: number, pricingVersion: string) {
+  async function submitGeneration(
+    generationId: string,
+    state: GeneratorState,
+    credits: number,
+    pricingVersion: string
+  ) {
     setStage('Submitting generation...');
     return apiPost<JobInfo>('/api/generator/generate', {
-      generationId, state, pricingVersion, maxAcceptedCredits: credits,
+      generationId,
+      state,
+      pricingVersion,
+      maxAcceptedCredits: credits,
     });
   }
 
-  function handleSubmitError(error: unknown, generationId: string, uploadedState: GeneratorState) {
-    if (error instanceof ApiError && error.data &&
-        typeof error.data === 'object') {
+  function handleSubmitError(
+    error: unknown,
+    generationId: string,
+    uploadedState: GeneratorState
+  ) {
+    if (
+      error instanceof ApiError &&
+      error.data &&
+      typeof error.data === 'object'
+    ) {
       const details = error.data as Record<string, unknown>;
-      if (details.code === 'PRICE_CHANGED' &&
-          typeof details.credits === 'number' &&
-          typeof details.pricingVersion === 'string') {
+      if (
+        details.code === 'PRICE_CHANGED' &&
+        typeof details.credits === 'number' &&
+        typeof details.pricingVersion === 'string'
+      ) {
         setPriceChange({
           credits: details.credits,
           pricingVersion: details.pricingVersion,
           generationId,
           uploadedState,
         });
-        setPageError('The price has changed. Review and confirm the updated credits below.');
+        setPageError(
+          'The price has changed. Review and confirm the updated credits below.'
+        );
         return;
       }
       if (details.code === 'INSUFFICIENT_CREDITS') {
@@ -408,11 +557,14 @@ export function GeneratorForm({
   }
 
   async function onGenerate() {
-    if (!form || !model || !quote || busy || mediaBusy || submitLock.current) return;
+    if (!form || !model || !quote || busy || mediaBusy || submitLock.current)
+      return;
     try {
       assertGeneratorReady(form, model);
     } catch (error) {
-      setPageError(error instanceof Error ? error.message : 'Please check your inputs');
+      setPageError(
+        error instanceof Error ? error.message : 'Please check your inputs'
+      );
       return;
     }
     submitLock.current = true;
@@ -438,7 +590,8 @@ export function GeneratorForm({
         });
       }
       const response = await submitGeneration(
-        generationId, uploadedState,
+        generationId,
+        uploadedState,
         attempt?.credits ?? quote.credits,
         attempt?.pricingVersion ?? quote.pricingVersion
       );
@@ -471,7 +624,11 @@ export function GeneratorForm({
       setRetryAttempt(null);
       setStage('');
     } catch (error) {
-      handleSubmitError(error, priceChange.generationId, priceChange.uploadedState);
+      handleSubmitError(
+        error,
+        priceChange.generationId,
+        priceChange.uploadedState
+      );
       setStage('');
     } finally {
       submitLock.current = false;
@@ -481,195 +638,338 @@ export function GeneratorForm({
 
   if (!model || !form || !spec) {
     return (
-      <div className="bg-card rounded-2xl border p-6 text-center sm:p-10">
-        <AlertCircle className="text-muted-foreground mx-auto mb-3 size-6" />
-        <h2 className="font-semibold">Generator integration in progress</h2>
-        <p className="text-muted-foreground mt-2 text-sm">
+      <div className="rounded-[22px] border border-[rgba(20,17,18,0.086)] bg-white p-6 text-center shadow-[0_24px_60px_-18px_rgba(24,14,16,0.09),0_6px_18px_-6px_rgba(24,14,16,0.04)] sm:p-10">
+        <AlertCircle className="mx-auto mb-3 size-6 text-[rgba(18,15,16,0.45)]" />
+        <h2 className="font-semibold text-[rgb(18,15,16)]">
+          Generator integration in progress
+        </h2>
+        <p className="mt-2 text-sm text-[rgba(18,15,16,0.55)]">
           No generation models are available for this media type.
         </p>
       </div>
     );
   }
 
-  const canSubmit = model.enabled && !!form.prompt.trim() && !!quote && !busy && !mediaBusy;
-  return (
-    <section className="bg-card rounded-2xl border p-4 sm:p-6">
-      <nav aria-label="Generator type" className="mb-5 flex gap-2">
-        <a
-          href="/ai-image-generator"
-          aria-current={mediaType === 'image' ? 'page' : undefined}
-          className={'rounded-lg border px-4 py-2 text-sm ' +
-            (mediaType === 'image' ? 'border-primary bg-primary/10 font-semibold' : 'text-muted-foreground')}
-        >AI Image</a>
-        <a
-          href="/ai-video-generator"
-          aria-current={mediaType === 'video' ? 'page' : undefined}
-          className={'rounded-lg border px-4 py-2 text-sm ' +
-            (mediaType === 'video' ? 'border-primary bg-primary/10 font-semibold' : 'text-muted-foreground')}
-        >AI Video</a>
-      </nav>
+  const canSubmit =
+    model.enabled && !!form.prompt.trim() && !!quote && !busy && !mediaBusy;
+  const activeSlots = INPUT_SLOTS.filter((slot) => !!spec.slots[slot]);
+  const workflows = Object.keys(model.workflows) as Workflow[];
+  const settingsFields = [
+    ...SETTINGS_FIELD_KEYS.filter((key) => {
+      const field = spec.fields[key];
+      return !!field && !field.internal;
+    }).map((name) => {
+      const field = spec.fields[name]!;
+      return {
+        name,
+        label: field.label,
+        values: fieldValues(field),
+        kind: name as 'aspectRatio' | 'duration' | 'resolution' | 'outputCount',
+      };
+    }),
+    ...Object.entries(spec.fields)
+      .filter(
+        ([name, field]) =>
+          !field.internal &&
+          typeof field.default !== 'boolean' &&
+          !(SETTINGS_FIELD_KEYS as readonly string[]).includes(name) &&
+          name !== 'promptExpansionMode' &&
+          fieldValues(field).length > 0
+      )
+      .sort(([left], [right]) => {
+        const l = FIELD_ORDER.indexOf(left);
+        const r = FIELD_ORDER.indexOf(right);
+        return (l < 0 ? 100 : l) - (r < 0 ? 100 : r);
+      })
+      .map(([name, field]) => ({
+        name,
+        label: field.label,
+        values: fieldValues(field),
+        kind: 'other' as const,
+      })),
+  ].filter((field) => field.values.length > 0);
+  const hasGenerateAudio =
+    !!spec.fields.generateAudio && !spec.fields.generateAudio.internal;
+  const hasFastMode = !!spec.fields.fastMode && !spec.fields.fastMode.internal;
+  const hasPromptExpansion =
+    !!spec.fields.promptExpansionMode &&
+    !spec.fields.promptExpansionMode.internal;
+  const showEnhance = hasPromptExpansion;
+  const showFast = hasFastMode || hasPromptExpansion;
+  const enhanceOn =
+    hasPromptExpansion && form.params.promptExpansionMode !== 'disabled';
+  const fastOn = hasFastMode
+    ? form.params.fastMode === true
+    : form.params.promptExpansionMode === 'fast';
+  const creditLabel = model.enabled && quote ? quote.credits : 0;
+  const isStartEnd =
+    activeSlots.includes('startFrame') && activeSlots.includes('endFrame');
 
-      <div className="grid gap-7 lg:grid-cols-[minmax(0,1.25fr)_minmax(320px,1fr)]">
-        <div className="space-y-5">
-          {Object.keys(model.workflows).length > 1 ? (
-            <div className="flex flex-wrap gap-2" role="group" aria-label="Generation mode">
-              {(Object.keys(model.workflows) as Workflow[]).map(workflow => (
-                <button key={workflow} type="button" onClick={() => setWorkflow(workflow)}
-                  aria-pressed={workflow === form.workflow}
-                  className={'rounded-xl border px-3 py-2 text-sm font-medium transition ' +
-                    (workflow === form.workflow
-                      ? 'border-primary bg-primary/10 text-foreground'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-muted')}>
-                  {model.workflows[workflow]?.label ?? workflow}
-                </button>
-              ))}
-            </div>
+  function onEnhanceChange(checked: boolean) {
+    if (!hasPromptExpansion) return;
+    if (!checked) {
+      setParam('promptExpansionMode', 'disabled');
+      return;
+    }
+    setParam('promptExpansionMode', 'balanced');
+  }
+
+  function onFastChange(checked: boolean) {
+    if (hasFastMode) {
+      setParam('fastMode', checked);
+      return;
+    }
+    if (!hasPromptExpansion) return;
+    setParam(
+      'promptExpansionMode',
+      checked ? 'fast' : enhanceOn ? 'balanced' : 'disabled'
+    );
+  }
+
+  return (
+    <div className="mx-auto w-full max-w-[1128px]">
+      <section
+        className="relative z-10 overflow-visible rounded-[22px] border border-[rgba(20,17,18,0.086)] bg-white px-2 pt-0.5 pb-2 text-[rgb(18,15,16)] shadow-[0_24px_60px_-18px_rgba(24,14,16,0.09),0_6px_18px_-6px_rgba(24,14,16,0.04)]"
+        style={{ ['--composer-accent' as string]: COMPOSER_ACCENT }}
+      >
+        {/* Header: Image / Video tabs + AI Enhance */}
+        <div className="flex items-center justify-between gap-3 px-1">
+          <nav aria-label="Generator type" className="flex items-stretch gap-1">
+            <a
+              href="/ai-image-generator"
+              aria-current={mediaType === 'image' ? 'page' : undefined}
+              className={cn(
+                'relative inline-flex h-11 items-center gap-2 px-1 text-sm font-medium transition',
+                mediaType === 'image'
+                  ? 'text-[rgb(18,15,16)] after:absolute after:right-0 after:bottom-0 after:left-0 after:h-0.5 after:rounded-full after:bg-[var(--composer-accent,#b04845)]'
+                  : 'text-[rgb(102,92,95)] hover:text-[rgb(18,15,16)]'
+              )}
+            >
+              <ImageIcon className="size-4 opacity-80" strokeWidth={1.75} />
+              Image
+            </a>
+            <a
+              href="/photo-to-video"
+              aria-current={mediaType === 'video' ? 'page' : undefined}
+              className={cn(
+                'relative inline-flex h-11 items-center gap-2 px-1 text-sm font-medium transition',
+                mediaType === 'video'
+                  ? 'text-[rgb(18,15,16)] after:absolute after:right-0 after:bottom-0 after:left-0 after:h-0.5 after:rounded-full after:bg-[var(--composer-accent,#b04845)]'
+                  : 'text-[rgb(102,92,95)] hover:text-[rgb(18,15,16)]'
+              )}
+            >
+              <Clapperboard className="size-4 opacity-80" strokeWidth={1.75} />
+              Video
+              {mediaType === 'video' ? (
+                <span className="-ms-1 mt-1.5 self-start rounded bg-[var(--composer-accent,#b04845)] px-1 py-0.5 text-[9px] font-bold tracking-wide text-white uppercase">
+                  Free
+                </span>
+              ) : null}
+            </a>
+          </nav>
+
+          {showEnhance ? (
+            <label className="flex cursor-pointer items-center gap-2 text-sm text-[rgba(18,15,16,0.78)]">
+              <span className="hidden sm:inline">AI Enhance</span>
+              <Switch
+                size="sm"
+                checked={!!enhanceOn}
+                onCheckedChange={onEnhanceChange}
+                aria-label="AI Enhance"
+                className={accentSwitchClass}
+              />
+            </label>
+          ) : null}
+        </div>
+
+        {/* Body: reference + prompt */}
+        <div className="mt-1 flex flex-col gap-3 px-1 sm:flex-row sm:items-stretch">
+          {activeSlots.length > 0 ? (
+            <ComposerFrameSlots showArrow={isStartEnd}>
+              {activeSlots.map((slot) => {
+                const limit = spec.slots[slot]!;
+                const emptyLabel =
+                  form.workflow === 'first-frame' && slot === 'startFrame'
+                    ? 'Reference Optional'
+                    : slot === 'startFrame' || slot === 'endFrame'
+                      ? SLOT_LABELS[slot]
+                      : limit.min === 0
+                        ? 'Reference Optional'
+                        : SLOT_LABELS[slot];
+                return (
+                  <MediaUploader
+                    key={slot}
+                    variant="composer"
+                    optional={emptyLabel === 'Reference Optional'}
+                    label={emptyLabel}
+                    urls={slotUrls(form.inputs, slot)}
+                    max={limit.max}
+                    accept={limit.accept}
+                    onFiles={(files) => onFiles(slot, files)}
+                    onRemove={(url) => removeFile(slot, url)}
+                  />
+                );
+              })}
+            </ComposerFrameSlots>
           ) : null}
 
-          {INPUT_SLOTS.filter(slot => !!spec.slots[slot]).map(slot => {
-            const limit = spec.slots[slot]!;
-            return (
-              <MediaUploader key={slot} label={SLOT_LABELS[slot]}
-                urls={slotUrls(form.inputs, slot)}
-                max={limit.max} accept={limit.accept}
-                onFiles={files => onFiles(slot, files)}
-                onRemove={url => removeFile(slot, url)}
-              />
-            );
-          })}
-          {mediaBusy ? <p className="text-muted-foreground text-xs">Reading media duration for accurate credits...</p> : null}
-          {uploadError ? <p role="alert" className="text-destructive text-xs">{uploadError}</p> : null}
-
-          <div className="space-y-2">
-            <div className="flex items-center justify-between gap-3">
-              <label htmlFor="generator-prompt" className="text-sm font-semibold">Prompt</label>
-              <span className="text-muted-foreground text-xs">{form.prompt.length} / {model.maxPromptChars ?? 50000}</span>
-            </div>
-            <textarea id="generator-prompt" rows={7} maxLength={model.maxPromptChars ?? 50000}
-              placeholder={'Describe the ' + mediaType + ' you want to create...'}
+          <div className="relative min-h-[96px] min-w-0 flex-1">
+            <label htmlFor="generator-prompt" className="sr-only">
+              Prompt
+            </label>
+            <textarea
+              id="generator-prompt"
+              rows={4}
+              maxLength={model.maxPromptChars ?? 50000}
+              placeholder={
+                'Describe the ' + mediaType + ' you want to generate...'
+              }
               value={form.prompt}
-              onChange={event => mutate({ prompt: event.target.value })}
-              className="bg-background placeholder:text-muted-foreground focus-visible:ring-ring/40 min-h-36 w-full resize-y rounded-xl border p-3 text-sm outline-none focus-visible:ring-2"
+              onChange={(event) => mutate({ prompt: event.target.value })}
+              className="h-full min-h-[96px] w-full resize-none border-0 bg-transparent p-0 text-sm leading-6 text-[rgb(18,15,16)] outline-none placeholder:px-0.5 placeholder:text-[rgba(18,15,16,0.38)] focus-visible:ring-0"
             />
           </div>
         </div>
 
-        <div className="space-y-5">
-          <div className="space-y-2">
-            <label htmlFor="generator-model" className="text-sm font-semibold">Model</label>
-            <select id="generator-model" className="bg-background w-full rounded-xl border p-3 text-sm"
-              value={model.id} onChange={event => setModel(event.target.value)}>
-              {models.map(item => <option key={item.id} value={item.id}>{item.name}{!item.enabled ? ' · Preview only' : ''}</option>)}
-            </select>
+        {mediaBusy ? (
+          <p className="px-1 pt-1 text-xs text-[rgba(18,15,16,0.55)]">
+            Reading media duration for accurate credits...
+          </p>
+        ) : null}
+        {uploadError ? (
+          <p role="alert" className="px-1 pt-1 text-xs text-red-600">
+            {uploadError}
+          </p>
+        ) : null}
+
+        {/* Toolbar */}
+        <div className="mt-1.5 flex flex-col gap-2 px-1 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 sm:gap-2">
+            <ComposerToolbar
+              models={models}
+              model={model}
+              workflow={form.workflow}
+              workflows={workflows}
+              params={form.params}
+              settingsFields={settingsFields}
+              hasGenerateAudio={hasGenerateAudio}
+              showFast={showFast}
+              fastOn={!!fastOn}
+              onSelectModel={setModel}
+              onSelectWorkflow={setWorkflow}
+              onSetParam={setParam}
+              onFastChange={onFastChange}
+            />
+            {!!spec.fields.webSearch && !spec.fields.webSearch.internal ? (
+              <label className="inline-flex h-7 cursor-pointer items-center gap-2 rounded-full bg-[rgba(20,17,18,0.043)] px-2 text-[12px] font-medium text-[rgba(18,15,16,0.85)]">
+                <span>Web Search</span>
+                <Switch
+                  size="sm"
+                  checked={form.params.webSearch === true}
+                  onCheckedChange={(checked) => setParam('webSearch', checked)}
+                  aria-label="Web Search"
+                  className={accentSwitchClass}
+                />
+              </label>
+            ) : null}
           </div>
 
-          {Object.entries(spec.fields)
-            .filter(([, field]) => !field.internal)
-            .sort(([left], [right]) => {
-              const l = FIELD_ORDER.indexOf(left), r = FIELD_ORDER.indexOf(right);
-              return (l < 0 ? 100 : l) - (r < 0 ? 100 : r);
-            })
-            .map(([name, field]) => {
-              const current = form.params[name];
-              if (typeof field.default === 'boolean') return (
-                <label key={name} className="bg-muted/40 flex cursor-pointer items-center justify-between rounded-xl border p-3">
-                  <span className="text-sm font-medium">{field.label}</span>
-                  <input type="checkbox" checked={current === true}
-                    onChange={event => setParam(name, event.target.checked)}
-                    className="accent-primary size-4" />
-                </label>
-              );
-              const values = field.options ?? [];
-              return (
-                <div key={name} className="space-y-2">
-                  <label className="text-sm font-semibold">{field.label}</label>
-                  {values.length ? (
-                    <div className="flex flex-wrap gap-2">
-                      {values.map(value => (
-                        <button key={String(value)} type="button" aria-pressed={current === value}
-                          onClick={() => setParam(name, value)}
-                          className={'min-w-16 rounded-xl border px-3 py-2 text-sm transition ' +
-                            (current === value
-                              ? 'border-primary bg-primary/10 text-foreground font-semibold'
-                              : 'text-muted-foreground hover:bg-muted')}>
-                          {name === 'duration' ? String(value) + 's' : String(value)}
-                        </button>
-                      ))}
-                    </div>
-                  ) : typeof field.default === 'number' ? (
-                    <div className="flex items-center gap-3">
-                      <input type="range" min={field.min} max={field.max}
-                        step={field.step ?? 1} value={Number(current)}
-                        onChange={event => setParam(name, Number(event.target.value))}
-                        className="accent-primary min-w-0 flex-1" />
-                      <span className="bg-muted min-w-14 rounded-lg border px-2 py-1 text-center text-sm tabular-nums">
-                        {name === 'duration' ? String(current) + 's' : String(current)}
-                      </span>
-                    </div>
-                  ) : null}
-                </div>
-              );
-            })}
-
-          <div className="bg-muted/40 space-y-3 rounded-xl border p-4">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <span className="block text-sm font-medium">Credits</span>
-                {quote?.precision === 'estimate' ? (
-                  <span className="text-muted-foreground text-xs">Estimated</span>
-                ) : null}
-              </div>
-              <span className="text-2xl font-bold tabular-nums">{model.enabled && quote ? quote.credits : '—'}</span>
-            </div>
-            <button type="button" disabled={!canSubmit} onClick={onGenerate}
-              className="bg-primary text-primary-foreground disabled:opacity-50 flex w-full items-center justify-center gap-2 rounded-xl px-5 py-3 font-semibold">
-              {busy ? <LoaderCircle className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
-              {busy ? stage || 'Working...' : !model.enabled ? 'Preview only · Model unavailable' : retryAttempt ? 'Retry existing generation' : 'Generate · ' + (quote?.credits ?? '—') + ' Credits'}
-            </button>
+          <div className="flex shrink-0 items-center gap-2 sm:ml-auto">
             {priceChange ? (
-              <button type="button" disabled={busy} onClick={onConfirmPrice}
-                className="flex w-full items-center justify-center rounded-xl border border-primary px-4 py-3 text-sm font-semibold">
-                Confirm updated price · {priceChange.credits} Credits
+              <button
+                type="button"
+                disabled={busy}
+                onClick={onConfirmPrice}
+                className="h-8 rounded-full border border-[var(--composer-accent,#b04845)] px-3 text-xs font-semibold text-[var(--composer-accent,#b04845)]"
+              >
+                Confirm · {priceChange.credits}
               </button>
             ) : null}
-            {pageError ? <p role="alert" className="text-destructive text-xs">{pageError}</p> : null}
-            <p className="text-muted-foreground text-center text-xs">
-              {model.enabled
-                ? 'Credits are checked and reserved by the server before generation.'
-                : 'The workflow is shown for development preview. Its pricing or provider limits are not verified yet.'}
-            </p>
+            <button
+              type="button"
+              disabled={!canSubmit}
+              onClick={onGenerate}
+              className={cn(
+                'relative inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-full px-3.5 text-sm font-semibold tracking-wide transition-[transform,opacity,background-color,color] duration-150 active:scale-95 sm:w-auto',
+                canSubmit
+                  ? 'bg-[var(--composer-accent,#b04845)] text-white hover:brightness-95'
+                  : 'cursor-not-allowed bg-[rgba(20,17,18,0.07)] text-[rgba(20,17,18,0.34)]'
+              )}
+            >
+              {busy ? <LoaderCircle className="size-3.5 animate-spin" /> : null}
+              <span>
+                {busy
+                  ? stage || 'Working...'
+                  : !model.enabled
+                    ? 'Preview only'
+                    : retryAttempt
+                      ? 'Retry'
+                      : 'Generate'}
+              </span>
+              {!busy && model.enabled ? (
+                <span className="inline-flex items-center gap-0.5 tabular-nums opacity-90">
+                  <Coins className="size-3.5" />
+                  {creditLabel}
+                </span>
+              ) : null}
+            </button>
           </div>
         </div>
-      </div>
+
+        {pageError ? (
+          <p role="alert" className="px-1 pt-2 text-xs text-red-600">
+            {pageError}
+          </p>
+        ) : null}
+      </section>
 
       {job ? (
-        <div className="mt-7 space-y-4 rounded-xl border p-4 sm:p-5">
+        <div className="mt-5 space-y-4 rounded-[18px] border border-[rgba(20,17,18,0.086)] bg-white p-4 shadow-[0_12px_32px_-16px_rgba(24,14,16,0.08)] sm:p-5">
           <div className="flex items-center justify-between gap-3">
             <h2 className="font-semibold">Latest generation</h2>
-            <span className="text-muted-foreground text-xs">{job.generationId.slice(0, 8)}</span>
+            <span className="text-xs text-[rgba(18,15,16,0.45)]">
+              {job.generationId.slice(0, 8)}
+            </span>
           </div>
           {job.status === 'processing' ? (
-            <p className="text-muted-foreground flex items-center gap-2 text-sm">
+            <p className="flex items-center gap-2 text-sm text-[rgba(18,15,16,0.55)]">
               <LoaderCircle className="size-4 animate-spin" />
-              Generating and saving your {mediaType}... You can also follow it in My Creations.
+              Generating and saving your {mediaType}... You can also follow it
+              in My Creations.
             </p>
           ) : job.status === 'completed' ? (
             <div className="space-y-3">
               <p className="flex items-center gap-2 text-sm">
-                <CheckCircle2 className="size-4 text-green-600" /> Generation completed
+                <CheckCircle2 className="size-4 text-green-600" /> Generation
+                completed
               </p>
               <div className="grid gap-3 sm:grid-cols-2">
                 {job.resultUrls.map((url, index) => (
-                  <div key={url} className="overflow-hidden rounded-xl border">
+                  <div
+                    key={url}
+                    className="overflow-hidden rounded-xl border border-[rgba(20,17,18,0.086)]"
+                  >
                     {mediaType === 'video' ? (
-                      <video controls playsInline preload="metadata" src={url}
-                        className="aspect-video w-full bg-black object-contain" />
+                      <video
+                        controls
+                        playsInline
+                        preload="metadata"
+                        src={url}
+                        className="aspect-video w-full bg-black object-contain"
+                      />
                     ) : (
-                      <img src={url} alt={'Generated image ' + (index + 1)}
-                        className="aspect-video w-full bg-muted object-contain" />
+                      <img
+                        src={url}
+                        alt={'Generated image ' + (index + 1)}
+                        className="aspect-video w-full bg-[rgba(20,17,18,0.04)] object-contain"
+                      />
                     )}
-                    <a href={url + (url.includes('?') ? '&' : '?') + 'download=1'}
-                      className="flex items-center justify-center gap-2 p-3 text-sm font-medium hover:underline">
+                    <a
+                      href={
+                        url + (url.includes('?') ? '&' : '?') + 'download=1'
+                      }
+                      className="flex items-center justify-center gap-2 p-3 text-sm font-medium hover:underline"
+                    >
                       <Download className="size-4" /> Download
                     </a>
                   </div>
@@ -684,9 +984,14 @@ export function GeneratorForm({
               {job.error ? ' ' + job.error : ''}
             </p>
           )}
-          <a href="/creations" className="text-primary text-sm underline">View My Creations</a>
+          <a
+            href="/creations"
+            className="text-sm font-medium text-[var(--composer-accent,#b04845)] underline"
+          >
+            View My Creations
+          </a>
         </div>
       ) : null}
-    </section>
+    </div>
   );
 }
