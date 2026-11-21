@@ -13,7 +13,7 @@ import {
   listGeneratorModels,
 } from '@/modules/generator/catalog';
 import {
-  availableGeneratorFieldValues,
+  getGeneratorSettingChoices,
   filterGeneratorLocalMedia,
   getGeneratorExpansionControls,
   generatorReadinessError,
@@ -74,29 +74,6 @@ const SETTINGS_FIELD_KEYS = [
 const COMPOSER_ACCENT = '#b04845';
 const accentSwitchClass =
   'data-checked:bg-[#b04845] data-unchecked:bg-[rgba(20,17,18,0.14)] h-4 w-7 data-[size=default]:h-4 data-[size=default]:w-7';
-
-function fieldValues(field: {
-  options?: readonly FieldValue[];
-  default: FieldValue;
-  min?: number;
-  max?: number;
-  step?: number;
-}): FieldValue[] {
-  if (field.options?.length) return [...field.options];
-  if (
-    typeof field.default === 'number' &&
-    field.min !== undefined &&
-    field.max !== undefined
-  ) {
-    const step = field.step ?? 1;
-    const values: number[] = [];
-    for (let value = field.min; value <= field.max + 1e-9; value += step) {
-      values.push(Number(value.toFixed(6)));
-    }
-    return values;
-  }
-  return [];
-}
 
 const SLOT_LABELS: Record<MediaSlot, string> = {
   startFrame: 'Start Frame',
@@ -746,12 +723,7 @@ export function GeneratorForm({
       return {
         name,
         label: field.label,
-        values: availableGeneratorFieldValues(
-          spec,
-          form.params,
-          name,
-          fieldValues(field)
-        ),
+        values: getGeneratorSettingChoices(spec, form.params, name),
         kind: name as 'aspectRatio' | 'duration' | 'resolution' | 'outputCount',
       };
     }),
@@ -761,7 +733,7 @@ export function GeneratorForm({
           !field.internal &&
           typeof field.default !== 'boolean' &&
           !(SETTINGS_FIELD_KEYS as readonly string[]).includes(name) &&
-          fieldValues(field).length > 0
+          getGeneratorSettingChoices(spec, form.params, name).length > 0
       )
       .sort(([left], [right]) => {
         const l = FIELD_ORDER.indexOf(left);
@@ -771,12 +743,7 @@ export function GeneratorForm({
       .map(([name, field]) => ({
         name,
         label: field.label,
-        values: availableGeneratorFieldValues(
-          spec,
-          form.params,
-          name,
-          fieldValues(field)
-        ),
+        values: getGeneratorSettingChoices(spec, form.params, name),
         kind: 'other' as const,
       })),
   ].filter((field) => field.values.length > 0);
