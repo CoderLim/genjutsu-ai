@@ -60,6 +60,47 @@ const NANO_BASE_FIELDS = {
   },
 } as const;
 
+const NANO_NEW_ASPECTS = [
+  'auto', '21:9', '16:9', '3:2', '4:3', '5:4', '1:1', '4:5',
+  '3:4', '2:3', '9:16', '4:1', '1:4', '8:1', '1:8',
+] as const;
+
+const NANO_21_FIELDS = {
+  ...NANO_BASE_FIELDS,
+  aspectRatio: {
+    label: 'Aspect Ratio', default: 'auto', options: NANO_NEW_ASPECTS,
+  },
+} as const;
+
+const NANO_LITE_FIELDS = {
+  aspectRatio: {
+    label: 'Aspect Ratio', default: 'auto', options: NANO_NEW_ASPECTS,
+  },
+  outputCount: {
+    label: 'Outputs', default: 1, options: [1, 2, 3, 4],
+  },
+  outputFormat: {
+    label: 'Format', default: 'png', options: ['png', 'jpeg', 'webp'],
+  },
+} as const;
+
+function nanoVariantWorkflows(
+  fields: typeof NANO_21_FIELDS | typeof NANO_LITE_FIELDS
+) {
+  return {
+    'text-to-image': {
+      label: 'Text to Image', slots: {}, fields: { ...fields },
+    },
+    'image-to-image': {
+      label: 'Image Edit',
+      slots: {
+        referenceImages: { min: 1, max: 14, accept: IMAGE_MIME, maxBytes: 12 * 1048576 },
+      },
+      fields: { ...fields },
+    },
+  } as const;
+}
+
 function nanoWorkflows() {
   return {
     'text-to-image': {
@@ -229,6 +270,39 @@ export const GENERATOR_MODELS: readonly GeneratorModel[] = [
         },
       },
     },
+  },
+  {
+    id: 'nano-banana-2.1',
+    name: 'Nano Banana 2.1',
+    mediaType: 'image',
+    enabled: true,
+    defaultWorkflow: 'text-to-image',
+    // Conservative customer tariff for token-billed fal image output.
+    // Reconcile with real account charges before production rollout.
+    pricing: {
+      version: '2026-11-21-nano21-v1',
+      precision: 'exact',
+      rule: { kind: 'matrix', fields: ['resolution'],
+        creditsByCombination: { '1K': 12, '2K': 20, '4K': 42 } },
+      includedReferenceImages: 1,
+      extraReferenceImageCredits: 5,
+    },
+    workflows: nanoVariantWorkflows(NANO_21_FIELDS),
+  },
+  {
+    id: 'nano-banana-2-lite',
+    name: 'Nano Banana 2 Lite',
+    mediaType: 'image',
+    enabled: true,
+    defaultWorkflow: 'text-to-image',
+    pricing: {
+      version: '2026-11-21-nano-lite-v1',
+      precision: 'exact',
+      rule: { kind: 'fixed', credits: 11 },
+      includedReferenceImages: 1,
+      extraReferenceImageCredits: 4,
+    },
+    workflows: nanoVariantWorkflows(NANO_LITE_FIELDS),
   },
   {
     id: 'nano-banana-2',
