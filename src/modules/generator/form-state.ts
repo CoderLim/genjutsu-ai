@@ -99,6 +99,29 @@ export function planGeneratorMixedReferenceFiles(
   return planned;
 }
 
+/**
+ * Short, stacked labels for the unified upload tile. Match the competitor's
+ * presentation, but derive truthful limits from the currently selected model.
+ * Unsupported media types are omitted, never shown as zero capacity.
+ */
+export function getGeneratorMixedReferenceTileLines(spec: WorkflowSpec): string[] {
+  const lines: string[] = [];
+  const images = spec.slots.referenceImages;
+  if (images) lines.push('Max ' + images.max + ' img');
+
+  const audio = spec.slots.referenceAudio;
+  if (audio) lines.push(audio.maxTotalSeconds !== undefined
+    ? audio.maxTotalSeconds + 's audio'
+    : 'Max ' + audio.max + ' audio');
+
+  const video = spec.slots.referenceVideos;
+  if (video) lines.push(video.maxTotalSeconds !== undefined
+    ? video.maxTotalSeconds + 's video'
+    : 'Max ' + video.max + ' video');
+
+  return lines;
+}
+
 /** Human-readable limits come from the selected workflow, never a hardcoded competitor value. */
 export function describeGeneratorMixedReferences(spec: WorkflowSpec): string {
   const labels: string[] = [];
