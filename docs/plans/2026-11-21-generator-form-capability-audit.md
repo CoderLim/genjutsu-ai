@@ -51,11 +51,31 @@ Extra settings: sound only for configured sound-capable models; image-to-video a
 
 ## Image model variants
 
+### Unified image composer (Raphael-style optional references)
+
+The Image tab **does not show a Text to Image / Image Edit dropdown**. Models with
+both provider endpoints always show one optional `Reference` upload tile, with
+the model-specific maximum image count. Leaving it empty keeps the text-to-image
+endpoint; uploading one or more references routes to the **same selected model's**
+image-edit endpoint. Removing the last reference returns to text-to-image.
+Neither the prompt nor settings must be reset. The server chooses and stores the
+specific provider endpoint using the sealed reference inputs, so quotes,
+submission, polling and old explicit edit task snapshots stay aligned.
+
+The updated default `text-to-image` workflow carries an optional
+`referenceImages: {min: 0, max: N}` slot. Legacy explicit
+`image-to-image` remains supported internally for old tasks, and still requires
+at least one reference. FLUX.2 Flash now also has a real Fal text endpoint
+(`fal-ai/flux-2/flash`) as well as `/edit`; it no longer starts with a
+mandatory upload. **FLUX.1 Schnell is an exception:** its available Redux
+reference API does not accept the prompt needed for editing, so it remains
+text-only and does not present a misleading image-edit upload tile.
+
 | Family | Models in menu | Main per-model settings |
 | --- | --- | --- |
 | Nano Banana | **2.1, 2 Lite, 2, Pro** | 2.1: 1K/2K/4K, text/edit, up to 14 reference images. Lite: **fixed 1K**, text/edit, up to 14 reference images, no `resolution` API field. 2/Pro: existing 1K/2K/4K text/edit profiles |
 | MiniMax | H3 Image, H3 Image Highspeed | 1K/2K/4K, text/edit, up to 16 reference images |
-| FLUX | FLUX.1 Schnell, FLUX.2 Flash | Schnell text image; Flash edit; respective output and input caps |
+| FLUX | FLUX.1 Schnell, FLUX.2 Flash | Schnell text-only (no prompt-based reference edit); Flash: optional up to 4 image refs, text/edit API auto-selected |
 
 New Nano Banana 2.1 and Lite use `google/nano-banana-2.1[/edit]` and `google/nano-banana-lite[/edit]`. Both are token-billed by Fal, so the provisional customer credits and per-reference surcharges require **actual Fal invoice checks before production**. Do not present these product tariffs as exact upstream costs.
 
