@@ -167,7 +167,8 @@ export const GENERATOR_MODELS: readonly GeneratorModel[] = [
     workflows: {
       'all-in-one-reference': {
         label: 'All-in-One Reference',
-        requiresAnyReference: true,
+        // References are optional: without any uploaded media, the composer
+        // routes this intent to text-to-video instead.
         maxCombinedReferences: 12,
         slots: {
           referenceImages: { min: 0, max: 9, accept: IMAGE_MIME, maxBytes: 12 * 1048576 },
