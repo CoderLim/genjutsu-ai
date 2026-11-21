@@ -24,6 +24,7 @@ import type {
   Workflow,
 } from '@/modules/generator/types';
 import { cn } from '@/lib/utils';
+import { getGeneratorModelFamilyId, groupGeneratorModels } from '@/modules/generator/model-families';
 import { Switch } from '@/components/ui/switch';
 
 const ACCENT = '#b04845';
@@ -34,14 +35,6 @@ const accentSwitchClass =
 
 type OpenPanel = 'model' | 'settings' | 'workflow' | null;
 
-type ModelFamily = {
-  id: string;
-  label: string;
-  blurb: string;
-  badge?: string;
-  models: GeneratorModel[];
-};
-
 function shortModelName(name: string) {
   return name.replace(/\s*·\s*.*$/, '').trim();
 }
@@ -49,56 +42,6 @@ function shortModelName(name: string) {
 function modelTitleParts(name: string) {
   const [brand, ...rest] = name.split(/\s*·\s*/);
   return { brand: brand?.trim() || name, variant: rest.join(' · ').trim() };
-}
-
-function modelFamilyId(model: GeneratorModel) {
-  const workflows = model.workflows ?? {};
-  if (model.mediaType === 'image') return 'image-tools';
-  if (workflows['first-frame'] || workflows['start-end'])
-    return 'photo-to-video';
-  if (workflows['all-in-one-reference'] || workflows['reference-to-video']) {
-    return 'reference-video';
-  }
-  if (workflows['text-to-video']) return 'text-to-video';
-  return 'video-tools';
-}
-
-function familyMeta(
-  id: string
-): Pick<ModelFamily, 'label' | 'blurb' | 'badge'> {
-  switch (id) {
-    case 'photo-to-video':
-      return {
-        label: 'Photo to Video',
-        blurb: 'Animate photos and guide keyframes',
-      };
-    case 'text-to-video':
-      return { label: 'Text to Video', blurb: 'Create video from a prompt' };
-    case 'reference-video':
-      return {
-        label: 'Reference Video',
-        blurb: 'Combine images and motion references',
-      };
-    case 'image-tools':
-      return { label: 'AI Image', blurb: 'Generate and edit images' };
-    default:
-      return { label: 'Video Tools', blurb: 'Video generation workflows' };
-  }
-}
-
-function groupModels(models: GeneratorModel[]): ModelFamily[] {
-  const map = new Map<string, GeneratorModel[]>();
-  for (const model of models) {
-    const id = modelFamilyId(model);
-    const list = map.get(id) ?? [];
-    list.push(model);
-    map.set(id, list);
-  }
-  return [...map.entries()].map(([id, familyModels]) => ({
-    id,
-    ...familyMeta(id),
-    models: familyModels,
-  }));
 }
 
 /** Selected chip elevation — shared by aspect tiles and segmented options. */
@@ -314,7 +257,7 @@ function modelBlurb(model: GeneratorModel) {
   if (slots.referenceImages && slots.referenceVideos)
     return 'Multimodal references with audio options';
   if (slots.referenceImages) return 'Multi-image reference control';
-  if (Object.keys(slots).length === 0) return 'Text-to-video generation';
+  if (Object.keys(slots).length === 0) return model.mediaType === 'image' ? 'Create an image from a text prompt' : 'Create a video from a text prompt';
   return 'Generation model';
 }
 
@@ -361,8 +304,8 @@ export function ComposerToolbar({
   onSetParam: (name: string, value: FieldValue) => void;
   onFastChange: (checked: boolean) => void;
 }) {
-  const families = useMemo(() => groupModels(models), [models]);
-  const currentFamilyId = modelFamilyId(model);
+  const families = useMemo(() => groupGeneratorModels(models), [models]);
+  const currentFamilyId = getGeneratorModelFamilyId(model.id);
   const [open, setOpen] = useState<OpenPanel>(null);
   const [familyId, setFamilyId] = useState(currentFamilyId);
 

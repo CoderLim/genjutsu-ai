@@ -213,19 +213,23 @@ export function GeneratorForm({
     setMediaType(initialMediaType);
   }, [initialMediaType]);
 
-  const models = useMemo(
-    () =>
-      import.meta.env.DEV
-        ? GENERATOR_MODELS.filter((item) => item.mediaType === mediaType)
-        : listGeneratorModels(mediaType),
-    [mediaType]
+  // The model menu spans both media types. Selecting a model also switches the
+  // Image/Video tab; workflow is independent, not a sidebar model category.
+  const allModels = useMemo(
+    () => import.meta.env.DEV ? [...GENERATOR_MODELS] : listGeneratorModels(),
+    []
   );
-  const preferredModel = useMemo(
-    () => models.find((item) => item.id === initialModelId) ?? models[0],
-    [initialModelId, models]
+  const initialModel = useMemo(
+    () => allModels.find(item => item.id === initialModelId &&
+      item.mediaType === initialMediaType) ??
+      allModels.find(item => item.id === (
+        initialMediaType === 'image' ? 'nano-banana-2' : 'photo-to-video-standard'
+      )) ??
+      allModels.find(item => item.mediaType === initialMediaType),
+    [allModels, initialMediaType, initialModelId]
   );
   const [draft, setDraft] = useState<GeneratorState | null>(() =>
-    preferredModel ? createGeneratorState(preferredModel) : null
+    initialModel ? createGeneratorState(initialModel) : null
   );
   const [uploadError, setUploadError] = useState('');
   const [pageError, setPageError] = useState('');
@@ -243,7 +247,7 @@ export function GeneratorForm({
   const localFiles = useRef(new Map<string, File>());
 
   const model =
-    models.find((item) => item.id === draft?.modelId) ?? preferredModel;
+    allModels.find((item) => item.id === draft?.modelId) ?? initialModel;
   const form =
     model && draft?.modelId === model.id
       ? draft
@@ -251,12 +255,15 @@ export function GeneratorForm({
         ? createGeneratorState(model)
         : null;
 
+  // Only URL-provided defaults reset the form. Internal model switches must
+  // not be overwritten by an effect watching the selected media tab.
   useEffect(() => {
-    setDraft(preferredModel ? createGeneratorState(preferredModel) : null);
+    setMediaType(initialMediaType);
+    setDraft(initialModel ? createGeneratorState(initialModel) : null);
     setPageError('');
     setPriceChange(null);
     setRetryAttempt(null);
-  }, [preferredModel]);
+  }, [initialMediaType, initialModel]);
 
   // Revoke stale blob URLs as soon as a model/workflow switch drops the asset.
   useEffect(() => {
@@ -360,12 +367,13 @@ export function GeneratorForm({
 
   function setModel(modelId: string) {
     if (busy || mediaReadLock.current || submitLock.current) return;
-    const next = models.find((item) => item.id === modelId);
+    const next = allModels.find((item) => item.id === modelId);
     if (!next) return;
     setUploadError('');
     setPageError('');
     setPriceChange(null);
     setRetryAttempt(null);
+    setMediaType(next.mediaType);
     setDraft((prev) =>
       prev
         ? syncReferenceQuote(normalizeGeneratorState(prev, next), next)
@@ -799,11 +807,10 @@ export function GeneratorForm({
                       mediaType === type
                     )
                       return;
-                    setMediaType(type);
-                    setUploadError('');
-                    setPageError('');
-                    setPriceChange(null);
-                    setRetryAttempt(null);
+                    const next = allModels.find(item => item.id ===
+                      (type === 'image' ? 'nano-banana-2' : 'photo-to-video-standard')) ??
+                      allModels.find(item => item.mediaType === type);
+                    if (next) setModel(next.id);
                   }}
                   className={cn(
                     'relative inline-flex h-11 items-center gap-2 px-1 text-sm font-medium transition disabled:opacity-50',
@@ -896,7 +903,7 @@ export function GeneratorForm({
         <div className="mt-1.5 flex flex-col gap-2 px-1 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 sm:gap-2">
             <ComposerToolbar
-              models={models}
+              models={allModels}
               model={model}
               workflow={form.workflow}
               workflows={workflows}
