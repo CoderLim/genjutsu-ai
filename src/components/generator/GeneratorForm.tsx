@@ -14,19 +14,19 @@ import {
   listGeneratorModels,
 } from '@/modules/generator/catalog';
 import {
+  availableGeneratorFieldValues,
+  generatorReadinessError,
+  getGeneratorSlotCapacity,
+  isGeneratorJobActive,
+  isGeneratorSlotOptional,
+  shouldPollGeneratorJob,
+} from '@/modules/generator/form-state';
+import {
   createGeneratorState,
   normalizeGeneratorState,
   updateGeneratorState,
 } from '@/modules/generator/normalize';
 import { calculateGeneratorCredits } from '@/modules/generator/pricing';
-import {
-  availableGeneratorFieldValues,
-  generatorReadinessError,
-  getGeneratorSlotCapacity,
-  isGeneratorSlotOptional,
-  isGeneratorJobActive,
-  shouldPollGeneratorJob,
-} from '@/modules/generator/form-state';
 import {
   assertReferenceAudioDuration,
   referenceVideoBillableSeconds,
@@ -201,12 +201,18 @@ function mediaDurationFromBlobUrl(
 }
 
 export function GeneratorForm({
-  mediaType,
+  mediaType: initialMediaType,
   initialModelId,
 }: {
   mediaType: MediaType;
   initialModelId?: string;
 }) {
+  // Image / Video tabs switch inside the composer — no route navigation.
+  const [mediaType, setMediaType] = useState<MediaType>(initialMediaType);
+  useEffect(() => {
+    setMediaType(initialMediaType);
+  }, [initialMediaType]);
+
   const models = useMemo(
     () =>
       import.meta.env.DEV
@@ -570,8 +576,15 @@ export function GeneratorForm({
   }
 
   async function onGenerate() {
-    if (!form || !model || !quote || busy || mediaBusy || submitLock.current ||
-      isGeneratorJobActive(job))
+    if (
+      !form ||
+      !model ||
+      !quote ||
+      busy ||
+      mediaBusy ||
+      submitLock.current ||
+      isGeneratorJobActive(job)
+    )
       return;
     try {
       assertGeneratorReady(form, model);
@@ -767,32 +780,43 @@ export function GeneratorForm({
         {/* Header: Image / Video tabs + AI Enhance */}
         <div className="flex items-center justify-between gap-3 px-1">
           <nav aria-label="Generator type" className="flex items-stretch gap-1">
-            <a
-              href="/ai-image-generator"
-              aria-current={mediaType === 'image' ? 'page' : undefined}
-              className={cn(
-                'relative inline-flex h-11 items-center gap-2 px-1 text-sm font-medium transition',
-                mediaType === 'image'
-                  ? 'text-[rgb(18,15,16)] after:absolute after:right-0 after:bottom-0 after:left-0 after:h-0.5 after:rounded-full after:bg-[var(--composer-accent,#b04845)]'
-                  : 'text-[rgb(102,92,95)] hover:text-[rgb(18,15,16)]'
-              )}
-            >
-              <ImageIcon className="size-4 opacity-80" strokeWidth={1.75} />
-              Image
-            </a>
-            <a
-              href="/photo-to-video"
-              aria-current={mediaType === 'video' ? 'page' : undefined}
-              className={cn(
-                'relative inline-flex h-11 items-center gap-2 px-1 text-sm font-medium transition',
-                mediaType === 'video'
-                  ? 'text-[rgb(18,15,16)] after:absolute after:right-0 after:bottom-0 after:left-0 after:h-0.5 after:rounded-full after:bg-[var(--composer-accent,#b04845)]'
-                  : 'text-[rgb(102,92,95)] hover:text-[rgb(18,15,16)]'
-              )}
-            >
-              <Clapperboard className="size-4 opacity-80" strokeWidth={1.75} />
-              Video
-            </a>
+            {[
+              { type: 'image' as const, label: 'Image', Icon: ImageIcon },
+              { type: 'video' as const, label: 'Video', Icon: Clapperboard },
+            ].map(({ type, label, Icon }) => {
+              const active = mediaType === type;
+              return (
+                <button
+                  key={type}
+                  type="button"
+                  aria-pressed={active}
+                  disabled={busy || mediaBusy || submitLock.current}
+                  onClick={() => {
+                    if (
+                      busy ||
+                      mediaBusy ||
+                      submitLock.current ||
+                      mediaType === type
+                    )
+                      return;
+                    setMediaType(type);
+                    setUploadError('');
+                    setPageError('');
+                    setPriceChange(null);
+                    setRetryAttempt(null);
+                  }}
+                  className={cn(
+                    'relative inline-flex h-11 items-center gap-2 px-1 text-sm font-medium transition disabled:opacity-50',
+                    active
+                      ? 'text-[rgb(18,15,16)] after:absolute after:right-0 after:bottom-0 after:left-0 after:h-0.5 after:rounded-full after:bg-[var(--composer-accent,#b04845)]'
+                      : 'text-[rgb(102,92,95)] hover:text-[rgb(18,15,16)]'
+                  )}
+                >
+                  <Icon className="size-4 opacity-80" strokeWidth={1.75} />
+                  {label}
+                </button>
+              );
+            })}
           </nav>
 
           {showEnhance ? (
@@ -817,7 +841,11 @@ export function GeneratorForm({
                 const limit = spec.slots[slot]!;
                 const optional = isGeneratorSlotOptional(spec, slot);
                 const emptyLabel = SLOT_LABELS[slot];
-                const capacity = getGeneratorSlotCapacity(spec, form.inputs, slot);
+                const capacity = getGeneratorSlotCapacity(
+                  spec,
+                  form.inputs,
+                  slot
+                );
                 return (
                   <MediaUploader
                     key={slot}

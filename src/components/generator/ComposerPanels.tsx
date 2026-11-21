@@ -52,12 +52,14 @@ function modelTitleParts(name: string) {
 }
 
 function modelFamilyId(model: GeneratorModel) {
+  const workflows = model.workflows ?? {};
   if (model.mediaType === 'image') return 'image-tools';
-  if (model.workflows['first-frame'] || model.workflows['start-end'])
+  if (workflows['first-frame'] || workflows['start-end'])
     return 'photo-to-video';
-  if (model.workflows['all-in-one-reference'] || model.workflows['reference-to-video'])
+  if (workflows['all-in-one-reference'] || workflows['reference-to-video']) {
     return 'reference-video';
-  if (model.workflows['text-to-video']) return 'text-to-video';
+  }
+  if (workflows['text-to-video']) return 'text-to-video';
   return 'video-tools';
 }
 
@@ -66,11 +68,17 @@ function familyMeta(
 ): Pick<ModelFamily, 'label' | 'blurb' | 'badge'> {
   switch (id) {
     case 'photo-to-video':
-      return { label: 'Photo to Video', blurb: 'Animate photos and guide keyframes' };
+      return {
+        label: 'Photo to Video',
+        blurb: 'Animate photos and guide keyframes',
+      };
     case 'text-to-video':
       return { label: 'Text to Video', blurb: 'Create video from a prompt' };
     case 'reference-video':
-      return { label: 'Reference Video', blurb: 'Combine images and motion references' };
+      return {
+        label: 'Reference Video',
+        blurb: 'Combine images and motion references',
+      };
     case 'image-tools':
       return { label: 'AI Image', blurb: 'Generate and edit images' };
     default:
@@ -93,6 +101,40 @@ function groupModels(models: GeneratorModel[]): ModelFamily[] {
   }));
 }
 
+/** Selected chip elevation — shared by aspect tiles and segmented options. */
+const selectedChipShadow =
+  'shadow-[0_2px_8px_rgba(24,14,16,0.08),0_0_0_1px_rgba(20,17,18,0.06)]';
+
+function fieldDisplayLabel(name: string, fallback: string) {
+  switch (name) {
+    case 'aspectRatio':
+      return 'Aspect Ratio';
+    case 'outputCount':
+      return 'Output Number';
+    case 'resolution':
+      return 'Resolution';
+    case 'outputFormat':
+      return 'Output Format';
+    case 'duration':
+      return 'Video Length';
+    case 'quality':
+      return 'Quality';
+    default:
+      return fallback;
+  }
+}
+
+function formatFieldValue(name: string, value: FieldValue) {
+  if (name === 'duration') return String(value) + 's';
+  if (name === 'outputFormat') {
+    const raw = String(value).toLowerCase();
+    if (raw === 'jpeg' || raw === 'jpg') return 'JPG';
+    if (raw === 'png') return 'PNG';
+    if (raw === 'webp') return 'WebP';
+  }
+  return String(value);
+}
+
 function AspectRatioGlyph({
   ratio,
   active,
@@ -103,14 +145,14 @@ function AspectRatioGlyph({
   const [w, h] = ratio.split(':').map(Number);
   const safeW = Number.isFinite(w) && w > 0 ? w : 1;
   const safeH = Number.isFinite(h) && h > 0 ? h : 1;
-  const max = 22;
+  const max = 14;
   const scale = max / Math.max(safeW, safeH);
-  const width = Math.max(8, Math.round(safeW * scale));
-  const height = Math.max(8, Math.round(safeH * scale));
+  const width = Math.max(7, Math.round(safeW * scale));
+  const height = Math.max(7, Math.round(safeH * scale));
   return (
     <span
       className={cn(
-        'block rounded-[3px] border-2',
+        'block rounded-[2px] border-[1.5px]',
         active ? 'border-[rgb(18,15,16)]' : 'border-[rgba(18,15,16,0.35)]'
       )}
       style={{ width, height }}
@@ -118,39 +160,97 @@ function AspectRatioGlyph({
   );
 }
 
-function SegmentedTrack({
+/**
+ * Shared Raphael-style segmented control.
+ * Used for Output Number, Resolution, Output Format, Video Length, Quality —
+ * identical chrome in Image and Video modes.
+ */
+function ComposerSegmentedField({
+  label,
   values,
   current,
   format,
   onSelect,
 }: {
+  label: string;
   values: FieldValue[];
   current: FieldValue;
-  format: (value: FieldValue) => string;
+  format?: (value: FieldValue) => string;
   onSelect: (value: FieldValue) => void;
 }) {
   return (
-    <div className="flex flex-wrap gap-0.5 rounded-2xl bg-[rgba(20,17,18,0.06)] p-0.5">
-      {values.map((value) => {
-        const active = current === value;
-        return (
-          <button
-            key={String(value)}
-            type="button"
-            aria-pressed={active}
-            onClick={() => onSelect(value)}
-            className={cn(
-              'min-w-9 rounded-full px-2.5 py-1.5 text-xs font-medium transition',
-              active
-                ? 'bg-white text-[rgb(18,15,16)] shadow-[0_1px_2px_rgba(20,17,18,0.12)] ring-1 ring-[rgba(20,17,18,0.06)]'
-                : 'text-[rgba(18,15,16,0.65)] hover:text-[rgb(18,15,16)]'
-            )}
-          >
-            {format(value)}
-          </button>
-        );
-      })}
-    </div>
+    <section className="p-0.5">
+      <div className="mb-0.5 px-1 text-[10px] font-medium text-[rgb(102,92,95)]">
+        {label}
+      </div>
+      <div className="flex flex-wrap gap-0.5 rounded-[11px] bg-[rgb(245,243,243)] p-0.5">
+        {values.map((value) => {
+          const active = current === value;
+          return (
+            <button
+              key={String(value)}
+              type="button"
+              aria-pressed={active}
+              onClick={() => onSelect(value)}
+              className={cn(
+                'min-h-8 min-w-9 flex-1 rounded-[9px] px-2.5 text-xs font-medium transition-all duration-200',
+                active
+                  ? cn('bg-white text-[rgb(18,15,16)]', selectedChipShadow)
+                  : 'bg-transparent text-[rgba(18,15,16,0.65)] hover:text-[rgb(18,15,16)]'
+              )}
+            >
+              {format ? format(value) : String(value)}
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+/** Shared Raphael-style aspect ratio glyph grid. */
+function ComposerAspectRatioField({
+  label,
+  values,
+  current,
+  onSelect,
+}: {
+  label: string;
+  values: FieldValue[];
+  current: FieldValue;
+  onSelect: (value: FieldValue) => void;
+}) {
+  return (
+    <section className="p-0.5">
+      <div className="mb-0.5 px-1 text-[10px] font-medium text-[rgb(102,92,95)]">
+        {label}
+      </div>
+      <div className="grid grid-cols-5 gap-0.5 sm:grid-cols-6">
+        {values.map((value) => {
+          const active = current === value;
+          const ratio = String(value);
+          return (
+            <button
+              key={ratio}
+              type="button"
+              aria-pressed={active}
+              onClick={() => onSelect(value)}
+              className={cn(
+                'flex h-9 flex-col items-center justify-center gap-0.5 rounded-[10px] border border-transparent px-1 transition-all duration-200',
+                active
+                  ? cn('bg-white', selectedChipShadow)
+                  : 'bg-transparent hover:bg-[rgba(20,17,18,0.04)]'
+              )}
+            >
+              <AspectRatioGlyph ratio={ratio} active={active} />
+              <span className="text-[10px] font-medium text-[rgba(18,15,16,0.75)]">
+                {ratio}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
@@ -196,7 +296,7 @@ function PanelShell({
       ref={ref}
       role="dialog"
       className={cn(
-        'absolute bottom-[calc(100%+10px)] left-0 z-[80] overflow-hidden rounded-2xl border border-[rgba(20,17,18,0.08)] bg-white shadow-[0_18px_48px_-18px_rgba(24,14,16,0.28),0_4px_14px_-6px_rgba(24,14,16,0.12)]',
+        'animate-in fade-in slide-in-from-bottom-1 absolute bottom-full left-0 z-[80] mb-2 overflow-hidden rounded-[20px] border border-[rgba(20,17,18,0.08)] bg-white shadow-[0_18px_48px_-18px_rgba(24,14,16,0.28),0_4px_14px_-6px_rgba(24,14,16,0.12)] duration-200',
         className
       )}
     >
@@ -432,7 +532,7 @@ export function ComposerToolbar({
             type="button"
             data-composer-trigger="settings"
             aria-expanded={open === 'settings'}
-            aria-label="Video settings"
+            aria-label="Settings"
             onClick={() => toggle('settings')}
             className={cn(pillClass, 'gap-0 px-1')}
           >
@@ -444,6 +544,15 @@ export function ComposerToolbar({
                 />
                 <span>{String(params[aspectField.name] ?? '')}</span>
               </span>
+            ) : null}
+            {outputField ? (
+              <>
+                <span className="h-3.5 w-px bg-[rgba(20,17,18,0.12)]" />
+                <span className="inline-flex items-center gap-1 px-1.5">
+                  <LayoutGrid className="size-3 opacity-70" />
+                  {String(params[outputField.name])}
+                </span>
+              </>
             ) : null}
             {durationField ? (
               <>
@@ -462,124 +571,95 @@ export function ComposerToolbar({
                 </span>
               </>
             ) : null}
-            {outputField ? (
-              <>
-                <span className="h-3.5 w-px bg-[rgba(20,17,18,0.12)]" />
-                <span className="inline-flex items-center gap-1 px-1.5">
-                  <LayoutGrid className="size-3 opacity-70" />
-                  {String(params[outputField.name])}
-                  {open === 'settings' ? (
-                    <ChevronUp className="size-3 opacity-60" />
-                  ) : (
-                    <ChevronDown className="size-3 opacity-60" />
-                  )}
-                </span>
-              </>
-            ) : (
-              <span className="px-1.5">
-                {open === 'settings' ? (
-                  <ChevronUp className="size-3.5 opacity-60" />
-                ) : (
-                  <ChevronDown className="size-3.5 opacity-60" />
-                )}
-              </span>
-            )}
+            <span className="px-1.5">
+              {open === 'settings' ? (
+                <ChevronUp className="size-3.5 opacity-60" />
+              ) : (
+                <ChevronDown className="size-3.5 opacity-60" />
+              )}
+            </span>
           </button>
           <PanelShell
             open={open === 'settings'}
             onClose={() => setOpen(null)}
-            className="w-[min(92vw,340px)] p-3.5"
+            className="w-[min(calc(100vw-2rem),392px)] p-1.5"
           >
-            {aspectField ? (
-              <div className="mb-3.5">
-                <p className="mb-2 text-xs text-[rgba(18,15,16,0.5)]">
-                  {aspectField.label}
-                </p>
-                <div className="flex flex-wrap gap-1.5">
-                  {aspectField.values.map((value) => {
-                    const active = params[aspectField.name] === value;
-                    return (
-                      <button
-                        key={String(value)}
-                        type="button"
-                        aria-pressed={active}
-                        onClick={() => onSetParam(aspectField.name, value)}
-                        className={cn(
-                          'flex min-w-[52px] flex-col items-center gap-1.5 rounded-xl px-2 py-2 transition',
-                          active
-                            ? 'bg-white shadow-[0_1px_3px_rgba(20,17,18,0.14)] ring-1 ring-[rgba(20,17,18,0.12)]'
-                            : 'bg-[rgba(20,17,18,0.04)] hover:bg-[rgba(20,17,18,0.07)]'
-                        )}
-                      >
-                        <AspectRatioGlyph
-                          ratio={String(value)}
-                          active={active}
-                        />
-                        <span className="text-[11px] font-medium text-[rgba(18,15,16,0.75)]">
-                          {String(value)}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            ) : null}
-
-            {durationField ? (
-              <div className="mb-3.5">
-                <p className="mb-2 text-xs text-[rgba(18,15,16,0.5)]">
-                  Video Length
-                </p>
-                <SegmentedTrack
-                  values={durationField.values}
-                  current={params[durationField.name]}
-                  format={(value) => String(value) + 's'}
-                  onSelect={(value) => onSetParam(durationField.name, value)}
+            <div className="space-y-0">
+              {aspectField ? (
+                <ComposerAspectRatioField
+                  label={fieldDisplayLabel(aspectField.name, aspectField.label)}
+                  values={aspectField.values}
+                  current={params[aspectField.name]}
+                  onSelect={(value) => onSetParam(aspectField.name, value)}
                 />
-              </div>
-            ) : null}
+              ) : null}
 
-            {resolutionField ? (
-              <div className="mb-3.5">
-                <p className="mb-2 text-xs text-[rgba(18,15,16,0.5)]">
-                  Resolution
-                </p>
-                <SegmentedTrack
-                  values={resolutionField.values}
-                  current={params[resolutionField.name]}
-                  format={(value) => String(value)}
-                  onSelect={(value) => onSetParam(resolutionField.name, value)}
-                />
-              </div>
-            ) : null}
-
-            {outputField ? (
-              <div className={otherFields.length ? 'mb-3.5' : undefined}>
-                <p className="mb-2 text-xs text-[rgba(18,15,16,0.5)]">
-                  Output Count
-                </p>
-                <SegmentedTrack
+              {/*
+                Shared ComposerSegmentedField chrome for both modes.
+                Image order: Output Number → Resolution → Format
+                Video order: Video Length → Resolution → Output Number
+              */}
+              {!durationField && outputField ? (
+                <ComposerSegmentedField
+                  label={fieldDisplayLabel(outputField.name, outputField.label)}
                   values={outputField.values}
                   current={params[outputField.name]}
-                  format={(value) => String(value)}
+                  format={(value) => formatFieldValue(outputField.name, value)}
                   onSelect={(value) => onSetParam(outputField.name, value)}
                 />
-              </div>
-            ) : null}
+              ) : null}
 
-            {otherFields.map((field) => (
-              <div key={field.name} className="mb-3 last:mb-0">
-                <p className="mb-2 text-xs text-[rgba(18,15,16,0.5)]">
-                  {field.label}
-                </p>
-                <SegmentedTrack
+              {durationField ? (
+                <ComposerSegmentedField
+                  label={fieldDisplayLabel(
+                    durationField.name,
+                    durationField.label
+                  )}
+                  values={durationField.values}
+                  current={params[durationField.name]}
+                  format={(value) =>
+                    formatFieldValue(durationField.name, value)
+                  }
+                  onSelect={(value) => onSetParam(durationField.name, value)}
+                />
+              ) : null}
+
+              {resolutionField ? (
+                <ComposerSegmentedField
+                  label={fieldDisplayLabel(
+                    resolutionField.name,
+                    resolutionField.label
+                  )}
+                  values={resolutionField.values}
+                  current={params[resolutionField.name]}
+                  format={(value) =>
+                    formatFieldValue(resolutionField.name, value)
+                  }
+                  onSelect={(value) => onSetParam(resolutionField.name, value)}
+                />
+              ) : null}
+
+              {durationField && outputField ? (
+                <ComposerSegmentedField
+                  label={fieldDisplayLabel(outputField.name, outputField.label)}
+                  values={outputField.values}
+                  current={params[outputField.name]}
+                  format={(value) => formatFieldValue(outputField.name, value)}
+                  onSelect={(value) => onSetParam(outputField.name, value)}
+                />
+              ) : null}
+
+              {otherFields.map((field) => (
+                <ComposerSegmentedField
+                  key={field.name}
+                  label={fieldDisplayLabel(field.name, field.label)}
                   values={field.values}
                   current={params[field.name]}
-                  format={(value) => String(value)}
+                  format={(value) => formatFieldValue(field.name, value)}
                   onSelect={(value) => onSetParam(field.name, value)}
                 />
-              </div>
-            ))}
+              ))}
+            </div>
           </PanelShell>
         </div>
       ) : null}
