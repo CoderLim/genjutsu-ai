@@ -4,6 +4,7 @@
  * Keep this browser-safe: the server independently reads sealed media lengths.
  */
 export function referenceVideoBillableSeconds(seconds: number[]): number {
+  if (seconds.length === 0) return 0;
   if (seconds.length > 3) throw new Error('Maximum 3 reference videos');
   let total = 0;
   for (const value of seconds) {
