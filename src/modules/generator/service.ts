@@ -2,6 +2,7 @@ import { scanPromptWithWaffo } from '@/core/content-safety/waffo-scan';
 import { getAllConfigs } from '@/modules/config/service';
 
 import {
+  assertGeneratorProviderConfigured,
   buildGeneratorProviderRequest,
   classifyGeneratorSubmitError,
   getGeneratorProviderIdentity,
@@ -191,6 +192,9 @@ export async function generateWithGenerator(input: {
   if (task) {
     assertGeneratorTaskSignature(task, requestedSignature);
   } else {
+    // A missing/invalid provider configuration cannot have accepted a job:
+    // reject before sealing files or debiting the user's balance.
+    await assertGeneratorProviderConfigured(state.modelId);
     if (!Number.isSafeInteger(input.maxAcceptedCredits) || input.maxAcceptedCredits < 0) {
       throw new Error('Invalid maximum accepted credits');
     }

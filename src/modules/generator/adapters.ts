@@ -76,6 +76,16 @@ async function getFal() {
   return new FalProvider({ apiKey: key });
 }
 
+/** Fail before reserving credits if the provider is unavailable. */
+export async function assertGeneratorProviderConfigured(modelId: string): Promise<void> {
+  const identity = getGeneratorProviderIdentity(modelId);
+  if (identity.provider === 'wavespeed') {
+    await assertWavespeedConfigured();
+    return;
+  }
+  await getFal();
+}
+
 export type MediaReadUrls = {
   startFrame?: string;
   endFrame?: string;

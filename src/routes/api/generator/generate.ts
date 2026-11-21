@@ -15,7 +15,7 @@ import { respData, respErr, respJson } from '@/lib/resp';
 
 async function POST({ request }: { request: Request }) {
   const limited = enforceMinIntervalRateLimit(request, {
-    intervalMs: 1000, keyPrefix: 'generator-generate',
+    intervalMs: 300, keyPrefix: 'generator-generate',
   });
   if (limited) return limited;
   try {
