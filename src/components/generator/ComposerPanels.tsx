@@ -477,20 +477,20 @@ export function ComposerToolbar({
                           {highlights.description}
                         </span>
                         <span className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-[rgba(18,15,16,0.58)]">
-                      {highlights.startingCredits !== null ? (
-                        <span className="inline-flex items-center gap-1 whitespace-nowrap">
-                          <Coins className="size-3.5" />
-                          From {highlights.startingCredits} credits
-                        </span>
-                      ) : !item.enabled ? (
-                        <span>Preview · Pricing pending</span>
-                      ) : null}
-                      {highlights.capability ? (
-                        <span className="inline-flex items-center gap-1 whitespace-nowrap">
-                          <Monitor className="size-3.5" />
-                          {highlights.capability}
-                        </span>
-                      ) : null}
+                          {highlights.startingCredits !== null ? (
+                            <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                              <Coins className="size-3.5" />
+                              From {highlights.startingCredits} credits
+                            </span>
+                          ) : !item.enabled ? (
+                            <span>Preview · Pricing pending</span>
+                          ) : null}
+                          {highlights.capability ? (
+                            <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                              <Monitor className="size-3.5" />
+                              {highlights.capability}
+                            </span>
+                          ) : null}
                           {highlights.maxDuration !== null ? (
                             <span className="inline-flex items-center gap-1 whitespace-nowrap">
                               <Clock3 className="size-3.5" />
