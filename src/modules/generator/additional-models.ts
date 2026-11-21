@@ -62,7 +62,7 @@ function videoFields(options: VideoOptions): Record<string, FieldSpec> {
     },
     aspectRatio: {
       label: 'Aspect Ratio',
-      default: ratios[0],
+      default: ratios[0] ?? '16:9',
       options: ratios,
     },
     outputCount: { label: 'Outputs', default: 1, options: [1] },
