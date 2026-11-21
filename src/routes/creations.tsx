@@ -70,6 +70,8 @@ const sleep = (ms: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 const PROCESSING_STATUSES = new Set([
+  'processing',
+  'review',
   'initiated',
   'sealing',
   'ready',
@@ -113,6 +115,7 @@ function sceneLabel(generation: Pick<Generation, 'scene' | 'mode'>) {
 function statusLabel(status: string) {
   if (status === 'completed') return m['creations.status.completed']();
   if (
+    status === 'failed' ||
     status === 'refunded' ||
     status === 'failed_preflight' ||
     status === 'insufficient_credits'
@@ -128,6 +131,7 @@ function statusLabel(status: string) {
 function statusVariant(status: string) {
   if (status === 'completed') return 'default' as const;
   if (
+    status === 'failed' ||
     status === 'refunded' ||
     status === 'failed_preflight' ||
     status === 'insufficient_credits'
@@ -292,6 +296,7 @@ function GenerationCard({
 }) {
   const completed = generation.status === 'completed' && generation.videoUrl;
   const failed =
+    generation.status === 'failed' ||
     generation.status === 'refunded' ||
     generation.status === 'failed_preflight' ||
     generation.status === 'insufficient_credits';
