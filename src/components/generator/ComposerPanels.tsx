@@ -272,12 +272,14 @@ function PanelShell({
   onClose,
   anchorRef,
   className,
+  scrollMode = 'outer',
   children,
 }: {
   open: boolean;
   onClose: () => void;
   anchorRef: RefObject<HTMLButtonElement | null>;
   className?: string;
+  scrollMode?: 'outer' | 'inner';
   children: ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -333,6 +335,23 @@ function PanelShell({
     };
   }, [open, anchorRef]);
 
+  // While a composer popover is open, wheel/touch scrolling must never
+  // leak through to the underlying page (including at a column boundary).
+  // Restore the original inline values exactly when it closes.
+  useEffect(() => {
+    if (!open) return;
+    const root = document.documentElement;
+    const body = document.body;
+    const previousRootOverflow = root.style.overflow;
+    const previousBodyOverflow = body.style.overflow;
+    root.style.overflow = 'hidden';
+    body.style.overflow = 'hidden';
+    return () => {
+      root.style.overflow = previousRootOverflow;
+      body.style.overflow = previousBodyOverflow;
+    };
+  }, [open]);
+
   useEffect(() => {
     if (!open) return;
     function onPointerDown(event: MouseEvent) {
@@ -370,7 +389,8 @@ function PanelShell({
       role="dialog"
       style={panelStyle}
       className={cn(
-        'animate-in fade-in slide-in-from-bottom-1 fixed z-[9999] overflow-y-auto rounded-[20px] border border-[rgba(20,17,18,0.08)] bg-white shadow-[0_18px_48px_-18px_rgba(24,14,16,0.28),0_4px_14px_-6px_rgba(24,14,16,0.12)] duration-200',
+        'animate-in fade-in slide-in-from-bottom-1 fixed z-[9999] overscroll-contain rounded-[20px] border border-[rgba(20,17,18,0.08)] bg-white shadow-[0_18px_48px_-18px_rgba(24,14,16,0.28),0_4px_14px_-6px_rgba(24,14,16,0.12)] duration-200',
+        scrollMode === 'inner' ? 'overflow-hidden' : 'overflow-y-auto',
         className
       )}
     >
@@ -480,13 +500,14 @@ export function ComposerToolbar({
           open={open === 'model'}
           anchorRef={modelTriggerRef}
           onClose={() => setOpen(null)}
+          scrollMode="inner"
           className="w-[min(94vw,640px)]"
         >
           <div
-            className="grid min-h-0 grid-cols-[124px_minmax(0,1fr)] sm:grid-cols-[184px_minmax(0,1fr)]"
-            style={{ maxHeight: 'min(440px, var(--composer-panel-max-height))' }}
+            className="grid min-h-0 grid-cols-[124px_minmax(0,1fr)] grid-rows-[minmax(0,1fr)] sm:grid-cols-[184px_minmax(0,1fr)]"
+            style={{ height: 'min(440px, var(--composer-panel-max-height))' }}
           >
-            <aside className="min-h-0 overflow-y-auto border-r border-[rgba(20,17,18,0.06)] bg-[rgba(20,17,18,0.02)] p-2">
+            <aside className="min-h-0 overflow-y-auto overscroll-y-contain border-r border-[rgba(20,17,18,0.06)] bg-[rgba(20,17,18,0.02)] p-2">
               <p className="px-2 pt-1 pb-2 text-[10px] font-semibold tracking-[0.08em] text-[rgba(18,15,16,0.45)] uppercase">
                 Models
               </p>
@@ -526,7 +547,7 @@ export function ComposerToolbar({
                 })}
               </div>
             </aside>
-            <div className="min-h-0 space-y-2 overflow-y-auto p-2.5">
+            <div className="min-h-0 space-y-2 overflow-y-auto overscroll-y-contain p-2.5">
               {(activeFamily?.models ?? []).map((item) => {
                 const selected = isSameGeneratorModelChoice(item, model);
                 const highlights = getGeneratorModelHighlights(item);
