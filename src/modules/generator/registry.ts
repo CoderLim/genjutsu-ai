@@ -12,7 +12,6 @@ export const GENERATOR_PREVIEW_MODELS: readonly GeneratorModel[] = [
     id: 'demo-video',
     name: 'Video Model · UI Preview',
     mediaType: 'video',
-    providerName: 'Preview',
     enabled: false,
     defaultWorkflow: 'first-frame',
     pricing: {
@@ -84,9 +83,8 @@ export const GENERATOR_PREVIEW_MODELS: readonly GeneratorModel[] = [
   },
   {
     id: 'h3-reference-preview',
-    name: 'MiniMax H3 · Reference-to-Video Preview',
+    name: 'Reference to Video · UI Preview',
     mediaType: 'video',
-    providerName: 'Fal (preview configuration)',
     enabled: false,
     defaultWorkflow: 'reference-to-video',
     // This is ONLY an illustrative local quote. See the provider for real rates.
@@ -136,7 +134,6 @@ export const GENERATOR_PREVIEW_MODELS: readonly GeneratorModel[] = [
     id: 'demo-image',
     name: 'Image Model · UI Preview',
     mediaType: 'image',
-    providerName: 'Preview',
     enabled: false,
     defaultWorkflow: 'text-to-image',
     pricing: {
