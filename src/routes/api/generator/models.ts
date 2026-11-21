@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
 
-import { listEnabledGeneratorModels } from '@/modules/generator/registry';
+import { listGeneratorModels } from '@/modules/generator/catalog';
 import type { MediaType } from '@/modules/generator/types';
 import { respData, respErr } from '@/lib/resp';
 
@@ -9,8 +9,8 @@ async function GET({ request }: { request: Request }) {
   if (requested !== null && requested !== 'image' && requested !== 'video') {
     return respErr('Invalid media type', { status: 400 });
   }
-  const models = listEnabledGeneratorModels((requested ?? undefined) as MediaType | undefined)
-    .map((model) => ({
+  const models = listGeneratorModels((requested ?? undefined) as MediaType | undefined)
+    .map(model => ({
       id: model.id,
       name: model.name,
       providerName: model.providerName,
@@ -19,9 +19,7 @@ async function GET({ request }: { request: Request }) {
       workflows: model.workflows,
       pricing: model.pricing,
     }));
-  return respData({ models }, {
-    headers: { 'Cache-Control': 'no-store' },
-  });
+  return respData({ models }, { headers: { 'Cache-Control': 'no-store' } });
 }
 
 export const Route = createFileRoute('/api/generator/models')({
