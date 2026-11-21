@@ -134,7 +134,7 @@ export function MediaUploader({
                     alt=""
                     className="h-full w-full object-cover"
                   />
-                )
+                )}
                 <button
                   type="button"
                   aria-label="Remove"
