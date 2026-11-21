@@ -52,13 +52,15 @@ export function normalizeGeneratorState(
   // Only semantic-preserving image transitions, never e.g. a start frame
   // silently becoming a reference video for H3.
   if (previous.workflow !== workflow) {
-    if (workflow === 'first-frame' && previous.workflow === 'all-in-one-reference') {
+    if (workflow === 'first-frame' && previous.workflow === 'all-in-one-reference' && !inputs.startFrame) {
       inputs.startFrame = inputs.referenceImages[0] ?? null;
     } else if (
       workflow === 'all-in-one-reference' &&
       (previous.workflow === 'first-frame' || previous.workflow === 'start-end')
     ) {
-      inputs.referenceImages = inputs.startFrame ? [inputs.startFrame] : [];
+      if (inputs.referenceImages.length === 0) {
+        inputs.referenceImages = inputs.startFrame ? [inputs.startFrame] : [];
+      }
     }
   }
 
@@ -147,6 +149,8 @@ export function updateGeneratorState(
   const next = {
     ...previous,
     ...patch,
+    // Preserve the source workflow for semantic media conversion.
+    workflow: previous.workflow,
     inputs: patch.inputs ? { ...previous.inputs, ...patch.inputs } : previous.inputs,
     params: patch.params ? { ...previous.params, ...patch.params } : previous.params,
   };
