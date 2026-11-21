@@ -8,6 +8,7 @@ import {
   getGeneratorExpansionControls,
   getGeneratorSlotCapacity,
   describeGeneratorMixedReferences,
+  getGeneratorMixedReferenceTileLines,
   planGeneratorMixedReferenceFiles,
   isGeneratorSlotOptional,
   isGeneratorJobActive,
@@ -464,4 +465,27 @@ test('mixed reference picker rejects unsupported MIME, oversized media and unsup
     createGeneratorState(flash).inputs, [
       { name: 'img.png', type: 'image/png', size: 1024 },
     ]), [{ index: 0, slot: 'referenceImages' }]);
+});
+
+test('single reference tile shows supported per-type limits instead of an item counter', () => {
+  const seedance = getGeneratorModel('all-in-one-video');
+  const seedanceSpec = seedance.workflows['all-in-one-reference']!;
+  assert.deepEqual(getGeneratorMixedReferenceTileLines(seedanceSpec), [
+    'Max 9 img', '15s audio', '15s video',
+  ]);
+
+  const flash = getGeneratorModel('seedance-2.5-flash');
+  assert.deepEqual(getGeneratorMixedReferenceTileLines(
+    flash.workflows['all-in-one-reference']!
+  ), ['Max 10 img']);
+
+  const kling = getGeneratorModel('kling-4');
+  assert.deepEqual(getGeneratorMixedReferenceTileLines(
+    kling.workflows['all-in-one-reference']!
+  ), ['Max 10 img']);
+
+  // The list updates with the selected workflow; no unsupported audio/video.
+  assert.deepEqual(getGeneratorMixedReferenceTileLines(
+    seedance.workflows['text-to-video']!
+  ), []);
 });
