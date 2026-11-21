@@ -21,6 +21,7 @@ test('public catalog lists completed reference workflows', () => {
     'seedance-2-fast', 'seedance-2-mini', 'seedance-2.5', 'seedance-2.5-flash',
     'minimax-h3-max-turbo', 'minimax-h3-max',
     'kling-4', 'kling-4-flash', 'kling-3-turbo', 'kling-3',
+    'minimax-h3-image', 'minimax-h3-image-highspeed',
   ]);
   assert.equal(getGeneratorModel('all-in-one-video').enabled, true);
   assert.throws(() => getGeneratorModel('reference-to-video-pro'), /not enabled/);
@@ -271,10 +272,9 @@ test('new MiniMax H3 Max models have bounded exact customer rates', () => {
 
 test('unpriced new models are impossible to charge through the public model lookup', () => {
   const pending = GENERATOR_MODELS.filter(model =>
-    model.id === 'minimax-h3-turbo' ||
-    model.id.startsWith('minimax-h3-image')
+    model.id === 'minimax-h3-turbo'
   );
-  assert.equal(pending.length, 3);
+  assert.equal(pending.length, 1);
   for (const model of pending) {
     assert.equal(model.enabled, false, model.id);
     assert.equal(model.pricing.precision, 'estimate', model.id);
@@ -302,5 +302,26 @@ test('customer tariff covers every enabled Fal video resolution', () => {
       assert.equal(calculateGeneratorCredits(draft, model).credits,
         Number(draft.params.duration) * rate, id + ':' + resolution);
     }
+  }
+});
+
+test('H3 Image output and reference surcharges are charged for both variants', () => {
+  for (const [id, rates, extra] of [
+    ['minimax-h3-image', [8, 12, 24], 5],
+    ['minimax-h3-image-highspeed', [12, 18, 42], 8],
+  ] as const) {
+    const m = getGeneratorModel(id);
+    for (const [i, resolution] of ['1K', '2K', '4K'].entries()) {
+      const draft = updateGeneratorState(createGeneratorState(m), m, {
+        params: { resolution, outputCount: 2 },
+      });
+      assert.equal(calculateGeneratorCredits(draft, m).credits, rates[i] * 2);
+    }
+    const edited = updateGeneratorState(createGeneratorState(m), m, {
+      workflow: 'image-to-image',
+      params: { resolution: '4K' },
+      inputs: { ...createGeneratorState(m).inputs, referenceImages: ['1','2','3'] },
+    });
+    assert.equal(calculateGeneratorCredits(edited, m).credits, rates[2] + extra * 2);
   }
 });

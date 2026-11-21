@@ -32,8 +32,8 @@ internal workflow profiles. Additional variants are wired to **Fal**.
 | Kling 3.0 Turbo | `fal-ai/kling-video/v3/turbo/standard/{text-to-video,image-to-video}` | Text, first, first + end | Yes: fixed endpoint and conservative audio-inclusive tariff |
 | Kling 3.0 | `fal-ai/kling-video/v3/pro/{text-to-video,image-to-video}` | Text, first, first + end | Yes: fixed endpoint and conservative audio-inclusive tariff |
 | Nano Banana 2 / Pro | Existing Fal `fal-ai/nano-banana-{2,pro}` + `/edit` | Text and edit | Yes (unchanged) |
-| MiniMax H3 Image | `minimax/h3-image/{text-to-image,edit}` | Text and edit (up to 16 references) | No: megapixel billing pending |
-| MiniMax H3 Image Highspeed | `minimax/h3-image/highspeed/{text-to-image,edit}` | Text and edit (up to 16 references) | No: megapixel billing pending |
+| MiniMax H3 Image | `minimax/h3-image/{text-to-image,edit}` | Text and edit (up to 16 references) | Yes: conservative resolution tier plus reference surcharges |
+| MiniMax H3 Image Highspeed | `minimax/h3-image/highspeed/{text-to-image,edit}` | Text and edit (up to 16 references) | Yes: conservative resolution tier plus reference surcharges |
 | FLUX.1 Schnell / FLUX.2 Flash | Existing Fal | Existing workflows | Yes (unchanged) |
 
 **Disabled models** are available in the **development-only** chooser for

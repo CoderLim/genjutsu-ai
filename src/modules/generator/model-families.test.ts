@@ -75,6 +75,7 @@ test('model menu contains one Seedance 2.0 item and no workflow or resolution me
     'Seedance 2.5', 'Seedance 2.5 Flash',
     'MiniMax H3 Max Turbo', 'MiniMax H3 Max',
     'Kling 4.0', 'Kling 4.0 Flash', 'Kling 3.0 Turbo', 'Kling 3.0',
+    'MiniMax H3 Image', 'MiniMax H3 Image Highspeed',
   ]);
   const selectedTextVideo = getGeneratorModel('text-to-video-standard');
   const seedance = getGeneratorModel('photo-to-video-standard');
@@ -148,9 +149,10 @@ test('image tab lists Nano Banana and real FLUX models, not feature labels', () 
     GENERATOR_MODELS.filter(model => model.mediaType === 'image')
   );
   const groups = groupGeneratorModels(models);
-  assert.deepEqual(groups.map(group => group.label), ['Nano Banana', 'FLUX']);
+  assert.deepEqual(groups.map(group => group.label), ['Nano Banana', 'MiniMax', 'FLUX']);
   assert.deepEqual(groups.map(group => group.models.map(generatorModelLabel)), [
     ['Nano Banana 2', 'Nano Banana Pro'],
+    ['MiniMax H3 Image', 'MiniMax H3 Image Highspeed'],
     ['FLUX.1 Schnell', 'FLUX.2 Flash'],
   ]);
   assert.equal(models.every(model => model.mediaType === 'image'), true);
@@ -191,7 +193,7 @@ test('development previews list requested versions but cannot bill unpriced mode
   assert.equal(video.filter(x => x.id.startsWith('kling-')).every(x => x.enabled), true);
   assert.ok(video.filter(x => x.id.startsWith('seedance-2')).every(x => x.enabled));
   assert.equal(image.filter(x => x.id.startsWith('minimax-h3-image')).length, 2);
-  assert.equal(image.filter(x => x.id.startsWith('minimax-h3-image')).every(x => !x.enabled), true);
+  assert.equal(image.filter(x => x.id.startsWith('minimax-h3-image')).every(x => x.enabled), true);
 });
 
 test('Seedance Fast workflows use Fast endpoints, not original Seedance profiles', () => {
