@@ -268,9 +268,10 @@ export function getGeneratorWorkflowChoices(
   const videoModes: Workflow[] = ['first-frame', 'start-end', 'all-in-one-reference'];
   const supported: Array<[Workflow, WorkflowSpec | undefined]> =
     active.mediaType === 'video'
-      ? videoModes.map(workflow => [workflow, active.workflows[workflow]])
+      ? videoModes.map(workflow =>
+          [workflow, active.workflows[workflow]] as [Workflow, WorkflowSpec | undefined])
       : Object.entries(active.workflows).map(
-          ([workflow, spec]) => [workflow as Workflow, spec]
+          ([workflow, spec]) => [workflow as Workflow, spec] as [Workflow, WorkflowSpec | undefined]
         );
   return supported
     .filter((entry): entry is [Workflow, NonNullable<typeof entry[1]>] => !!entry[1])
