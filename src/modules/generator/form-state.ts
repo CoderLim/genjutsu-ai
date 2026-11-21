@@ -138,6 +138,38 @@ export function availableGeneratorFieldValues(
 }
 
 /**
+ * Single source of truth for the segmented settings panel and its tests.
+ * Choices depend on the *selected model/workflow*, and conditional constraints
+ * may narrow them further when another setting changes.
+ */
+export function getGeneratorSettingChoices(
+  spec: WorkflowSpec,
+  params: Record<string, FieldValue>,
+  name: string
+): FieldValue[] {
+  const field = spec.fields[name];
+  if (!field || field.internal) return [];
+  let candidates: FieldValue[];
+  if (field.options) {
+    candidates = [...field.options];
+  } else if (
+    typeof field.default === 'number' &&
+    field.min !== undefined &&
+    field.max !== undefined
+  ) {
+    const step = field.step ?? 1;
+    if (!Number.isFinite(step) || step <= 0) return [];
+    candidates = [];
+    for (let value = field.min; value <= field.max + 1e-9; value += step) {
+      candidates.push(Number(value.toFixed(6)));
+    }
+  } else {
+    candidates = [];
+  }
+  return availableGeneratorFieldValues(spec, params, name, candidates);
+}
+
+/**
  * MiniMax H3 supports a Fast expansion mode, while Max variants expose only
  * disabled/balanced/quality. The UI must not render a switch that normalizes
  * every click back to the previous value.
