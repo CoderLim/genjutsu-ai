@@ -306,7 +306,42 @@ test('model or workflow changes remove oversize, missing and unsupported referen
     ...filtered, prompt: 'Change background to a forest',
   }, nano), null);
 
+  // The new unified image form keeps compatible references while moving
+  // between the internal legacy edit and default text workflow.
   const text = normalizeGeneratorState(filtered, nano, 'text-to-image');
   assert.deepEqual(filterGeneratorLocalMedia(text, nano, url => files.get(url))
-    .inputs.referenceImages, []);
+    .inputs.referenceImages, ['good']);
+});
+
+test('image composer keeps an optional reference upload and updates quote without mode selection', () => {
+  for (const id of [
+    'nano-banana-2.1', 'nano-banana-2-lite', 'nano-banana-2',
+    'nano-banana-pro', 'minimax-h3-image',
+    'minimax-h3-image-highspeed', 'image-edit-standard',
+  ]) {
+    const model = getGeneratorModel(id);
+    const empty = updateGeneratorState(createGeneratorState(model), model, {
+      prompt: 'A peaceful cabin beside a lake',
+    });
+    assert.equal(empty.workflow, 'text-to-image', id);
+    const spec = model.workflows[empty.workflow]!;
+    assert.equal(spec.slots.referenceImages?.min, 0, id);
+    assert.equal(isGeneratorSlotOptional(spec, 'referenceImages'), true, id);
+    assert.ok(getGeneratorSlotCapacity(spec, empty.inputs, 'referenceImages') > 0, id);
+    assert.equal(generatorReadinessError(empty, model), null, id);
+    const one = updateGeneratorState(empty, model, {
+      inputs: { ...empty.inputs, referenceImages: ['reference'] },
+    });
+    assert.equal(one.workflow, 'text-to-image', id);
+    assert.equal(generatorReadinessError(one, model), null, id);
+    const removed = updateGeneratorState(one, model, {
+      inputs: { ...one.inputs, referenceImages: [] },
+    });
+    assert.equal(removed.workflow, 'text-to-image', id);
+    assert.equal(generatorReadinessError(removed, model), null, id);
+  }
+  // No prompt-capable reference-edit endpoint is configured for Schnell.
+  const schnell = getGeneratorModel('text-to-image-fast');
+  assert.equal(schnell.workflows['image-to-image'], undefined);
+  assert.equal(schnell.workflows['text-to-image']!.slots.referenceImages, undefined);
 });
