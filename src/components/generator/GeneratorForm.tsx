@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, CheckCircle2, Download, LoaderCircle, Sparkles } from 'lucide-react';
 
-import { apiGet, apiPost, ApiError } from '@/lib/api-client';
+import { apiGet, apiPost, ApiError, uploadToSignedUrl } from '@/lib/api-client';
 import { GENERATOR_MODELS, listGeneratorModels } from '@/modules/generator/catalog';
 import {
   createGeneratorState,
@@ -246,11 +246,16 @@ export function GeneratorForm({
       startFrame: null, endFrame: null,
       referenceImages: [], referenceVideos: [], referenceAudio: [],
     };
+    let lastUploadDescriptorAt = 0;
     for (const slot of INPUT_SLOTS) {
       const uploaded: string[] = [];
       for (const url of slotUrls(state.inputs, slot)) {
         const file = localFiles.current.get(url);
         if (!file) throw new Error('Reference media is missing. Please upload it again.');
+        // The upload preflight API rate-limits per user/path; space rapid
+        // multi-image uploads while retaining retryable signed uploads.
+        const gap = 360 - (Date.now() - lastUploadDescriptorAt);
+        if (gap > 0) await new Promise(resolve => setTimeout(resolve, gap));
         const descriptor = await apiPost<UploadDescriptor>(
           '/api/generator/upload-url', {
             modelId: state.modelId,
@@ -260,16 +265,12 @@ export function GeneratorForm({
             contentLength: file.size,
           }
         );
-        const response = await fetch(descriptor.uploadUrl, {
-          method: 'PUT',
+        lastUploadDescriptorAt = Date.now();
+        await uploadToSignedUrl({
+          url: descriptor.uploadUrl,
+          file,
           headers: descriptor.uploadHeaders,
-          body: file,
-          credentials: 'same-origin',
         });
-        if (!response.ok) {
-          const detail = await response.text().catch(() => '');
-          throw new Error(detail || 'Unable to upload ' + file.name);
-        }
         uploaded.push(descriptor.storageKey);
       }
       if (slot === 'startFrame' || slot === 'endFrame') inputs[slot] = uploaded[0] ?? null;
