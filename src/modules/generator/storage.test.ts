@@ -9,6 +9,7 @@ import {
   createGeneratorStagingKey,
   getGeneratorResultKey,
   normalizeUploadType,
+  safeGeneratorProviderUrl,
 } from './storage';
 
 test('staging paths bind user, generation and semantic slot', () => {
@@ -49,4 +50,27 @@ test('result keys isolate user and generation in My Creations', () => {
   assert.doesNotThrow(() => assertResultOwnership(key, 'owner', generationId));
   assert.throws(() => assertResultOwnership(key, 'other', generationId), /Invalid result/);
   assert.throws(() => assertResultOwnership(key, 'owner', crypto.randomUUID()), /Invalid result/);
+});
+
+test('only provider storage hosts may supply outputs to R2', () => {
+  assert.equal(
+    safeGeneratorProviderUrl('https://cdn.wavespeed.ai/outputs/clip.mp4'),
+    'https://cdn.wavespeed.ai/outputs/clip.mp4'
+  );
+  assert.equal(
+    safeGeneratorProviderUrl('https://v3b.fal.media/files/output.png'),
+    'https://v3b.fal.media/files/output.png'
+  );
+  assert.throws(
+    () => safeGeneratorProviderUrl('https://cdn.wavespeed.ai.evil.example/video.mp4'),
+    /Untrusted/
+  );
+  assert.throws(
+    () => safeGeneratorProviderUrl('http://cdn.wavespeed.ai/video.mp4'),
+    /Untrusted/
+  );
+  assert.throws(
+    () => safeGeneratorProviderUrl('https://169.254.169.254/metadata'),
+    /Untrusted/
+  );
 });

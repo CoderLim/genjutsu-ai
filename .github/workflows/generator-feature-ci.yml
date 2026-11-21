@@ -43,7 +43,7 @@ jobs:
 
           # main currently has legacy TypeScript errors. Do not hide any new
           # generator type errors behind that baseline.
-          new_errors="$(grep -E '^src/(modules/generator/|components/generator/|routes/api/generator/|routes/api/cron/generator/|routes/(ai-image-generator|ai-video-generator|photo-to-video)\.tsx)' tsc-report.txt || true)"
+          new_errors="$(grep -E '^src/(modules/generator/|components/generator/|modules/generations/scenes\.ts|routes/api/generator/|routes/api/admin/generator/|routes/api/cron/generator/|routes/creations\.tsx|routes/(ai-image-generator|ai-video-generator|photo-to-video)\.tsx)' tsc-report.txt || true)"
           if [ -n "$new_errors" ]; then
             echo "New generator type errors:"
             echo "$new_errors"
