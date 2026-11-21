@@ -174,3 +174,21 @@ test('switching away from Kling Start & End drops an unsupported end frame', () 
   assert.equal(changed.params.duration, 5);
   assert.equal(changed.params.resolution, '720p');
 });
+
+test('all advertised H3 prompt expansion options survive form normalization', () => {
+  for (const id of ['minimax-h3', 'minimax-h3-max', 'minimax-h3-max-turbo']) {
+    const model = getGeneratorModel(id);
+    const spec = model.workflows['text-to-video']!;
+    const modes = spec.fields.promptExpansionMode.options!;
+    const available = availableGeneratorFieldValues(spec,
+      createGeneratorState(model).params, 'promptExpansionMode', modes);
+    assert.deepEqual(available, modes, id);
+    for (const mode of modes) {
+      const state = updateGeneratorState(createGeneratorState(model), model, {
+        workflow: 'text-to-video',
+        params: { promptExpansionMode: mode },
+      });
+      assert.equal(state.params.promptExpansionMode, mode, id + ':' + mode);
+    }
+  }
+});
