@@ -10,7 +10,6 @@ import {
 } from 'lucide-react';
 
 import {
-  GENERATOR_MODELS,
   listGeneratorModels,
 } from '@/modules/generator/catalog';
 import {
@@ -215,10 +214,9 @@ export function GeneratorForm({
 
   // The model menu spans both media types. Selecting a model also switches the
   // Image/Video tab; workflow is independent, not a sidebar model category.
-  const allModels = useMemo(
-    () => import.meta.env.DEV ? [...GENERATOR_MODELS] : listGeneratorModels(),
-    []
-  );
+  // A model without a verified endpoint/price must never look selectable,
+  // including in local development. Server validation remains authoritative.
+  const allModels = useMemo(() => listGeneratorModels(), []);
   const initialModel = useMemo(
     () => allModels.find(item => item.id === initialModelId &&
       item.mediaType === initialMediaType) ??
@@ -762,8 +760,10 @@ export function GeneratorForm({
   const hasPromptExpansion =
     !!spec.fields.promptExpansionMode &&
     !spec.fields.promptExpansionMode.internal;
-  const showEnhance = hasPromptExpansion;
-  const showFast = hasFastMode || hasPromptExpansion;
+  const expansionOptions = spec.fields.promptExpansionMode?.options ?? [];
+  const showEnhance = hasPromptExpansion && expansionOptions.includes('disabled');
+  const showFast = hasFastMode ||
+    (hasPromptExpansion && expansionOptions.includes('fast'));
   const enhanceOn =
     hasPromptExpansion && form.params.promptExpansionMode !== 'disabled';
   const fastOn = hasFastMode
@@ -787,7 +787,7 @@ export function GeneratorForm({
       setParam('fastMode', checked);
       return;
     }
-    if (!hasPromptExpansion) return;
+    if (!hasPromptExpansion || !expansionOptions.includes('fast')) return;
     setParam(
       'promptExpansionMode',
       checked ? 'fast' : enhanceOn ? 'balanced' : 'disabled'
