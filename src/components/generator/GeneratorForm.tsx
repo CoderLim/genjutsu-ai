@@ -285,13 +285,14 @@ export function GeneratorForm({
 
   // The result is always fetched from an authenticated, scene-scoped route.
   useEffect(() => {
-    if (!shouldPollGeneratorJob(job)) return;
+    const generationId = job?.generationId;
+    if (!generationId || !shouldPollGeneratorJob(job)) return;
     let canceled = false;
     const handle = setInterval(async () => {
       try {
         const status = await apiGet<JobInfo>(
           '/api/generator/status?generationId=' +
-            encodeURIComponent(job.generationId)
+            encodeURIComponent(generationId)
         );
         if (!canceled)
           setJob((current) =>
@@ -813,6 +814,7 @@ export function GeneratorForm({
           {activeSlots.length > 0 ? (
             <ComposerFrameSlots showArrow={isStartEnd}>
               {activeSlots.map((slot) => {
+                const limit = spec.slots[slot]!;
                 const optional = isGeneratorSlotOptional(spec, slot);
                 const emptyLabel = SLOT_LABELS[slot];
                 const capacity = getGeneratorSlotCapacity(spec, form.inputs, slot);
