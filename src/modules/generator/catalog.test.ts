@@ -17,7 +17,8 @@ test('public catalog lists completed reference workflows', () => {
   const ids = listGeneratorModels().map(x => x.id);
   assert.deepEqual(ids, [
     'photo-to-video-standard', 'text-to-video-standard', 'multi-image-to-video', 'all-in-one-video',
-    'nano-banana-2', 'nano-banana-pro', 'text-to-image-fast', 'image-edit-standard',
+    'nano-banana-2.1', 'nano-banana-2-lite', 'nano-banana-2', 'nano-banana-pro',
+    'text-to-image-fast', 'image-edit-standard',
     'seedance-2-fast', 'seedance-2-mini', 'seedance-2.5', 'seedance-2.5-flash',
     'minimax-h3', 'minimax-h3-max-turbo', 'minimax-h3-max',
     'kling-4', 'kling-4-flash', 'kling-3-turbo', 'kling-3',
