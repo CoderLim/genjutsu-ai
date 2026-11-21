@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { createGeneratorState, normalizeGeneratorState, updateGeneratorState } from './normalize';
-import { getPreviewModel } from './registry';
+import { GENERATOR_PREVIEW_MODELS, getPreviewModel } from './registry';
 
 const video = getPreviewModel('video');
 const image = getPreviewModel('image');
@@ -72,4 +72,13 @@ test('image output count survives compatible workflow switching', () => {
   const start = createGeneratorState(image);
   const edited = updateGeneratorState(start, image, { params: { outputCount: 3 } });
   assert.equal(updateGeneratorState(edited, image, { workflow: 'image-to-image' }).params.outputCount, 3);
+});
+
+test('H3 preview is reference-to-video only, never all-in-one', () => {
+  const h3 = GENERATOR_PREVIEW_MODELS.find((model) => model.id === 'h3-reference-preview');
+  assert.ok(h3);
+  assert.deepEqual(Object.keys(h3.workflows), ['reference-to-video']);
+  const incompatible = normalizeGeneratorState(createGeneratorState(h3), h3, 'all-in-one-reference');
+  assert.equal(incompatible.workflow, 'reference-to-video');
+  assert.equal(h3.workflows['reference-to-video']!.slots.referenceImages!.max, 9);
 });
