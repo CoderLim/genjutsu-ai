@@ -433,7 +433,7 @@ export function ComposerToolbar({
   onFastChange: (checked: boolean) => void;
 }) {
   const families = useMemo(() =>
-    groupGeneratorModels(getGeneratorModelChoices(models, import.meta.env.DEV)), [models]);
+    groupGeneratorModels(getGeneratorModelChoices(models)), [models]);
   const workflowChoices = useMemo(
     () => getGeneratorWorkflowChoices(models, model),
     [models, model]
