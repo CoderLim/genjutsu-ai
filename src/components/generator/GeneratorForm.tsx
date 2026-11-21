@@ -735,7 +735,6 @@ export function GeneratorForm({
           !field.internal &&
           typeof field.default !== 'boolean' &&
           !(SETTINGS_FIELD_KEYS as readonly string[]).includes(name) &&
-          name !== 'promptExpansionMode' &&
           fieldValues(field).length > 0
       )
       .sort(([left], [right]) => {
