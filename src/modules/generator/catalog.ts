@@ -187,7 +187,7 @@ export const GENERATOR_MODELS: readonly GeneratorModel[] = [
   },
   {
     id: 'reference-to-video-pro',
-    name: 'Reference to Video · Pro',
+    name: 'MiniMax H3',
     mediaType: 'video',
     maxPromptChars: 7000,
     enabled: false,

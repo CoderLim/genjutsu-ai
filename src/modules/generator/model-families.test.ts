@@ -23,6 +23,7 @@ test('model chooser lists Seedance and Nano Banana, not workflow categories', ()
   assert.deepEqual(groups[1].models.map(m => m.id), ['nano-banana-2', 'nano-banana-pro']);
   assert.equal(getGeneratorModelFamilyId('nano-banana-pro'), 'nano-banana');
   assert.equal(getGeneratorModelFamilyId('reference-to-video-pro'), 'minimax');
+  assert.equal(GENERATOR_MODELS.find(model => model.id === 'reference-to-video-pro')?.name, 'MiniMax H3');
   assert.equal(getGeneratorModelFamilyId('image-edit-standard'), 'flux');
 });
 
