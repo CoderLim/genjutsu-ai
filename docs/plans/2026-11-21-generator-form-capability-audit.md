@@ -83,3 +83,32 @@ New Nano Banana 2.1 and Lite use `google/nano-banana-2.1[/edit]` and `google/nan
 - Kling 4.0 Flash: https://fal.ai/models/kling/v4/flash/reference-to-video/api
 - Nano Banana 2.1: https://fal.ai/models/google/nano-banana-2.1/api
 - Nano Banana Lite: https://fal.ai/models/google/nano-banana-lite/api
+
+## Post-review reliability fixes (2026-11-21)
+
+### Provider query failure escalation (P1)
+
+Fal `QUERY_PERMANENT_ERROR`, `RESULT_FETCH_PERMANENT_ERROR`, or a success status with no downloadable output is **not** evidence that the upstream generation was rejected. A `query-error` response increments `taskResult.queryFailureCount` with a compare-and-swap update to avoid concurrent poll double-counting. A successful `processing` poll clears the streak. After **3 consecutive inconclusive lookups**, the task transitions to `query_review` and is exposed as `status: review, pollable: false`; the cron reconciler will no longer select it.
+
+`query_review` retains `aiTask.taskId`, `aiTask.model` (the concrete provider endpoint), credit reservation, provider status, and a review message. **No automatic refund or resubmission** is allowed because provider execution/charges are still uncertain.
+
+Existing authenticated, `admin.*`-protected endpoint: `POST /api/admin/generator/resolve`. Each admin resolution requires the task `generationId`, `userId`, and an operator `note` of at least 12 characters:
+
+- `{ "generationId": "...", "userId": "...", "action": "resume-query", "note": "Upstream result verified; retrying status lookup" }`: only for `query_review` with a saved provider request ID; resets the streak and queries the **original saved endpoint**.
+- `{ "generationId": "...", "userId": "...", "action": "refund", "confirmedProviderBillingReviewed": true, "note": "Provider billing and result checked; approving refund" }`: only after manual upstream charge/outcome verification. Refund is limited to the reviewed task's status and restores credits exactly once.
+
+Existing `submission_unknown` link-request and refund paths remain supported; admin refund there still requires `confirmedProviderNotCharged: true`. The admin route writes operator notes to the server log, not customer-visible error messages. Admins must verify provider charges and outputs before choosing between re-querying and refunding.
+
+### Background media type changes (P2)
+
+The composer permits Image / Video and model switching during an active job. Its Latest generation panel now takes both its status text and `video`/`img` component choice from **`job.mediaType`**, never the current draft's `mediaType`.
+
+### Retained local upload validation (P2)
+
+On every model/workflow change, normalize compatible media slots and then filter the retained browser `blob:` URLs against the destination slot's accepted MIME types and maximum bytes using `localFiles.current`. Unsupported and missing files are dropped immediately and revoked by the existing blob cleanup effect. Compatible local images survive. Uploaded files are still validated by the signed-upload API before submission, so this client-side check is additional protection, not a security boundary.
+
+Regression tests cover WebP Seedance → PNG/JPEG-only Kling Turbo, oversize and missing local files, provider query error threshold, and supported media retention.
+
+### Remaining release gates
+
+Still required: CI/unit test and build execution, browser interactions during in-flight jobs, provider query-error staging simulation, admin `resume-query`/manual-refund exercise, Fal/WaveSpeed real generation, and D1/R2 + provider account cost reconciliation. Stationary `precision: exact` tariffs are **customer credit formulas only**, not a validated upstream cost or margin.
