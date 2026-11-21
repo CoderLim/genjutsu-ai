@@ -22,7 +22,8 @@ type VideoOptions = {
   resolutions: readonly string[];
   duration: readonly [number, number];
   aspectRatios?: readonly string[];
-  rate?: number; // exact customer credits/second, not the Fal unit price
+  rate?: number; // customer credits/second, not the Fal unit price
+  rates?: Record<string, number>; // tiered customer credit rate by resolution
   rateResolution?: string;
   audio?: boolean;
   startEnd?: boolean;
@@ -70,24 +71,28 @@ function videoProfile(options: VideoOptions): GeneratorModel {
   const firstFrame: WorkflowSpec = {
     label: 'First Frame', slots: videoFrames, fields,
   };
-  const paidRate = options.rate;
-  const pricing = paidRate === undefined
+  const pricedRates = options.rates ??
+    (options.rate !== undefined && options.rateResolution
+      ? { [options.rateResolution]: options.rate }
+      : null);
+  const pricing = pricedRates === null
     ? {
         version: 'pending-fal-billing-2026-11',
         precision: 'estimate' as const,
         rule: { kind: 'fixed' as const, credits: 0 },
       }
     : {
-        version: '2026-11-21-h3-768p-v1',
+        // Product price for customers, not an assertion about Fal's bill.
+        version: '2026-11-21-' + options.id + '-v1',
         precision: 'exact' as const,
-        rule: { kind: 'per-second' as const, rates: { [options.rateResolution!]: paidRate } },
+        rule: { kind: 'per-second' as const, rates: pricedRates },
       };
   return {
     id: options.id,
     name: options.name,
     mediaType: 'video',
     maxPromptChars: 3000,
-    enabled: paidRate !== undefined,
+    enabled: pricedRates !== null,
     defaultWorkflow: 'first-frame',
     pricing,
     workflows: {
@@ -148,22 +153,22 @@ export const ADDITIONAL_GENERATOR_MODELS: readonly GeneratorModel[] = [
   videoProfile({
     id: 'seedance-2-fast', name: 'Seedance 2.0 Fast',
     resolutions: ['480p', '720p'], duration: [4, 15], audio: true,
-    startEnd: true,
+    rates: { '480p': 19, '720p': 42 }, startEnd: true,
   }),
   videoProfile({
     id: 'seedance-2-mini', name: 'Seedance 2.0 Mini',
     resolutions: ['480p', '720p'], duration: [4, 15], audio: true,
-    startEnd: true,
+    rates: { '480p': 13, '720p': 27 }, startEnd: true,
   }),
   videoProfile({
     id: 'seedance-2.5', name: 'Seedance 2.5',
     resolutions: ['480p', '720p'], duration: [4, 30], audio: true,
-    startEnd: true,
+    rates: { '480p': 38, '720p': 81 }, startEnd: true,
   }),
   videoProfile({
     id: 'seedance-2.5-flash', name: 'Seedance 2.5 Flash',
     resolutions: ['480p', '720p'], duration: [4, 30], audio: true,
-    startEnd: true,
+    rates: { '480p': 25, '720p': 53 }, startEnd: true,
   }),
   // Fal has a base H3 endpoint but no verified, distinct H3 Turbo endpoint.
   // Do not misroute requests to the base H3 while calling it Turbo.
@@ -185,25 +190,25 @@ export const ADDITIONAL_GENERATOR_MODELS: readonly GeneratorModel[] = [
   }),
   videoProfile({
     id: 'kling-4', name: 'Kling 4.0',
-    resolutions: ['720p', '1080p'], duration: [3, 30], audio: true,
-    startEnd: true,
+    resolutions: ['720p', '1080p'], duration: [3, 30],
+    rates: { '720p': 27, '1080p': 40 }, startEnd: true,
   }),
   videoProfile({
     id: 'kling-4-flash', name: 'Kling 4.0 Flash',
-    resolutions: ['720p'], duration: [3, 20], audio: true,
-    startEnd: true,
+    resolutions: ['720p'], duration: [3, 20],
+    rates: { '720p': 17 }, startEnd: true,
   }),
   videoProfile({
     id: 'kling-3-turbo', name: 'Kling 3.0 Turbo',
     resolutions: ['720p'], duration: [3, 15],
     aspectRatios: ['16:9', '9:16', '1:1'],
-    startEnd: true,
+    rates: { '720p': 20 }, startEnd: true,
   }),
   videoProfile({
     id: 'kling-3', name: 'Kling 3.0',
-    resolutions: ['720p', '1080p'], duration: [3, 15], audio: true,
+    resolutions: ['1080p'], duration: [3, 15], audio: true,
     aspectRatios: ['16:9', '9:16', '1:1'],
-    startEnd: true,
+    rates: { '1080p': 29 }, startEnd: true,
   }),
   minimaxImage('minimax-h3-image', 'MiniMax H3 Image'),
   minimaxImage('minimax-h3-image-highspeed', 'MiniMax H3 Image Highspeed'),
