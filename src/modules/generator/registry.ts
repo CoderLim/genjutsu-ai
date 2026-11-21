@@ -83,6 +83,56 @@ export const GENERATOR_PREVIEW_MODELS: readonly GeneratorModel[] = [
     },
   },
   {
+    id: 'h3-reference-preview',
+    name: 'MiniMax H3 · Reference-to-Video Preview',
+    mediaType: 'video',
+    providerName: 'Fal (preview configuration)',
+    enabled: false,
+    defaultWorkflow: 'reference-to-video',
+    // This is ONLY an illustrative local quote. See the provider for real rates.
+    pricing: {
+      version: 'h3-preview-only',
+      precision: 'estimate',
+      rule: {
+        kind: 'per-second',
+        rates: { '480P': 8, '768P': 12, '2K': 20, '4K': 26 },
+      },
+      includedReferenceImages: 5,
+      extraReferenceImageCredits: 14,
+    },
+    workflows: {
+      'reference-to-video': {
+        label: 'Reference to Video',
+        slots: {
+          referenceVideos: {
+            min: 1, max: 1,
+            accept: ['video/mp4', 'video/quicktime'],
+          },
+          referenceImages: {
+            min: 1, max: 9,
+            accept: ['image/jpeg', 'image/png', 'image/webp'],
+          },
+        },
+        fields: {
+          duration: { label: 'Duration', default: 8, min: 5, max: 15, step: 1 },
+          resolution: {
+            label: 'Resolution', default: '768P',
+            options: ['480P', '768P', '2K', '4K'],
+          },
+          aspectRatio: {
+            label: 'Aspect Ratio', default: '16:9',
+            options: ['adaptive', '21:9', '16:9', '4:3', '1:1', '3:4', '9:16'],
+          },
+          promptExpansionMode: {
+            label: 'Prompt Expansion', default: 'disabled',
+            options: ['disabled', 'fast', 'balanced', 'quality'],
+          },
+          outputCount: { label: 'Outputs', default: 1, options: [1] },
+        },
+      },
+    },
+  },
+  {
     id: 'demo-image',
     name: 'Image Model · UI Preview',
     mediaType: 'image',
