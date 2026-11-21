@@ -119,7 +119,13 @@ function nanoVariantWorkflows(
   } as const;
 }
 
-function nanoWorkflows(fields: typeof NANO_BASE_FIELDS = NANO_BASE_FIELDS) {
+function nanoWorkflows(isPro = false) {
+  const fields = isPro
+    ? {
+        ...NANO_BASE_FIELDS,
+        aspectRatio: { ...NANO_BASE_FIELDS.aspectRatio, options: NANO_PRO_ASPECTS },
+      }
+    : NANO_BASE_FIELDS;
   return {
     'text-to-image': {
       label: 'Text to Image',
@@ -350,10 +356,7 @@ export const GENERATOR_MODELS: readonly GeneratorModel[] = [
       precision: 'exact',
       rule: { kind: 'matrix', fields: ['resolution'], creditsByCombination: NANO_PRO_CREDITS },
     },
-    workflows: nanoWorkflows({
-      ...NANO_BASE_FIELDS,
-      aspectRatio: { ...NANO_BASE_FIELDS.aspectRatio, options: NANO_PRO_ASPECTS },
-    }),
+    workflows: nanoWorkflows(true),
   },
   {
     id: 'text-to-image-fast',
