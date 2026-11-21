@@ -6,7 +6,14 @@ import {
   useQueryClient,
 } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
-import { Film, LoaderCircle, Play, Radio, RefreshCw, Sparkles } from 'lucide-react';
+import {
+  Film,
+  LoaderCircle,
+  Play,
+  Radio,
+  RefreshCw,
+  Sparkles,
+} from 'lucide-react';
 
 import { useSession } from '@/core/auth/client';
 import { Link } from '@/core/i18n/navigation';
@@ -20,11 +27,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+  MediaViewer,
+  type MediaItem,
+} from '@/components/ui/chatcn/media-gallery';
 
 type LiveSessionHistory = {
   state: 'completed' | 'starting' | 'unconfirmed' | 'review' | 'not-started';
@@ -57,9 +62,9 @@ interface GenerationStatus {
   status: string;
 }
 
-interface VideoPreview {
-  url: string;
-  title: string;
+interface MediaViewerState {
+  items: MediaItem[];
+  index: number;
 }
 
 const PAGE_SIZE = 12;
@@ -236,7 +241,11 @@ function LiveSessionCard({
                 {history.endedAtMs !== null ? (
                   <div className="flex justify-between gap-3">
                     <span>{m['creations.live_ended_at']()}</span>
-                    <span>{formatDateTime(new Date(history.endedAtMs).toISOString())}</span>
+                    <span>
+                      {formatDateTime(
+                        new Date(history.endedAtMs).toISOString()
+                      )}
+                    </span>
                   </div>
                 ) : null}
                 <div className="flex justify-between gap-3">
@@ -246,14 +255,19 @@ function LiveSessionCard({
                 <div className="flex justify-between gap-3">
                   <span>{m['creations.live_final_charge']()}</span>
                   <span className="tabular-nums">
-                    {m['creations.credits']({ count: history.finalCredits ?? 0 })}
+                    {m['creations.credits']({
+                      count: history.finalCredits ?? 0,
+                    })}
                   </span>
                 </div>
-                {history.returnedCredits !== null && history.returnedCredits > 0 ? (
+                {history.returnedCredits !== null &&
+                history.returnedCredits > 0 ? (
                   <div className="flex justify-between gap-3">
                     <span>{m['creations.live_credits_returned']()}</span>
                     <span className="tabular-nums">
-                      {m['creations.credits']({ count: history.returnedCredits })}
+                      {m['creations.credits']({
+                        count: history.returnedCredits,
+                      })}
                     </span>
                   </div>
                 ) : null}
@@ -277,7 +291,9 @@ function LiveSessionCard({
           </Link>
           {state !== 'completed' && state !== 'not-started' ? (
             <Button variant="outline" onClick={onRefresh} disabled={refreshing}>
-              <RefreshCw className={refreshing ? 'size-4 animate-spin' : 'size-4'} />
+              <RefreshCw
+                className={refreshing ? 'size-4 animate-spin' : 'size-4'}
+              />
               {m['creations.refresh_status']()}
             </Button>
           ) : null}
@@ -285,6 +301,40 @@ function LiveSessionCard({
       </CardContent>
     </Card>
   );
+}
+
+function mediaItemsForGeneration(generation: Generation): MediaItem[] {
+  const resultUrl = generation.videoUrl;
+  if (!resultUrl) return [];
+
+  if (generation.mediaType === 'image') {
+    const urls = generation.resultUrls?.length
+      ? generation.resultUrls
+      : [resultUrl];
+    return urls.map((src, index) => ({
+      id: `${generation.id}:image:${index}`,
+      kind: 'image' as const,
+      src,
+      alt: m['creations.view_image'](),
+    }));
+  }
+
+  const items: MediaItem[] = [];
+  if (generation.sourceVideoUrl) {
+    items.push({
+      id: `${generation.id}:source`,
+      kind: 'video',
+      src: generation.sourceVideoUrl,
+      alt: m['creations.source_video'](),
+    });
+  }
+  items.push({
+    id: `${generation.id}:result`,
+    kind: 'video',
+    src: resultUrl,
+    alt: m['creations.generated_video'](),
+  });
+  return items;
 }
 
 function GenerationCard({
@@ -296,7 +346,7 @@ function GenerationCard({
   generation: Generation;
   onRefresh: (generation: Generation) => void;
   refreshing: boolean;
-  onPreview: (preview: VideoPreview) => void;
+  onPreview: (items: MediaItem[], index: number) => void;
 }) {
   const completed = generation.status === 'completed' && generation.videoUrl;
   const failed =
@@ -306,19 +356,42 @@ function GenerationCard({
     generation.status === 'insufficient_credits';
   const sourceUrl = generation.sourceVideoUrl;
   const resultUrl = generation.videoUrl;
+  const mediaItems = mediaItemsForGeneration(generation);
+  const imageUrls = generation.resultUrls?.length
+    ? generation.resultUrls
+    : resultUrl
+      ? [resultUrl]
+      : [];
+  const openAt = (index: number) => {
+    if (mediaItems.length === 0) return;
+    onPreview(mediaItems, Math.max(0, Math.min(index, mediaItems.length - 1)));
+  };
 
   return (
     <Card className="overflow-hidden py-0">
       <div className="bg-muted relative aspect-video overflow-hidden">
         {completed && generation.mediaType === 'image' && resultUrl ? (
-          <div className={'grid size-full gap-1 ' +
-            ((generation.resultUrls?.length ?? 0) > 1 ? 'grid-cols-2' : 'grid-cols-1')}>
-            {(generation.resultUrls?.length ? generation.resultUrls : [resultUrl]).map((url, index) => (
-              <a key={url} href={url} target="_blank" rel="noopener noreferrer"
-                className="block min-h-0 min-w-0" aria-label={'View generated image ' + (index + 1)}>
-                <img src={url} alt={(generation.prompt || 'Generated image') + ' ' + (index + 1)}
-                  className="size-full object-contain" loading="lazy" />
-              </a>
+          <div
+            className={
+              'grid size-full gap-1 ' +
+              (imageUrls.length > 1 ? 'grid-cols-2' : 'grid-cols-1')
+            }
+          >
+            {imageUrls.map((url, index) => (
+              <button
+                key={url}
+                type="button"
+                onClick={() => openAt(index)}
+                className="group relative block min-h-0 min-w-0 cursor-zoom-in overflow-hidden"
+                aria-label={m['creations.open_image']({ index: index + 1 })}
+              >
+                <img
+                  src={url}
+                  alt=""
+                  className="size-full object-contain transition duration-200 group-hover:scale-[1.02]"
+                  loading="lazy"
+                />
+              </button>
             ))}
           </div>
         ) : completed && sourceUrl && resultUrl ? (
@@ -326,44 +399,36 @@ function GenerationCard({
             <VideoThumb
               src={sourceUrl}
               label={m['creations.source_video']()}
-              onOpen={() =>
-                onPreview({
-                  url: sourceUrl,
-                  title: m['creations.source_video'](),
-                })
-              }
+              onOpen={() => openAt(0)}
             />
             <VideoThumb
               src={resultUrl}
               label={m['creations.generated_video']()}
-              onOpen={() =>
-                onPreview({
-                  url: resultUrl,
-                  title: m['creations.generated_video'](),
-                })
-              }
+              onOpen={() => openAt(1)}
             />
           </div>
         ) : completed && resultUrl ? (
           <VideoThumb
             src={resultUrl}
             label={m['creations.generated_video']()}
-            onOpen={() =>
-              onPreview({
-                url: resultUrl,
-                title: m['creations.generated_video'](),
-              })
-            }
+            onOpen={() => openAt(0)}
           />
         ) : failed && sourceUrl ? (
           <VideoThumb
             src={sourceUrl}
             label={m['creations.source_video']()}
             onOpen={() =>
-              onPreview({
-                url: sourceUrl,
-                title: m['creations.source_video'](),
-              })
+              onPreview(
+                [
+                  {
+                    id: `${generation.id}:source`,
+                    kind: 'video',
+                    src: sourceUrl,
+                    alt: m['creations.source_video'](),
+                  },
+                ],
+                0
+              )
             }
           />
         ) : (
@@ -423,17 +488,13 @@ function GenerationCard({
 
         <div className="flex gap-2">
           {completed && resultUrl && generation.mediaType === 'image' ? (
-            <a href={resultUrl} target="_blank" rel="noopener noreferrer"
-              className={buttonVariants({ variant: 'outline' })}>View Image</a>
+            <Button variant="outline" onClick={() => openAt(0)}>
+              {m['creations.view_image']()}
+            </Button>
           ) : completed && resultUrl ? (
             <Button
               variant="outline"
-              onClick={() =>
-                onPreview({
-                  url: resultUrl,
-                  title: m['creations.generated_video'](),
-                })
-              }
+              onClick={() => openAt(mediaItems.length > 1 ? 1 : 0)}
             >
               <Play className="size-4" />
               {m['creations.view_video']()}
@@ -465,7 +526,7 @@ function GenerationCard({
 
 function CreationsPage() {
   const [page, setPage] = useState(1);
-  const [preview, setPreview] = useState<VideoPreview | null>(null);
+  const [viewer, setViewer] = useState<MediaViewerState | null>(null);
   const { data: session, isPending: sessionPending } = useSession();
   const queryClient = useQueryClient();
   const userId = session?.user?.id;
@@ -482,9 +543,10 @@ function CreationsPage() {
 
   const processingGenerations = useMemo(
     () =>
-      (query.data?.items ?? []).filter((generation) =>
-        generation.scene !== 'live-face-swap' &&
-        isProcessingStatus(generation.status)
+      (query.data?.items ?? []).filter(
+        (generation) =>
+          generation.scene !== 'live-face-swap' &&
+          isProcessingStatus(generation.status)
       ),
     [query.data?.items]
   );
@@ -670,7 +732,7 @@ function CreationsPage() {
                   <GenerationCard
                     key={generation.id}
                     generation={generation}
-                    onPreview={setPreview}
+                    onPreview={(items, index) => setViewer({ items, index })}
                     onRefresh={(item) => refreshMutation.mutate(item)}
                     refreshing={
                       refreshMutation.isPending &&
@@ -709,31 +771,19 @@ function CreationsPage() {
       </main>
       <SiteFooter />
 
-      <Dialog
-        open={Boolean(preview)}
-        onOpenChange={(open) => {
-          if (!open) setPreview(null);
-        }}
-      >
-        <DialogContent
-          className="overflow-hidden p-0 sm:max-w-4xl"
-          showCloseButton
-        >
-          <DialogHeader className="px-4 pt-4 pr-12">
-            <DialogTitle>{preview?.title}</DialogTitle>
-          </DialogHeader>
-          {preview ? (
-            <video
-              key={preview.url}
-              src={preview.url}
-              controls
-              autoPlay
-              playsInline
-              className="max-h-[75vh] w-full bg-black object-contain"
-            />
-          ) : null}
-        </DialogContent>
-      </Dialog>
+      {viewer ? (
+        <MediaViewer
+          items={viewer.items}
+          index={viewer.index}
+          open
+          onIndexChange={(index) =>
+            setViewer((current) => (current ? { ...current, index } : current))
+          }
+          onOpenChange={(open) => {
+            if (!open) setViewer(null);
+          }}
+        />
+      ) : null}
     </div>
   );
 }
