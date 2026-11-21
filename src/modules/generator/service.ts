@@ -26,6 +26,7 @@ import {
   type GeneratorTask,
 } from './billing';
 import { getGeneratorModel, GENERATOR_MODELS } from './catalog';
+import { probeGeneratorVideoDuration } from './media-metadata';
 import { calculateGeneratorCredits } from './pricing';
 import {
   assertGenerationId,
@@ -204,6 +205,19 @@ export async function generateWithGenerator(input: {
       slots: spec.slots,
     });
     try {
+      // Verify duration of all bounded reference videos before consuming credits.
+      for (const slot of ['referenceVideos'] as const) {
+        const limit = spec.slots[slot];
+        if (!limit || (limit.minSeconds === undefined && limit.maxSeconds === undefined)) continue;
+        for (const key of sealed.inputs[slot]) {
+          const seconds = await probeGeneratorVideoDuration(await signGeneratorReadUrl(key));
+          if ((limit.minSeconds !== undefined && seconds < limit.minSeconds) ||
+              (limit.maxSeconds !== undefined && seconds > limit.maxSeconds)) {
+            throw new Error('Reference video must be between ' +
+              limit.minSeconds + ' and ' + limit.maxSeconds + ' seconds');
+          }
+        }
+      }
       task = await reserveGeneratorTask({
         generationId, userId: input.userId, userEmail: input.userEmail,
         state, sealedState: { ...state, inputs: sealed.inputs },
