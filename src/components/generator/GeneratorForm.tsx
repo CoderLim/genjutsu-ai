@@ -18,6 +18,9 @@ import {
   getGeneratorExpansionControls,
   generatorReadinessError,
   getGeneratorSlotCapacity,
+  GENERATOR_REFERENCE_SLOTS,
+  describeGeneratorMixedReferences,
+  planGeneratorMixedReferenceFiles,
   isGeneratorJobActive,
   isGeneratorSlotOptional,
   shouldPollGeneratorJob,
@@ -49,6 +52,7 @@ import { Switch } from '@/components/ui/switch';
 
 import { ComposerFrameSlots, ComposerToolbar } from './ComposerPanels';
 import { MediaUploader } from './MediaUploader';
+import { MixedReferenceUploader } from './MixedReferenceUploader';
 
 const FIELD_ORDER = [
   'aspectRatio',
@@ -397,6 +401,99 @@ export function GeneratorForm({
           )
         : createGeneratorState(next)
     );
+  }
+
+  /**
+   * The All-in-One picker is a single control, but images, videos and audio
+   * remain distinct provider slots. Validate the entire mixed batch before
+   * committing any browser URLs, metadata, or quote changes.
+   */
+  async function onMixedReferenceFiles(files: File[]) {
+    if (!spec || !form || !model || busy || mediaReadLock.current ||
+        submitLock.current || files.length === 0) return;
+
+    let assignments: ReturnType<typeof planGeneratorMixedReferenceFiles>;
+    try {
+      assignments = planGeneratorMixedReferenceFiles(spec, form.inputs, files);
+    } catch (error) {
+      setUploadError(error instanceof Error ? error.message : 'Invalid reference file');
+      return;
+    }
+
+    mediaReadLock.current = true;
+    setMediaBusy(true);
+    const created: Array<{
+      url: string;
+      slot: 'referenceImages' | 'referenceVideos' | 'referenceAudio';
+      file: File;
+    }> = [];
+    const durations = new Map<string, number>();
+    try {
+      for (const { index, slot } of assignments) {
+        const file = files[index];
+        const rule = spec.slots[slot]!;
+        const url = URL.createObjectURL(file);
+        created.push({ url, slot, file });
+        if (slot === 'referenceVideos' || slot === 'referenceAudio') {
+          const seconds = await mediaDurationFromBlobUrl(url, slot);
+          if ((rule.minSeconds !== undefined && seconds < rule.minSeconds) ||
+              (rule.maxSeconds !== undefined && seconds > rule.maxSeconds)) {
+            throw new Error('Reference media duration exceeds model limits: ' + file.name);
+          }
+          durations.set(url, seconds);
+        }
+      }
+
+      const addedVideos = created.filter(item => item.slot === 'referenceVideos');
+      if (addedVideos.length) {
+        referenceVideoBillableSeconds([
+          ...form.inputs.referenceVideos.map(
+            url => mediaDurations.current.get(url) ?? NaN
+          ),
+          ...addedVideos.map(item => durations.get(item.url) ?? NaN),
+        ]);
+      }
+      const addedAudio = created.filter(item => item.slot === 'referenceAudio');
+      if (addedAudio.length) {
+        assertReferenceAudioDuration([
+          ...form.inputs.referenceAudio.map(
+            url => mediaDurations.current.get(url) ?? NaN
+          ),
+          ...addedAudio.map(item => durations.get(item.url) ?? NaN),
+        ]);
+      }
+
+      for (const { url, file } of created) {
+        localFiles.current.set(url, file);
+        const seconds = durations.get(url);
+        if (seconds !== undefined) mediaDurations.current.set(url, seconds);
+      }
+      setUploadError('');
+      setPageError('');
+      setPriceChange(null);
+      setRetryAttempt(null);
+      setDraft(prev => {
+        if (!prev) return null;
+        const inputs = {
+          ...prev.inputs,
+          referenceImages: [...prev.inputs.referenceImages],
+          referenceVideos: [...prev.inputs.referenceVideos],
+          referenceAudio: [...prev.inputs.referenceAudio],
+        };
+        for (const { url, slot } of created) inputs[slot].push(url);
+        return syncReferenceQuote(
+          updateGeneratorState(prev, model, { inputs }), model
+        );
+      });
+    } catch (error) {
+      for (const { url } of created) URL.revokeObjectURL(url);
+      setUploadError(
+        error instanceof Error ? error.message : 'Could not read the uploaded media'
+      );
+    } finally {
+      mediaReadLock.current = false;
+      setMediaBusy(false);
+    }
   }
 
   async function onFiles(slot: MediaSlot, files: File[]) {
