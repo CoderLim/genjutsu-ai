@@ -115,6 +115,9 @@ function sceneLabel(generation: Pick<Generation, 'scene' | 'mode'>) {
 
 function statusLabel(status: string) {
   if (status === 'completed') return m['creations.status.completed']();
+  // Query lookup failed repeatedly, but upstream generation/billing is
+  // unconfirmed. Display review, not failure or indefinite Processing.
+  if (status === 'query_review') return m['creations.live_review']();
   if (
     status === 'failed' ||
     status === 'refunded' ||
