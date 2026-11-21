@@ -38,6 +38,7 @@ interface Generation {
   id: string;
   scene: string;
   mediaType?: 'image' | 'video';
+  resultUrls?: string[];
   prompt: string;
   status: string;
   mode: string | null;
@@ -307,9 +308,16 @@ function GenerationCard({
     <Card className="overflow-hidden py-0">
       <div className="bg-muted relative aspect-video overflow-hidden">
         {completed && generation.mediaType === 'image' && resultUrl ? (
-          <a href={resultUrl} target="_blank" rel="noopener noreferrer" className="block size-full" aria-label="View generated image">
-            <img src={resultUrl} alt={generation.prompt || 'Generated image'} className="size-full object-contain" />
-          </a>
+          <div className={'grid size-full gap-1 ' +
+            ((generation.resultUrls?.length ?? 0) > 1 ? 'grid-cols-2' : 'grid-cols-1')}>
+            {(generation.resultUrls?.length ? generation.resultUrls : [resultUrl]).map((url, index) => (
+              <a key={url} href={url} target="_blank" rel="noopener noreferrer"
+                className="block min-h-0 min-w-0" aria-label={'View generated image ' + (index + 1)}>
+                <img src={url} alt={(generation.prompt || 'Generated image') + ' ' + (index + 1)}
+                  className="size-full object-contain" loading="lazy" />
+              </a>
+            ))}
+          </div>
         ) : completed && sourceUrl && resultUrl ? (
           <div className="grid size-full grid-cols-2">
             <VideoThumb
