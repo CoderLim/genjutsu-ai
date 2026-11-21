@@ -102,6 +102,9 @@ export function GeneratorForm({
   const [stage, setStage] = useState('');
   const [job, setJob] = useState<JobInfo | null>(null);
   const [priceChange, setPriceChange] = useState<PriceChange | null>(null);
+  const [retryAttempt, setRetryAttempt] = useState<PriceChange | null>(null);
+  // Synchronous guard; React busy state alone may not block same-tick clicks.
+  const submitLock = useRef(false);
 
   const localFiles = useRef(new Map<string, File>());
 
@@ -113,6 +116,7 @@ export function GeneratorForm({
     setDraft(preferredModel ? createGeneratorState(preferredModel) : null);
     setPageError('');
     setPriceChange(null);
+    setRetryAttempt(null);
   }, [preferredModel]);
 
   // Revoke stale blob URLs as soon as a model/workflow switch drops the asset.
@@ -166,6 +170,7 @@ export function GeneratorForm({
   ) {
     setPageError('');
     setPriceChange(null);
+    setRetryAttempt(null);
     setDraft(prev => prev && (nextModel ?? model)
       ? updateGeneratorState(prev, nextModel ?? model!, patch)
       : prev
@@ -187,6 +192,7 @@ export function GeneratorForm({
     setUploadError('');
     setPageError('');
     setPriceChange(null);
+    setRetryAttempt(null);
     setDraft(prev => prev
       ? normalizeGeneratorState(prev, next)
       : createGeneratorState(next)
@@ -217,6 +223,7 @@ export function GeneratorForm({
     setUploadError('');
     setPageError('');
     setPriceChange(null);
+    setRetryAttempt(null);
     setDraft(prev => {
       if (!prev) return null;
       const inputs = { ...prev.inputs };
@@ -311,37 +318,55 @@ export function GeneratorForm({
   }
 
   async function onGenerate() {
-    if (!form || !model || !quote || busy) return;
+    if (!form || !model || !quote || busy || submitLock.current) return;
     try {
       assertGeneratorReady(form, model);
     } catch (error) {
       setPageError(error instanceof Error ? error.message : 'Please check your inputs');
       return;
     }
+    submitLock.current = true;
     setBusy(true);
     setPageError('');
     setPriceChange(null);
     setJob(null);
-    const generationId = crypto.randomUUID();
-    let uploadedState = form;
+
+    // Preserve the generation ID AND sealed-bound staging keys when a request
+    // may have reached the server but the browser missed the response.
+    const attempt = retryAttempt;
+    const generationId = attempt?.generationId ?? crypto.randomUUID();
+    let uploadedState = attempt?.uploadedState ?? form;
     try {
-      setStage('Uploading reference media...');
-      uploadedState = await uploadAssets(form, generationId);
+      if (!attempt) {
+        setStage('Uploading reference media...');
+        uploadedState = await uploadAssets(form, generationId);
+        setRetryAttempt({
+          generationId,
+          uploadedState,
+          credits: quote.credits,
+          pricingVersion: quote.pricingVersion,
+        });
+      }
       const response = await submitGeneration(
-        generationId, uploadedState, quote.credits, quote.pricingVersion
+        generationId, uploadedState,
+        attempt?.credits ?? quote.credits,
+        attempt?.pricingVersion ?? quote.pricingVersion
       );
       setJob(response);
+      setRetryAttempt(null);
       setStage('');
     } catch (error) {
       handleSubmitError(error, generationId, uploadedState);
       setStage('');
     } finally {
+      submitLock.current = false;
       setBusy(false);
     }
   }
 
   async function onConfirmPrice() {
-    if (!priceChange || busy) return;
+    if (!priceChange || busy || submitLock.current) return;
+    submitLock.current = true;
     setBusy(true);
     setPageError('');
     try {
@@ -353,11 +378,13 @@ export function GeneratorForm({
       );
       setJob(response);
       setPriceChange(null);
+      setRetryAttempt(null);
       setStage('');
     } catch (error) {
       handleSubmitError(error, priceChange.generationId, priceChange.uploadedState);
       setStage('');
     } finally {
+      submitLock.current = false;
       setBusy(false);
     }
   }
@@ -505,7 +532,7 @@ export function GeneratorForm({
             <button type="button" disabled={!canSubmit} onClick={onGenerate}
               className="bg-primary text-primary-foreground disabled:opacity-50 flex w-full items-center justify-center gap-2 rounded-xl px-5 py-3 font-semibold">
               {busy ? <LoaderCircle className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
-              {busy ? stage || 'Working...' : model.enabled ? 'Generate · ' + (quote?.credits ?? '—') + ' Credits' : 'Preview only · Model unavailable'}
+              {busy ? stage || 'Working...' : !model.enabled ? 'Preview only · Model unavailable' : retryAttempt ? 'Retry existing generation' : 'Generate · ' + (quote?.credits ?? '—') + ' Credits'}
             </button>
             {priceChange ? (
               <button type="button" disabled={busy} onClick={onConfirmPrice}
