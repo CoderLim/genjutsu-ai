@@ -13,12 +13,12 @@ test('live catalog capabilities and price tables are valid', () => {
   }
 });
 
-test('public models omit unverified multimodal endpoints', () => {
+test('public catalog lists completed reference workflows', () => {
   const ids = listGeneratorModels().map(x => x.id);
   assert.deepEqual(ids, [
-    'seedance-2-i2v', 'seedance-2-t2v', 'seedance-2-multiimage', 'h3-reference', 'flux-schnell', 'flux2-flash-edit',
+    'seedance-2-i2v', 'seedance-2-t2v', 'seedance-2-multiimage', 'seedance-2-reference', 'h3-reference', 'flux-schnell', 'flux2-flash-edit',
   ]);
-  assert.throws(() => getGeneratorModel('seedance-2-reference'), /not enabled/);
+  assert.equal(getGeneratorModel('seedance-2-reference').enabled, true);
 });
 
 test('photo-to-video offers verified first-frame and start-end only', () => {
@@ -162,4 +162,39 @@ test('multi-image reference charges output seconds only and truncates extra phot
   });
   assert.equal(draft.inputs.referenceImages.length, 9);
   assert.equal(calculateGeneratorCredits(draft, model).credits, 204);
+});
+
+test('reference video input charges input+output using provider-specific tariff', () => {
+  const model = getGeneratorModel('seedance-2-reference');
+  const defaultDraft = createGeneratorState(model);
+  assert.throws(() => assertGeneratorReady({
+    ...defaultDraft, prompt: 'Generate a running scene',
+  }, model), /At least one reference/);
+
+  const photos = updateGeneratorState(defaultDraft, model, {
+    inputs: { ...defaultDraft.inputs, referenceImages: ['image-a'] },
+  });
+  assert.equal(calculateGeneratorCredits(photos, model).credits, 204);
+
+  const videos = updateGeneratorState(defaultDraft, model, {
+    inputs: {
+      ...defaultDraft.inputs,
+      referenceVideos: ['reference-clip'],
+    },
+    params: { inputVideoSeconds: 3 },
+  });
+  assert.equal(calculateGeneratorCredits(videos, model).credits, 204); // 5+3 seconds at 25.5
+  assert.equal(calculateGeneratorCredits(
+    updateGeneratorState(videos, model, { params: { resolution: '480p' } }), model
+  ).credits, 102); // 8 seconds at 12.75
+  assert.throws(() => calculateGeneratorCredits(
+    updateGeneratorState(videos, model, { params: { inputVideoSeconds: 0 } }), model
+  ), /duration is not ready/);
+});
+test('audio reference without image or video is invalid', () => {
+  const model = getGeneratorModel('seedance-2-reference');
+  const initial = createGeneratorState(model);
+  assert.throws(() => assertGeneratorDraft({
+    ...initial, inputs: { ...initial.inputs, referenceAudio: ['audio-only'] },
+  }, model), /require an image or video/);
 });
