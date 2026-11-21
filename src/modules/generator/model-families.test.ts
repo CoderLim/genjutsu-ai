@@ -21,6 +21,8 @@ test('model chooser lists Seedance and Nano Banana, not workflow categories', ()
   assert.deepEqual(groups[0].models.map(m => m.id), [
     'photo-to-video-standard', 'text-to-video-standard',
     'multi-image-to-video', 'all-in-one-video',
+    'seedance-2-fast', 'seedance-2-mini',
+    'seedance-2.5', 'seedance-2.5-flash',
   ]);
   assert.deepEqual(groups[1].models.map(m => m.id), ['nano-banana-2', 'nano-banana-pro']);
   assert.equal(getGeneratorModelFamilyId('nano-banana-pro'), 'nano-banana');
