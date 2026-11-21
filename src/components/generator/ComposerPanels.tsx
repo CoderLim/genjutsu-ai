@@ -277,7 +277,7 @@ export function ComposerToolbar({
   onFastChange: (checked: boolean) => void;
 }) {
   const families = useMemo(() =>
-    groupGeneratorModels(getGeneratorModelChoices(models)), [models]);
+    groupGeneratorModels(getGeneratorModelChoices(models, import.meta.env.DEV)), [models]);
   const workflowChoices = useMemo(
     () => getGeneratorWorkflowChoices(models, model),
     [models, model]
@@ -406,6 +406,11 @@ export function ComposerToolbar({
                     <span className="block pr-6 text-sm font-semibold text-[rgb(18,15,16)]">
                       {generatorModelLabel(item)}
                     </span>
+                    {!item.enabled ? (
+                      <span className="mt-1 block text-[11px] text-[rgba(18,15,16,0.55)]">
+                        Preview · Pricing pending
+                      </span>
+                    ) : null}
                   </button>
                 );
               })}

@@ -18,7 +18,10 @@ export function getGeneratorModelFamilyId(modelId: string): string {
     modelId === 'multi-image-to-video' ||
     modelId === 'all-in-one-video'
   ) return 'seedance';
-  if (modelId === 'reference-to-video-pro') return 'minimax';
+  if (modelId === 'reference-to-video-pro' || modelId.startsWith('minimax-'))
+    return 'minimax';
+  if (modelId.startsWith('seedance-')) return 'seedance';
+  if (modelId.startsWith('kling-')) return 'kling';
   if (modelId === 'text-to-image-fast' || modelId === 'image-edit-standard')
     return 'flux';
   // Future models should never be mislabeled as a generic tool category.
@@ -40,11 +43,15 @@ const FAMILIES: Record<string, Pick<GeneratorModelFamily, 'label' | 'blurb' | 'b
   },
   minimax: {
     label: 'MiniMax',
-    blurb: 'MiniMax video models',
+    blurb: 'MiniMax video and image models',
+  },
+  kling: {
+    label: 'Kling',
+    blurb: 'Kling video models',
   },
 };
 
-const ORDER = ['seedance', 'nano-banana', 'flux', 'minimax'];
+const ORDER = ['seedance', 'nano-banana', 'minimax', 'kling', 'flux'];
 
 export function groupGeneratorModels(models: readonly GeneratorModel[]): GeneratorModelFamily[] {
   const map = new Map<string, GeneratorModel[]>();
@@ -77,49 +84,45 @@ export type GeneratorWorkflowChoice = {
  * Seedance currently uses multiple backend catalog profiles; collapse them to
  * one visual model while retaining their original API and pricing boundaries.
  */
+const SEEDANCE_BASE_IDS = new Set([
+  'photo-to-video-standard',
+  'text-to-video-standard',
+  'multi-image-to-video',
+  'all-in-one-video',
+]);
+
+/** Collapse only the original Seedance 2.0 workflow profiles. */
 export function getGeneratorModelChoices(
-  models: readonly GeneratorModel[]
+  models: readonly GeneratorModel[],
+  includeDisabled = false
 ): GeneratorModel[] {
-  // An unverified/disabled model must not appear in either image or video
-  // selection, even when the form runs in development mode.
-  const enabledModels = models.filter(model => model.enabled);
-  const seedance = enabledModels.filter(
-    model => getGeneratorModelFamilyId(model.id) === 'seedance'
-  );
-  const representative = seedance.find(
-    model => model.id === 'photo-to-video-standard'
-  ) ?? seedance[0];
-  return enabledModels.filter(model =>
-    getGeneratorModelFamilyId(model.id) !== 'seedance' ||
-    model.id === representative?.id
+  const available = includeDisabled ? models : models.filter(model => model.enabled);
+  const base = available.filter(model => SEEDANCE_BASE_IDS.has(model.id));
+  const representative = base.find(model => model.id === 'photo-to-video-standard') ?? base[0];
+  return available.filter(model =>
+    !SEEDANCE_BASE_IDS.has(model.id) || model.id === representative?.id
   );
 }
 
 export function generatorModelLabel(model: GeneratorModel): string {
-  return getGeneratorModelFamilyId(model.id) === 'seedance'
-    ? 'Seedance 2.0'
-    : model.name;
+  return SEEDANCE_BASE_IDS.has(model.id) ? 'Seedance 2.0' : model.name;
 }
 
 export function isSameGeneratorModelChoice(
   candidate: GeneratorModel,
   selected: GeneratorModel
 ): boolean {
-  if (getGeneratorModelFamilyId(candidate.id) === 'seedance') {
-    return getGeneratorModelFamilyId(selected.id) === 'seedance';
+  if (SEEDANCE_BASE_IDS.has(candidate.id)) {
+    return SEEDANCE_BASE_IDS.has(selected.id);
   }
   return candidate.id === selected.id;
 }
 
-/**
- * A workflow selection can change internal backend profile without changing
- * the visible model. The UI submits the resolved modelId/workflow together.
- */
 export function getGeneratorWorkflowChoices(
   models: readonly GeneratorModel[],
   active: GeneratorModel
 ): GeneratorWorkflowChoice[] {
-  if (getGeneratorModelFamilyId(active.id) === 'seedance') {
+  if (SEEDANCE_BASE_IDS.has(active.id)) {
     const choices: GeneratorWorkflowChoice[] = [
       { modelId: 'photo-to-video-standard', workflow: 'first-frame', label: 'First Frame' },
       { modelId: 'photo-to-video-standard', workflow: 'start-end', label: 'Start & End' },

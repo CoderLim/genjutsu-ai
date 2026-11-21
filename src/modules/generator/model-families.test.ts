@@ -15,7 +15,7 @@ import { calculateGeneratorCredits } from './pricing';
 
 test('model chooser lists Seedance and Nano Banana, not workflow categories', () => {
   const groups = groupGeneratorModels(listGeneratorModels());
-  assert.deepEqual(groups.map(g => g.label), ['Seedance', 'Nano Banana', 'FLUX']);
+  assert.deepEqual(groups.map(g => g.label), ['Seedance', 'Nano Banana', 'MiniMax', 'FLUX']);
   assert.deepEqual(groups[0].models.map(m => m.id), [
     'photo-to-video-standard', 'text-to-video-standard',
     'multi-image-to-video', 'all-in-one-video',
@@ -69,6 +69,8 @@ test('model menu contains one Seedance 2.0 item and no workflow or resolution me
     'Nano Banana Pro',
     'FLUX.1 Schnell',
     'FLUX.2 Flash',
+    'MiniMax H3 Max Turbo',
+    'MiniMax H3 Max',
   ]);
   const selectedTextVideo = getGeneratorModel('text-to-video-standard');
   const seedance = getGeneratorModel('photo-to-video-standard');
@@ -121,8 +123,10 @@ test('video tab shows actual enabled video model families only', () => {
     allModels.filter(model => model.mediaType === 'video')
   );
   const groups = groupGeneratorModels(models);
-  assert.deepEqual(groups.map(group => group.label), ['Seedance']);
-  assert.deepEqual(models.map(generatorModelLabel), ['Seedance 2.0']);
+  assert.deepEqual(groups.map(group => group.label), ['Seedance', 'MiniMax']);
+  assert.deepEqual(models.map(generatorModelLabel), [
+    'Seedance 2.0', 'MiniMax H3 Max Turbo', 'MiniMax H3 Max',
+  ]);
   // The H3 preview has unverified pricing, so it is not selectable in DEV.
   assert.ok(!models.some(model => model.id === 'reference-to-video-pro'));
   const workflowChoices = getGeneratorWorkflowChoices(allModels, models[0]);
@@ -153,4 +157,39 @@ test('future enabled MiniMax model appears under its real brand only', () => {
     getGeneratorModelChoices([{ ...h3, enabled: true }])
   );
   assert.deepEqual(families.map(group => group.label), ['MiniMax']);
+});
+
+
+test('development previews list requested versions but cannot bill unpriced models', () => {
+  const video = getGeneratorModelChoices(
+    GENERATOR_MODELS.filter(model => model.mediaType === 'video'), true
+  );
+  const image = getGeneratorModelChoices(
+    GENERATOR_MODELS.filter(model => model.mediaType === 'image'), true
+  );
+  assert.deepEqual(groupGeneratorModels(video).map(x => x.label), [
+    'Seedance', 'MiniMax', 'Kling',
+  ]);
+  assert.deepEqual(groupGeneratorModels(image).map(x => x.label), [
+    'Nano Banana', 'MiniMax', 'FLUX',
+  ]);
+  assert.deepEqual(video.filter(x => x.id.startsWith('seedance-')).map(x => x.name), [
+    'Seedance 2.0 Fast', 'Seedance 2.0 Mini',
+    'Seedance 2.5', 'Seedance 2.5 Flash',
+  ]);
+  assert.deepEqual(video.filter(x => x.id.startsWith('kling-')).map(x => x.name), [
+    'Kling 4.0', 'Kling 4.0 Flash', 'Kling 3.0 Turbo', 'Kling 3.0',
+  ]);
+  assert.equal(video.filter(x => x.id.startsWith('kling-')).every(x => !x.enabled), true);
+  assert.equal(image.filter(x => x.id.startsWith('minimax-h3-image')).length, 2);
+  assert.equal(image.filter(x => x.id.startsWith('minimax-h3-image')).every(x => !x.enabled), true);
+});
+
+test('Seedance Fast workflows use Fast endpoints, not original Seedance profiles', () => {
+  const fast = GENERATOR_MODELS.find(x => x.id === 'seedance-2-fast')!;
+  const choices = getGeneratorWorkflowChoices(GENERATOR_MODELS, fast);
+  assert.deepEqual(choices.map(x => x.label), ['First Frame', 'Text to Video']);
+  assert.ok(choices.every(x => x.modelId === fast.id));
+  const old = GENERATOR_MODELS.find(x => x.id === 'photo-to-video-standard')!;
+  assert.equal(isSameGeneratorModelChoice(old, fast), false);
 });

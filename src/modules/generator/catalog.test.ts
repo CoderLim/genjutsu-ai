@@ -16,7 +16,7 @@ test('live catalog capabilities and price tables are valid', () => {
 test('public catalog lists completed reference workflows', () => {
   const ids = listGeneratorModels().map(x => x.id);
   assert.deepEqual(ids, [
-    'photo-to-video-standard', 'text-to-video-standard', 'multi-image-to-video', 'all-in-one-video', 'nano-banana-2', 'nano-banana-pro', 'text-to-image-fast', 'image-edit-standard',
+    'photo-to-video-standard', 'text-to-video-standard', 'multi-image-to-video', 'all-in-one-video', 'nano-banana-2', 'nano-banana-pro', 'text-to-image-fast', 'image-edit-standard', 'minimax-h3-max-turbo', 'minimax-h3-max',
   ]);
   assert.equal(getGeneratorModel('all-in-one-video').enabled, true);
   assert.throws(() => getGeneratorModel('reference-to-video-pro'), /not enabled/);
