@@ -524,3 +524,74 @@ test('H3 base exposes only two Raphael modes and does not promise non-existent F
   assert.equal(body.prompt_expansion_mode, undefined);
   assert.equal(body.enable_safety_checker, undefined);
 });
+
+test('image composer routes optional references to matching model edit APIs without mode selection', () => {
+  const ids = [
+    'nano-banana-2.1', 'nano-banana-2-lite', 'nano-banana-2',
+    'nano-banana-pro', 'minimax-h3-image',
+    'minimax-h3-image-highspeed', 'image-edit-standard',
+  ];
+  for (const id of ids) {
+    const model = getGeneratorModel(id);
+    const text = updateGeneratorState(createGeneratorState(model), model, {
+      prompt: 'A glass house surrounded by flowers',
+    });
+    assert.equal(text.workflow, 'text-to-image', id);
+    assert.doesNotThrow(() => assertGeneratorReady(text, model), id);
+    const textEndpoint = getGeneratorProviderIdentity(id, text.workflow, false);
+    const textPayload = buildGeneratorProviderRequest(text, emptyMedia);
+    assert.equal(textEndpoint.provider, 'fal', id);
+    assert.equal(textPayload.image_urls, undefined, id);
+
+    const withReference = updateGeneratorState(text, model, {
+      inputs: { ...text.inputs, referenceImages: ['uploaded-photo'] },
+    });
+    assert.equal(withReference.workflow, 'text-to-image', id);
+    assert.doesNotThrow(() => assertGeneratorReady(withReference, model), id);
+    const editEndpoint = getGeneratorProviderIdentity(id, withReference.workflow, true);
+    assert.equal(editEndpoint.provider, textEndpoint.provider);
+    assert.notEqual(editEndpoint.providerModelId, textEndpoint.providerModelId, id);
+    assert.ok(editEndpoint.providerModelId.endsWith('/edit'), id);
+    const editPayload = buildGeneratorProviderRequest(withReference, {
+      ...emptyMedia,
+      referenceImages: ['https://example.test/source.png'],
+    });
+    assert.deepEqual(editPayload.image_urls,
+      ['https://example.test/source.png'], id);
+
+    const cleared = updateGeneratorState(withReference, model, {
+      inputs: { ...withReference.inputs, referenceImages: [] },
+    });
+    assert.equal(cleared.workflow, 'text-to-image', id);
+    assert.equal(getGeneratorProviderIdentity(id, cleared.workflow, false).providerModelId,
+      textEndpoint.providerModelId, id);
+    assert.equal(buildGeneratorProviderRequest(cleared, emptyMedia).image_urls,
+      undefined, id);
+  }
+  assert.equal(getGeneratorProviderIdentity(
+    'image-edit-standard', 'text-to-image', false
+  ).providerModelId, 'fal-ai/flux-2/flash');
+  assert.equal(getGeneratorProviderIdentity(
+    'image-edit-standard', 'text-to-image', true
+  ).providerModelId, 'fal-ai/flux-2/flash/edit');
+});
+
+test('older explicit image edit tasks retain their edit endpoint', () => {
+  for (const id of ['nano-banana-2', 'minimax-h3-image', 'image-edit-standard']) {
+    const model = getGeneratorModel(id);
+    const old = updateGeneratorState(createGeneratorState(model), model, {
+      workflow: 'image-to-image',
+      prompt: 'Remove background clutter',
+      inputs: {
+        ...createGeneratorState(model).inputs,
+        referenceImages: ['old-input'],
+      },
+    });
+    assert.doesNotThrow(() => assertGeneratorReady(old, model), id);
+    const identity = getGeneratorProviderIdentity(id, old.workflow);
+    assert.ok(identity.providerModelId.endsWith('/edit'), id);
+    assert.deepEqual(buildGeneratorProviderRequest(old, {
+      ...emptyMedia, referenceImages: ['https://example.test/old.png'],
+    }).image_urls, ['https://example.test/old.png'], id);
+  }
+});
