@@ -57,7 +57,10 @@ function videoFields(options: VideoOptions): Record<string, FieldSpec> {
     fields.promptExpansionMode = {
       label: 'Prompt Expansion',
       default: 'balanced',
-      options: ['disabled', 'balanced', 'quality'],
+      // H3 base additionally supports 'fast'; H3 Max variants do not.
+      options: options.id === 'minimax-h3'
+        ? ['disabled', 'fast', 'balanced', 'quality']
+        : ['disabled', 'balanced', 'quality'],
     };
   }
   return fields;
@@ -219,13 +222,13 @@ export const ADDITIONAL_GENERATOR_MODELS: readonly GeneratorModel[] = [
   videoProfile({
     id: 'kling-4-flash', name: 'Kling 4.0 Flash',
     resolutions: ['720p'], duration: [3, 20],
-    rates: { '720p': 17 }, startEnd: true,
+    rates: { '720p': 17 }, // Fal 4.0 Flash does not accept an end frame.
   }),
   videoProfile({
     id: 'kling-3-turbo', name: 'Kling 3.0 Turbo',
     resolutions: ['720p'], duration: [3, 15],
     aspectRatios: ['16:9', '9:16', '1:1'],
-    rates: { '720p': 20 }, startEnd: true,
+    rates: { '720p': 20 }, // Fal V3 Turbo Standard accepts one image only.
   }),
   videoProfile({
     id: 'kling-3', name: 'Kling 3.0',
