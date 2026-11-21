@@ -43,7 +43,79 @@ export function getGeneratorSlotCapacity(
   return Math.max(0, available);
 }
 
-export type GeneratorLocalFileMeta = { type: string; size: number };
+export const GENERATOR_REFERENCE_SLOTS = [
+  'referenceImages', 'referenceVideos', 'referenceAudio',
+] as const;
+export type GeneratorReferenceSlot = (typeof GENERATOR_REFERENCE_SLOTS)[number];
+
+export type GeneratorLocalFileMeta = { type: string; size: number; name?: string };
+
+export type GeneratorMixedFileAssignment = {
+  index: number;
+  slot: GeneratorReferenceSlot;
+};
+
+/**
+ * One visual upload control can accept several media types, but uploaded
+ * assets must still be assigned to their separate provider slots.
+ * Reject the entire batch if any file violates its own or the combined cap:
+ * silently truncating a mixed batch would lose user-selected media.
+ */
+export function planGeneratorMixedReferenceFiles(
+  spec: WorkflowSpec,
+  inputs: GeneratorInputs,
+  files: readonly GeneratorLocalFileMeta[]
+): GeneratorMixedFileAssignment[] {
+  const counts: Record<GeneratorReferenceSlot, number> = {
+    referenceImages: inputs.referenceImages.length,
+    referenceVideos: inputs.referenceVideos.length,
+    referenceAudio: inputs.referenceAudio.length,
+  };
+  let total = counts.referenceImages + counts.referenceVideos + counts.referenceAudio;
+  const planned: GeneratorMixedFileAssignment[] = [];
+
+  files.forEach((file, index) => {
+    const slot = GENERATOR_REFERENCE_SLOTS.find(
+      name => spec.slots[name]?.accept.includes(file.type)
+    );
+    if (!slot) throw new Error('Unsupported reference file type: ' + (file.name ?? file.type));
+    const rule = spec.slots[slot]!;
+    if (!Number.isFinite(file.size) || file.size < 0 ||
+        (rule.maxBytes !== undefined && file.size > rule.maxBytes)) {
+      throw new Error('Reference file exceeds the size limit: ' + (file.name ?? file.type));
+    }
+    if (counts[slot] >= rule.max) {
+      throw new Error('Maximum ' + rule.max + ' ' +
+        (slot === 'referenceImages' ? 'images' : slot === 'referenceVideos' ? 'videos' : 'audio files'));
+    }
+    if (spec.maxCombinedReferences !== undefined &&
+        total >= spec.maxCombinedReferences) {
+      throw new Error('Maximum ' + spec.maxCombinedReferences + ' reference items in total');
+    }
+    counts[slot] += 1;
+    total += 1;
+    planned.push({ index, slot });
+  });
+  return planned;
+}
+
+/** Human-readable limits come from the selected workflow, never a hardcoded competitor value. */
+export function describeGeneratorMixedReferences(spec: WorkflowSpec): string {
+  const labels: string[] = [];
+  for (const slot of GENERATOR_REFERENCE_SLOTS) {
+    const rule = spec.slots[slot];
+    if (!rule) continue;
+    const suffix = slot === 'referenceImages' ? 'images (JPG / PNG / WebP)' :
+      slot === 'referenceVideos' ? 'videos (MP4 / MOV)' : 'audio (M4A / WAV)';
+    labels.push(rule.max + ' ' + suffix +
+      (rule.maxTotalSeconds !== undefined ? ', ' + rule.maxTotalSeconds + 's total' : ''));
+  }
+  if (labels.length === 0) return '';
+  const total = spec.maxCombinedReferences;
+  return (total !== undefined ? 'Up to ' + total + ' items total: ' : 'Up to ') +
+    labels.join(' · ');
+}
+
 
 /**
  * A model/workflow change can retain the same semantic image even though
