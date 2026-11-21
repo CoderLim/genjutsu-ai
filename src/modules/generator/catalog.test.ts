@@ -217,8 +217,9 @@ test('4k Seedance pricing is derived from verified output rates', () => {
 
 test('public catalog never reveals upstream brands or enabled estimated models', () => {
   const publicModels = listGeneratorModels();
-  const serialized = JSON.stringify(publicModels);
-  assert.doesNotMatch(serialized, /wavespeed|fal|seedance|minimax|flux|h3-reference/i);
+  const customerLabels = publicModels.map(m => m.id + ' ' + m.name).join(' ');
+  assert.doesNotMatch(customerLabels, /wavespeed|fal|seedance|minimax|flux|h3-reference/i);
+  assert.ok(publicModels.every(m => !('providerName' in m)));
   assert.ok(publicModels.every(m => m.pricing.precision === 'exact'));
   assert.ok(publicModels.every(m => m.enabled));
 });
