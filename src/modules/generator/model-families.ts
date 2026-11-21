@@ -266,9 +266,12 @@ export function getGeneratorWorkflowChoices(
   // Raphael-style video picker offers at most three intent modes. Text-only
   // generation lives in All-in-One Reference with optional media.
   const videoModes: Workflow[] = ['first-frame', 'start-end', 'all-in-one-reference'];
-  const supported = active.mediaType === 'video'
-    ? videoModes.map(workflow => [workflow, active.workflows[workflow]] as const)
-    : Object.entries(active.workflows);
+  const supported: Array<[Workflow, WorkflowSpec | undefined]> =
+    active.mediaType === 'video'
+      ? videoModes.map(workflow => [workflow, active.workflows[workflow]])
+      : Object.entries(active.workflows).map(
+          ([workflow, spec]) => [workflow as Workflow, spec]
+        );
   return supported
     .filter((entry): entry is [Workflow, NonNullable<typeof entry[1]>] => !!entry[1])
     .map(([workflow, spec]) => ({
