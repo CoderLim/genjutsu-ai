@@ -50,7 +50,7 @@ function videoFields(options: VideoOptions): Record<string, FieldSpec> {
   };
   if (options.audio) {
     fields.generateAudio = {
-      label: 'Sound', default: true, options: [true],
+      label: 'Sound', default: true, options: [true, false],
     };
   }
   if (options.promptExpansion) {
@@ -65,11 +65,15 @@ function videoFields(options: VideoOptions): Record<string, FieldSpec> {
 
 function videoProfile(options: VideoOptions): GeneratorModel {
   const fields = videoFields(options);
+  // Image-to-video follows the uploaded frame's canvas. Fal ignores any
+  // manually selected aspect ratio for those workflows.
+  const frameFields = { ...fields };
+  delete frameFields.aspectRatio;
   const textToVideo: WorkflowSpec = {
     label: 'Text to Video', slots: {}, fields,
   };
   const firstFrame: WorkflowSpec = {
-    label: 'First Frame', slots: videoFrames, fields,
+    label: 'First Frame', slots: videoFrames, fields: frameFields,
   };
   const pricedRates = options.rates ??
     (options.rate !== undefined && options.rateResolution
@@ -106,7 +110,7 @@ function videoProfile(options: VideoOptions): GeneratorModel {
               min: 1, max: 1, accept: IMAGE_MIME, maxBytes: 12 * 1048576,
             },
           },
-          fields,
+          fields: frameFields,
         },
       } : {}),
       'text-to-video': textToVideo,
@@ -122,6 +126,7 @@ const MINIMAX_IMAGE_FIELDS: Record<string, FieldSpec> = {
     label: 'Resolution', default: '1K', options: ['1K', '2K', '4K'],
   },
   outputCount: { label: 'Outputs', default: 1, options: [1, 2, 3, 4] },
+  outputFormat: { label: 'Format', default: 'png', options: ['png', 'jpeg', 'webp'] },
 };
 
 function minimaxImage(id: string, name: string): GeneratorModel {
