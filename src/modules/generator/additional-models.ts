@@ -111,7 +111,7 @@ function videoProfile(options: VideoOptions): GeneratorModel {
     maxPromptChars: 3000,
     enabled: pricedRates !== null,
     defaultWorkflow: 'first-frame',
-    pricing: options.id === 'minimax-h3'
+    pricing: options.id === 'minimax-h3' || options.id.startsWith('minimax-h3-max')
       ? { ...pricing, includedReferenceImages: 5, extraReferenceImageCredits: 14 }
       : pricing,
     workflows: {
