@@ -13,6 +13,8 @@ type Props = {
   /** Compact dashed slot matching Raphael composer reference box */
   variant?: 'default' | 'composer';
   optional?: boolean;
+  /** Visible secondary line for optional reference uploads (e.g. Up to 14). */
+  hint?: string;
 };
 
 export function MediaUploader({
@@ -24,6 +26,7 @@ export function MediaUploader({
   onRemove,
   variant = 'default',
   optional = false,
+  hint,
 }: Props) {
   const canAdd = urls.length < max;
   // "Reference Optional" can appear for several slots at once. Labels must
@@ -105,7 +108,12 @@ export function MediaUploader({
               strokeWidth={1.75}
             />
             <span className="px-1 text-[10px] leading-tight font-medium text-[rgba(18,15,16,0.55)]">
-              {optional ? label + ' (optional)' : label}
+              {hint ? (
+                <>
+                  <span className="block">{label}</span>
+                  <span className="mt-0.5 block">{hint}</span>
+                </>
+              ) : optional ? label + ' (optional)' : label}
             </span>
           </label>
         )}
