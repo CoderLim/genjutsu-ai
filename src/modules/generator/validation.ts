@@ -79,8 +79,9 @@ export function assertGeneratorReady(
   assertGeneratorDraft(state, model);
 
   const prompt = state.prompt.trim();
-  if (!prompt || prompt.length > 50_000) {
-    throw new Error('Prompt must contain 1–50,000 characters');
+  const maxChars = model.maxPromptChars ?? 50_000;
+  if (!prompt || prompt.length > maxChars) {
+    throw new Error('Prompt must contain 1–' + maxChars + ' characters');
   }
 
   const spec = getWorkflowSpec(model, state.workflow);

@@ -96,6 +96,7 @@ export type GeneratorModel = {
   name: string;
   mediaType: MediaType;
   providerName: string;
+  maxPromptChars?: number;
   enabled: boolean;
   defaultWorkflow: Workflow;
   workflows: Partial<Record<Workflow, WorkflowSpec>>;

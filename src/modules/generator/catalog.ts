@@ -150,6 +150,7 @@ export const GENERATOR_MODELS: readonly GeneratorModel[] = [
     id: 'h3-reference',
     name: 'MiniMax H3 · Reference to Video',
     mediaType: 'video', providerName: 'Fal',
+    maxPromptChars: 7000,
     enabled: true,
     defaultWorkflow: 'reference-to-video',
     pricing: {

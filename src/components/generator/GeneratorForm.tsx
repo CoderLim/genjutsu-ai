@@ -543,9 +543,9 @@ export function GeneratorForm({
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-3">
               <label htmlFor="generator-prompt" className="text-sm font-semibold">Prompt</label>
-              <span className="text-muted-foreground text-xs">{form.prompt.length} / 50000</span>
+              <span className="text-muted-foreground text-xs">{form.prompt.length} / {model.maxPromptChars ?? 50000}</span>
             </div>
-            <textarea id="generator-prompt" rows={7} maxLength={50000}
+            <textarea id="generator-prompt" rows={7} maxLength={model.maxPromptChars ?? 50000}
               placeholder={'Describe the ' + mediaType + ' you want to create...'}
               value={form.prompt}
               onChange={event => mutate({ prompt: event.target.value })}
