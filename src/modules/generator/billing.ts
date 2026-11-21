@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNotNull, lt, or } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, isNull, lt, or } from 'drizzle-orm';
 
 import { db } from '@/core/db';
 import { aiTask } from '@/config/db/schema';
@@ -14,6 +14,9 @@ const COMPLETION_CLAIM_TTL_MS = 3 * 60 * 1000;
 const REFUNDABLE = [
   'reserved', 'submitting', 'submitted', 'submission_unknown',
 ] as const;
+const QUERY_REVIEW_THRESHOLD = 3;
+export const GENERATOR_QUERY_REVIEW_STATUS = 'query_review';
+type RefundableStatus = (typeof REFUNDABLE)[number] | typeof GENERATOR_QUERY_REVIEW_STATUS;
 
 export type GeneratorTask = typeof aiTask.$inferSelect;
 
@@ -242,6 +245,75 @@ export async function promoteGeneratorUnknown(input: {
   return getGeneratorTask(input);
 }
 
+/**
+ * A failed result lookup does not mean the provider failed the job. Keep the
+ * original request ID and credit reservation. CAS on taskResult also prevents
+ * overlapping status and cron polls from double-counting one old snapshot.
+ *
+ * After three consecutive query-error responses, take the job out of cron
+ * and user polling until an admin verifies upstream and explicitly reopens it.
+ */
+export async function recordGeneratorQueryFailure(input: {
+  userId: string; generationId: string; providerStatus: string; message?: string;
+}) {
+  const current = await getGeneratorTask(input);
+  if (!current || !['submitted', 'completing'].includes(current.status)) return current;
+  const previous = parseTaskJson(current.taskResult);
+  if (current.status === 'completing') {
+    // Do not race an in-progress R2 result write. A stale completion claim
+    // can be reviewed after its lease has expired.
+    const claimed = Date.parse(previous.completingClaimedAt || '');
+    if (Number.isFinite(claimed) && Date.now() - claimed < COMPLETION_CLAIM_TTL_MS) {
+      return current;
+    }
+  }
+
+  const previousCount = typeof previous.queryFailureCount === 'number' &&
+    Number.isSafeInteger(previous.queryFailureCount) && previous.queryFailureCount > 0
+    ? previous.queryFailureCount : 0;
+  const failures = Math.min(QUERY_REVIEW_THRESHOLD, previousCount + 1);
+  const needsReview = failures >= QUERY_REVIEW_THRESHOLD;
+  const result = {
+    queryFailureCount: failures,
+    lastQueryFailureAt: new Date().toISOString(),
+    providerStatus: input.providerStatus,
+    error: needsReview
+      ? 'Provider status could not be verified. Support review is required; credits remain reserved.'
+      : undefined,
+  };
+  await db().update(aiTask).set({
+    status: needsReview ? GENERATOR_QUERY_REVIEW_STATUS : current.status,
+    taskResult: JSON.stringify(result),
+  }).where(and(
+    eq(aiTask.id, input.generationId),
+    eq(aiTask.userId, input.userId),
+    eq(aiTask.scene, GENERATOR_SCENE),
+    eq(aiTask.status, current.status),
+    current.taskResult === null ? isNull(aiTask.taskResult)
+      : eq(aiTask.taskResult, current.taskResult)
+  ));
+  return getGeneratorTask(input);
+}
+
+/** A genuine successful processing lookup resets the consecutive error count. */
+export async function clearGeneratorQueryFailures(input: {
+  userId: string; generationId: string;
+}) {
+  const current = await getGeneratorTask(input);
+  if (!current || current.status !== 'submitted') return current;
+  if (!parseTaskJson(current.taskResult).queryFailureCount) return current;
+  await db().update(aiTask).set({
+    taskResult: null,
+  }).where(and(
+    eq(aiTask.id, input.generationId),
+    eq(aiTask.userId, input.userId),
+    eq(aiTask.scene, GENERATOR_SCENE),
+    eq(aiTask.status, 'submitted'),
+    eq(aiTask.taskResult, current.taskResult!)
+  ));
+  return getGeneratorTask(input);
+}
+
 export async function claimGeneratorCompletion(input: {
   userId: string; generationId: string;
 }): Promise<boolean> {
@@ -298,7 +370,7 @@ export async function completeGeneratorTask(input: {
 export async function refundGeneratorTask(input: {
   userId: string; generationId: string;
   reason: string; providerStatus?: string;
-  allowedStatuses?: readonly (typeof REFUNDABLE)[number][];
+  allowedStatuses?: readonly RefundableStatus[];
 }) {
   const token = getUuid();
   return db().transaction(async (tx: any) => {
