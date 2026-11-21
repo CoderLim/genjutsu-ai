@@ -13,6 +13,7 @@ import {
 import { getGeneratorModel, GENERATOR_MODELS } from './catalog';
 import { getPreviewModel } from './registry';
 import { createGeneratorState, normalizeGeneratorState, updateGeneratorState } from './normalize';
+import { generatorResultContentType } from './types';
 
 test('photo-to-video requires a start frame in the new composer', () => {
   const model = getGeneratorModel('photo-to-video-standard');
@@ -217,4 +218,12 @@ test('switching from a reference model to H3 preserves only a compatible first f
   assert.equal(startEnd.inputs.startFrame, 'reference-1');
   assert.equal(startEnd.inputs.endFrame, null);
   assert.match(generatorReadinessError(startEnd, h3) ?? '', /endFrame/);
+});
+
+test('saved output MIME matches the supported image format, not always JPEG', () => {
+  assert.equal(generatorResultContentType('image', 'png'), 'image/png');
+  assert.equal(generatorResultContentType('image', 'jpeg'), 'image/jpeg');
+  assert.equal(generatorResultContentType('image', 'webp'), 'image/webp');
+  assert.equal(generatorResultContentType('image', undefined), 'image/png');
+  assert.equal(generatorResultContentType('video', 'webp'), 'video/mp4');
 });
