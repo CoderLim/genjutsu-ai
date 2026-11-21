@@ -79,6 +79,88 @@ text-only and does not present a misleading image-edit upload tile.
 
 New Nano Banana 2.1 and Lite use `google/nano-banana-2.1[/edit]` and `google/nano-banana-lite[/edit]`. Both are token-billed by Fal, so the provisional customer credits and per-reference surcharges require **actual Fal invoice checks before production**. Do not present these product tariffs as exact upstream costs.
 
+## Per-model settings panel audit (Aspect Ratio / Video Length / Resolution / Output Number)
+
+The settings UI now gets **all visible values** from one shared helper
+`getGeneratorSettingChoices(spec, params, field)`, which reads the selected
+model + workflow's capability definition and filters conditional constraints.
+It is used by the React composer and by `model-settings.test.ts`. On switching
+models, the normalizer preserves values only when valid for the destination;
+otherwise it resets to that model's configured default. The quote and submitted
+provider payload use this normalized state.
+
+Verified against publicly accessible Raphael model descriptions and the specific
+Fal / WaveSpeed schemas, rather than claiming a direct scrape of the private
+client-side dynamic dropdown for every model.
+
+### Video
+
+| Model family | Visible text / reference-mode aspect ratios | Duration choices | Product-priced resolution choices | Output Count |
+| --- | --- | --- | --- | --- |
+| Seedance 2.0 (WaveSpeed) | 16:9 / 9:16 / 4:3 / 3:4 / 1:1 / 21:9 | 4–15s | 480p / 720p / 1080p / 4K | 1 |
+| Seedance 2.0 Fast / Mini | auto / 21:9 / 16:9 / 4:3 / 1:1 / 3:4 / 9:16 | 4–15s | 480p / 720p | 1 |
+| Seedance 2.5 / Flash | auto / 21:9 / 16:9 / 4:3 / 1:1 / 3:4 / 9:16 | 4–30s | 480p / 720p | 1 |
+| MiniMax H3 | 16:9 / 21:9 / 4:3 / 1:1 / 3:4 / 9:16 | 5–15s | 768P / 2K / 4K | 1 |
+| MiniMax H3 Max / Max Turbo | H3 product ratio presets | 5–15s | 768P (only priced tier) | 1 |
+| Kling 3.0 / Turbo | 16:9 / 9:16 / 1:1 | 3–15s | 1080p for Pro, 720p for the Fal Turbo Standard route | 1 |
+| Kling 4.0 / Flash | 16:9 / 9:16 / 1:1 | 3–30s / 3–20s | 720p, 1080p / 720p | 1 |
+
+**First Frame and Start & End:** the reference images determine the output
+canvas on the corresponding Fal image-to-video endpoints, so the unused
+text-to-video aspect ratio control is hidden instead of silently ignored.
+
+**Output Number:** Raphael may show 2 for some video models, but most Fal video
+endpoints return a single video per request and this app has one-task/one-request
+billing. We keep these models at **one video per generation** rather than
+displaying a fake 2-output control that would silently create one asset or charge
+incorrectly. Two videos needs deliberate multi-job accounting, retry and
+result-history support first.
+
+**Known provider difference:** Raphael's Kling 3 Turbo marketing page allows
+1080p, but our configured Fal `v3/turbo/standard` endpoint is 720p. The
+1080p option is not exposed until a corresponding, separately priced provider
+tier is wired.
+
+### Image
+
+| Model | Aspect options | Resolution | Output Count |
+| --- | --- | --- | --- |
+| Nano Banana 2.1 | 15 (Auto and the published Gemini ratio presets) | 1K / 2K / 4K | 1–4 |
+| Nano Banana 2 Lite | 15 (Auto + wide/long variants) | Fixed 1K | 1–4 |
+| Nano Banana 2 | 15 (Auto + 4:1 / 1:4 / 8:1 / 1:8) | 1K / 2K / 4K | 1–4 |
+| Nano Banana Pro | 11 (Auto + standard portrait/landscape ratios) | 1K / 2K / 4K | 1–4 |
+| MiniMax H3 Image / Highspeed | 15 common ratios, within Fal 1:3–3:1 | 1K / 2K / 4K | 1–4 |
+| FLUX.1 Schnell / FLUX.2 Flash | Existing five standard ratio presets | Their existing fixed model output size | 1–4 |
+
+MiniMax H3 Image's custom pixel size math now clamps after 32px rounding to
+stay within the **Fal 1:3–3:1** inclusive ratio and the 655,360–20,000,000
+pixel area bounds. The 15 presets are selected within the published Fal range
+and Raphael's advertised count; their exact UI order has **not** been verified
+through an authenticated Raphael workspace.
+
+For Nano Banana 2, Fal additionally advertises a 0.5K tier. That option is
+intentionally not enabled without a reviewed customer price. MiniMax H3 Image's
+JPG/PNG/WebP format setting and image model input caps remain model-specific.
+
+### Regression coverage
+
+`model-settings.test.ts` walks all enabled models and configured workflows,
+checks each displayed option produces a valid normalized state and positive
+quote, verifies representative cross-family switches, and checks every MiniMax
+Image aspect/resolution pair builds a Fal-compliant size.
+
+### Reference materials
+
+- https://raphael.app/?mode=video
+- https://raphael.app/minimax-h3-image
+- https://raphael.app/kling-3-turbo
+- https://fal.ai/models/bytedance/seedance-2.5/text-to-video/api
+- https://fal.ai/models/minimax/h3/text-to-video/api
+- https://fal.ai/models/minimax/h3-image/text-to-image/api
+- https://fal.ai/models/fal-ai/nano-banana-2/api
+- https://fal.ai/models/fal-ai/nano-banana-pro/api
+- https://fal.ai/models/fal-ai/kling-video/v3/turbo/standard/image-to-video/api
+
 ## API and pricing handoff
 
 - `src/modules/generator/model-families.ts`: visible video mode and brand menu; capability highlights.
