@@ -791,9 +791,6 @@ export function GeneratorForm({
             >
               <Clapperboard className="size-4 opacity-80" strokeWidth={1.75} />
               Video
-              {mediaType === 'video' ? (
-
-              ) : null}
             </a>
           </nav>
 
