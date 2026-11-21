@@ -7,6 +7,7 @@ import { getUuid } from '@/lib/hash';
 
 import { assertGenerationId } from './storage';
 import type { GeneratorState, CreditEstimate } from './types';
+import { nextGeneratorQueryFailure } from './query-recovery';
 
 export const GENERATOR_SCENE = 'generic-generator';
 const SUBMISSION_CLAIM_TTL_MS = 3 * 60 * 1000;
@@ -14,7 +15,6 @@ const COMPLETION_CLAIM_TTL_MS = 3 * 60 * 1000;
 const REFUNDABLE = [
   'reserved', 'submitting', 'submitted', 'submission_unknown',
 ] as const;
-const QUERY_REVIEW_THRESHOLD = 3;
 export const GENERATOR_QUERY_REVIEW_STATUS = 'query_review';
 type RefundableStatus = (typeof REFUNDABLE)[number] | typeof GENERATOR_QUERY_REVIEW_STATUS;
 
@@ -268,15 +268,14 @@ export async function recordGeneratorQueryFailure(input: {
     }
   }
 
-  const previousCount = typeof previous.queryFailureCount === 'number' &&
-    Number.isSafeInteger(previous.queryFailureCount) && previous.queryFailureCount > 0
-    ? previous.queryFailureCount : 0;
-  const failures = Math.min(QUERY_REVIEW_THRESHOLD, previousCount + 1);
-  const needsReview = failures >= QUERY_REVIEW_THRESHOLD;
+  const { failures, needsReview } = nextGeneratorQueryFailure(
+    previous.queryFailureCount
+  );
   const result = {
     queryFailureCount: failures,
     lastQueryFailureAt: new Date().toISOString(),
     providerStatus: input.providerStatus,
+    queryMessage: input.message?.slice(0, 200) || undefined,
     error: needsReview
       ? 'Provider status could not be verified. Support review is required; credits remain reserved.'
       : undefined,
