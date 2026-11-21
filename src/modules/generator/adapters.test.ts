@@ -322,7 +322,9 @@ test('model-specific workflows match documented Fal frame and expansion support'
     assert.ok(getGeneratorModel(id).workflows['start-end'], id);
   }
   const h3 = getGeneratorModel('minimax-h3');
-  assert.ok(h3.workflows['text-to-video']?.fields.promptExpansionMode.options?.includes('fast'));
+  assert.equal(h3.workflows['text-to-video']?.fields.promptExpansionMode, undefined);
+  assert.deepEqual(h3.workflows['first-frame']?.fields.resolution.options,
+    ['768P', '2K', '4K']);
   for (const id of ['minimax-h3-max', 'minimax-h3-max-turbo']) {
     const mode = getGeneratorModel(id).workflows['text-to-video']?.fields.promptExpansionMode;
     assert.ok(mode);
