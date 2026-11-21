@@ -267,7 +267,7 @@ test('new MiniMax H3 Max models have bounded exact customer rates', () => {
 
 test('unpriced new models are impossible to charge through the public model lookup', () => {
   const pending = GENERATOR_MODELS.filter(model =>
-    (model.id.startsWith('seedance-2-') && model.id !== 'seedance-2.0') ||
+    model.id.startsWith('seedance-2') ||
     model.id.startsWith('kling-') ||
     model.id.startsWith('minimax-h3-image')
   );
