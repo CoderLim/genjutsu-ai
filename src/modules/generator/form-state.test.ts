@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   availableGeneratorFieldValues,
   generatorReadinessError,
+  getGeneratorExpansionControls,
   getGeneratorSlotCapacity,
   isGeneratorSlotOptional,
   isGeneratorJobActive,
@@ -130,4 +131,46 @@ test('pending or ambiguous generation blocks a second new submission', () => {
   assert.equal(isGeneratorJobActive({status: 'completed'}), false);
   assert.equal(isGeneratorJobActive({status: 'failed'}), false);
   assert.equal(isGeneratorJobActive(null), false);
+});
+
+test('H3 Fast and Enhance controls only appear when supported by the selected model', () => {
+  const h3 = getGeneratorModel('minimax-h3');
+  const base = getGeneratorExpansionControls(h3.workflows['first-frame']!);
+  assert.deepEqual(base, { enhance: true, fast: true });
+  const h3Turbo = GENERATOR_MODELS.find(model => model.id === 'minimax-h3-turbo')!;
+  assert.deepEqual(
+    getGeneratorExpansionControls(h3Turbo.workflows['first-frame']!),
+    { enhance: false, fast: false }
+  );
+  for (const id of ['minimax-h3-max', 'minimax-h3-max-turbo']) {
+    const spec = getGeneratorModel(id).workflows['text-to-video']!;
+    assert.deepEqual(getGeneratorExpansionControls(spec),
+      { enhance: true, fast: false }, id);
+  }
+  for (const id of ['kling-4', 'seedance-2-fast', 'nano-banana-2']) {
+    const spec = getGeneratorModel(id).workflows[
+      getGeneratorModel(id).defaultWorkflow
+    ]!;
+    assert.deepEqual(getGeneratorExpansionControls(spec),
+      { enhance: false, fast: false }, id);
+  }
+});
+
+test('switching away from Kling Start & End drops an unsupported end frame', () => {
+  const kling4 = getGeneratorModel('kling-4');
+  const flash = getGeneratorModel('kling-4-flash');
+  const prepared = updateGeneratorState(createGeneratorState(kling4), kling4, {
+    workflow: 'start-end', prompt: 'Camera tracks subject',
+    inputs: {
+      ...createGeneratorState(kling4).inputs,
+      startFrame: 'start-frame',
+      endFrame: 'end-frame',
+    },
+  });
+  const changed = normalizeGeneratorState(prepared, flash);
+  assert.equal(changed.workflow, 'first-frame');
+  assert.equal(changed.inputs.startFrame, 'start-frame');
+  assert.equal(changed.inputs.endFrame, null);
+  assert.equal(changed.params.duration, 5);
+  assert.equal(changed.params.resolution, '720p');
 });
