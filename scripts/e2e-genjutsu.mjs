@@ -21,10 +21,11 @@ const childEnv = {
   AUTH_URL: baseUrl,
   AUTH_SECRET: process.env.AUTH_SECRET || `${randomUUID()}${randomUUID()}`,
   GENJUTSU_E2E_MOCK: 'true',
-  // Isolate from local Seedance/Volcengine prefs in .env.development —
-  // this smoke path exercises the Higgsfield mock + sealed R2/E2E store.
+  // Isolate from local Seedance/Volcengine prefs in .env.development.
+  // Motion smoke stays on classic Higgsfield mock; objects-swap products
+  // (zombie-hug) require a Seedance-family provider with E2E mock support.
   GENJUTSU_MOTION_PROVIDER: 'higgsfield',
-  GENJUTSU_OBJECT_SWAP_PROVIDER: 'higgsfield',
+  GENJUTSU_OBJECT_SWAP_PROVIDER: 'seedance-higgsfield',
 };
 
 function cleanDb() {
