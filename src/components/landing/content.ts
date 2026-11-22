@@ -48,7 +48,7 @@ export const NAV_ITEMS: NavItem[] = [
           {
             title: 'Image to Video',
             description: 'Animate reference images',
-            href: '/image-to-video',
+            href: '/image-to-video/',
           },
           {
             title: 'Video Face Swap',
@@ -747,6 +747,10 @@ export const FOOTER_COLUMNS: FooterColumn[] = [
   {
     title: 'More Tools',
     links: [
+      {
+        label: 'Image to Video AI',
+        href: '/image-to-video/',
+      },
       {
         label: 'Video Face Swap',
         href: '/video-face-swap',

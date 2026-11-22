@@ -142,6 +142,7 @@ const STATUSES = [
   'completing',
   'completed',
   'submission_unknown',
+  'query_review',
   'refunding',
   'refunded',
 ] as const;
@@ -151,7 +152,8 @@ function statusVariant(status: string) {
   if (
     status === 'refunded' ||
     status === 'failed_preflight' ||
-    status === 'submission_unknown'
+    status === 'submission_unknown' ||
+    status === 'query_review'
   ) {
     return 'destructive';
   }
@@ -902,6 +904,12 @@ function GenerationsPage() {
                   {detail.status === 'submission_unknown' ? (
                     <div className="text-destructive mt-1 text-xs">
                       {m['admin.generations.submission_unknown_hint']()}
+                    </div>
+                  ) : detail.status === 'query_review' ? (
+                    <div className="text-destructive mt-1 text-xs">
+                      Provider query failed repeatedly. Verify the upstream
+                      request and charges before retrying or manually refunding.
+                      Credits are still reserved.
                     </div>
                   ) : null}
                   <div className="text-muted-foreground mt-1 text-xs">

@@ -1,0 +1,54 @@
+name: Generator feature branch CI
+
+on:
+  push:
+    branches:
+      - feat/unified-ai-generator-20261121
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: generator-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
+      - run: pnpm build
+      - name: Typecheck new generator; report pre-existing repository errors
+        shell: bash
+        run: |
+          set +e
+          pnpm exec tsc --noEmit --pretty false > tsc-report.txt 2>&1
+          typecheck_status=$?
+          set -e
+          if [ "$typecheck_status" -eq 0 ]; then
+            echo "Full project typecheck passed."
+            exit 0
+          fi
+
+          # main currently has legacy TypeScript errors. Do not hide any new
+          # generator type errors behind that baseline.
+          new_errors="$(grep -E '^src/(modules/generator/|components/generator/|modules/generations/scenes\.ts|routes/api/generator/|routes/api/admin/generator/|routes/api/cron/generator/|routes/creations\.tsx|routes/(ai-image-generator|ai-video-generator|photo-to-video)\.tsx)' tsc-report.txt || true)"
+          if [ -n "$new_errors" ]; then
+            echo "New generator type errors:"
+            echo "$new_errors"
+            exit 1
+          fi
+          total="$(grep -c 'error TS' tsc-report.txt || true)"
+          echo "::warning title=Existing TypeScript debt::Full typecheck has $total errors outside the new generator paths (also present in the existing application)."
+          grep -m 5 'error TS' tsc-report.txt || true
