@@ -1,4 +1,5 @@
 import { scanPromptWithWaffo } from '@/core/content-safety/waffo-scan';
+import type { FalQueueUrls } from '@/core/ai/fal-queue-urls';
 import { getAllConfigs } from '@/modules/config/service';
 
 import {
@@ -35,6 +36,7 @@ import {
   probeGeneratorVideoDuration,
 } from './media-metadata';
 import { calculateGeneratorCredits } from './pricing';
+import { readGeneratorFalQueueMetadata } from './fal-queue-metadata';
 import {
   assertReferenceAudioDuration,
   referenceVideoBillableSeconds,
@@ -422,14 +424,17 @@ export async function generateWithGenerator(input: {
   }
 
   let requestId: string | undefined;
+  let falQueueUrls: FalQueueUrls | undefined;
   try {
     const started = await submitGeneratorProvider(sealedState, readUrls);
     requestId = started.requestId;
+    falQueueUrls = 'falQueueUrls' in started ? started.falQueueUrls : undefined;
     if (!requestId) throw new Error('Provider returned no request ID');
     const updated = await markGeneratorSubmitted({
       generationId,
       userId: input.userId,
       requestId,
+      falQueueUrls,
     });
     if (!updated || updated.status !== 'submitted') {
       throw new Error('Unable to bind provider request ID');
@@ -444,6 +449,7 @@ export async function generateWithGenerator(input: {
           generationId,
           userId: input.userId,
           requestId,
+          falQueueUrls,
           message: 'Provider request needs reconciliation',
         });
       } catch (persistError) {
@@ -519,12 +525,26 @@ export async function reconcileGeneratorTask(task: GeneratorTask) {
       mediaType: task.mediaType as 'image' | 'video',
       workflow: options.workflow as GeneratorState['workflow'],
       // Reference and text-only paths use different provider endpoints.
-      // Read the immutable endpoint recorded at task reservation.
+      // Read the immutable endpoint and canonical queue URLs saved at submit.
       providerModelId: task.model,
+      falQueueUrls: task.provider === 'fal'
+        ? readGeneratorFalQueueMetadata(task.taskInfo, task.taskId)
+        : undefined,
     });
   } catch (error) {
-    console.warn('[generator] status query failed', { id: task.id, error });
-    return publicGeneratorTask(task);
+    // Transport, invalid stored URL or malformed provider response must not
+    // leave a paid task in Processing forever. These are lookup failures, not
+    // evidence that Fal rejected the generation, so never auto-refund.
+    console.warn('[generator] status query failed', {
+      id: task.id,
+      error: error instanceof Error ? error.message : 'unknown',
+    });
+    const updated = await recordGeneratorQueryFailure({
+      ...identity,
+      providerStatus: 'QUERY_EXCEPTION',
+      message: error instanceof Error ? error.message : 'Query failed',
+    });
+    return publicGeneratorTask(updated ?? task);
   }
 
   if (provider.status === 'failed') {
