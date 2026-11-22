@@ -10,23 +10,29 @@ import {
 } from './seo';
 
 test('Image to Video SEO metadata matches the public search intent and canonical path', () => {
-  assert.equal(IMAGE_TO_VIDEO_PATH, '/image-to-video/');
-  assert.equal(IMAGE_TO_VIDEO_TITLE,
-    'Image to Video AI — Turn Photos Into a Video Online');
-  assert.equal(IMAGE_TO_VIDEO_TITLE.length, 51);
-  assert.equal(IMAGE_TO_VIDEO_DESCRIPTION,
-    'Turn a photo into a moving video with AI. Upload an image, describe the motion, and download your clip for social posts, product listings, or old family photos.');
+  assert.equal(IMAGE_TO_VIDEO_PATH, '/image-to-video');
+  assert.equal(
+    IMAGE_TO_VIDEO_TITLE,
+    'Image to Video AI — Turn Photos Into Video | Genjutsu'
+  );
+  assert.ok(IMAGE_TO_VIDEO_TITLE.length <= 60);
+  assert.match(IMAGE_TO_VIDEO_TITLE, /Genjutsu/);
+  assert.equal(
+    IMAGE_TO_VIDEO_DESCRIPTION,
+    'Image to video AI: upload a photo, describe the motion, and download a short clip for social posts, product listings, or old family photos.'
+  );
+  assert.match(IMAGE_TO_VIDEO_DESCRIPTION, /^Image to video/i);
+  assert.ok(IMAGE_TO_VIDEO_DESCRIPTION.length <= 160);
   assert.ok(!IMAGE_TO_VIDEO_DESCRIPTION.includes('['));
 });
 
 test('visible HowTo and FAQ schema copy stays complete and without fabricated placeholders', () => {
-  assert.deepEqual(IMAGE_TO_VIDEO_STEPS.map(s => s.name), [
-    'Upload your photo',
-    'Describe the motion',
-    'Generate and download',
-  ]);
+  assert.deepEqual(
+    IMAGE_TO_VIDEO_STEPS.map((s) => s.name),
+    ['Upload your photo', 'Describe the motion', 'Generate and download']
+  );
   assert.ok(IMAGE_TO_VIDEO_FAQS.length >= 6);
-  const questions = IMAGE_TO_VIDEO_FAQS.map(item => item.question);
+  const questions = IMAGE_TO_VIDEO_FAQS.map((item) => item.question);
   assert.equal(new Set(questions).size, questions.length);
   for (const record of [...IMAGE_TO_VIDEO_STEPS, ...IMAGE_TO_VIDEO_FAQS]) {
     for (const text of Object.values(record)) {
@@ -36,11 +42,14 @@ test('visible HowTo and FAQ schema copy stays complete and without fabricated pl
   }
 
   const freeQuestion = IMAGE_TO_VIDEO_FAQS.find(
-    item => item.question === 'Are free videos watermarked?'
+    (item) => item.question === 'Are free videos watermarked?'
   );
   assert.ok(freeQuestion);
   assert.match(freeQuestion.answer, /depend on the model and provider/);
-  assert.match(IMAGE_TO_VIDEO_FAQS.find(
-    item => item.question === 'Can I use the videos commercially?'
-  )!.answer, /Check the Genjutsu AI terms/);
+  assert.match(
+    IMAGE_TO_VIDEO_FAQS.find(
+      (item) => item.question === 'Can I use the videos commercially?'
+    )!.answer,
+    /Check the Genjutsu AI terms/
+  );
 });

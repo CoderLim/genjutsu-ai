@@ -43,7 +43,7 @@ function HomePage() {
             </div>
           </div>
           <Link
-            href="/image-to-video/"
+            href="/image-to-video"
             className="text-primary inline-flex shrink-0 items-center gap-1.5 text-sm font-semibold hover:underline"
           >
             Image to Video AI

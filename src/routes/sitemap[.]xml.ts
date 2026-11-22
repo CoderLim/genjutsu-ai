@@ -12,7 +12,7 @@ import {
 const STATIC_PATHS = [
   '',
   '/pricing',
-  '/image-to-video/',
+  '/image-to-video',
   '/genjutsu-prompts',
   '/hotel-lobby-ai',
   '/58th-floor-ai-video',
@@ -52,7 +52,7 @@ const STATIC_PATHS = [
 /** Only emit variants with real editorial translations. */
 const LIMITED_STATIC_PATH_LOCALES: Record<string, readonly string[]> = {
   // English editorial only. Do not emit translated sitemap URLs until written.
-  '/image-to-video/': [baseLocale],
+  '/image-to-video': [baseLocale],
   '/ai-rumpelstiltskin': RUMPEL_SEO_LOCALES,
   // Bulin 47's visible editorial content is not fully localized yet.
   '/bulin-47-ai': [baseLocale],

@@ -21,6 +21,8 @@ import { SeoJsonLd } from '@/components/seo-json-ld';
 const CANONICAL = absoluteUrl(IMAGE_TO_VIDEO_PATH);
 const HERO_VIDEO_SRC = '/videos/image-to-video-hero.mp4';
 const HERO_POSTER_SRC = '/videos/image-to-video-hero-poster.jpg';
+const HERO_POSTER_WIDTH = 1280;
+const HERO_POSTER_HEIGHT = 720;
 
 function softwareApplicationJsonLd() {
   return {
@@ -31,8 +33,12 @@ function softwareApplicationJsonLd() {
     operatingSystem: 'Web',
     url: CANONICAL,
     description: IMAGE_TO_VIDEO_DESCRIPTION,
-    // This is a credit-based generator, not a promise of free generation.
-    // Avoid fabricated free quotas, provider costs or app-level USD offers.
+    offers: {
+      '@type': 'Offer',
+      priceCurrency: 'USD',
+      description:
+        'Generation uses Genjutsu AI credits; the estimated cost is shown before you confirm.',
+    },
   };
 }
 
@@ -68,12 +74,34 @@ function faqJsonLd() {
   };
 }
 
+function breadcrumbJsonLd() {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      {
+        '@type': 'ListItem',
+        position: 1,
+        name: 'Home',
+        item: absoluteUrl('/'),
+      },
+      {
+        '@type': 'ListItem',
+        position: 2,
+        name: 'Image to Video AI',
+        item: CANONICAL,
+      },
+    ],
+  };
+}
+
 function ImageToVideoPage() {
   return (
     <div className="bg-background text-foreground flex min-h-screen flex-col">
       <SeoJsonLd value={softwareApplicationJsonLd()} />
       <SeoJsonLd value={howToJsonLd()} />
       <SeoJsonLd value={faqJsonLd()} />
+      <SeoJsonLd value={breadcrumbJsonLd()} />
 
       <SiteHeader />
 
@@ -105,7 +133,7 @@ function ImageToVideoPage() {
 
           <div className="relative z-10 mx-auto w-full max-w-[1180px] px-4 pt-20 pb-10 sm:pt-24 sm:pb-14 md:px-5">
             <p className="text-xs font-semibold tracking-wide text-white/70 uppercase">
-              Image to video generator
+              Genjutsu · Image to video generator
             </p>
             <h1 className="mt-2 text-3xl font-bold tracking-tight text-[rgb(237,234,222)] sm:text-5xl">
               Image to Video AI
@@ -148,6 +176,8 @@ export const Route = createFileRoute('/image-to-video')({
         description: IMAGE_TO_VIDEO_DESCRIPTION,
         url: CANONICAL,
         image: absoluteUrl(HERO_POSTER_SRC),
+        imageWidth: HERO_POSTER_WIDTH,
+        imageHeight: HERO_POSTER_HEIGHT,
       }),
     ],
     links: [

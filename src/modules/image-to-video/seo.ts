@@ -3,10 +3,12 @@
  * Both the visible component and schema.org markup import these values,
  * so FAQ/HowTo JSON-LD always reflects what visitors can read.
  */
-export const IMAGE_TO_VIDEO_PATH = '/image-to-video/';
-export const IMAGE_TO_VIDEO_TITLE = 'Image to Video AI — Turn Photos Into a Video Online';
+/** Must match the live 200 URL (no trailing slash — slash form 307s away). */
+export const IMAGE_TO_VIDEO_PATH = '/image-to-video';
+export const IMAGE_TO_VIDEO_TITLE =
+  'Image to Video AI — Turn Photos Into Video | Genjutsu';
 export const IMAGE_TO_VIDEO_DESCRIPTION =
-  'Turn a photo into a moving video with AI. Upload an image, describe the motion, and download your clip for social posts, product listings, or old family photos.';
+  'Image to video AI: upload a photo, describe the motion, and download a short clip for social posts, product listings, or old family photos.';
 
 export const IMAGE_TO_VIDEO_STEPS = [
   {

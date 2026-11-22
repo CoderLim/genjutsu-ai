@@ -1,7 +1,10 @@
 import { ArrowRight, CheckCircle2, Film, Images, Sparkles } from 'lucide-react';
 
 import { Link } from '@/core/i18n/navigation';
-import { IMAGE_TO_VIDEO_FAQS, IMAGE_TO_VIDEO_STEPS } from '@/modules/image-to-video/seo';
+import {
+  IMAGE_TO_VIDEO_FAQS,
+  IMAGE_TO_VIDEO_STEPS,
+} from '@/modules/image-to-video/seo';
 
 /**
  * Keep HowTo/FAQ JSON-LD in the route sourced from this same visible copy.
@@ -58,9 +61,11 @@ const MOTION_TIPS = [
   },
 ] as const;
 
-const headingClass = 'text-2xl font-semibold tracking-tight text-foreground sm:text-[28px]';
+const headingClass =
+  'text-2xl font-semibold tracking-tight text-foreground sm:text-[28px]';
 const paragraphClass = 'mt-4 text-base leading-8 text-muted-foreground';
-const articleLinkClass = 'font-medium text-primary underline underline-offset-4 hover:opacity-80';
+const articleLinkClass =
+  'font-medium text-primary underline underline-offset-4 hover:opacity-80';
 
 export function ImageToVideoSeoSections() {
   return (
@@ -75,13 +80,13 @@ export function ImageToVideoSeoSections() {
             <li
               id={`step-${index + 1}`}
               key={item.name}
-              className="rounded-2xl border border-border/70 bg-card/50 p-6"
+              className="border-border/70 bg-card/50 rounded-2xl border p-6"
             >
-              <span className="inline-flex size-8 items-center justify-center rounded-full bg-primary/15 text-sm font-semibold text-primary">
+              <span className="bg-primary/15 text-primary inline-flex size-8 items-center justify-center rounded-full text-sm font-semibold">
                 {index + 1}
               </span>
               <h3 className="mt-4 text-lg font-semibold">{item.name}</h3>
-              <p className="mt-3 text-sm leading-7 text-muted-foreground">
+              <p className="text-muted-foreground mt-3 text-sm leading-7">
                 {item.text}
               </p>
             </li>
@@ -94,19 +99,18 @@ export function ImageToVideoSeoSections() {
           Photo to video, image to video, picture to video — the same job
         </h2>
         <p className={paragraphClass}>
-          People look for this feature under different names, but the job is
-          the same: give a still image movement. Whether you call it photo to
-          video, image to video, or picture to video, you start from a frame
-          you have already chosen instead of generating a whole scene from
-          scratch.
+          People look for this feature under different names, but the job is the
+          same: give a still image movement. Whether you call it photo to video,
+          image to video, or picture to video, you start from a frame you have
+          already chosen instead of generating a whole scene from scratch.
         </p>
         <p className={paragraphClass}>
           What changes is the motion you ask for. A camera can push closer,
           drift across a room, or rise slowly above the subject. A person might
           turn their head, blink, or feel wind moving through their hair. The
           model interprets those instructions and creates a new short clip. The
-          starting picture helps guide the result, although fine details are
-          not guaranteed to remain perfectly unchanged.
+          starting picture helps guide the result, although fine details are not
+          guaranteed to remain perfectly unchanged.
         </p>
       </section>
 
@@ -121,9 +125,9 @@ export function ImageToVideoSeoSections() {
         </p>
         <div className="mt-8 grid gap-x-10 gap-y-7 sm:grid-cols-2">
           {USE_CASES.map((item) => (
-            <div key={item.name} className="border-l-2 border-primary/45 pl-4">
+            <div key={item.name} className="border-primary/45 border-l-2 pl-4">
               <h3 className="text-base font-semibold">{item.name}</h3>
-              <p className="mt-2 text-sm leading-7 text-muted-foreground">
+              <p className="text-muted-foreground mt-2 text-sm leading-7">
                 {item.text}
               </p>
             </div>
@@ -136,22 +140,28 @@ export function ImageToVideoSeoSections() {
           Image to video, or text to video?
         </h2>
         <p className={paragraphClass}>
-          They solve different problems. <strong className="font-semibold text-foreground">
-          Image to video</strong> gives the model a picture to work from. It
-          is useful when you already have a portrait, product, illustration,
-          or scene and want to keep its overall look while adding motion.
-          Composition, lighting, and the subject all have a starting point.
+          They solve different problems.{' '}
+          <strong className="text-foreground font-semibold">
+            Image to video
+          </strong>{' '}
+          gives the model a picture to work from. It is useful when you already
+          have a portrait, product, illustration, or scene and want to keep its
+          overall look while adding motion. Composition, lighting, and the
+          subject all have a starting point.
         </p>
         <p className={paragraphClass}>
-          <strong className="font-semibold text-foreground">Text to video</strong>
-          {' '}starts from a description instead. The model has more freedom to
+          <strong className="text-foreground font-semibold">
+            Text to video
+          </strong>{' '}
+          starts from a description instead. The model has more freedom to
           invent framing, lighting, and subject details. If you have no image
           yet and want to explore a scene from scratch, start with our{' '}
           <Link href="/" className={articleLinkClass}>
             text to video generator
-          </Link>. The two workflows can complement each other, but an
-          existing image is usually the better starting point when a specific
-          composition matters.
+          </Link>
+          . The two workflows can complement each other, but an existing image
+          is usually the better starting point when a specific composition
+          matters.
         </p>
       </section>
 
@@ -162,12 +172,12 @@ export function ImageToVideoSeoSections() {
         <ol className="mt-6 space-y-5">
           {MOTION_TIPS.map((tip, index) => (
             <li key={tip.name} className="flex items-start gap-4">
-              <span className="mt-1 flex size-7 shrink-0 items-center justify-center rounded-full border border-primary/40 text-xs font-semibold text-primary">
+              <span className="border-primary/40 text-primary mt-1 flex size-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold">
                 {index + 1}
               </span>
               <div>
                 <h3 className="font-semibold">{tip.name}</h3>
-                <p className="mt-1 text-sm leading-7 text-muted-foreground">
+                <p className="text-muted-foreground mt-1 text-sm leading-7">
                   {tip.text}
                 </p>
               </div>
@@ -176,23 +186,24 @@ export function ImageToVideoSeoSections() {
         </ol>
       </section>
 
-      <section aria-labelledby="image-to-video-free" className="rounded-2xl border border-border/70 bg-card/40 p-6 sm:p-8">
+      <section
+        aria-labelledby="image-to-video-free"
+        className="border-border/70 bg-card/40 rounded-2xl border p-6 sm:p-8"
+      >
         <h2 id="image-to-video-free" className={headingClass}>
           Is photo to video free?
         </h2>
         <p className={paragraphClass}>
-          You can open the generator and explore the controls without paying
-          up front. Generating a video consumes credits, and the required
-          amount changes with the model, duration, and resolution. The
-          estimated credit cost is shown in the editor before you submit a
-          job.
+          You can open the generator and explore the controls without paying up
+          front. Generating a video consumes credits, and the required amount
+          changes with the model, duration, and resolution. The estimated credit
+          cost is shown in the editor before you submit a job.
         </p>
         <p className={paragraphClass}>
-          If your account has trial or promotional credits, you can use
-          those toward an eligible generation. Otherwise, you can purchase
-          credits as needed. There is no blanket promise of a free video
-          allowance, fixed render time, or watermark-free output for every
-          model.{' '}
+          If your account has trial or promotional credits, you can use those
+          toward an eligible generation. Otherwise, you can purchase credits as
+          needed. There is no blanket promise of a free video allowance, fixed
+          render time, or watermark-free output for every model.{' '}
           <Link href="/pricing" className={articleLinkClass}>
             Check available credit packs
           </Link>{' '}
@@ -204,11 +215,11 @@ export function ImageToVideoSeoSections() {
         <h2 id="image-to-video-faq" className={headingClass}>
           Frequently asked questions
         </h2>
-        <div className="mt-7 divide-y divide-border/70 border-y border-border/70">
+        <div className="divide-border/70 border-border/70 mt-7 divide-y border-y">
           {IMAGE_TO_VIDEO_FAQS.map((item) => (
             <div key={item.question} className="py-5">
               <h3 className="text-base font-semibold">{item.question}</h3>
-              <p className="mt-2 text-sm leading-7 text-muted-foreground">
+              <p className="text-muted-foreground mt-2 text-sm leading-7">
                 {item.answer}
               </p>
             </div>
@@ -216,15 +227,47 @@ export function ImageToVideoSeoSections() {
         </div>
       </section>
 
-      <section className="rounded-3xl border border-primary/20 bg-primary/[0.06] px-6 py-9 text-center sm:px-12 sm:py-12">
-        <div className="mx-auto mb-4 flex w-fit items-center gap-2 text-xs font-semibold uppercase tracking-wider text-primary">
+      <section aria-labelledby="image-to-video-related">
+        <h2 id="image-to-video-related" className={headingClass}>
+          Related one-photo video tools
+        </h2>
+        <p className={paragraphClass}>
+          Prefer a fixed scene instead of writing your own motion prompt? These
+          Genjutsu pages lock a ready-made look and still start from a photo.
+        </p>
+        <ul className="mt-6 flex flex-wrap gap-x-6 gap-y-3 text-sm">
+          <li>
+            <Link href="/enzo-fernandez-ai" className={articleLinkClass}>
+              Enzo Fernandez AI
+            </Link>
+          </li>
+          <li>
+            <Link href="/day-of-the-dead-ai-video" className={articleLinkClass}>
+              Day of the Dead AI Video
+            </Link>
+          </li>
+          <li>
+            <Link href="/jatayu-video-prompt" className={articleLinkClass}>
+              Jatayu video prompt
+            </Link>
+          </li>
+          <li>
+            <Link href="/video-face-swap" className={articleLinkClass}>
+              Video Face Swap
+            </Link>
+          </li>
+        </ul>
+      </section>
+
+      <section className="border-primary/20 bg-primary/[0.06] rounded-3xl border px-6 py-9 text-center sm:px-12 sm:py-12">
+        <div className="text-primary mx-auto mb-4 flex w-fit items-center gap-2 text-xs font-semibold tracking-wider uppercase">
           <Sparkles className="size-4" />
           Ready to animate a photo?
         </div>
         <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
           Your next clip can start from one good photo.
         </h2>
-        <p className="mx-auto mt-4 max-w-2xl text-sm leading-7 text-muted-foreground">
+        <p className="text-muted-foreground mx-auto mt-4 max-w-2xl text-sm leading-7">
           Upload an image, write a short motion prompt, and compare the credit
           estimate before generating. If you need more credits, choose a pack
           that fits your plans — you do not need to buy a subscription just to
@@ -233,21 +276,21 @@ export function ImageToVideoSeoSections() {
         <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
           <a
             href="#generator"
-            className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-5 py-2.5 text-sm font-semibold transition hover:bg-accent"
+            className="border-border bg-background hover:bg-accent inline-flex items-center gap-2 rounded-full border px-5 py-2.5 text-sm font-semibold transition"
           >
             <Images className="size-4" />
             Upload a photo
           </a>
           <Link
             href="/pricing"
-            className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground transition hover:opacity-90"
+            className="bg-primary text-primary-foreground inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold transition hover:opacity-90"
           >
             <Film className="size-4" />
             View credit packs
             <ArrowRight className="size-4" />
           </Link>
         </div>
-        <p className="mt-4 flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
+        <p className="text-muted-foreground mt-4 flex items-center justify-center gap-1.5 text-xs">
           <CheckCircle2 className="size-3.5" />
           Review the credit estimate before generating
         </p>

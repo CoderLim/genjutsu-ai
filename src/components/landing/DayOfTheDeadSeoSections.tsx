@@ -117,6 +117,7 @@ const RELATED_LINKS = [
   { label: 'AI Zombie Hug', href: '/ai-zombie-hug' },
   { label: 'Crazy Frog AI', href: '/crazy-frog-ai' },
   { label: 'Coldplay Kiss Cam', href: '/coldplay-kiss-cam' },
+  { label: 'Image to Video AI', href: '/image-to-video' },
   { label: 'Hotel Lobby AI', href: '/hotel-lobby-ai' },
   { label: 'Pricing', href: '/pricing' },
 ] as const;

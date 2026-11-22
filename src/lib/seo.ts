@@ -17,13 +17,24 @@ export function socialMeta(opts: {
   description: string;
   url?: string;
   image?: string;
+  imageWidth?: number;
+  imageHeight?: number;
+  siteName?: string;
 }) {
   const image = opts.image || ogImageUrl();
+  const siteName = opts.siteName || envConfigs.app_name;
   return [
     { property: 'og:type', content: 'website' },
+    { property: 'og:site_name', content: siteName },
     { property: 'og:title', content: opts.title },
     { property: 'og:description', content: opts.description },
     { property: 'og:image', content: image },
+    ...(opts.imageWidth
+      ? [{ property: 'og:image:width', content: String(opts.imageWidth) }]
+      : []),
+    ...(opts.imageHeight
+      ? [{ property: 'og:image:height', content: String(opts.imageHeight) }]
+      : []),
     ...(opts.url ? [{ property: 'og:url', content: opts.url }] : []),
     { name: 'twitter:card', content: 'summary_large_image' },
     { name: 'twitter:title', content: opts.title },
@@ -46,26 +57,29 @@ export function localeLinks(
   const available = locales.filter((loc) => supportedLocales.includes(loc));
   const canonicalLocale = available.includes(locale as (typeof locales)[number])
     ? locale
-    : available.includes('en') ? 'en' : (available[0] ?? 'en');
+    : available.includes('en')
+      ? 'en'
+      : (available[0] ?? 'en');
   const urlFor = (loc: string) =>
     localizeUrl(absoluteUrl(path || '/'), {
       locale: loc as (typeof locales)[number],
     }).href;
   return {
     canonical: urlFor(canonicalLocale),
-    alternates: available.length > 1
-      ? [
-          ...available.map((loc) => ({
-            rel: 'alternate' as const,
-            hrefLang: loc,
-            href: urlFor(loc),
-          })),
-          {
-            rel: 'alternate' as const,
-            hrefLang: 'x-default',
-            href: urlFor(available.includes('en') ? 'en' : available[0]!),
-          },
-        ]
-      : [],
+    alternates:
+      available.length > 1
+        ? [
+            ...available.map((loc) => ({
+              rel: 'alternate' as const,
+              hrefLang: loc,
+              href: urlFor(loc),
+            })),
+            {
+              rel: 'alternate' as const,
+              hrefLang: 'x-default',
+              href: urlFor(available.includes('en') ? 'en' : available[0]!),
+            },
+          ]
+        : [],
   };
 }
