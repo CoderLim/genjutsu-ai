@@ -218,15 +218,35 @@ export class FalProvider implements AIProvider {
       ? assertFalQueueUrls(queueUrls, taskId) : undefined;
     const queryModel = verified ? '' : this.getQueryModel(model);
     const legacyResultUrl = `${this.baseUrl}/${queryModel}/requests/${encodeURIComponent(taskId)}`;
+    let resultUrl = verified?.responseUrl ?? legacyResultUrl;
     const statusUrl = verified?.statusUrl ?? legacyResultUrl + '/status';
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       Authorization: `Key ${this.configs.apiKey}`,
     };
 
-    const statusResp = await fetch(statusUrl, {
+    let statusResp = await fetch(statusUrl, {
       method: 'GET', headers, redirect: 'error',
     });
+
+    // Old tasks have no canonical URLs. If a long submit path is not a
+    // readable queue endpoint, try the standard owner/app GET once. This
+    // never submits another job and never affects new tasks with saved URLs.
+    if (!verified && (statusResp.status === 404 || statusResp.status === 405)) {
+      const parts = (model ?? '').replace(/^\/+/, '').split('/');
+      const appPath = parts.slice(0, 2).join('/');
+      if (parts.length > 2 && appPath !== queryModel &&
+          /^[a-zA-Z0-9._-]+\/[a-zA-Z0-9._-]+$/.test(appPath)) {
+        const fallbackResult = `${this.baseUrl}/${appPath}/requests/${encodeURIComponent(taskId)}`;
+        const fallbackResp = await fetch(fallbackResult + '/status', {
+          method: 'GET', headers, redirect: 'error',
+        });
+        if (fallbackResp.ok) {
+          statusResp = fallbackResp;
+          resultUrl = fallbackResult;
+        }
+      }
+    }
 
     if (!statusResp.ok) {
       const detail = await statusResp.text().catch(() => '');
@@ -268,7 +288,6 @@ export class FalProvider implements AIProvider {
       };
     }
 
-    const resultUrl = verified?.responseUrl ?? legacyResultUrl;
     const resultResp = await fetch(resultUrl, {
       method: 'GET', headers, redirect: 'error',
     });
