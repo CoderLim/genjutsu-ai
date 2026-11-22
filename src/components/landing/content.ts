@@ -748,6 +748,10 @@ export const FOOTER_COLUMNS: FooterColumn[] = [
     title: 'More Tools',
     links: [
       {
+        label: 'Image to Video AI',
+        href: '/image-to-video/',
+      },
+      {
         label: 'Video Face Swap',
         href: '/video-face-swap',
       },
