@@ -136,8 +136,16 @@ test('Nano Banana switches Fal endpoints by workflow, without changing user mode
       referenceVideos: [],
       referenceAudio: [],
     };
+    // Text-only requests have no references; the unified image composer
+    // automatically uses the same model's edit endpoint when files are added.
+    const textOnly = buildGeneratorProviderRequest(textState, emptyMedia);
+    assert.equal(textOnly.image_urls, undefined);
     const textBody = buildGeneratorProviderRequest(textState, media);
-    assert.equal(textBody.image_urls, undefined);
+    assert.deepEqual(textBody.image_urls, media.referenceImages);
+    assert.equal(
+      getGeneratorProviderIdentity(id, 'text-to-image', true).providerModelId,
+      editIdentity.providerModelId
+    );
     assert.equal(textBody.resolution, '1K');
     assert.equal(textBody.aspect_ratio, '1:1');
     assert.equal(textBody.enable_web_search, undefined);

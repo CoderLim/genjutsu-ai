@@ -57,8 +57,10 @@ test('Seedance, H3 and Kling text-video aspect ratio options differ by model', (
       workflow: 'text-to-video',
     });
     assert.deepEqual(choices(model, state, 'aspectRatio'), expected, id);
+    // First Frame has an optional upload. Until a start image is present,
+    // the form still needs text-to-video aspect ratio settings.
     const frame = updateGeneratorState(state, model, { workflow: 'first-frame' });
-    assert.deepEqual(choices(model, frame, 'aspectRatio'), [], id);
+    assert.deepEqual(choices(model, frame, 'aspectRatio'), expected, id);
   }
 });
 

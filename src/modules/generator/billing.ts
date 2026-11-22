@@ -8,6 +8,8 @@ import { getUuid } from '@/lib/hash';
 import { assertGenerationId } from './storage';
 import type { GeneratorState, CreditEstimate } from './types';
 import { nextGeneratorQueryFailure } from './query-recovery';
+import { serializeGeneratorFalQueueMetadata } from './fal-queue-metadata';
+import type { FalQueueUrls } from '@/core/ai/fal-queue-urls';
 
 export const GENERATOR_SCENE = 'generic-generator';
 const SUBMISSION_CLAIM_TTL_MS = 3 * 60 * 1000;
@@ -201,9 +203,14 @@ export async function claimGeneratorSubmission(input: {
 
 export async function markGeneratorSubmitted(input: {
   userId: string; generationId: string; requestId: string;
+  falQueueUrls?: FalQueueUrls;
 }) {
+  const taskInfo = serializeGeneratorFalQueueMetadata(
+    input.requestId, input.falQueueUrls
+  );
   await db().update(aiTask).set({
     taskId: input.requestId,
+    taskInfo,
     status: 'submitted',
     taskResult: null,
   }).where(and(
@@ -215,10 +222,14 @@ export async function markGeneratorSubmitted(input: {
 
 export async function markGeneratorSubmissionUnknown(input: {
   userId: string; generationId: string; message: string; requestId?: string;
+  falQueueUrls?: FalQueueUrls;
 }) {
+  const taskInfo = input.requestId
+    ? serializeGeneratorFalQueueMetadata(input.requestId, input.falQueueUrls)
+    : null;
   await db().update(aiTask).set({
     status: 'submission_unknown',
-    ...(input.requestId ? { taskId: input.requestId } : {}),
+    ...(input.requestId ? { taskId: input.requestId, taskInfo } : {}),
     taskResult: JSON.stringify({
       error: input.message,
       requestId: input.requestId ?? null,

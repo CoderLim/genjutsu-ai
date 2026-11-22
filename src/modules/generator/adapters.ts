@@ -7,6 +7,8 @@ import {
   AITaskStatus,
   classifyFalSubmitFailure,
   FalProvider,
+  readFalQueueUrls,
+  type FalQueueUrls,
 } from '@/core/ai';
 import {
   assertWavespeedConfigured,
@@ -579,7 +581,10 @@ export async function submitGeneratorProvider(
     },
   });
   if (!result.taskId) throw new Error('Fal did not return a request ID');
-  return { requestId: result.taskId, status: 'processing' };
+  // The submit response contains the canonical queue GET URLs, which may
+  // differ from the POST endpoint's model/workflow path.
+  const falQueueUrls = readFalQueueUrls(result.taskResult, result.taskId);
+  return { requestId: result.taskId, status: 'processing', falQueueUrls };
 }
 
 export function classifyGeneratorSubmitError(
@@ -614,6 +619,7 @@ export async function queryGeneratorProvider(input: {
   mediaType: 'image' | 'video';
   workflow?: Workflow;
   providerModelId?: string;
+  falQueueUrls?: FalQueueUrls;
 }): Promise<ProviderResult> {
   const identity = getGeneratorQueryIdentity(input);
   if (identity.provider === 'wavespeed') {
@@ -644,6 +650,7 @@ export async function queryGeneratorProvider(input: {
   const result = await fal.query({
     taskId: input.requestId,
     model: identity.providerModelId,
+    queueUrls: input.falQueueUrls,
     mediaType:
       input.mediaType === 'image' ? AIMediaType.IMAGE : AIMediaType.VIDEO,
   });

@@ -11,6 +11,7 @@ import {
   SaveFilesFunction,
   UuidFunction,
 } from './types';
+import { assertFalQueueUrls, type FalQueueUrls } from './fal-queue-urls';
 
 const defaultUuid: UuidFunction = () => crypto.randomUUID();
 
@@ -204,20 +205,48 @@ export class FalProvider implements AIProvider {
     taskId,
     model,
     mediaType,
+    queueUrls,
   }: {
     taskId: string;
     model?: string;
     mediaType?: AIMediaType;
+    queueUrls?: FalQueueUrls;
   }): Promise<AITaskResult> {
-    const queryModel = this.getQueryModel(model);
-
-    const statusUrl = `${this.baseUrl}/${queryModel}/requests/${taskId}/status`;
+    // Only legacy tasks lacking submission metadata use the old path rules.
+    // The queue URLs returned by Fal take precedence for all new tasks.
+    const verified = queueUrls
+      ? assertFalQueueUrls(queueUrls, taskId) : undefined;
+    const queryModel = verified ? '' : this.getQueryModel(model);
+    const legacyResultUrl = `${this.baseUrl}/${queryModel}/requests/${encodeURIComponent(taskId)}`;
+    let resultUrl = verified?.responseUrl ?? legacyResultUrl;
+    const statusUrl = verified?.statusUrl ?? legacyResultUrl + '/status';
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       Authorization: `Key ${this.configs.apiKey}`,
     };
 
-    const statusResp = await fetch(statusUrl, { method: 'GET', headers });
+    let statusResp = await fetch(statusUrl, {
+      method: 'GET', headers, redirect: 'error',
+    });
+
+    // Old tasks have no canonical URLs. If a long submit path is not a
+    // readable queue endpoint, try the standard owner/app GET once. This
+    // never submits another job and never affects new tasks with saved URLs.
+    if (!verified && (statusResp.status === 404 || statusResp.status === 405)) {
+      const parts = (model ?? '').replace(/^\/+/, '').split('/');
+      const appPath = parts.slice(0, 2).join('/');
+      if (parts.length > 2 && appPath !== queryModel &&
+          /^[a-zA-Z0-9._-]+\/[a-zA-Z0-9._-]+$/.test(appPath)) {
+        const fallbackResult = `${this.baseUrl}/${appPath}/requests/${encodeURIComponent(taskId)}`;
+        const fallbackResp = await fetch(fallbackResult + '/status', {
+          method: 'GET', headers, redirect: 'error',
+        });
+        if (fallbackResp.ok) {
+          statusResp = fallbackResp;
+          resultUrl = fallbackResult;
+        }
+      }
+    }
 
     if (!statusResp.ok) {
       const detail = await statusResp.text().catch(() => '');
@@ -259,8 +288,9 @@ export class FalProvider implements AIProvider {
       };
     }
 
-    const resultUrl = `${this.baseUrl}/${queryModel}/requests/${taskId}`;
-    const resultResp = await fetch(resultUrl, { method: 'GET', headers });
+    const resultResp = await fetch(resultUrl, {
+      method: 'GET', headers, redirect: 'error',
+    });
 
     if (!resultResp.ok) {
       const detail = await resultResp.text().catch(() => '');

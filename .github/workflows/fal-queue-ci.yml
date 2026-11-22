@@ -1,0 +1,59 @@
+name: Fal Queue Reliability CI
+
+on:
+  pull_request:
+    paths:
+      - 'src/core/ai/fal*.ts'
+      - 'src/modules/generator/**'
+      - '.github/workflows/fal-queue-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Fal submit / query and persisted metadata tests
+        run: node --import tsx --test src/core/ai/fal-submit.test.ts src/modules/generator/fal-queue-metadata.test.ts
+      - name: Full unit suite (includes pre-existing tests)
+        id: full_suite
+        continue-on-error: true
+        run: pnpm test
+      - name: Production build
+        run: pnpm build
+      - name: Check changed Fal and generator TypeScript files
+        shell: bash
+        run: |
+          set +e
+          pnpm exec tsc --noEmit --pretty false > tsc-report.txt 2>&1
+          typecheck_status=$?
+          set -e
+          if [ "$typecheck_status" -eq 0 ]; then
+            echo "Full TypeScript check passed."
+            exit 0
+          fi
+          changed_errors="$(grep -E '^src/core/ai/(fal|index\.ts)|^src/modules/generator/(adapters|billing|service|fal-queue-metadata)' tsc-report.txt || true)"
+          if [ -n "$changed_errors" ]; then
+            echo "$changed_errors"
+            exit 1
+          fi
+          echo "::warning title=Existing type debt::Project has TypeScript errors outside changed Fal/generator files."
+          grep -m 5 'error TS' tsc-report.txt || true
+
+      - name: Report full-suite failures separately
+        if: steps.full_suite.outcome == 'failure'
+        run: |
+          echo "::error title=Full unit suite failed::Check the test logs; the Fal-specific tests and build have independent steps."
+          exit 1
