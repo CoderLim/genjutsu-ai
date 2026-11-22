@@ -11,7 +11,7 @@ export const IMAGE_TO_VIDEO_DESCRIPTION =
 export const IMAGE_TO_VIDEO_STEPS = [
   {
     name: 'Upload your photo',
-    text: 'Choose a clear JPG, PNG, or WebP photo. Each model has its own file type and size limits, which the uploader checks. A sharp, well-lit original usually gives the model more detail to work with.',
+    text: 'Choose a clear JPG, PNG, or WebP photo, up to 12 MB on supported image-to-video inputs. Some models accept fewer formats; the uploader checks your chosen model. A sharp, well-lit original gives the model more detail to work with.',
   },
   {
     name: 'Describe the motion',
@@ -42,7 +42,7 @@ export const IMAGE_TO_VIDEO_FAQS = [
   {
     question: 'Which image formats are supported?',
     answer:
-      'JPG, PNG, and WebP are supported by many of the available models. Individual models can have narrower format and file-size limits; the uploader checks the model you choose.',
+      'JPG, PNG, and WebP are supported by many available models, with a 12 MB per-image upload limit on the configured video workflows. Some models accept only JPG or PNG; the uploader checks the model you choose.',
   },
   {
     question: 'Why does my result look distorted?',
