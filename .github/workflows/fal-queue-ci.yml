@@ -25,7 +25,11 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Unit tests
+      - name: Fal submit / query and persisted metadata tests
+        run: node --import tsx --test src/core/ai/fal-submit.test.ts src/modules/generator/fal-queue-metadata.test.ts
+      - name: Full unit suite (includes pre-existing tests)
+        id: full_suite
+        continue-on-error: true
         run: pnpm test
       - name: Production build
         run: pnpm build
@@ -47,3 +51,9 @@ jobs:
           fi
           echo "::warning title=Existing type debt::Project has TypeScript errors outside changed Fal/generator files."
           grep -m 5 'error TS' tsc-report.txt || true
+
+      - name: Report full-suite failures separately
+        if: steps.full_suite.outcome == 'failure'
+        run: |
+          echo "::error title=Full unit suite failed::Check the test logs; the Fal-specific tests and build have independent steps."
+          exit 1
