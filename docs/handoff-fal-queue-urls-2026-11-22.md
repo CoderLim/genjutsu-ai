@@ -122,12 +122,52 @@ and https://fal.ai/docs/api-reference/inference-api/queue/status
 
 No production deployment or data migration is performed by this patch.
 
+## Confirmed production incident: incompatible Cloudflare redirect mode
+
+The live D1 record for task `31cd04c8-86a4-4c7b-842a-603f307bc155`
+(model `bytedance/seedance-2.0/mini/text-to-video`) had a **saved**
+canonical `taskInfo.falQueue.statusUrl` under
+`https://queue.fal.run/bytedance/seedance-2.0/requests/...`.
+The `task_result` showed:
+
+```text
+providerStatus: QUERY_EXCEPTION
+queryMessage: Invalid redirect value, must be one of "follow" or "manual"
+("error" won't be implemented since it does not make sense at the edge ...)
+```
+
+This conclusively identifies the current incident as a **runtime compatibility
+bug in our Fal GET calls**, NOT Mini's missing `/mini` path. PR #38 had
+added `fetch(..., { redirect: 'error' })` while trying to prevent leaking a
+Fal API key across redirects. Cloudflare Workers implements only `follow`
+and `manual`: the former forwards sensitive headers to redirect targets,
+so **all three Fal query GET call sites now use `redirect: 'manual'`**.
+An HTTP 3xx response is treated as a blocked, permanent **lookup**
+error (`QUERY_PERMANENT_ERROR` or `RESULT_FETCH_PERMANENT_ERROR`) that
+the generator handles as `query-error` / `query_review`, NOT evidence of
+provider generation failure and NOT an automatic refund. Redirect target
+URLs are never fetched.
+
+Cloudflare reference:
+https://developers.cloudflare.com/workers/runtime-apis/request/
+
+The bidirectional legacy lookup fallback remains a **separate compatibility
+improvement** for records without saved canonical queue URLs; it **cannot**
+explain or repair the above task, because the canonical status URL was saved.
+
+After this change is deployed, admin may inspect the original Fal request,
+then use `resume-query` to restore the same paid task without resubmission
+or additional credit consumption. No recovery is performed automatically.
+The screenshot and D1 record do not establish that Fal finished generating
+or that R2 persistence has succeeded; both need verification.
+
 ## Seedance 2.0 Mini query_review follow-up
 
-The pictured task `31cd04c8…` shows the correct **customer-visible**
-review state, not an upstream generation failure. However the screenshot
-alone does **not** identify which Fal URL returned 404, whether the saved
-queue metadata was missing, or whether status vs result fetch failed.
+The original screenshot alone could not identify the root cause,
+but the subsequent D1 query **did**: canonical queue metadata was saved,
+and the Worker threw for an unsupported `redirect: 'error'` option before
+querying Fal. The remaining SQL below is still useful when investigating
+**other** `query_review` tasks.
 
 Read the D1 `ai_task` record before changing provider-specific routing:
 
@@ -143,13 +183,11 @@ FROM ai_task
 WHERE scene = 'generic-generator' AND id LIKE '31cd04c8%';
 ```
 
-If `status_url` is present, the provider queried that URL directly;
-the legacy `bytedance/*` truncation **cannot** be the root cause. Check
-actual Fal request ID, status/result GET response, authentication, output
-availability, and whether the current Cloudflare deployment includes PR #38.
-If `status_url` is missing, the old two-segment lookup may have returned
-404; the new bounded fallback tries the original full
-`bytedance/seedance-2.0/mini/text-to-video` path and intermediate prefixes.
+If `status_url` is present, code selects that URL directly,
+but edge/runtime configuration may still reject the fetch **before network
+I/O**, as this incident demonstrates. If `status_url` is missing, the
+bounded legacy fallback handles status 404/405 via alternate model paths.
+Do not infer a path mismatch from `query_review` alone.
 
 An existing `query_review` job will not restart on its own. After deploying
 the fix, an admin should verify the original Fal request and perform
