@@ -10,8 +10,9 @@ import type { FieldSpec, GeneratorModel, WorkflowSpec } from './types';
 
 const IMAGE_MIME = ['image/png', 'image/jpeg', 'image/webp'] as const;
 const videoFrames = {
+  // First Frame matches Raphael: image is optional and falls back to text-to-video.
   startFrame: {
-    min: 1,
+    min: 0,
     max: 1,
     accept: IMAGE_MIME,
     maxBytes: 12 * 1048576,
@@ -122,7 +123,8 @@ function videoProfile(options: VideoOptions): GeneratorModel {
     },
   };
   // Image-to-video follows the uploaded frame's canvas. Fal ignores any
-  // manually selected aspect ratio for those workflows.
+  // manually selected aspect ratio for those workflows. Keep aspect ratio on
+  // First Frame so text-only (no start frame) still has a canvas control.
   const frameFields = { ...fields };
   delete frameFields.aspectRatio;
   const textToVideo: WorkflowSpec = {
@@ -133,7 +135,8 @@ function videoProfile(options: VideoOptions): GeneratorModel {
   const firstFrame: WorkflowSpec = {
     label: 'First Frame',
     slots: frameSlots,
-    fields: frameFields,
+    // Keep aspect ratio: start frame is optional; without it this is text-to-video.
+    fields,
   };
   const pricedRates =
     options.rates ??
@@ -175,7 +178,10 @@ function videoProfile(options: VideoOptions): GeneratorModel {
             'start-end': {
               label: 'Start & End',
               slots: {
-                ...frameSlots,
+                startFrame: {
+                  ...frameSlots.startFrame,
+                  min: 1,
+                },
                 endFrame: {
                   min: 1,
                   max: 1,

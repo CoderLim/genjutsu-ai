@@ -2,7 +2,12 @@
  * Provider-specific business adapters for the *new* generator pipeline.
  * These call generic provider transports, never legacy generation services.
  */
-import { AIMediaType, AITaskStatus, FalProvider, classifyFalSubmitFailure } from '@/core/ai';
+import {
+  AIMediaType,
+  AITaskStatus,
+  classifyFalSubmitFailure,
+  FalProvider,
+} from '@/core/ai';
 import {
   assertWavespeedConfigured,
   classifyWavespeedSubmitFailure,
@@ -11,6 +16,7 @@ import {
 } from '@/core/ai/wavespeed';
 import { envConfigs } from '@/config';
 import { getConfig } from '@/modules/config/service';
+
 import type { GeneratorState, Workflow } from './types';
 
 export type ProviderResult = {
@@ -46,10 +52,19 @@ const MODEL_IDENTITIES: Record<string, ProviderIdentity> = {
     provider: 'fal',
     providerModelId: 'minimax/h3/reference-to-video',
   },
-  'nano-banana-2.1': { provider: 'fal', providerModelId: 'google/nano-banana-2.1' },
-  'nano-banana-2-lite': { provider: 'fal', providerModelId: 'google/nano-banana-lite' },
+  'nano-banana-2.1': {
+    provider: 'fal',
+    providerModelId: 'google/nano-banana-2.1',
+  },
+  'nano-banana-2-lite': {
+    provider: 'fal',
+    providerModelId: 'google/nano-banana-lite',
+  },
   'nano-banana-2': { provider: 'fal', providerModelId: 'fal-ai/nano-banana-2' },
-  'nano-banana-pro': { provider: 'fal', providerModelId: 'fal-ai/nano-banana-pro' },
+  'nano-banana-pro': {
+    provider: 'fal',
+    providerModelId: 'fal-ai/nano-banana-pro',
+  },
   'text-to-image-fast': {
     provider: 'fal',
     providerModelId: 'fal-ai/flux-1/schnell',
@@ -60,14 +75,23 @@ const MODEL_IDENTITIES: Record<string, ProviderIdentity> = {
   },
 };
 
-
 /**
  * Fal endpoints are selected by workflow, *not* by a client-provided endpoint.
  * A missing endpoint deliberately blocks submission instead of silently
  * substituting a different model (notably H3 Turbo, still unverified).
  */
 export const ADDITIONAL_FAL_ENDPOINTS: Record<
-  string, Partial<Record<'text-to-video' | 'first-frame' | 'all-in-one-reference' | 'text-to-image' | 'image-to-image', string>>
+  string,
+  Partial<
+    Record<
+      | 'text-to-video'
+      | 'first-frame'
+      | 'all-in-one-reference'
+      | 'text-to-image'
+      | 'image-to-image',
+      string
+    >
+  >
 > = {
   'seedance-2-fast': {
     'all-in-one-reference': 'bytedance/seedance-2.0/fast/reference-to-video',
@@ -139,33 +163,52 @@ export class GeneratorProviderNotConfiguredError extends Error {
 }
 
 export function getGeneratorProviderIdentity(
-  modelId: string, workflow?: Workflow, hasReferences?: boolean
+  modelId: string,
+  workflow?: Workflow,
+  hasReferences?: boolean
 ): ProviderIdentity {
   const extra = ADDITIONAL_FAL_ENDPOINTS[modelId];
   if (extra) {
-    const apiWorkflow = workflow === 'start-end' ? 'first-frame'
-      : workflow === 'text-to-image' && hasReferences === true &&
-        extra['image-to-image'] ? 'image-to-image'
-      : workflow === 'all-in-one-reference' &&
-        (hasReferences === false || !extra['all-in-one-reference'])
-        ? 'text-to-video'
-        : workflow;
-    const endpoint = apiWorkflow ? extra[apiWorkflow as keyof typeof extra]
-      : extra['first-frame'] ?? extra['text-to-image'];
+    // First Frame without a start image falls back to text-to-video, same as
+    // All-in-One Reference with no media. Only remap when hasReferences is
+    // explicitly false so existing calls that omit the flag stay image-to-video.
+    const apiWorkflow =
+      workflow === 'start-end'
+        ? 'first-frame'
+        : workflow === 'text-to-image' &&
+            hasReferences === true &&
+            extra['image-to-image']
+          ? 'image-to-image'
+          : workflow === 'first-frame' && hasReferences === false
+            ? 'text-to-video'
+            : workflow === 'all-in-one-reference' &&
+                (hasReferences === false || !extra['all-in-one-reference'])
+              ? 'text-to-video'
+              : workflow;
+    const endpoint = apiWorkflow
+      ? extra[apiWorkflow as keyof typeof extra]
+      : (extra['first-frame'] ?? extra['text-to-image']);
     if (!endpoint) throw new Error('Unsupported Fal model/workflow endpoint');
     return { provider: 'fal', providerModelId: endpoint };
   }
-  const resolvedModelId = modelId === 'all-in-one-video' &&
+  const resolvedModelId =
+    modelId === 'all-in-one-video' &&
     (workflow === 'text-to-video' ||
       (workflow === 'all-in-one-reference' && hasReferences === false))
-    ? 'text-to-video-standard' : modelId;
+      ? 'text-to-video-standard'
+      : modelId;
   const identity = MODEL_IDENTITIES[resolvedModelId];
   if (!identity) throw new Error('Unknown generator adapter: ' + modelId);
   // Both UI workflows share one named model; Fal has separate queue endpoints
   // for generation and editing. The selected endpoint is sealed in task options.
   if (
-    (['nano-banana-2.1', 'nano-banana-2-lite', 'nano-banana-2', 'nano-banana-pro']
-      .includes(modelId) || modelId === 'image-edit-standard') &&
+    ([
+      'nano-banana-2.1',
+      'nano-banana-2-lite',
+      'nano-banana-2',
+      'nano-banana-pro',
+    ].includes(modelId) ||
+      modelId === 'image-edit-standard') &&
     (workflow === 'image-to-image' ||
       (workflow === 'text-to-image' && hasReferences === true))
   ) {
@@ -182,7 +225,9 @@ async function getFal() {
 }
 
 /** Fail before reserving credits if the provider is unavailable. */
-export async function assertGeneratorProviderConfigured(modelId: string): Promise<void> {
+export async function assertGeneratorProviderConfigured(
+  modelId: string
+): Promise<void> {
   const identity = getGeneratorProviderIdentity(modelId);
   if (identity.provider === 'wavespeed') {
     await assertWavespeedConfigured();
@@ -199,28 +244,37 @@ export type MediaReadUrls = {
   referenceAudio: string[];
 };
 
-
-function minimaxCustomImageSize(params: Record<string, string | number | boolean>) {
-  const dimensions: Record<string, number> = { '1K': 1024, '2K': 2048, '4K': 3840 };
+function minimaxCustomImageSize(
+  params: Record<string, string | number | boolean>
+) {
+  const dimensions: Record<string, number> = {
+    '1K': 1024,
+    '2K': 2048,
+    '4K': 3840,
+  };
   const width = dimensions[String(params.resolution)];
   if (!width) throw new Error('Invalid image resolution');
   const aspect = String(params.aspectRatio).split(':').map(Number);
-  if (aspect.length !== 2 || aspect.some(x => !Number.isFinite(x) || x <= 0)) {
+  if (
+    aspect.length !== 2 ||
+    aspect.some((x) => !Number.isFinite(x) || x <= 0)
+  ) {
     throw new Error('Invalid image aspect ratio');
   }
   // For 4K landscape, use the conventional width; rotate for portrait.
-  let w = width, h = Math.round(width * aspect[1] / aspect[0] / 32) * 32;
+  let w = width,
+    h = Math.round((width * aspect[1]) / aspect[0] / 32) * 32;
   if (h > width) {
     h = width;
-    w = Math.round(width * aspect[0] / aspect[1] / 32) * 32;
+    w = Math.round((width * aspect[0]) / aspect[1] / 32) * 32;
   }
   // Fal requires at least 655,360 pixels. At 1K, 16:9 and 9:16 would
   // otherwise be only 1024 x 576, so increase both sides together.
   const minPixels = 655360;
   if (w * h < minPixels) {
     const scale = Math.sqrt(minPixels / (w * h));
-    w = Math.ceil(w * scale / 32) * 32;
-    h = Math.ceil(h * scale / 32) * 32;
+    w = Math.ceil((w * scale) / 32) * 32;
+    h = Math.ceil((h * scale) / 32) * 32;
   }
   // Rounded dimensions must not exceed Fal's inclusive 3:1 / 1:3 bounds.
   // E.g. a 2048px 3:1 output rounded to 2048x672 exceeds 3:1.
@@ -234,12 +288,17 @@ export function buildGeneratorProviderRequest(
   media: MediaReadUrls
 ): Record<string, unknown> {
   const params = state.params;
-  const hasReferenceFiles = media.referenceImages.length > 0 ||
-    media.referenceVideos.length > 0 || media.referenceAudio.length > 0;
+  const hasReferenceFiles =
+    media.referenceImages.length > 0 ||
+    media.referenceVideos.length > 0 ||
+    media.referenceAudio.length > 0;
   if (ADDITIONAL_FAL_ENDPOINTS[state.modelId]) {
     const id = state.modelId;
     if (id.startsWith('minimax-h3-image')) {
-      if (state.workflow === 'image-to-image' && !media.referenceImages.length) {
+      if (
+        state.workflow === 'image-to-image' &&
+        !media.referenceImages.length
+      ) {
         throw new Error('Reference image required');
       }
       return {
@@ -248,15 +307,21 @@ export function buildGeneratorProviderRequest(
         num_images: params.outputCount,
         output_format: params.outputFormat,
         ...(media.referenceImages.length
-          ? { image_urls: media.referenceImages } : {}),
+          ? { image_urls: media.referenceImages }
+          : {}),
       };
     }
-    const hasImage = state.workflow === 'first-frame' || state.workflow === 'start-end';
-    const isReference = state.workflow === 'all-in-one-reference' && hasReferenceFiles;
+    const hasImage =
+      !!media.startFrame &&
+      (state.workflow === 'first-frame' || state.workflow === 'start-end');
+    const isReference =
+      state.workflow === 'all-in-one-reference' && hasReferenceFiles;
     if (isReference && !ADDITIONAL_FAL_ENDPOINTS[id]['all-in-one-reference']) {
       throw new Error('This model does not support reference uploads');
     }
-    if (hasImage && !media.startFrame) throw new Error('Start frame required');
+    if (state.workflow === 'start-end' && !media.startFrame) {
+      throw new Error('Start frame required');
+    }
     if (state.workflow === 'start-end' && !media.endFrame) {
       throw new Error('End frame required');
     }
@@ -268,14 +333,18 @@ export function buildGeneratorProviderRequest(
     if (id.startsWith('kling-4')) {
       return {
         ...base,
-        ...(isReference ? {
-          image_urls: media.referenceImages,
-          aspect_ratio: params.aspectRatio,
-        } : {}),
+        ...(isReference
+          ? {
+              image_urls: media.referenceImages,
+              aspect_ratio: params.aspectRatio,
+            }
+          : {}),
         ...(hasImage
           ? {
               start_image_url: media.startFrame,
-              ...(state.workflow === 'start-end' ? { end_image_url: media.endFrame } : {}),
+              ...(state.workflow === 'start-end'
+                ? { end_image_url: media.endFrame }
+                : {}),
             }
           : { aspect_ratio: params.aspectRatio }),
         // Kling 4 uses its own per-shot defaults. Do not send WaveSpeed keys.
@@ -290,7 +359,9 @@ export function buildGeneratorProviderRequest(
             ? { image_url: media.startFrame }
             : {
                 start_image_url: media.startFrame,
-                ...(state.workflow === 'start-end' ? { end_image_url: media.endFrame } : {}),
+                ...(state.workflow === 'start-end'
+                  ? { end_image_url: media.endFrame }
+                  : {}),
               }
           : { aspect_ratio: params.aspectRatio }),
         ...(id === 'kling-3' ? { generate_audio: params.generateAudio } : {}),
@@ -299,19 +370,25 @@ export function buildGeneratorProviderRequest(
     if (id === 'minimax-h3' || id.startsWith('minimax-h3-max')) {
       return {
         ...base,
-        ...(isReference ? {
-          reference_image_urls: media.referenceImages,
-        } : {}),
-        ...(hasImage ? {
-          image_url: media.startFrame,
-          ...(state.workflow === 'start-end'
-            ? { end_image_url: media.endFrame }
-            : {}),
-        } : { aspect_ratio: params.aspectRatio }),
-        ...(id === 'minimax-h3' ? {} : {
-          prompt_expansion_mode: params.promptExpansionMode,
-          enable_safety_checker: true,
-        }),
+        ...(isReference
+          ? {
+              reference_image_urls: media.referenceImages,
+            }
+          : {}),
+        ...(hasImage
+          ? {
+              image_url: media.startFrame,
+              ...(state.workflow === 'start-end'
+                ? { end_image_url: media.endFrame }
+                : {}),
+            }
+          : { aspect_ratio: params.aspectRatio }),
+        ...(id === 'minimax-h3'
+          ? {}
+          : {
+              prompt_expansion_mode: params.promptExpansionMode,
+              enable_safety_checker: true,
+            }),
       };
     }
     // Seedance Fast/Mini/2.5 use fal's image_url, not WaveSpeed's
@@ -319,18 +396,25 @@ export function buildGeneratorProviderRequest(
     return {
       ...base,
       ...(isReference ? { image_urls: media.referenceImages } : {}),
-      ...(hasImage ? {
-        image_url: media.startFrame,
-        ...(state.workflow === 'start-end' ? { end_image_url: media.endFrame } : {}),
-      } : { aspect_ratio: params.aspectRatio }),
+      ...(hasImage
+        ? {
+            image_url: media.startFrame,
+            ...(state.workflow === 'start-end'
+              ? { end_image_url: media.endFrame }
+              : {}),
+          }
+        : { aspect_ratio: params.aspectRatio }),
       generate_audio: params.generateAudio,
     };
   }
 
   if (state.modelId === 'multi-image-to-video') {
-    if (media.referenceImages.length < 1) throw new Error('Reference images required');
+    if (media.referenceImages.length < 1)
+      throw new Error('Reference images required');
     if (media.referenceVideos.length || media.referenceAudio.length) {
-      throw new Error('This model accepts images only; mixed references require verified billing');
+      throw new Error(
+        'This model accepts images only; mixed references require verified billing'
+      );
     }
     return {
       prompt: state.prompt,
@@ -368,11 +452,13 @@ export function buildGeneratorProviderRequest(
   if (state.modelId === 'all-in-one-video') {
     return {
       prompt: state.prompt,
-      ...(state.workflow === 'all-in-one-reference' && hasReferenceFiles ? {
-        reference_images: media.referenceImages,
-        reference_videos: media.referenceVideos,
-        reference_audios: media.referenceAudio,
-      } : {}),
+      ...(state.workflow === 'all-in-one-reference' && hasReferenceFiles
+        ? {
+            reference_images: media.referenceImages,
+            reference_videos: media.referenceVideos,
+            reference_audios: media.referenceAudio,
+          }
+        : {}),
       duration: params.duration,
       resolution: params.resolution,
       aspect_ratio: params.aspectRatio,
@@ -382,8 +468,10 @@ export function buildGeneratorProviderRequest(
   }
 
   if (state.modelId === 'reference-to-video-pro') {
-    if (media.referenceVideos.length !== 1 ||
-        media.referenceImages.length < 1) {
+    if (
+      media.referenceVideos.length !== 1 ||
+      media.referenceImages.length < 1
+    ) {
       throw new Error('H3 requires one video and at least one image');
     }
     return {
@@ -398,15 +486,26 @@ export function buildGeneratorProviderRequest(
     };
   }
 
-  if (['nano-banana-2.1', 'nano-banana-2-lite', 'nano-banana-2', 'nano-banana-pro'].includes(state.modelId)) {
+  if (
+    [
+      'nano-banana-2.1',
+      'nano-banana-2-lite',
+      'nano-banana-2',
+      'nano-banana-pro',
+    ].includes(state.modelId)
+  ) {
     if (state.workflow === 'image-to-image' && !media.referenceImages.length) {
       throw new Error('At least one reference image is required');
     }
     return {
       prompt: state.prompt,
-      ...(media.referenceImages.length ? { image_urls: media.referenceImages } : {}),
+      ...(media.referenceImages.length
+        ? { image_urls: media.referenceImages }
+        : {}),
       aspect_ratio: params.aspectRatio,
-      ...(state.modelId === 'nano-banana-2-lite' ? {} : { resolution: params.resolution }),
+      ...(state.modelId === 'nano-banana-2-lite'
+        ? {}
+        : { resolution: params.resolution }),
       num_images: params.outputCount,
       output_format: params.outputFormat,
       // Omit optional web search and thinking: their incremental cost is not
@@ -437,7 +536,9 @@ export function buildGeneratorProviderRequest(
     }
     return {
       prompt: state.prompt,
-      ...(media.referenceImages.length ? { image_urls: media.referenceImages } : {}),
+      ...(media.referenceImages.length
+        ? { image_urls: media.referenceImages }
+        : {}),
       image_size: size,
       num_images: params.outputCount,
       output_format: params.outputFormat,
@@ -451,9 +552,17 @@ export async function submitGeneratorProvider(
   state: GeneratorState,
   media: MediaReadUrls
 ) {
-  const hasReferences = media.referenceImages.length > 0 ||
-    media.referenceVideos.length > 0 || media.referenceAudio.length > 0;
-  const identity = getGeneratorProviderIdentity(state.modelId, state.workflow, hasReferences);
+  const hasReferences =
+    state.workflow === 'first-frame' || state.workflow === 'start-end'
+      ? !!media.startFrame
+      : media.referenceImages.length > 0 ||
+        media.referenceVideos.length > 0 ||
+        media.referenceAudio.length > 0;
+  const identity = getGeneratorProviderIdentity(
+    state.modelId,
+    state.workflow,
+    hasReferences
+  );
   const body = buildGeneratorProviderRequest(state, media);
   if (identity.provider === 'wavespeed') {
     await assertWavespeedConfigured();
@@ -462,8 +571,8 @@ export async function submitGeneratorProvider(
   const fal = await getFal();
   const result = await fal.generate({
     params: {
-      mediaType: state.mediaType === 'image'
-        ? AIMediaType.IMAGE : AIMediaType.VIDEO,
+      mediaType:
+        state.mediaType === 'image' ? AIMediaType.IMAGE : AIMediaType.VIDEO,
       model: identity.providerModelId,
       prompt: state.prompt,
       options: body,
@@ -474,7 +583,8 @@ export async function submitGeneratorProvider(
 }
 
 export function classifyGeneratorSubmitError(
-  error: unknown, provider: ProviderIdentity['provider']
+  error: unknown,
+  provider: ProviderIdentity['provider']
 ): 'refund' | 'uncertain' {
   if (error instanceof GeneratorProviderNotConfiguredError) return 'refund';
   if (provider === 'wavespeed') return classifyWavespeedSubmitFailure(error);
@@ -499,7 +609,9 @@ export function getGeneratorQueryIdentity(input: {
 }
 
 export async function queryGeneratorProvider(input: {
-  modelId: string; requestId: string; mediaType: 'image' | 'video';
+  modelId: string;
+  requestId: string;
+  mediaType: 'image' | 'video';
   workflow?: Workflow;
   providerModelId?: string;
 }): Promise<ProviderResult> {
@@ -521,28 +633,38 @@ export async function queryGeneratorProvider(input: {
         error: result.error,
       };
     }
-    return { status: 'processing', providerStatus: result.providerStatus, outputUrls: [] };
+    return {
+      status: 'processing',
+      providerStatus: result.providerStatus,
+      outputUrls: [],
+    };
   }
 
   const fal = await getFal();
   const result = await fal.query({
     taskId: input.requestId,
     model: identity.providerModelId,
-    mediaType: input.mediaType === 'image'
-      ? AIMediaType.IMAGE : AIMediaType.VIDEO,
+    mediaType:
+      input.mediaType === 'image' ? AIMediaType.IMAGE : AIMediaType.VIDEO,
   });
-  const providerStatus = String(result.taskInfo?.status || result.taskStatus || 'processing');
+  const providerStatus = String(
+    result.taskInfo?.status || result.taskStatus || 'processing'
+  );
   if (result.taskStatus === AITaskStatus.SUCCESS) {
     const images = result.taskInfo?.images as
-      | Array<{ imageUrl?: string }> | undefined;
+      | Array<{ imageUrl?: string }>
+      | undefined;
     const videos = result.taskInfo?.videos as
-      | Array<{ videoUrl?: string }> | undefined;
-    const urls = input.mediaType === 'image'
-      ? (images ?? []).map(x => x.imageUrl).filter((x): x is string => !!x)
-      : (videos ?? []).map(x => x.videoUrl).filter((x): x is string => !!x);
+      | Array<{ videoUrl?: string }>
+      | undefined;
+    const urls =
+      input.mediaType === 'image'
+        ? (images ?? []).map((x) => x.imageUrl).filter((x): x is string => !!x)
+        : (videos ?? []).map((x) => x.videoUrl).filter((x): x is string => !!x);
     if (!urls.length) {
       return {
-        status: 'query-error', providerStatus,
+        status: 'query-error',
+        providerStatus,
         outputUrls: [],
         error: 'Provider reported success with no downloadable output',
       };
@@ -552,11 +674,21 @@ export async function queryGeneratorProvider(input: {
   if (result.taskStatus === AITaskStatus.FAILED) {
     // Fal HTTP 4xx status/result lookup is not proof that generation failed.
     const kind = String(result.taskInfo?.status ?? '');
-    if (kind === 'QUERY_PERMANENT_ERROR' || kind === 'RESULT_FETCH_PERMANENT_ERROR') {
-      return { status: 'query-error', providerStatus, outputUrls: [], error: 'Provider query needs review' };
+    if (
+      kind === 'QUERY_PERMANENT_ERROR' ||
+      kind === 'RESULT_FETCH_PERMANENT_ERROR'
+    ) {
+      return {
+        status: 'query-error',
+        providerStatus,
+        outputUrls: [],
+        error: 'Provider query needs review',
+      };
     }
     return {
-      status: 'failed', providerStatus, outputUrls: [],
+      status: 'failed',
+      providerStatus,
+      outputUrls: [],
       error: String(result.taskInfo?.errorMessage || 'Generation failed'),
     };
   }

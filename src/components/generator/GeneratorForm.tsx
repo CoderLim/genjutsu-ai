@@ -1106,9 +1106,15 @@ export function GeneratorForm({
                     const optional = isGeneratorSlotOptional(spec, slot);
                     const isImageReference =
                       mediaType === 'image' && slot === 'referenceImages';
-                    const emptyLabel = isImageReference
-                      ? 'Reference'
-                      : SLOT_LABELS[slot];
+                    // Raphael First Frame: empty tile reads "Reference / Optional".
+                    const isOptionalFirstFrame =
+                      form.workflow === 'first-frame' &&
+                      slot === 'startFrame' &&
+                      optional;
+                    const emptyLabel =
+                      isImageReference || isOptionalFirstFrame
+                        ? 'Reference'
+                        : SLOT_LABELS[slot];
                     const capacity = getGeneratorSlotCapacity(
                       spec,
                       form.inputs,
@@ -1120,7 +1126,11 @@ export function GeneratorForm({
                         variant="composer"
                         optional={optional}
                         hint={
-                          isImageReference ? 'Up to ' + limit.max : undefined
+                          isImageReference
+                            ? 'Up to ' + limit.max
+                            : isOptionalFirstFrame
+                              ? 'Optional'
+                              : undefined
                         }
                         label={emptyLabel}
                         urls={slotUrls(form.inputs, slot)}
