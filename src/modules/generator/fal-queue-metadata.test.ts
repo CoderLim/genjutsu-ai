@@ -59,3 +59,14 @@ test('multi-segment canonical URLs are preserved in durable Fal taskInfo', () =>
     assert.deepEqual(readGeneratorFalQueueMetadata(saved, id), urls);
   }
 });
+
+test('accepted Fal submission without canonical URLs preserves diagnostic marker', () => {
+  const stored = serializeGeneratorFalQueueMetadata(id, undefined, true);
+  assert.deepEqual(JSON.parse(stored!), {
+    falQueueUrlState: 'missing-at-submit',
+  });
+  // Recorded absence is still eligible for bounded compatibility lookups,
+  // while canonical URLs always take precedence.
+  assert.equal(readGeneratorFalQueueMetadata(stored, id), undefined);
+  assert.equal(serializeGeneratorFalQueueMetadata(id, undefined, false), null);
+});
