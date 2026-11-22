@@ -944,221 +944,244 @@ export function GeneratorForm({
   return (
     <div className="mx-auto w-full max-w-[1128px]">
       <section
-        className="relative z-10 overflow-visible rounded-[22px] border border-[rgba(20,17,18,0.086)] bg-white px-2 pt-0.5 pb-2 text-[rgb(18,15,16)] shadow-[0_24px_60px_-18px_rgba(24,14,16,0.09),0_6px_18px_-6px_rgba(24,14,16,0.04)]"
+        className="relative z-10 overflow-visible rounded-[22px] border border-[rgba(20,17,18,0.086)] bg-white px-2 pt-0.5 text-[rgb(18,15,16)] shadow-[0_24px_60px_-18px_rgba(24,14,16,0.09),0_6px_18px_-6px_rgba(24,14,16,0.04)]"
         style={{ ['--composer-accent' as string]: COMPOSER_ACCENT }}
       >
-        {/* Header: Image / Video tabs + AI Enhance */}
-        <div className="flex items-center justify-between gap-3 px-1">
-          <nav aria-label="Generator type" className="flex items-stretch gap-1">
-            {[
-              { type: 'image' as const, label: 'Image', Icon: ImageIcon },
-              { type: 'video' as const, label: 'Video', Icon: Clapperboard },
-            ].map(({ type, label, Icon }) => {
-              const active = mediaType === type;
-              return (
-                <button
-                  key={type}
-                  type="button"
-                  aria-pressed={active}
-                  disabled={busy || mediaBusy || submitLock.current}
-                  onClick={() => {
-                    if (
-                      busy ||
-                      mediaBusy ||
-                      submitLock.current ||
-                      mediaType === type
-                    )
-                      return;
-                    const next =
-                      allModels.find(
-                        (item) =>
-                          item.id ===
-                          (type === 'image'
-                            ? 'nano-banana-2'
-                            : 'photo-to-video-standard')
-                      ) ?? allModels.find((item) => item.mediaType === type);
-                    if (next) setModel(next.id);
-                  }}
-                  className={cn(
-                    'relative inline-flex h-11 items-center gap-2 px-1 text-sm font-medium transition disabled:opacity-50',
-                    active
-                      ? 'text-[rgb(18,15,16)] after:absolute after:right-0 after:bottom-0 after:left-0 after:h-0.5 after:rounded-full after:bg-[var(--composer-accent,#b04845)]'
-                      : 'text-[rgb(102,92,95)] hover:text-[rgb(18,15,16)]'
-                  )}
-                >
-                  <Icon className="size-4 opacity-80" strokeWidth={1.75} />
-                  {label}
-                </button>
-              );
-            })}
-          </nav>
-
-          {showEnhance ? (
-            <label className="flex cursor-pointer items-center gap-2 text-sm text-[rgba(18,15,16,0.78)]">
-              <span className="hidden sm:inline">AI Enhance</span>
-              <Switch
-                size="sm"
-                checked={!!enhanceOn}
-                onCheckedChange={onEnhanceChange}
-                aria-label="AI Enhance"
-                className={accentSwitchClass}
-              />
-            </label>
-          ) : null}
-        </div>
-
-        {/* Body: reference + prompt */}
-        <div className="mt-1 flex flex-col gap-3 px-1 sm:flex-row sm:items-stretch">
-          {showUnifiedReference ? (
-            <MixedReferenceUploader
-              items={mixedItems}
-              accept={mixedAccept}
-              canAdd={mixedCanAdd}
-              limitLines={mixedLimitLines}
-              onFiles={onMixedReferenceFiles}
-              onRemove={removeFile}
-            />
-          ) : activeSlots.length > 0 ? (
-            <ComposerFrameSlots showArrow={isStartEnd}>
-              {activeSlots.map((slot) => {
-                const limit = spec.slots[slot]!;
-                const optional = isGeneratorSlotOptional(spec, slot);
-                const isImageReference =
-                  mediaType === 'image' && slot === 'referenceImages';
-                const emptyLabel = isImageReference
-                  ? 'Reference'
-                  : SLOT_LABELS[slot];
-                const capacity = getGeneratorSlotCapacity(
-                  spec,
-                  form.inputs,
-                  slot
-                );
+        {/* Header: Image / Video tabs + AI Enhance (Raphael: -mx-2 -mt-0.5, px-4, border-b) */}
+        <div className="-mx-2 -mt-0.5 overflow-hidden [border-top-left-radius:inherit] [border-top-right-radius:inherit]">
+          <div className="flex min-w-0 flex-wrap items-end justify-between gap-x-3 gap-y-1 border-b border-[rgba(20,17,18,0.06)] px-4">
+            <nav
+              aria-label="Generator type"
+              className="inline-flex min-w-0 items-stretch gap-3 sm:gap-5"
+            >
+              {[
+                { type: 'image' as const, label: 'Image', Icon: ImageIcon },
+                { type: 'video' as const, label: 'Video', Icon: Clapperboard },
+              ].map(({ type, label, Icon }) => {
+                const active = mediaType === type;
                 return (
-                  <MediaUploader
-                    key={slot}
-                    variant="composer"
-                    optional={optional}
-                    hint={isImageReference ? 'Up to ' + limit.max : undefined}
-                    label={emptyLabel}
-                    urls={slotUrls(form.inputs, slot)}
-                    max={slotUrls(form.inputs, slot).length + capacity}
-                    accept={limit.accept}
-                    onFiles={(files) => onFiles(slot, files)}
-                    onRemove={(url) => removeFile(slot, url)}
-                  />
+                  <button
+                    key={type}
+                    type="button"
+                    aria-pressed={active}
+                    disabled={busy || mediaBusy || submitLock.current}
+                    onClick={() => {
+                      if (
+                        busy ||
+                        mediaBusy ||
+                        submitLock.current ||
+                        mediaType === type
+                      )
+                        return;
+                      const next =
+                        allModels.find(
+                          (item) =>
+                            item.id ===
+                            (type === 'image'
+                              ? 'nano-banana-2'
+                              : 'photo-to-video-standard')
+                        ) ?? allModels.find((item) => item.mediaType === type);
+                      if (next) setModel(next.id);
+                    }}
+                    className={cn(
+                      'relative inline-flex h-11 items-center gap-2 px-1 py-2 text-sm font-medium transition disabled:opacity-50',
+                      active
+                        ? 'text-[rgb(18,15,16)] after:absolute after:right-0 after:bottom-0 after:left-0 after:h-0.5 after:rounded-full after:bg-[var(--composer-accent,#b04845)]'
+                        : 'text-[rgb(102,92,95)] hover:text-[rgb(18,15,16)]'
+                    )}
+                  >
+                    <Icon className="size-4 opacity-80" strokeWidth={1.75} />
+                    {label}
+                  </button>
                 );
               })}
-            </ComposerFrameSlots>
-          ) : null}
+            </nav>
 
-          <div className="relative flex min-h-[96px] min-w-0 flex-1 flex-col">
-            <label htmlFor="generator-prompt" className="sr-only">
-              Prompt
-            </label>
-            <textarea
-              id="generator-prompt"
-              rows={4}
-              maxLength={model.maxPromptChars ?? 50000}
-              placeholder={
-                'Describe the ' + mediaType + ' you want to generate...'
-              }
-              value={form.prompt}
-              onChange={(event) => mutate({ prompt: event.target.value })}
-              className="min-h-[72px] w-full flex-1 resize-none border-0 bg-transparent p-0 text-sm leading-6 text-[rgb(18,15,16)] outline-none placeholder:px-0.5 placeholder:text-[rgba(18,15,16,0.38)] focus-visible:ring-0"
-            />
-          </div>
-        </div>
-
-        {mediaBusy ? (
-          <p className="px-1 pt-1 text-xs text-[rgba(18,15,16,0.55)]">
-            Reading media duration for accurate credits...
-          </p>
-        ) : null}
-        {uploadError ? (
-          <p role="alert" className="px-1 pt-1 text-xs text-red-600">
-            {uploadError}
-          </p>
-        ) : null}
-
-        {/* Toolbar */}
-        <div className="mt-1.5 flex flex-col gap-2 px-1 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 sm:gap-2">
-            <ComposerToolbar
-              models={allModels.filter((item) => item.mediaType === mediaType)}
-              model={model}
-              workflow={form.workflow}
-              params={form.params}
-              settingsFields={settingsFields}
-              hasGenerateAudio={hasGenerateAudio}
-              showFast={showFast}
-              fastOn={!!fastOn}
-              onSelectModel={setModel}
-              onSelectWorkflow={setWorkflow}
-              onSetParam={setParam}
-              onFastChange={onFastChange}
-            />
-            {!!spec.fields.webSearch && !spec.fields.webSearch.internal ? (
-              <label className="inline-flex h-7 cursor-pointer items-center gap-2 rounded-full bg-[rgba(20,17,18,0.043)] px-2 text-[12px] font-medium text-[rgba(18,15,16,0.85)]">
-                <span>Web Search</span>
+            {showEnhance ? (
+              <label className="ml-auto flex shrink-0 cursor-pointer items-center gap-2 self-center text-sm text-[rgba(18,15,16,0.78)]">
+                <span className="hidden sm:inline">AI Enhance</span>
                 <Switch
                   size="sm"
-                  checked={form.params.webSearch === true}
-                  onCheckedChange={(checked) => setParam('webSearch', checked)}
-                  aria-label="Web Search"
+                  checked={!!enhanceOn}
+                  onCheckedChange={onEnhanceChange}
+                  aria-label="AI Enhance"
                   className={accentSwitchClass}
                 />
               </label>
             ) : null}
           </div>
+        </div>
 
-          <div className="flex shrink-0 items-center gap-2 sm:ml-auto">
-            {priceChange ? (
+        {/* Body shell: Raphael pad 12/12/4, row min-h 144, gap 12 */}
+        <div className="relative rounded-lg p-2 pb-1 sm:p-3 sm:pb-1">
+          <div className="flex min-h-[124px] flex-col items-stretch gap-2 sm:min-h-[144px] sm:flex-row sm:gap-3">
+            {showUnifiedReference ? (
+              <div className="flex shrink-0 items-start self-start pt-1 sm:pt-2">
+                <MixedReferenceUploader
+                  items={mixedItems}
+                  accept={mixedAccept}
+                  canAdd={mixedCanAdd}
+                  limitLines={mixedLimitLines}
+                  onFiles={onMixedReferenceFiles}
+                  onRemove={removeFile}
+                />
+              </div>
+            ) : activeSlots.length > 0 ? (
+              <div className="flex shrink-0 items-start self-start pt-1 sm:pt-2">
+                <ComposerFrameSlots showArrow={isStartEnd}>
+                  {activeSlots.map((slot) => {
+                    const limit = spec.slots[slot]!;
+                    const optional = isGeneratorSlotOptional(spec, slot);
+                    const isImageReference =
+                      mediaType === 'image' && slot === 'referenceImages';
+                    const emptyLabel = isImageReference
+                      ? 'Reference'
+                      : SLOT_LABELS[slot];
+                    const capacity = getGeneratorSlotCapacity(
+                      spec,
+                      form.inputs,
+                      slot
+                    );
+                    return (
+                      <MediaUploader
+                        key={slot}
+                        variant="composer"
+                        optional={optional}
+                        hint={
+                          isImageReference ? 'Up to ' + limit.max : undefined
+                        }
+                        label={emptyLabel}
+                        urls={slotUrls(form.inputs, slot)}
+                        max={slotUrls(form.inputs, slot).length + capacity}
+                        accept={limit.accept}
+                        onFiles={(files) => onFiles(slot, files)}
+                        onRemove={(url) => removeFile(slot, url)}
+                      />
+                    );
+                  })}
+                </ComposerFrameSlots>
+              </div>
+            ) : null}
+
+            <div className="relative flex min-w-0 flex-1 flex-col justify-start pt-0">
+              <div className="relative flex min-h-[96px] flex-1 flex-col">
+                <label htmlFor="generator-prompt" className="sr-only">
+                  Prompt
+                </label>
+                <textarea
+                  id="generator-prompt"
+                  rows={4}
+                  maxLength={model.maxPromptChars ?? 50000}
+                  placeholder={
+                    'Describe the ' + mediaType + ' you want to generate...'
+                  }
+                  value={form.prompt}
+                  onChange={(event) => mutate({ prompt: event.target.value })}
+                  className="min-h-[96px] w-full flex-1 resize-none border-0 bg-transparent p-0 text-sm leading-5 text-[rgb(18,15,16)] outline-none placeholder:px-2 placeholder:text-[rgba(18,15,16,0.38)] focus-visible:ring-0"
+                />
+              </div>
+            </div>
+          </div>
+
+          {mediaBusy ? (
+            <p className="pt-1 text-xs text-[rgba(18,15,16,0.55)]">
+              Reading media duration for accurate credits...
+            </p>
+          ) : null}
+          {uploadError ? (
+            <p role="alert" className="pt-1 text-xs text-red-600">
+              {uploadError}
+            </p>
+          ) : null}
+        </div>
+
+        {/* Toolbar: Raphael pad 4/8/8 */}
+        <div className="px-2 pt-1 pb-2">
+          <div className="flex flex-col gap-1.5 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between sm:gap-2">
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+              <ComposerToolbar
+                models={allModels.filter(
+                  (item) => item.mediaType === mediaType
+                )}
+                model={model}
+                workflow={form.workflow}
+                params={form.params}
+                settingsFields={settingsFields}
+                hasGenerateAudio={hasGenerateAudio}
+                showFast={showFast}
+                fastOn={!!fastOn}
+                onSelectModel={setModel}
+                onSelectWorkflow={setWorkflow}
+                onSetParam={setParam}
+                onFastChange={onFastChange}
+              />
+              {!!spec.fields.webSearch && !spec.fields.webSearch.internal ? (
+                <label className="inline-flex h-7 cursor-pointer items-center gap-2 rounded-full bg-[rgba(20,17,18,0.043)] px-2 text-[12px] font-medium text-[rgba(18,15,16,0.85)]">
+                  <span>Web Search</span>
+                  <Switch
+                    size="sm"
+                    checked={form.params.webSearch === true}
+                    onCheckedChange={(checked) =>
+                      setParam('webSearch', checked)
+                    }
+                    aria-label="Web Search"
+                    className={accentSwitchClass}
+                  />
+                </label>
+              ) : null}
+            </div>
+
+            <div className="relative flex w-full shrink-0 items-center gap-2 sm:ml-auto sm:w-auto">
+              {priceChange ? (
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={onConfirmPrice}
+                  className="h-8 rounded-full border border-[var(--composer-accent,#b04845)] px-3 text-xs font-semibold text-[var(--composer-accent,#b04845)]"
+                >
+                  Confirm · {priceChange.credits}
+                </button>
+              ) : null}
               <button
                 type="button"
-                disabled={busy}
-                onClick={onConfirmPrice}
-                className="h-8 rounded-full border border-[var(--composer-accent,#b04845)] px-3 text-xs font-semibold text-[var(--composer-accent,#b04845)]"
+                disabled={!canSubmit}
+                onClick={onGenerate}
+                className={cn(
+                  'relative inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-full px-3.5 text-sm font-semibold tracking-wide transition-[transform,opacity,background-color,color] duration-150 active:scale-95 sm:w-auto',
+                  canSubmit
+                    ? 'bg-[var(--composer-accent,#b04845)] text-white hover:brightness-95'
+                    : 'cursor-not-allowed bg-[rgba(20,17,18,0.07)] text-[rgba(20,17,18,0.34)]'
+                )}
               >
-                Confirm · {priceChange.credits}
-              </button>
-            ) : null}
-            <button
-              type="button"
-              disabled={!canSubmit}
-              onClick={onGenerate}
-              className={cn(
-                'relative inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-full px-3.5 text-sm font-semibold tracking-wide transition-[transform,opacity,background-color,color] duration-150 active:scale-95 sm:w-auto',
-                canSubmit
-                  ? 'bg-[var(--composer-accent,#b04845)] text-white hover:brightness-95'
-                  : 'cursor-not-allowed bg-[rgba(20,17,18,0.07)] text-[rgba(20,17,18,0.34)]'
-              )}
-            >
-              {busy ? <LoaderCircle className="size-3.5 animate-spin" /> : null}
-              <span>
-                {busy
-                  ? stage || 'Working...'
-                  : !model.enabled
-                    ? 'Preview only'
-                    : retryAttempt
-                      ? 'Retry'
-                      : 'Generate'}
-              </span>
-              {!busy && model.enabled ? (
-                <span className="inline-flex items-center gap-0.5 tabular-nums opacity-90">
-                  <Coins className="size-3.5" />
-                  {creditLabel}
+                {busy ? (
+                  <LoaderCircle className="size-3.5 animate-spin" />
+                ) : null}
+                <span>
+                  {busy
+                    ? stage || 'Working...'
+                    : !model.enabled
+                      ? 'Preview only'
+                      : retryAttempt
+                        ? 'Retry'
+                        : 'Generate'}
                 </span>
-              ) : null}
-            </button>
+                {!busy && model.enabled ? (
+                  <span className="inline-flex items-center gap-0.5 tabular-nums opacity-90">
+                    <Coins className="size-3.5" />
+                    {creditLabel}
+                  </span>
+                ) : null}
+              </button>
+            </div>
           </div>
         </div>
 
         {pageError ? (
-          <p role="alert" className="px-1 pt-2 text-xs text-red-600">
+          <p role="alert" className="px-4 pt-1 pb-2 text-xs text-red-600">
             {pageError}
           </p>
         ) : readinessError && model.enabled && form.prompt.trim() ? (
-          <p className="px-1 pt-2 text-xs text-[rgba(18,15,16,0.55)]">
+          <p className="px-4 pt-1 pb-2 text-xs text-[rgba(18,15,16,0.55)]">
             {readinessError}
           </p>
         ) : null}
