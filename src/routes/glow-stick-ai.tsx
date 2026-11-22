@@ -8,10 +8,10 @@ import {
   WandSparkles,
 } from 'lucide-react';
 
+import { resolveGlowStickAiProviderTarget } from '@/modules/glow-stick-ai/provider';
 import { localeLinks, socialMeta } from '@/lib/seo';
 import { m } from '@/paraglide/messages.js';
 import { getLocale } from '@/paraglide/runtime.js';
-import { resolveGlowStickAiProviderTarget } from '@/modules/glow-stick-ai/provider';
 import { GlowStickAiGeneratorPanel } from '@/components/landing/GlowStickAiGeneratorPanel';
 import { SiteFooter } from '@/components/landing/SiteFooter';
 import { SiteHeader } from '@/components/landing/SiteHeader';
@@ -125,12 +125,10 @@ function GlowStickAiPage() {
       <SeoJsonLd value={howToJsonLd()} />
       <SeoJsonLd value={faqJsonLd()} />
 
-      <div className="relative">
-        <div className="absolute inset-x-0 top-0 z-[260]">
-          <SiteHeader />
-        </div>
+      <SiteHeader />
 
-        <section className="mx-auto w-full max-w-7xl px-4 pt-20 pb-8 text-center sm:pt-24 md:px-5 md:pb-10">
+      <div className="relative">
+        <section className="mx-auto w-full max-w-7xl px-4 pt-8 pb-8 text-center md:px-5 md:pb-10">
           <div className="border-primary/20 bg-primary/10 text-primary mx-auto mb-4 flex w-fit items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium">
             <WandSparkles className="size-3.5" />
             {m['site.glow_stick.hero_badge']()}
@@ -144,7 +142,10 @@ function GlowStickAiPage() {
           </p>
 
           <div id="generator" className="mt-8 scroll-mt-24 text-left sm:mt-10">
-            <GlowStickAiGeneratorPanel creditProvider={creditProvider} creditModel={creditModel} />
+            <GlowStickAiGeneratorPanel
+              creditProvider={creditProvider}
+              creditModel={creditModel}
+            />
           </div>
         </section>
       </div>
@@ -313,7 +314,11 @@ export const Route = createFileRoute('/glow-stick-ai')({
   loader: () => {
     const locale = getLocale();
     const target = resolveGlowStickAiProviderTarget();
-    return { locale, creditProvider: target.provider, creditModel: target.model };
+    return {
+      locale,
+      creditProvider: target.provider,
+      creditModel: target.model,
+    };
   },
   head: ({ loaderData }) => {
     const locale = loaderData?.locale ?? 'en';

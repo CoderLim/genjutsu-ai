@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Flame } from 'lucide-react';
 
 import { useSession } from '@/core/auth/client';
@@ -323,174 +323,211 @@ function AuthSlot({ className }: { className?: string }) {
   return <SignInButton className={className} />;
 }
 
+/** Scroll distance (px) over which the header fades from transparent → solid. */
+const HEADER_SOLID_AT = 96;
+
+/** Matches fixed bar + spacer so full-bleed heroes can pull up under the nav. */
+export const SITE_HEADER_OFFSET_CLASS = '-mt-16';
+
 export function SiteHeader() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [trendingOpen, setTrendingOpen] = useState(false);
   const [toolsOpen, setToolsOpen] = useState(false);
+  const [solid, setSolid] = useState(0);
+
+  useEffect(() => {
+    const update = () => {
+      setSolid(Math.min(1, window.scrollY / HEADER_SOLID_AT));
+    };
+    update();
+    window.addEventListener('scroll', update, { passive: true });
+    return () => window.removeEventListener('scroll', update);
+  }, []);
+
+  const bgPct = Math.round(solid * 92);
+  const blurPx = solid > 0.05 ? solid * 8 : 0;
 
   return (
-    <section className="text-foreground relative z-[260] py-3">
-      <div className="mx-auto px-4 md:max-w-7xl">
-        {/* Desktop */}
-        <nav className="hidden items-center justify-between gap-4 lg:flex">
-          <div className="flex min-w-0 items-center gap-2 xl:gap-4">
-            <BrandLink />
-            <div className="flex items-center">
-              <DropdownMenu open={trendingOpen} onOpenChange={setTrendingOpen}>
-                <DropdownMenuTrigger className={navLinkClass}>
-                  <TrendingHotMark className="mr-1" />
-                  {m['site.header.trending']()}
-                  <ChevronDownIcon className="ml-1 size-3.5 opacity-70" />
-                </DropdownMenuTrigger>
-                <DropdownMenuContent
-                  align="start"
-                  className="w-[min(720px,calc(100vw-2rem))] p-3"
+    <>
+      <section
+        className="text-foreground fixed inset-x-0 top-0 z-[260] py-3"
+        style={{
+          backgroundColor: `color-mix(in srgb, var(--background) ${bgPct}%, transparent)`,
+          backdropFilter: blurPx ? `blur(${blurPx}px)` : undefined,
+          WebkitBackdropFilter: blurPx ? `blur(${blurPx}px)` : undefined,
+        }}
+      >
+        <div className="mx-auto px-4 md:max-w-7xl">
+          {/* Desktop */}
+          <nav className="hidden items-center justify-between gap-4 lg:flex">
+            <div className="flex min-w-0 items-center gap-2 xl:gap-4">
+              <BrandLink />
+              <div className="flex items-center">
+                <DropdownMenu
+                  open={trendingOpen}
+                  onOpenChange={setTrendingOpen}
                 >
-                  {/*
+                  <DropdownMenuTrigger className={navLinkClass}>
+                    <TrendingHotMark className="mr-1" />
+                    {m['site.header.trending']()}
+                    <ChevronDownIcon className="ml-1 size-3.5 opacity-70" />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    align="start"
+                    className="w-[min(720px,calc(100vw-2rem))] p-3"
+                  >
+                    {/*
                     Use Link (not Menu.Item + router.push). Base UI Menu.Item
                     close/unmount can swallow the navigate for this dense grid.
                   */}
-                  <div className="grid grid-cols-4 gap-2">
-                    {TRENDING_LINKS.map((item) => (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        className="hover:bg-accent focus-visible:bg-accent flex h-auto cursor-pointer flex-col items-stretch gap-1.5 rounded-lg px-1.5 py-1.5 transition-colors outline-none"
-                        onClick={() => setTrendingOpen(false)}
-                      >
-                        <TrendingThumb poster={item.poster} />
-                        <span className="text-foreground line-clamp-2 px-0.5 text-left text-xs leading-snug font-medium">
-                          {item.label}
-                        </span>
-                      </Link>
-                    ))}
-                  </div>
-                </DropdownMenuContent>
-              </DropdownMenu>
-              <DropdownMenu open={toolsOpen} onOpenChange={setToolsOpen}>
-                <DropdownMenuTrigger className={navLinkClass}>
-                  {m['site.header.tools']()}
-                  <ChevronDownIcon className="ml-1 size-3.5 opacity-70" />
-                </DropdownMenuTrigger>
-                <DropdownMenuContent
-                  align="start"
-                  className="min-w-[220px] p-1.5"
-                >
-                  {TOOLS_LINKS.map((item) => (
-                    <ToolsMenuLink
-                      key={item.href}
-                      item={item}
-                      onClick={() => setToolsOpen(false)}
-                    />
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-              {NAV_LINKS.map((item) => (
-                <Link key={item.href} href={item.href} className={navLinkClass}>
-                  {item.label()}
-                </Link>
-              ))}
-              <Link href="/creations" className={navLinkClass}>
-                {m['creations.nav']()}
-              </Link>
-            </div>
-          </div>
-
-          <div className="flex shrink-0 items-center gap-2">
-            <UpgradePill />
-            <LocaleSelector className="text-muted-foreground hover:bg-accent hover:text-foreground size-9" />
-            <AuthSlot />
-          </div>
-        </nav>
-
-        {/* Mobile */}
-        <div className="flex items-center justify-between gap-3 lg:hidden">
-          <BrandLink />
-          <div className="flex items-center gap-2">
-            <UpgradePill className="hidden sm:inline-flex" />
-            <AuthSlot />
-            <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-              <SheetTrigger
-                aria-label={m['site.header.menu']()}
-                className="text-foreground hover:bg-accent inline-flex size-9 items-center justify-center rounded-md transition-colors"
-              >
-                <MenuIcon className="size-5" />
-              </SheetTrigger>
-              <SheetContent
-                side="right"
-                className="border-border bg-background w-[min(100vw,360px)] p-0"
-              >
-                <SheetHeader className="border-border border-b px-4 py-4 text-left">
-                  <SheetTitle className="text-primary flex items-center gap-2">
-                    <RaphaelLogo size={28} className="rounded-full" />
-                    {envConfigs.app_name}
-                  </SheetTitle>
-                </SheetHeader>
-                <div className="flex h-full flex-col overflow-y-auto px-4 pt-2 pb-8">
-                  <div className="border-border/60 border-b py-3">
-                    <p className="text-muted-foreground flex items-center gap-1 text-xs font-medium tracking-wide uppercase">
-                      <TrendingHotMark className="size-3" />
-                      {m['site.header.trending']()}
-                    </p>
-                    <div className="mt-2 grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-4 gap-2">
                       {TRENDING_LINKS.map((item) => (
                         <Link
                           key={item.href}
                           href={item.href}
-                          className="hover:bg-accent focus-visible:bg-accent rounded-lg p-1.5 transition-colors"
-                          onClick={() => setSheetOpen(false)}
+                          className="hover:bg-accent focus-visible:bg-accent flex h-auto cursor-pointer flex-col items-stretch gap-1.5 rounded-lg px-1.5 py-1.5 transition-colors outline-none"
+                          onClick={() => setTrendingOpen(false)}
                         >
                           <TrendingThumb poster={item.poster} />
-                          <span className="mt-1.5 line-clamp-2 block px-0.5 text-xs leading-snug font-medium">
+                          <span className="text-foreground line-clamp-2 px-0.5 text-left text-xs leading-snug font-medium">
                             {item.label}
                           </span>
                         </Link>
                       ))}
                     </div>
-                  </div>
-                  <div className="border-border/60 border-b py-3">
-                    <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-                      {m['site.header.tools']()}
-                    </p>
-                    <div className="mt-1 flex flex-col">
-                      {TOOLS_LINKS.map((item) => (
-                        <ToolsMenuLink
-                          key={item.href}
-                          item={item}
-                          className="rounded-none px-0 py-2.5"
-                          onClick={() => setSheetOpen(false)}
-                        />
-                      ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <DropdownMenu open={toolsOpen} onOpenChange={setToolsOpen}>
+                  <DropdownMenuTrigger className={navLinkClass}>
+                    {m['site.header.tools']()}
+                    <ChevronDownIcon className="ml-1 size-3.5 opacity-70" />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    align="start"
+                    className="min-w-[220px] p-1.5"
+                  >
+                    {TOOLS_LINKS.map((item) => (
+                      <ToolsMenuLink
+                        key={item.href}
+                        item={item}
+                        onClick={() => setToolsOpen(false)}
+                      />
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                {NAV_LINKS.map((item) => (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={navLinkClass}
+                  >
+                    {item.label()}
+                  </Link>
+                ))}
+                <Link href="/creations" className={navLinkClass}>
+                  {m['creations.nav']()}
+                </Link>
+              </div>
+            </div>
+
+            <div className="flex shrink-0 items-center gap-2">
+              <UpgradePill />
+              <LocaleSelector className="text-muted-foreground hover:bg-accent hover:text-foreground size-9" />
+              <AuthSlot />
+            </div>
+          </nav>
+
+          {/* Mobile */}
+          <div className="flex items-center justify-between gap-3 lg:hidden">
+            <BrandLink />
+            <div className="flex items-center gap-2">
+              <UpgradePill className="hidden sm:inline-flex" />
+              <AuthSlot />
+              <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+                <SheetTrigger
+                  aria-label={m['site.header.menu']()}
+                  className="text-foreground hover:bg-accent inline-flex size-9 items-center justify-center rounded-md transition-colors"
+                >
+                  <MenuIcon className="size-5" />
+                </SheetTrigger>
+                <SheetContent
+                  side="right"
+                  className="border-border bg-background w-[min(100vw,360px)] p-0"
+                >
+                  <SheetHeader className="border-border border-b px-4 py-4 text-left">
+                    <SheetTitle className="text-primary flex items-center gap-2">
+                      <RaphaelLogo size={28} className="rounded-full" />
+                      {envConfigs.app_name}
+                    </SheetTitle>
+                  </SheetHeader>
+                  <div className="flex h-full flex-col overflow-y-auto px-4 pt-2 pb-8">
+                    <div className="border-border/60 border-b py-3">
+                      <p className="text-muted-foreground flex items-center gap-1 text-xs font-medium tracking-wide uppercase">
+                        <TrendingHotMark className="size-3" />
+                        {m['site.header.trending']()}
+                      </p>
+                      <div className="mt-2 grid grid-cols-2 gap-2">
+                        {TRENDING_LINKS.map((item) => (
+                          <Link
+                            key={item.href}
+                            href={item.href}
+                            className="hover:bg-accent focus-visible:bg-accent rounded-lg p-1.5 transition-colors"
+                            onClick={() => setSheetOpen(false)}
+                          >
+                            <TrendingThumb poster={item.poster} />
+                            <span className="mt-1.5 line-clamp-2 block px-0.5 text-xs leading-snug font-medium">
+                              {item.label}
+                            </span>
+                          </Link>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                  {NAV_LINKS.map((item) => (
+                    <div className="border-border/60 border-b py-3">
+                      <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                        {m['site.header.tools']()}
+                      </p>
+                      <div className="mt-1 flex flex-col">
+                        {TOOLS_LINKS.map((item) => (
+                          <ToolsMenuLink
+                            key={item.href}
+                            item={item}
+                            className="rounded-none px-0 py-2.5"
+                            onClick={() => setSheetOpen(false)}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                    {NAV_LINKS.map((item) => (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        className="border-border/60 border-b py-3 text-sm font-medium"
+                        onClick={() => setSheetOpen(false)}
+                      >
+                        {item.label()}
+                      </Link>
+                    ))}
                     <Link
-                      key={item.href}
-                      href={item.href}
+                      href="/creations"
                       className="border-border/60 border-b py-3 text-sm font-medium"
                       onClick={() => setSheetOpen(false)}
                     >
-                      {item.label()}
+                      {m['creations.nav']()}
                     </Link>
-                  ))}
-                  <Link
-                    href="/creations"
-                    className="border-border/60 border-b py-3 text-sm font-medium"
-                    onClick={() => setSheetOpen(false)}
-                  >
-                    {m['creations.nav']()}
-                  </Link>
-                  <div className="mt-6 flex flex-col gap-3">
-                    <UpgradePill className="w-fit" />
-                    <LocaleSelector variant="pill" className="w-fit" />
-                    <AuthSlot className="w-full" />
+                    <div className="mt-6 flex flex-col gap-3">
+                      <UpgradePill className="w-fit" />
+                      <LocaleSelector variant="pill" className="w-fit" />
+                      <AuthSlot className="w-full" />
+                    </div>
                   </div>
-                </div>
-              </SheetContent>
-            </Sheet>
+                </SheetContent>
+              </Sheet>
+            </div>
           </div>
         </div>
-      </div>
-    </section>
+      </section>
+      {/* Keeps page content clear of the fixed bar; heroes pull up with SITE_HEADER_OFFSET_CLASS. */}
+      <div className="h-16 shrink-0" aria-hidden="true" />
+    </>
   );
 }

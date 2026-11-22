@@ -12,6 +12,7 @@ import {
   type MotionTemplate,
 } from '@/components/landing/motion-templates';
 import { MotionTemplateGallery } from '@/components/landing/MotionTemplateGallery';
+import { SITE_HEADER_OFFSET_CLASS } from '@/components/landing/SiteHeader';
 
 const BADGES = [
   m['site.hero.motion'],
@@ -86,12 +87,13 @@ export function Hero({ className }: { className?: string }) {
     <section
       className={cn(
         'relative flex min-h-svh w-full flex-col justify-center',
+        SITE_HEADER_OFFSET_CLASS,
         className
       )}
     >
       {/* Pin media to the first viewport only — Hero grows with the generator. */}
       <div
-        className="pointer-events-none absolute inset-x-0 top-0 h-svh overflow-hidden"
+        className="pointer-events-none absolute inset-x-0 top-0 z-0 h-svh overflow-hidden"
         aria-hidden
       >
         <div

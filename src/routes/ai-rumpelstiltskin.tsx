@@ -360,12 +360,10 @@ function AiRumpelstiltskinPage() {
     <div className="bg-background text-foreground flex min-h-screen flex-col">
       <SeoJsonLd value={graphJsonLd()} />
 
-      <div className="relative">
-        <div className="absolute inset-x-0 top-0 z-[260]">
-          <SiteHeader />
-        </div>
+      <SiteHeader />
 
-        <section className="mx-auto w-full max-w-7xl px-4 pt-20 pb-8 text-center sm:pt-24 md:px-5 md:pb-10">
+      <div className="relative">
+        <section className="mx-auto w-full max-w-7xl px-4 pt-8 pb-8 text-center md:px-5 md:pb-10">
           <div className="border-primary/20 bg-primary/10 text-primary mx-auto mb-4 flex w-fit items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium">
             <WandSparkles className="size-3.5" />
             {m['site.rumpel.hero_badge']()}

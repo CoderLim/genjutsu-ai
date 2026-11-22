@@ -11,7 +11,10 @@ import { absoluteUrl, socialMeta } from '@/lib/seo';
 import { GeneratorForm } from '@/components/generator/GeneratorForm';
 import { ImageToVideoSeoSections } from '@/components/landing/ImageToVideoSeoSections';
 import { SiteFooter } from '@/components/landing/SiteFooter';
-import { SiteHeader } from '@/components/landing/SiteHeader';
+import {
+  SITE_HEADER_OFFSET_CLASS,
+  SiteHeader,
+} from '@/components/landing/SiteHeader';
 import { SeoJsonLd } from '@/components/seo-json-ld';
 
 // English-only editorial until real translations are available.
@@ -72,12 +75,12 @@ function ImageToVideoPage() {
       <SeoJsonLd value={howToJsonLd()} />
       <SeoJsonLd value={faqJsonLd()} />
 
-      <div className="relative">
-        <div className="absolute inset-x-0 top-0 z-[260]">
-          <SiteHeader />
-        </div>
+      <SiteHeader />
 
-        <section className="relative flex min-h-svh w-full flex-col justify-center">
+      <div className="relative">
+        <section
+          className={`relative flex min-h-svh w-full flex-col justify-center ${SITE_HEADER_OFFSET_CLASS}`}
+        >
           {/* Pin media to the first viewport only — section grows with the generator. */}
           <div
             className="pointer-events-none absolute inset-x-0 top-0 h-svh overflow-hidden"
@@ -100,7 +103,7 @@ function ImageToVideoPage() {
             </video>
           </div>
 
-          <div className="relative z-10 mx-auto w-full max-w-[1180px] px-4 pt-24 pb-10 sm:pt-28 sm:pb-14 md:px-5">
+          <div className="relative z-10 mx-auto w-full max-w-[1180px] px-4 pt-20 pb-10 sm:pt-24 sm:pb-14 md:px-5">
             <p className="text-xs font-semibold tracking-wide text-white/70 uppercase">
               Image to video generator
             </p>

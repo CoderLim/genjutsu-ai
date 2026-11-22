@@ -9,13 +9,13 @@ import {
 } from 'lucide-react';
 
 import { Link } from '@/core/i18n/navigation';
+import { resolveWassupInAMinuteAiProviderTarget } from '@/modules/wassup-in-a-minute-ai/provider';
 import { getWassupInAMinuteAiSeoPriceAmounts } from '@/modules/wassup-in-a-minute-ai/seo-pricing';
 import { absoluteUrl, localeLinks, socialMeta } from '@/lib/seo';
 import { m } from '@/paraglide/messages.js';
 import { getLocale } from '@/paraglide/runtime.js';
 import { SiteFooter } from '@/components/landing/SiteFooter';
 import { SiteHeader } from '@/components/landing/SiteHeader';
-import { resolveWassupInAMinuteAiProviderTarget } from '@/modules/wassup-in-a-minute-ai/provider';
 import { WassupInAMinuteGeneratorPanel } from '@/components/landing/WassupInAMinuteGeneratorPanel';
 import { SeoJsonLd } from '@/components/seo-json-ld';
 
@@ -222,12 +222,10 @@ function WassupInAMinuteAiPage() {
       <SeoJsonLd value={breadcrumbJsonLd(canonical)} />
       <SeoJsonLd value={softwareApplicationJsonLd(canonical)} />
 
-      <div className="relative">
-        <div className="absolute inset-x-0 top-0 z-[260]">
-          <SiteHeader />
-        </div>
+      <SiteHeader />
 
-        <section className="mx-auto w-full max-w-7xl px-4 pt-20 pb-8 text-center sm:pt-24 md:px-5 md:pb-10">
+      <div className="relative">
+        <section className="mx-auto w-full max-w-7xl px-4 pt-8 pb-8 text-center md:px-5 md:pb-10">
           <div className="border-primary/20 bg-primary/10 text-primary mx-auto mb-4 flex w-fit items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium">
             <WandSparkles className="size-3.5" />
             {m['site.wassup.hero_badge']()}
@@ -250,7 +248,10 @@ function WassupInAMinuteAiPage() {
           </p>
 
           <div id="generator" className="mt-8 scroll-mt-24 text-left sm:mt-10">
-            <WassupInAMinuteGeneratorPanel creditProvider={creditProvider} creditModel={creditModel} />
+            <WassupInAMinuteGeneratorPanel
+              creditProvider={creditProvider}
+              creditModel={creditModel}
+            />
           </div>
         </section>
       </div>

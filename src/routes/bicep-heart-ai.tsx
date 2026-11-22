@@ -64,12 +64,10 @@ function BicepHeartAiPage() {
       <SeoJsonLd value={faqJsonLd()} />
       <SeoJsonLd value={breadcrumbJsonLd(canonical)} />
 
-      <div className="relative">
-        <div className="absolute inset-x-0 top-0 z-[260]">
-          <SiteHeader />
-        </div>
+      <SiteHeader />
 
-        <section className="mx-auto w-full max-w-7xl px-4 pt-20 pb-8 text-center sm:pt-24 md:px-5 md:pb-10">
+      <div className="relative">
+        <section className="mx-auto w-full max-w-7xl px-4 pt-8 pb-8 text-center md:px-5 md:pb-10">
           <div className="border-primary/20 bg-primary/10 text-primary mx-auto mb-4 flex w-fit items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium">
             <WandSparkles className="size-3.5" />
             {m['site.bicep_heart.hero_badge']()}
@@ -86,7 +84,10 @@ function BicepHeartAiPage() {
             id="generator"
             className="mx-auto mt-8 w-full max-w-5xl scroll-mt-24 text-left sm:mt-10"
           >
-            <BicepHeartAiGeneratorPanel creditProvider={creditProvider} creditModel={creditModel} />
+            <BicepHeartAiGeneratorPanel
+              creditProvider={creditProvider}
+              creditModel={creditModel}
+            />
           </div>
         </section>
       </div>
@@ -114,7 +115,11 @@ export const Route = createFileRoute('/bicep-heart-ai')({
   loader: () => {
     const locale = getLocale();
     const target = resolveBicepHeartAiProviderTarget();
-    return { locale, creditProvider: target.provider, creditModel: target.model };
+    return {
+      locale,
+      creditProvider: target.provider,
+      creditModel: target.model,
+    };
   },
   head: ({ loaderData }) => {
     const locale = loaderData?.locale ?? 'en';
