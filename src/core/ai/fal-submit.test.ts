@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   classifyFalSubmitFailure,
   FalProvider,
+  falLegacyQueueCandidates,
   falQueueQueryModel,
   isDefiniteFalSubmitRejection,
   isTransientFalHttpStatus,
@@ -388,5 +389,123 @@ test('FalProvider uses supplied multi-segment URLs verbatim for submit/status/re
     }
   } finally {
     globalThis.fetch = originalFetch;
+  }
+});
+
+test('legacy compatibility candidates are model-agnostic and bounded', () => {
+  assert.deepEqual(
+    falLegacyQueueCandidates('bytedance/seedance-2.0/mini/text-to-video'),
+    [
+      'bytedance/seedance-2.0',
+      'bytedance/seedance-2.0/mini/text-to-video',
+      'bytedance/seedance-2.0/mini',
+    ]
+  );
+  assert.deepEqual(
+    falLegacyQueueCandidates('minimax/h3-max-turbo/text-to-video'),
+    [
+      'minimax/h3-max-turbo/text-to-video',
+      'minimax/h3-max-turbo',
+    ]
+  );
+  assert.deepEqual(
+    falLegacyQueueCandidates('fal-ai/kling-video/v3/pro/text-to-video'),
+    [
+      'fal-ai/kling-video/v3/pro/text-to-video',
+      'fal-ai/kling-video',
+      'fal-ai/kling-video/v3/pro',
+      'fal-ai/kling-video/v3',
+    ]
+  );
+  assert.deepEqual(falLegacyQueueCandidates('fal-ai/flux/schnell'), [
+    'fal-ai/flux/schnell',
+    'fal-ai/flux',
+  ]);
+});
+
+test('legacy Seedance Mini recovers from truncated two-segment 404 via full path', async () => {
+  const id = 'mini-legacy-request-id';
+  const model = 'bytedance/seedance-2.0/mini/text-to-video';
+  const base = 'https://queue.fal.run/';
+  const shortStatus = base + 'bytedance/seedance-2.0/requests/' + id + '/status';
+  const fullResult = base + model + '/requests/' + id;
+  const calls: string[] = [];
+  const original = globalThis.fetch;
+  globalThis.fetch = (async (url: string | URL | Request, options?: RequestInit) => {
+    const current = String(url);
+    calls.push(current);
+    assert.equal(options?.method, 'GET');
+    assert.equal(options?.redirect, 'error');
+    if (current === shortStatus) return new Response('Not Found', {status: 404});
+    if (current === fullResult + '/status') {
+      return new Response(JSON.stringify({status: 'COMPLETED'}), {status: 200});
+    }
+    if (current === fullResult) {
+      return new Response(JSON.stringify({
+        video: {url: 'https://cdn.example.test/seedance-mini.mp4'},
+      }), {status: 200});
+    }
+    throw new Error('Unexpected Fal URL ' + current);
+  }) as typeof fetch;
+  try {
+    const result = await new FalProvider({apiKey: 'test-key'}).query({
+      taskId: id, mediaType: AIMediaType.VIDEO, model,
+    });
+    assert.equal(result.taskStatus, AITaskStatus.SUCCESS);
+    assert.equal(result.taskInfo?.videos?.[0].videoUrl,
+      'https://cdn.example.test/seedance-mini.mp4');
+    assert.deepEqual(calls, [
+      shortStatus,
+      fullResult + '/status',
+      fullResult,
+    ]);
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+
+test('saved canonical Mini URL never triggers alternative model-path queries', async () => {
+  const id = 'mini-canonical-request-id';
+  const model = 'bytedance/seedance-2.0/mini/text-to-video';
+  const responseUrl = 'https://queue.fal.run/bytedance/seedance-2.0/mini/requests/' + id;
+  const statusUrl = responseUrl + '/status';
+  const calls: string[] = [];
+  const original = globalThis.fetch;
+  globalThis.fetch = (async (url: string | URL | Request) => {
+    calls.push(String(url));
+    return new Response('Not Found', {status: 404});
+  }) as typeof fetch;
+  try {
+    const result = await new FalProvider({apiKey: 'test-key'}).query({
+      taskId: id, model, mediaType: AIMediaType.VIDEO,
+      queueUrls: {statusUrl, responseUrl},
+    });
+    assert.equal(result.taskInfo?.status, 'QUERY_PERMANENT_ERROR');
+    assert.deepEqual(calls, [statusUrl]);
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+
+test('legacy recovery never retries 401/403 or 5xx as alternate endpoints', async () => {
+  const id = 'mini-error-request-id';
+  const model = 'bytedance/seedance-2.0/mini/text-to-video';
+  const original = globalThis.fetch;
+  try {
+    for (const status of [401, 403, 429, 500]) {
+      const calls: string[] = [];
+      globalThis.fetch = (async (url: string | URL | Request) => {
+        calls.push(String(url));
+        return new Response('Error', {status});
+      }) as typeof fetch;
+      const result = await new FalProvider({apiKey: 'test-key'}).query({
+        taskId: id, model, mediaType: AIMediaType.VIDEO,
+      });
+      assert.equal(calls.length, 1, String(status));
+      assert.equal(result.taskInfo?.status,
+        status >= 429 ? 'QUERY_ERROR' : 'QUERY_PERMANENT_ERROR');
+    }
+  } finally {
+    globalThis.fetch = original;
   }
 });
