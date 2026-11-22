@@ -27,6 +27,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Fal submit / query and persisted metadata tests
         run: node --import tsx --test src/core/ai/fal-submit.test.ts src/modules/generator/fal-queue-metadata.test.ts
+      - name: Generator R2 multipart and persistence retry tests
+        run: node --import tsx --test src/modules/generator/r2-result-multipart.test.ts src/modules/generator/persistence-recovery.test.ts
       - name: Full unit suite (includes pre-existing tests)
         id: full_suite
         continue-on-error: true
@@ -44,7 +46,7 @@ jobs:
             echo "Full TypeScript check passed."
             exit 0
           fi
-          changed_errors="$(grep -E '^src/core/ai/(fal|index\.ts)|^src/modules/generator/(adapters|billing|service|fal-queue-metadata)' tsc-report.txt || true)"
+          changed_errors="$(grep -E '^src/core/ai/(fal|index\.ts)|^src/modules/generator/(adapters|billing|service|fal-queue-metadata|storage|r2-result-multipart|persistence-recovery)|^src/components/generator/GeneratorForm\.tsx|^src/routes/(creations|admin/generations|api/admin/generator/resolve)' tsc-report.txt || true)"
           if [ -n "$changed_errors" ]; then
             echo "$changed_errors"
             exit 1
