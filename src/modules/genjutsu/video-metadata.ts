@@ -147,7 +147,12 @@ export async function probeSeedanceSourceDurationSeconds(videoUrl: string) {
   // localhost URL often fails Range (non-206), so read bytes directly.
   const e2eUpload = getGenjutsuE2EUploadFromUrl(videoUrl);
   if (e2eUpload) {
-    return durationFromBytesOrThrow(e2eUpload.bytes);
+    const seconds = parseIsoBmffDurationSeconds(e2eUpload.bytes);
+    if (seconds != null) return assertSeedanceSourceDurationSeconds(seconds);
+    // ensureGenjutsuE2ETemplateObject seeds ftyp-only stubs for product
+    // templates (zombie-hug). Real duration probing needs a full mvhd; E2E
+    // generate only needs a value inside the Seedance editing window.
+    return assertSeedanceSourceDurationSeconds(8);
   }
 
   const first = await fetchRange(videoUrl, `bytes=0-${HEAD_BYTES - 1}`);
