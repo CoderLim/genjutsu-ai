@@ -11,6 +11,7 @@ import {
 } from '@/lib/r2-signing-config';
 import type { GeneratorInputs, MediaSlot } from './types';
 import { limitStagingUploadStream } from './upload-limits';
+import { putBoundedGeneratorResultMultipart } from './r2-result-multipart';
 
 export const GENERATOR_MAX_IMAGE_BYTES = 12 * 1024 * 1024;
 export const GENERATOR_MAX_VIDEO_BYTES = 80 * 1024 * 1024;
@@ -377,11 +378,43 @@ async function saveProviderOutput(input: {
   url: string; key: string; contentType: string; maxBytes: number;
 }) {
   const response = await fetchTrustedProviderOutput(input.url);
-  const declaredSize = response.headers.get('content-length');
-  if (declaredSize && Number(declaredSize) > input.maxBytes) {
+  const declaredHeader = response.headers.get('content-length');
+  const declaredBytes = declaredHeader === null ? undefined : Number(declaredHeader);
+  if (declaredBytes !== undefined &&
+      (!Number.isSafeInteger(declaredBytes) || declaredBytes < 1 ||
+       declaredBytes > input.maxBytes)) {
     await response.body?.cancel();
-    throw new Error('Provider result exceeds maximum file size');
+    throw new Error('Provider result exceeds maximum or has invalid Content-Length');
   }
+
+  const binding = bucketBinding();
+  if (binding) {
+    try {
+      const cfg = await config();
+      // Do not pass a TransformStream to R2.put(): on Cloudflare Workers
+      // its body length is unknown, even if upstream supplied Content-Length.
+      // Multipart accepts fixed-size Uint8Array parts and caps memory at
+      // one 8 MiB buffer plus the currently received source chunk.
+      if (typeof binding.createMultipartUpload !== 'function') {
+        throw new Error('R2 multipart binding unavailable');
+      }
+      await putBoundedGeneratorResultMultipart({
+        bucket: binding,
+        key: resolveR2ObjectKey(cfg.uploadPath, input.key),
+        body: response.body!,
+        contentType: input.contentType,
+        maxBytes: input.maxBytes,
+        declaredBytes,
+      });
+    } catch (error) {
+      await response.body?.cancel().catch(() => undefined);
+      throw error;
+    }
+    return;
+  }
+
+  // Node/local adapter retains a bounded stream; production Workers use the
+  // R2 multipart binding above and never buffer an entire video.
   let received = 0;
   const limited = response.body!.pipeThrough(
     new TransformStream<Uint8Array, Uint8Array>({
@@ -395,14 +428,6 @@ async function saveProviderOutput(input: {
       },
     })
   );
-  const binding = bucketBinding();
-  if (binding) {
-    const cfg = await config();
-    await binding.put(resolveR2ObjectKey(cfg.uploadPath, input.key), limited, {
-      httpMetadata: { contentType: input.contentType },
-    });
-    return;
-  }
   // Node/local fallback only; Workers without R2 binding must not buffer media.
   if ((globalThis as any).__CF_ENV__ || (globalThis as any).__env__) {
     throw new Error('R2_BUCKET binding missing for output persistence');

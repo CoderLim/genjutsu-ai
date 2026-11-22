@@ -1301,11 +1301,20 @@ export function GeneratorForm({
             </span>
           </div>
           {job.status === 'processing' ? (
-            <p className="flex items-center gap-2 text-sm text-[rgba(18,15,16,0.7)]">
-              <LoaderCircle className="size-4 animate-spin" />
-              Generating and saving your {job.mediaType}... You can also follow
-              it in My Creations.
-            </p>
+            <div className="space-y-2">
+              <p className="flex items-center gap-2 text-sm text-[rgba(18,15,16,0.7)]">
+                <LoaderCircle className="size-4 animate-spin" />
+                {job.taskStatus === 'completing' && job.error
+                  ? 'Your generation is ready. Retrying result storage...'
+                  : `Generating and saving your ${job.mediaType}...`}
+                {' '}You can also follow it in My Creations.
+              </p>
+              {job.error ? (
+                <p role="status" className="text-sm text-amber-800">
+                  {job.error}
+                </p>
+              ) : null}
+            </div>
           ) : job.status === 'completed' ? (
             <div className="space-y-3">
               <p className="flex items-center gap-2 text-sm text-[rgb(18,15,16)]">
@@ -1379,8 +1388,10 @@ export function GeneratorForm({
               }
             >
               {job.status === 'review'
-                ? job.taskStatus === 'query_review'
-                  ? 'We could not verify the provider result. Support will review this task; credits are still reserved.'
+                ? job.taskStatus === 'persistence_review'
+                  ? 'Your generation completed, but we could not save the result. Support review is required; credits remain reserved.'
+                  : job.taskStatus === 'query_review'
+                    ? 'We could not verify the provider result. Support will review this task; credits are still reserved.'
                   : job.pollable
                     ? 'Checking the existing generation. Do not start another task.'
                     : 'Submission needs support review. Do not start a new generation for this request.'

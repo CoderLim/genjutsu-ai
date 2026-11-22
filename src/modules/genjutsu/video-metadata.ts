@@ -132,22 +132,17 @@ async function fetchRange(url: string, range: string) {
   };
 }
 
-function durationFromBytesOrThrow(bytes: Uint8Array) {
-  const seconds = parseIsoBmffDurationSeconds(bytes);
-  if (seconds == null) {
-    throw new Error(
-      'Could not read the source video duration. Seedance currently requires MP4 or MOV input with readable metadata.'
-    );
-  }
-  return assertSeedanceSourceDurationSeconds(seconds);
-}
-
 export async function probeSeedanceSourceDurationSeconds(videoUrl: string) {
   // E2E mock stores uploads in process memory. Self-fetching the public
   // localhost URL often fails Range (non-206), so read bytes directly.
   const e2eUpload = getGenjutsuE2EUploadFromUrl(videoUrl);
   if (e2eUpload) {
-    return durationFromBytesOrThrow(e2eUpload.bytes);
+    const seconds = parseIsoBmffDurationSeconds(e2eUpload.bytes);
+    if (seconds != null) return assertSeedanceSourceDurationSeconds(seconds);
+    // ensureGenjutsuE2ETemplateObject seeds ftyp-only stubs for product
+    // templates (zombie-hug). Real duration probing needs a full mvhd; E2E
+    // generate only needs a value inside the Seedance editing window.
+    return assertSeedanceSourceDurationSeconds(8);
   }
 
   const first = await fetchRange(videoUrl, `bytes=0-${HEAD_BYTES - 1}`);
