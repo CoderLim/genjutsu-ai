@@ -38,7 +38,6 @@ export async function putBoundedGeneratorResultMultipart(input: {
 
   const reader = body.getReader();
   let upload: Awaited<ReturnType<GeneratorResultMultipartBucket['createMultipartUpload']>> | undefined;
-  let completed = false;
   let total = 0;
   let partLength = 0;
   let buffer = new Uint8Array(GENERATOR_RESULT_PART_BYTES);
@@ -87,7 +86,6 @@ export async function putBoundedGeneratorResultMultipart(input: {
       ));
     }
     await upload.complete(parts);
-    completed = true;
     return total;
   } catch (error) {
     // Failed or truncated objects never become visible at the final key.
@@ -98,9 +96,6 @@ export async function putBoundedGeneratorResultMultipart(input: {
     ]);
     throw error;
   } finally {
-    if (completed) {
-      // Reader reached EOF; do not cancel an already completed source.
-    }
     reader.releaseLock();
   }
 }
