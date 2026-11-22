@@ -49,7 +49,7 @@ async function POST({ request }: { request: Request }) {
       return respData(await reconcileGeneratorTask(task));
     }
     if (action === 'resume-query') {
-      if (task.status !== 'query_review' || !task.taskId) {
+      if (!['query_review', 'persistence_review'].includes(task.status) || !task.taskId) {
         return respErr('Only a reviewed task with a provider ID can resume querying', {
           status: 409,
         });
@@ -60,7 +60,7 @@ async function POST({ request }: { request: Request }) {
         eq(aiTask.id, generationId),
         eq(aiTask.userId, userId),
         eq(aiTask.scene, GENERATOR_SCENE),
-        eq(aiTask.status, 'query_review'),
+        eq(aiTask.status, task.status),
         eq(aiTask.taskId, task.taskId)
       ));
       const updated = await getGeneratorTask({ generationId, userId });
@@ -69,7 +69,7 @@ async function POST({ request }: { request: Request }) {
       }
       return respData(await reconcileGeneratorTask(updated));
     }
-    if (task.status !== 'submission_unknown' && task.status !== 'query_review') {
+    if (!['submission_unknown', 'query_review', 'persistence_review'].includes(task.status)) {
       return respErr('Only uncertain submissions and query reviews can be resolved', {
         status: 409,
       });
@@ -104,7 +104,7 @@ async function POST({ request }: { request: Request }) {
       return respData(await reconcileGeneratorTask(updated));
     }
     if (action === 'refund') {
-      if (task.status === 'query_review') {
+      if (task.status === 'query_review' || task.status === 'persistence_review') {
         if (body.confirmedProviderBillingReviewed !== true) {
           throw new Error('Verify upstream request and billing before manual refund');
         }
@@ -113,7 +113,7 @@ async function POST({ request }: { request: Request }) {
       }
       const refunded = await refundGeneratorTask({
         userId, generationId,
-        reason: task.status === 'query_review'
+        reason: task.status === 'query_review' || task.status === 'persistence_review'
           ? 'Admin reviewed upstream billing and approved a manual refund'
           : 'Admin verified provider did not accept this request',
         allowedStatuses: [task.status],
