@@ -335,14 +335,14 @@ export async function clearGeneratorQueryFailures(input: {
 
 export async function claimGeneratorCompletion(input: {
   userId: string; generationId: string;
-}): Promise<boolean> {
+}): Promise<string | null> {
   const token = getUuid();
   const current = await getGeneratorTask(input);
-  if (!current || !['submitted', 'completing'].includes(current.status)) return false;
+  if (!current || !['submitted', 'completing'].includes(current.status)) return null;
   if (current.status === 'completing') {
     const claimed = Date.parse(parseTaskJson(current.taskResult).completingClaimedAt || '');
     if (Number.isFinite(claimed) && Date.now() - claimed < COMPLETION_CLAIM_TTL_MS) {
-      return false;
+      return null;
     }
   }
   // Lease claim CAS includes the previous taskResult so two status polls cannot
@@ -368,8 +368,8 @@ export async function claimGeneratorCompletion(input: {
   }).where(where);
 
   const after = await getGeneratorTask(input);
-  return Boolean(after && after.status === 'completing' &&
-    parseTaskJson(after.taskResult).completionClaim === token);
+  return after && after.status === 'completing' &&
+    parseTaskJson(after.taskResult).completionClaim === token ? token : null;
 }
 
 /**
