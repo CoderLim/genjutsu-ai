@@ -26,6 +26,10 @@ const childEnv = {
   // (zombie-hug) require a Seedance-family provider with E2E mock support.
   GENJUTSU_MOTION_PROVIDER: 'higgsfield',
   GENJUTSU_OBJECT_SWAP_PROVIDER: 'seedance-higgsfield',
+  // A single SEEDANCE_HIGGSFIELD_MODEL pin makes attempt persist that model
+  // for objects-swap, while binding asserts use the mode-specific edit id.
+  SEEDANCE_HIGGSFIELD_MODEL: '',
+  GENJUTSU_PRODUCT_PROVIDER: '',
 };
 
 function cleanDb() {
