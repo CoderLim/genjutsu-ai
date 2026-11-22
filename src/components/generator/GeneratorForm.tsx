@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { createPortal } from 'react-dom';
 
+import { useSession } from '@/core/auth/client';
 import { listGeneratorModels } from '@/modules/generator/catalog';
 import {
   filterGeneratorLocalMedia,
@@ -48,6 +49,9 @@ import {
 import { assertGeneratorReady } from '@/modules/generator/validation';
 import { ApiError, apiGet, apiPost, uploadToSignedUrl } from '@/lib/api-client';
 import { cn } from '@/lib/utils';
+import { useCreditGate } from '@/hooks/use-credit-gate';
+import { useUserCredits } from '@/hooks/use-user-credits';
+import { InsufficientCreditsModal } from '@/components/credits/insufficient-credits-modal';
 import { Switch } from '@/components/ui/switch';
 
 import { ComposerFrameSlots, ComposerToolbar } from './ComposerPanels';
@@ -263,6 +267,13 @@ export function GeneratorForm({
   useEffect(() => {
     setMediaType(initialMediaType);
   }, [initialMediaType]);
+
+  const { data: session } = useSession();
+  const creditsQuery = useUserCredits(Boolean(session?.user));
+  const creditGate = useCreditGate({
+    balance: creditsQuery.data?.balance,
+    email: session?.user?.email,
+  });
 
   // The model menu spans both media types. Selecting a model also switches the
   // Image/Video tab; workflow is independent, not a sidebar model category.
@@ -785,6 +796,7 @@ export function GeneratorForm({
         typeof details.credits === 'number' &&
         typeof details.pricingVersion === 'string'
       ) {
+        creditGate.clear();
         setPriceChange({
           credits: details.credits,
           pricingVersion: details.pricingVersion,
@@ -797,10 +809,18 @@ export function GeneratorForm({
         return;
       }
       if (details.code === 'INSUFFICIENT_CREDITS') {
-        setPageError('Not enough credits. Add credits in Pricing to continue.');
-        return;
+        const requiredCredits = Number(details.requiredCredits);
+        const balance = Number(details.balance);
+        if (Number.isFinite(requiredCredits) && Number.isFinite(balance)) {
+          // Homepage parity: modal with pack checkout, not an inline Pricing hint.
+          creditGate.open({ requiredCredits, balance });
+          setPageError('');
+          void creditsQuery.refetch();
+          return;
+        }
       }
     }
+    creditGate.clear();
     setPageError(error instanceof Error ? error.message : 'Generation failed');
   }
 
@@ -825,6 +845,7 @@ export function GeneratorForm({
     }
     submitLock.current = true;
     setBusy(true);
+    creditGate.clear();
     setPageError('');
     setPriceChange(null);
     setJob(null);
@@ -1379,6 +1400,14 @@ export function GeneratorForm({
           </a>
         </div>
       ) : null}
+
+      <InsufficientCreditsModal
+        gate={creditGate.gate}
+        pack={creditGate.recommendedPack}
+        checkoutLoading={creditGate.checkoutLoading}
+        onClose={creditGate.clear}
+        onBuy={() => void creditGate.buy()}
+      />
     </div>
   );
 }
