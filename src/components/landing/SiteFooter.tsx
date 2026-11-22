@@ -91,12 +91,16 @@ export function SiteFooter() {
           <div className="flex flex-col items-center justify-between gap-10 text-center lg:flex-row lg:items-start lg:text-left">
             <div className="flex max-w-96 shrink flex-col items-center justify-between gap-6 lg:items-start">
               <div>
-                <div className="flex items-center justify-center gap-2 lg:justify-start">
+                <Link
+                  href="/"
+                  aria-label="Genjutsu AI home"
+                  className="flex items-center justify-center gap-2 lg:justify-start"
+                >
                   <RaphaelLogo size={44} className="h-11 w-11" />
-                  <p className="text-foreground text-3xl font-semibold">
+                  <span className="text-foreground text-3xl font-semibold">
                     {envConfigs.app_name}
-                  </p>
-                </div>
+                  </span>
+                </Link>
                 <p className="text-md text-muted-foreground mt-6">
                   {m['site.footer.description']()}
                 </p>
