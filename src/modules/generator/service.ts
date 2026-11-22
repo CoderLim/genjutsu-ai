@@ -25,6 +25,7 @@ import {
   markGeneratorSubmitted,
   parseTaskJson,
   recordGeneratorQueryFailure,
+  recordGeneratorPersistenceFailure,
   recoverStaleGeneratorTask,
   refundGeneratorTask,
   reserveGeneratorTask,
@@ -200,7 +201,8 @@ export function publicGeneratorTask(task: GeneratorTask) {
       ? 'completed'
       : task.status === 'refunded' || task.status === 'failed_preflight'
         ? 'failed'
-        : task.status === 'submission_unknown' || task.status === 'query_review'
+        : task.status === 'submission_unknown' ||
+          task.status === 'query_review' || task.status === 'persistence_review'
           ? 'review'
           : 'processing';
 
@@ -578,8 +580,8 @@ export async function reconcileGeneratorTask(task: GeneratorTask) {
     return publicGeneratorTask(updated ?? task);
   }
   if (provider.status !== 'completed') return publicGeneratorTask(task);
-  const claimed = await claimGeneratorCompletion(identity);
-  if (!claimed) {
+  const completionClaim = await claimGeneratorCompletion(identity);
+  if (!completionClaim) {
     return publicGeneratorTask((await getGeneratorTask(identity))!);
   }
 
@@ -609,7 +611,12 @@ export async function reconcileGeneratorTask(task: GeneratorTask) {
       errorMessage: error instanceof Error ? error.message : String(error),
       errorStack: error instanceof Error ? error.stack : undefined,
     });
-    return publicGeneratorTask((await getGeneratorTask(identity))!);
+    const updated = await recordGeneratorPersistenceFailure({
+      ...identity,
+      completionClaim,
+      message: error instanceof Error ? error.message : String(error),
+    });
+    return publicGeneratorTask(updated ?? (await getGeneratorTask(identity))!);
   }
 }
 
