@@ -314,7 +314,7 @@ test('Fal rejects percent-encoded or traversing segments even if URLs are paired
     base.replace('/minimax/', '/minimax/%00/'),
     base.replace('/minimax/', '/minimax/%5c/'),
     base.replace('/minimax/', '/minimax/@evil/'),
-    base.replace('/requests/', '/requests/other/requests/'),
+    base.replace('/requests/', '/not-requests/'),
     base.replace(id, 'other-request'),
     base + '?q=1',
     base + '#fragment',
