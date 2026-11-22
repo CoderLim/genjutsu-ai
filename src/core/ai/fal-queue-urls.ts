@@ -19,21 +19,28 @@ function queueUrl(
   kind: 'status' | 'result'
 ): string | null {
   if (typeof input !== 'string' || input.length > 2048) return null;
-  if (!SEGMENT.test(requestId)) return null;
+  if (!SEGMENT.test(requestId) || requestId === '.' || requestId === '..') return null;
   try {
     const url = new URL(input);
     if (url.origin !== FAL_QUEUE_ORIGIN ||
         url.username || url.password || url.search || url.hash ||
         url.href !== input) return null;
 
-    // Fal queue GET is /{owner}/{app}/requests/{request_id}[/status].
-    // Never follow arbitrary submit paths or percent-encoded path segments.
+    // Fal's response is authoritative: the queue path may have multiple
+    // model/mode segments before the /requests/{requestId} suffix.
+    // Validate the *suffix* and every preceding segment, not owner/app depth.
+    // Raw encoded components, dot traversal and URL normalization are denied.
     const parts = url.pathname.split('/');
-    if (parts.length !== (kind === 'status' ? 6 : 5) ||
-        parts[0] !== '' || parts[3] !== 'requests' ||
-        parts[4] !== requestId ||
-        (kind === 'status' && parts[5] !== 'status') ||
-        !SEGMENT.test(parts[1]) || !SEGMENT.test(parts[2])) {
+    const requestIndex = parts.length - (kind === 'status' ? 2 : 1);
+    const requestsIndex = requestIndex - 1;
+    const prefix = parts.slice(1, requestsIndex);
+    if (parts[0] !== '' || prefix.length < 1 ||
+        parts[requestsIndex] !== 'requests' ||
+        parts[requestIndex] !== requestId ||
+        (kind === 'status' && parts[requestIndex + 1] !== 'status') ||
+        prefix.some(part =>
+          !SEGMENT.test(part) || part === '.' || part === '..'
+        )) {
       return null;
     }
     return url.href;
