@@ -1,5 +1,5 @@
-import { scanPromptWithWaffo } from '@/core/content-safety/waffo-scan';
 import type { FalQueueUrls } from '@/core/ai/fal-queue-urls';
+import { scanPromptWithWaffo } from '@/core/content-safety/waffo-scan';
 import { getAllConfigs } from '@/modules/config/service';
 
 import {
@@ -31,12 +31,12 @@ import {
   type GeneratorTask,
 } from './billing';
 import { GENERATOR_MODELS, getGeneratorModel } from './catalog';
+import { readGeneratorFalQueueMetadata } from './fal-queue-metadata';
 import {
   probeGeneratorAudioDuration,
   probeGeneratorVideoDuration,
 } from './media-metadata';
 import { calculateGeneratorCredits } from './pricing';
-import { readGeneratorFalQueueMetadata } from './fal-queue-metadata';
 import {
   assertReferenceAudioDuration,
   referenceVideoBillableSeconds,
@@ -533,9 +533,10 @@ export async function reconcileGeneratorTask(task: GeneratorTask) {
       // Reference and text-only paths use different provider endpoints.
       // Read the immutable endpoint and canonical queue URLs saved at submit.
       providerModelId: task.model,
-      falQueueUrls: task.provider === 'fal'
-        ? readGeneratorFalQueueMetadata(task.taskInfo, task.taskId)
-        : undefined,
+      falQueueUrls:
+        task.provider === 'fal'
+          ? readGeneratorFalQueueMetadata(task.taskInfo, task.taskId)
+          : undefined,
     });
   } catch (error) {
     // Transport, invalid stored URL or malformed provider response must not
@@ -603,7 +604,10 @@ export async function reconcileGeneratorTask(task: GeneratorTask) {
     // Provider succeeded. Never refund due to a temporary storage error.
     console.error('[generator] result persistence failed', {
       id: task.id,
-      error,
+      // Error properties are non-enumerable and otherwise become {} in Worker logs.
+      errorName: error instanceof Error ? error.name : 'NonErrorThrown',
+      errorMessage: error instanceof Error ? error.message : String(error),
+      errorStack: error instanceof Error ? error.stack : undefined,
     });
     return publicGeneratorTask((await getGeneratorTask(identity))!);
   }
