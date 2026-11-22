@@ -6,11 +6,17 @@ import {
 /** Provider metadata is durable, while taskResult is overwritten by polling. */
 export function serializeGeneratorFalQueueMetadata(
   requestId: string,
-  urls: FalQueueUrls | undefined
+  urls: FalQueueUrls | undefined,
+  missingAtSubmit = false
 ): string | null {
-  return urls ? JSON.stringify({
+  if (urls) return JSON.stringify({
     falQueue: assertFalQueueUrls(urls, requestId),
-  }) : null;
+  });
+  // Unlike historical tasks with taskInfo=null, a newly submitted task
+  // should retain explicit evidence that Fal returned no usable Queue URLs.
+  return missingAtSubmit
+    ? JSON.stringify({ falQueueUrlState: 'missing-at-submit' })
+    : null;
 }
 
 /**
