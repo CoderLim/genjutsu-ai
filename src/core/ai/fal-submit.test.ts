@@ -213,3 +213,62 @@ test('old requests without stored URLs still use the historical query-model mapp
     globalThis.fetch = prior;
   }
 });
+
+test('legacy long-path 404 retries the owner/app queue GET once without a second submit', async () => {
+  const id = 'old-request-id';
+  const model = 'minimax/h3-max-turbo/text-to-video';
+  const longStatus = 'https://queue.fal.run/' + model + '/requests/' + id + '/status';
+  const baseResult = 'https://queue.fal.run/minimax/h3-max-turbo/requests/' + id;
+  const calls: string[] = [];
+  const prior = globalThis.fetch;
+  globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
+    const key = String(url);
+    calls.push(key);
+    assert.equal(init?.method, 'GET');
+    assert.equal(init?.redirect, 'error');
+    if (key === longStatus) return new Response('not found', {status: 404});
+    if (key === baseResult + '/status') return new Response(
+      JSON.stringify({status: 'COMPLETED'}), {status: 200}
+    );
+    if (key === baseResult) return new Response(
+      JSON.stringify({video: {url: 'https://cdn.example/recovered.mp4'}}), {status: 200}
+    );
+    throw new Error('Unexpected lookup ' + key);
+  }) as typeof fetch;
+  try {
+    const result = await new FalProvider({apiKey: 'test-key'}).query({
+      taskId: id, model, mediaType: AIMediaType.VIDEO,
+    });
+    assert.equal(result.taskStatus, AITaskStatus.SUCCESS);
+    assert.equal(result.taskInfo?.videos?.[0].videoUrl,
+      'https://cdn.example/recovered.mp4');
+    assert.deepEqual(calls, [longStatus, baseResult + '/status', baseResult]);
+  } finally {
+    globalThis.fetch = prior;
+  }
+});
+
+test('canonical queue URLs never trigger legacy fallbacks even on 404', async () => {
+  const id = 'new-request-id';
+  const resultUrl = 'https://queue.fal.run/minimax/h3-max-turbo/requests/' + id;
+  const urls = {statusUrl: resultUrl + '/status', responseUrl: resultUrl};
+  const called: string[] = [];
+  const original = globalThis.fetch;
+  globalThis.fetch = (async (url: string | URL | Request) => {
+    called.push(String(url));
+    return new Response('not found', {status: 404});
+  }) as typeof fetch;
+  try {
+    const result = await new FalProvider({apiKey: 'test-key'}).query({
+      taskId: id,
+      model: 'minimax/h3-max-turbo/text-to-video',
+      mediaType: AIMediaType.VIDEO,
+      queueUrls: urls,
+    });
+    assert.equal(result.taskStatus, AITaskStatus.FAILED);
+    assert.equal(result.taskInfo?.status, 'QUERY_PERMANENT_ERROR');
+    assert.deepEqual(called, [urls.statusUrl]);
+  } finally {
+    globalThis.fetch = original;
+  }
+});
