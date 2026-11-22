@@ -1,6 +1,11 @@
-import type { FieldValue, GeneratorModel, Workflow, WorkflowSpec } from './types';
 import { createGeneratorState, updateGeneratorState } from './normalize';
 import { calculateGeneratorCredits } from './pricing';
+import type {
+  FieldValue,
+  GeneratorModel,
+  Workflow,
+  WorkflowSpec,
+} from './types';
 
 export type GeneratorModelFamily = {
   id: string;
@@ -18,7 +23,8 @@ export function getGeneratorModelFamilyId(modelId: string): string {
     modelId === 'text-to-video-standard' ||
     modelId === 'multi-image-to-video' ||
     modelId === 'all-in-one-video'
-  ) return 'seedance';
+  )
+    return 'seedance';
   if (modelId === 'reference-to-video-pro' || modelId.startsWith('minimax-'))
     return 'minimax';
   if (modelId.startsWith('seedance-')) return 'seedance';
@@ -29,7 +35,10 @@ export function getGeneratorModelFamilyId(modelId: string): string {
   return modelId;
 }
 
-const FAMILIES: Record<string, Pick<GeneratorModelFamily, 'label' | 'blurb' | 'badge'>> = {
+const FAMILIES: Record<
+  string,
+  Pick<GeneratorModelFamily, 'label' | 'blurb' | 'badge'>
+> = {
   seedance: {
     label: 'Seedance',
     blurb: 'Multi-reference video creation',
@@ -54,7 +63,34 @@ const FAMILIES: Record<string, Pick<GeneratorModelFamily, 'label' | 'blurb' | 'b
 
 const ORDER = ['seedance', 'nano-banana', 'minimax', 'kling', 'flux'];
 
-export function groupGeneratorModels(models: readonly GeneratorModel[]): GeneratorModelFamily[] {
+/** Picker order inside the Seedance family (2.5 Flash / 2.5 first). */
+const SEEDANCE_MODEL_ORDER = [
+  'seedance-2.5-flash',
+  'seedance-2.5',
+  'photo-to-video-standard',
+  'text-to-video-standard',
+  'multi-image-to-video',
+  'all-in-one-video',
+  'seedance-2-fast',
+  'seedance-2-mini',
+] as const;
+
+function sortFamilyModels(familyId: string, models: GeneratorModel[]) {
+  if (familyId !== 'seedance') return models;
+  return [...models].sort((left, right) => {
+    const leftRank = SEEDANCE_MODEL_ORDER.indexOf(
+      left.id as (typeof SEEDANCE_MODEL_ORDER)[number]
+    );
+    const rightRank = SEEDANCE_MODEL_ORDER.indexOf(
+      right.id as (typeof SEEDANCE_MODEL_ORDER)[number]
+    );
+    return (leftRank < 0 ? 999 : leftRank) - (rightRank < 0 ? 999 : rightRank);
+  });
+}
+
+export function groupGeneratorModels(
+  models: readonly GeneratorModel[]
+): GeneratorModelFamily[] {
   const map = new Map<string, GeneratorModel[]>();
   for (const model of models) {
     const key = getGeneratorModelFamilyId(model.id);
@@ -65,15 +101,14 @@ export function groupGeneratorModels(models: readonly GeneratorModel[]): Generat
   return [...map.entries()]
     .sort(([a], [b]) => ORDER.indexOf(a) - ORDER.indexOf(b))
     .map(([id, familyModels]) => ({
-      id, ...(FAMILIES[id] ?? {
+      id,
+      ...(FAMILIES[id] ?? {
         label: familyModels[0]?.name ?? id,
         blurb: '',
       }),
-      models: familyModels,
+      models: sortFamilyModels(id, familyModels),
     }));
 }
-
-
 
 /** One plain-language use case per actual model; never put workflows in the picker. */
 const MODEL_SUMMARIES: Record<string, string> = {
@@ -100,17 +135,25 @@ const MODEL_SUMMARIES: Record<string, string> = {
   'image-edit-standard': 'Image editing with multiple references',
 };
 
-function fieldMinimum(field: WorkflowSpec['fields'][string] | undefined): FieldValue | undefined {
+function fieldMinimum(
+  field: WorkflowSpec['fields'][string] | undefined
+): FieldValue | undefined {
   if (!field) return undefined;
   if (field.options?.length) {
-    const numeric = field.options.filter((value): value is number => typeof value === 'number');
+    const numeric = field.options.filter(
+      (value): value is number => typeof value === 'number'
+    );
     return numeric.length ? Math.min(...numeric) : field.default;
   }
-  return typeof field.default === 'number' ? (field.min ?? field.default) : field.default;
+  return typeof field.default === 'number'
+    ? (field.min ?? field.default)
+    : field.default;
 }
 
 /** The same pricing calculator as Generate, sampled at valid minimum settings. */
-export function getGeneratorStartingCredits(model: GeneratorModel): number | null {
+export function getGeneratorStartingCredits(
+  model: GeneratorModel
+): number | null {
   if (!model.enabled || model.pricing.precision !== 'exact') return null;
   let cheapest = Infinity;
   for (const [workflow, spec] of Object.entries(model.workflows)) {
@@ -122,8 +165,11 @@ export function getGeneratorStartingCredits(model: GeneratorModel): number | nul
       spec.requiresAnyReference && spec.slots.referenceImages ? 1 : 0
     );
     if (spec.requiresAnyReference && minImages === 0) continue;
-    if ((spec.slots.referenceVideos?.min ?? 0) > 0 ||
-        (spec.slots.referenceAudio?.min ?? 0) > 0) continue;
+    if (
+      (spec.slots.referenceVideos?.min ?? 0) > 0 ||
+      (spec.slots.referenceAudio?.min ?? 0) > 0
+    )
+      continue;
 
     const resolutionField = spec.fields.resolution;
     const resolutions = resolutionField?.options ?? [resolutionField?.default];
@@ -144,12 +190,18 @@ export function getGeneratorStartingCredits(model: GeneratorModel): number | nul
           inputs: {
             startFrame: null,
             endFrame: null,
-            referenceImages: Array.from({ length: minImages }, (_, i) => 'reference-' + i),
+            referenceImages: Array.from(
+              { length: minImages },
+              (_, i) => 'reference-' + i
+            ),
             referenceVideos: [],
             referenceAudio: [],
           },
         });
-        cheapest = Math.min(cheapest, calculateGeneratorCredits(state, model).credits);
+        cheapest = Math.min(
+          cheapest,
+          calculateGeneratorCredits(state, model).credits
+        );
       } catch {
         // An incompatible parameter combination is not an available minimum.
       }
@@ -158,13 +210,22 @@ export function getGeneratorStartingCredits(model: GeneratorModel): number | nul
   return Number.isFinite(cheapest) ? cheapest : null;
 }
 
-function maxConfiguredNumber(model: GeneratorModel, field: 'duration' | 'outputCount') {
+function maxConfiguredNumber(
+  model: GeneratorModel,
+  field: 'duration' | 'outputCount'
+) {
   const values = Object.values(model.workflows).flatMap((spec) => {
     const config = spec?.fields[field];
     if (!config) return [];
-    if (config.options) return config.options.filter((value): value is number => typeof value === 'number');
-    return typeof config.max === 'number' ? [config.max] :
-      typeof config.default === 'number' ? [config.default] : [];
+    if (config.options)
+      return config.options.filter(
+        (value): value is number => typeof value === 'number'
+      );
+    return typeof config.max === 'number'
+      ? [config.max]
+      : typeof config.default === 'number'
+        ? [config.default]
+        : [];
   });
   return values.length ? Math.max(...values) : null;
 }
@@ -176,20 +237,29 @@ export function getGeneratorModelHighlights(model: GeneratorModel) {
   );
   const resolutionScore = (resolution: string) => {
     const match = /^(\d+(?:\.\d+)?)(k|p)$/i.exec(resolution);
-    return match ? Number(match[1]) * (match[2].toLowerCase() === 'k' ? 1000 : 1) : -1;
+    return match
+      ? Number(match[1]) * (match[2].toLowerCase() === 'k' ? 1000 : 1)
+      : -1;
   };
-  const maxResolution = resolutions.sort((a, b) => resolutionScore(b) - resolutionScore(a))[0] ?? null;
-  const maxReferenceImages = Math.max(0, ...Object.values(model.workflows).map(
-    spec => spec?.slots.referenceImages?.max ?? 0
-  ));
+  const maxResolution =
+    resolutions.sort((a, b) => resolutionScore(b) - resolutionScore(a))[0] ??
+    null;
+  const maxReferenceImages = Math.max(
+    0,
+    ...Object.values(model.workflows).map(
+      (spec) => spec?.slots.referenceImages?.max ?? 0
+    )
+  );
   const maxOutputs = maxConfiguredNumber(model, 'outputCount');
-  const maxDuration = model.mediaType === 'video'
-    ? maxConfiguredNumber(model, 'duration')
-    : null;
+  const maxDuration =
+    model.mediaType === 'video' ? maxConfiguredNumber(model, 'duration') : null;
 
   return {
-    description: MODEL_SUMMARIES[model.id] ??
-      (model.mediaType === 'image' ? 'Image generation & editing' : 'Video generation'),
+    description:
+      MODEL_SUMMARIES[model.id] ??
+      (model.mediaType === 'image'
+        ? 'Image generation & editing'
+        : 'Video generation'),
     startingCredits: getGeneratorStartingCredits(model),
     // Video: e.g. 1080p, 4K. Image models with no resolution control
     // show a grounded reference/output limit instead of inventing a 4K claim.
@@ -227,11 +297,15 @@ export function getGeneratorModelChoices(
   models: readonly GeneratorModel[],
   includeDisabled = false
 ): GeneratorModel[] {
-  const available = includeDisabled ? models : models.filter(model => model.enabled);
-  const base = available.filter(model => SEEDANCE_BASE_IDS.has(model.id));
-  const representative = base.find(model => model.id === 'photo-to-video-standard') ?? base[0];
-  return available.filter(model =>
-    !SEEDANCE_BASE_IDS.has(model.id) || model.id === representative?.id
+  const available = includeDisabled
+    ? models
+    : models.filter((model) => model.enabled);
+  const base = available.filter((model) => SEEDANCE_BASE_IDS.has(model.id));
+  const representative =
+    base.find((model) => model.id === 'photo-to-video-standard') ?? base[0];
+  return available.filter(
+    (model) =>
+      !SEEDANCE_BASE_IDS.has(model.id) || model.id === representative?.id
   );
 }
 
@@ -258,30 +332,57 @@ export function getGeneratorWorkflowChoices(
   if (active.mediaType === 'image') return [];
   if (SEEDANCE_BASE_IDS.has(active.id)) {
     const choices: GeneratorWorkflowChoice[] = [
-      { modelId: 'photo-to-video-standard', workflow: 'first-frame', label: 'First Frame' },
-      { modelId: 'photo-to-video-standard', workflow: 'start-end', label: 'Start & End' },
-      { modelId: 'all-in-one-video', workflow: 'all-in-one-reference', label: 'All-in-One Reference' },
+      {
+        modelId: 'photo-to-video-standard',
+        workflow: 'first-frame',
+        label: 'First Frame',
+      },
+      {
+        modelId: 'photo-to-video-standard',
+        workflow: 'start-end',
+        label: 'Start & End',
+      },
+      {
+        modelId: 'all-in-one-video',
+        workflow: 'all-in-one-reference',
+        label: 'All-in-One Reference',
+      },
     ];
-    return choices.filter(choice => {
-      const model = models.find(item => item.id === choice.modelId);
+    return choices.filter((choice) => {
+      const model = models.find((item) => item.id === choice.modelId);
       return !!model?.workflows[choice.workflow];
     });
   }
   // Raphael-style video picker offers at most three intent modes. Text-only
   // generation lives in All-in-One Reference with optional media.
-  const videoModes: Workflow[] = ['first-frame', 'start-end', 'all-in-one-reference'];
+  const videoModes: Workflow[] = [
+    'first-frame',
+    'start-end',
+    'all-in-one-reference',
+  ];
   const supported: Array<[Workflow, WorkflowSpec | undefined]> =
     active.mediaType === 'video'
-      ? videoModes.map(workflow =>
-          [workflow, active.workflows[workflow]] as [Workflow, WorkflowSpec | undefined])
+      ? videoModes.map(
+          (workflow) =>
+            [workflow, active.workflows[workflow]] as [
+              Workflow,
+              WorkflowSpec | undefined,
+            ]
+        )
       : Object.entries(active.workflows).map(
-          ([workflow, spec]) => [workflow as Workflow, spec] as [Workflow, WorkflowSpec | undefined]
+          ([workflow, spec]) =>
+            [workflow as Workflow, spec] as [Workflow, WorkflowSpec | undefined]
         );
   return supported
-    .filter((entry): entry is [Workflow, NonNullable<typeof entry[1]>] => !!entry[1])
+    .filter(
+      (entry): entry is [Workflow, NonNullable<(typeof entry)[1]>] => !!entry[1]
+    )
     .map(([workflow, spec]) => ({
       modelId: active.id,
       workflow,
-      label: workflow === 'all-in-one-reference' ? 'All-in-One Reference' : spec.label,
+      label:
+        workflow === 'all-in-one-reference'
+          ? 'All-in-One Reference'
+          : spec.label,
     }));
 }

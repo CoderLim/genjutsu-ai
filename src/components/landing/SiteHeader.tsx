@@ -31,6 +31,21 @@ const NAV_LINKS = [
 const AI_PHOTO_EDITOR_HREF =
   'https://getaiphotoeditor.com/?utm_source=genjutsu-ai';
 
+const TOOLS_LINKS = [
+  {
+    label: m['site.header.photo_editor'],
+    href: AI_PHOTO_EDITOR_HREF,
+    external: true,
+    badge: true,
+  },
+  {
+    label: m['site.header.image_to_video'],
+    href: '/image-to-video',
+    external: false,
+    badge: false,
+  },
+] as const;
+
 const TRENDING_LINKS = [
   {
     label: 'Jatayu Video Prompt',
@@ -220,23 +235,29 @@ function NewBadge({ className }: { className?: string }) {
   );
 }
 
-function AiPhotoEditorLink({
+function ToolsMenuLink({
+  item,
   className,
   onClick,
 }: {
+  item: (typeof TOOLS_LINKS)[number];
   className?: string;
   onClick?: () => void;
 }) {
   return (
     <Link
-      href={AI_PHOTO_EDITOR_HREF}
-      target="_blank"
-      rel="noopener noreferrer"
-      className={cn(navLinkClass, 'relative', className)}
+      href={item.href}
+      {...(item.external
+        ? { target: '_blank', rel: 'noopener noreferrer' }
+        : {})}
+      className={cn(
+        'hover:bg-accent focus-visible:bg-accent flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors outline-none',
+        className
+      )}
       onClick={onClick}
     >
-      {m['site.header.photo_editor']()}
-      <NewBadge className="ml-1.5" />
+      {item.label()}
+      {item.badge ? <NewBadge className="ml-1.5" /> : null}
     </Link>
   );
 }
@@ -305,6 +326,7 @@ function AuthSlot({ className }: { className?: string }) {
 export function SiteHeader() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [trendingOpen, setTrendingOpen] = useState(false);
+  const [toolsOpen, setToolsOpen] = useState(false);
 
   return (
     <section className="text-foreground relative z-[260] py-3">
@@ -345,6 +367,24 @@ export function SiteHeader() {
                   </div>
                 </DropdownMenuContent>
               </DropdownMenu>
+              <DropdownMenu open={toolsOpen} onOpenChange={setToolsOpen}>
+                <DropdownMenuTrigger className={navLinkClass}>
+                  {m['site.header.tools']()}
+                  <ChevronDownIcon className="ml-1 size-3.5 opacity-70" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  align="start"
+                  className="min-w-[220px] p-1.5"
+                >
+                  {TOOLS_LINKS.map((item) => (
+                    <ToolsMenuLink
+                      key={item.href}
+                      item={item}
+                      onClick={() => setToolsOpen(false)}
+                    />
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
               {NAV_LINKS.map((item) => (
                 <Link key={item.href} href={item.href} className={navLinkClass}>
                   {item.label()}
@@ -353,7 +393,6 @@ export function SiteHeader() {
               <Link href="/creations" className={navLinkClass}>
                 {m['creations.nav']()}
               </Link>
-              <AiPhotoEditorLink />
             </div>
           </div>
 
@@ -409,6 +448,21 @@ export function SiteHeader() {
                       ))}
                     </div>
                   </div>
+                  <div className="border-border/60 border-b py-3">
+                    <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                      {m['site.header.tools']()}
+                    </p>
+                    <div className="mt-1 flex flex-col">
+                      {TOOLS_LINKS.map((item) => (
+                        <ToolsMenuLink
+                          key={item.href}
+                          item={item}
+                          className="rounded-none px-0 py-2.5"
+                          onClick={() => setSheetOpen(false)}
+                        />
+                      ))}
+                    </div>
+                  </div>
                   {NAV_LINKS.map((item) => (
                     <Link
                       key={item.href}
@@ -426,10 +480,6 @@ export function SiteHeader() {
                   >
                     {m['creations.nav']()}
                   </Link>
-                  <AiPhotoEditorLink
-                    className="border-border/60 h-auto justify-start rounded-none border-b px-0 py-3"
-                    onClick={() => setSheetOpen(false)}
-                  />
                   <div className="mt-6 flex flex-col gap-3">
                     <UpgradePill className="w-fit" />
                     <LocaleSelector variant="pill" className="w-fit" />
