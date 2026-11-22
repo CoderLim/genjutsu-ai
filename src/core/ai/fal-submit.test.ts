@@ -62,19 +62,34 @@ test('HTTP status helpers match Fal transport rules', () => {
   assert.equal(isDefiniteFalSubmitRejection(404), true);
 });
 
-test('queue status/result uses Fal app id, not nested submit path', () => {
+test('queue status/result keeps mode endpoints; truncates submit-only nests', () => {
   assert.equal(
     falQueueQueryModel('fal-ai/kling-video/o3/standard/video-to-video/edit'),
     'fal-ai/kling-video'
   );
   assert.equal(
     falQueueQueryModel('minimax/h3/reference-to-video'),
-    'minimax/h3'
+    'minimax/h3/reference-to-video'
   );
-  assert.equal(falQueueQueryModel('fal-ai/flux/schnell'), 'fal-ai/flux');
+  assert.equal(
+    falQueueQueryModel('minimax/h3-max-turbo/text-to-video'),
+    'minimax/h3-max-turbo/text-to-video'
+  );
+  assert.equal(
+    falQueueQueryModel('fal-ai/kling-video/v3/pro/text-to-video'),
+    'fal-ai/kling-video/v3/pro/text-to-video'
+  );
+  assert.equal(
+    falQueueQueryModel('fal-ai/flux/schnell'),
+    'fal-ai/flux/schnell'
+  );
   assert.equal(falQueueQueryModel('fal-ai/kling-video'), 'fal-ai/kling-video');
   assert.equal(
     falQueueQueryModel('fal-ai/bytedance/dreamactor/v2'),
     'fal-ai/bytedance'
+  );
+  assert.equal(
+    falQueueQueryModel('bytedance/seedance-2.5/us/reference-to-video'),
+    'bytedance/seedance-2.5'
   );
 });

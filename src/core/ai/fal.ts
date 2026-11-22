@@ -67,10 +67,15 @@ export function isFalPermanentQueryFailure(
 export const FAL_QUERY_PERMANENT_ERROR_THRESHOLD = 3;
 
 /**
- * Fal queue status/result URLs use the app id (`owner/name`) only.
- * Nested submit paths (e.g. `.../video-to-video/edit`, `minimax/h3/...`,
- * `fal-ai/bytedance/dreamactor/v2`) return HTTP 405 on GET when the full
- * path is used — verified against Kling O3 edit and DreamActor v2.
+ * Fal queue status/result model id — usually the same endpoint used at submit.
+ *
+ * Keep the full path for MiniMax / Kling mode endpoints (`…/text-to-video`,
+ * `…/image-to-video`, etc.). Truncating those to `owner/name` makes status
+ * miss a Completed request (UI stuck on Generating) while Fal shows done.
+ *
+ * Exception: nested submit-only paths that 405 on full-path GET — Kling O3
+ * `…/video-to-video/edit` and `fal-ai/bytedance/dreamactor/v2` — truncate to
+ * `owner/name`. `bytedance/*` matches seedance `falQueueAppPath`.
  */
 export function falQueueQueryModel(model?: string): string {
   if (!model) return '';
@@ -79,7 +84,20 @@ export function falQueueQueryModel(model?: string): string {
   if (parts.length <= 2) {
     return parts.join('/');
   }
-  return `${parts[0]}/${parts[1]}`;
+  // Match seedance falQueueAppPath: bytedance queue apps live at owner/name.
+  if (parts[0] === 'bytedance') {
+    return `${parts[0]}/${parts[1]}`;
+  }
+  // DreamActor and similar fal-ai/bytedance nests 405 on full-path GET.
+  if (parts[0] === 'fal-ai' && parts[1] === 'bytedance') {
+    return `${parts[0]}/${parts[1]}`;
+  }
+  // Kling O3 …/video-to-video/edit — submit-only suffix; full path 405s.
+  if (parts[parts.length - 1] === 'edit') {
+    return `${parts[0]}/${parts[1]}`;
+  }
+  // MiniMax / Kling mode endpoints need the full id (…/text-to-video, etc.).
+  return parts.join('/');
 }
 
 /**
