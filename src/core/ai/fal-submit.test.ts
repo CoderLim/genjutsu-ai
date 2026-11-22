@@ -272,3 +272,121 @@ test('canonical queue URLs never trigger legacy fallbacks even on 404', async ()
     globalThis.fetch = original;
   }
 });
+
+test('Fal accepts canonical two-, three- and deeply nested queue URLs', () => {
+  const requestId = '019a1b2c-3d4e-7f80-9a1b-2c3d4e5f6a7b';
+  for (const prefix of [
+    'minimax/h3-max-turbo',
+    'minimax/h3-max-turbo/text-to-video',
+    'minimax/h3-max-turbo/image-to-video',
+    'fal-ai/kling-video/v3/pro/text-to-video',
+    'fal-ai/kling-video/v3/pro/image-to-video',
+  ]) {
+    const responseUrl = 'https://queue.fal.run/' + prefix + '/requests/' + requestId;
+    const urls = {
+      status_url: responseUrl + '/status',
+      response_url: responseUrl,
+    };
+    assert.deepEqual(readFalQueueUrls(urls, requestId), {
+      statusUrl: urls.status_url,
+      responseUrl: urls.response_url,
+    }, prefix);
+    assert.deepEqual(assertFalQueueUrls({
+      statusUrl: urls.status_url,
+      responseUrl: urls.response_url,
+    }, requestId), {
+      statusUrl: urls.status_url,
+      responseUrl: urls.response_url,
+    }, prefix);
+  }
+});
+
+test('Fal rejects percent-encoded or traversing segments even if URLs are paired', () => {
+  const id = '019a1b2c-3d4e-7f80-9a1b-2c3d4e5f6a7b';
+  const base = 'https://queue.fal.run/minimax/h3-max-turbo/text-to-video/requests/' + id;
+  const cases = [
+    base.replace('/text-to-video/', '/%74ext-to-video/'),
+    base.replace('/text-to-video/', '/%2e%2e/text-to-video/'),
+    base.replace('/text-to-video/', '/../text-to-video/'),
+    base.replace('/text-to-video/', '/text-to-video//'),
+    base.replace('/text-to-video/', '/./text-to-video/'),
+    base.replace('/minimax/', '/minimax/%2Fmalicious/'),
+    base.replace('/minimax/', '/minimax/%00/'),
+    base.replace('/minimax/', '/minimax/%5c/'),
+    base.replace('/minimax/', '/minimax/@evil/'),
+    base.replace('/requests/', '/requests/other/requests/'),
+    base.replace(id, 'other-request'),
+    base + '?q=1',
+    base + '#fragment',
+    'https://evil.example/minimax/h3-max-turbo/text-to-video/requests/' + id,
+    'http://queue.fal.run/minimax/h3-max-turbo/text-to-video/requests/' + id,
+    'https://queue.fal.run:8443/minimax/h3-max-turbo/text-to-video/requests/' + id,
+  ];
+  for (const candidate of cases) {
+    assert.equal(readFalQueueUrls({
+      status_url: candidate + '/status',
+      response_url: candidate,
+    }, id), undefined, candidate);
+  }
+  // Valid-looking but mismatched queue routes or request IDs are forbidden.
+  assert.equal(readFalQueueUrls({
+    status_url: base + '/status',
+    response_url: base.replace('text-to-video', 'image-to-video'),
+  }, id), undefined);
+});
+
+test('FalProvider uses supplied multi-segment URLs verbatim for submit/status/result', async () => {
+  const requestId = '019a1b2c-3d4e-7f80-9a1b-2c3d4e5f6a7b';
+  const models = [
+    'minimax/h3-max-turbo/text-to-video',
+    'fal-ai/kling-video/v3/pro/text-to-video',
+  ];
+  const originalFetch = globalThis.fetch;
+  try {
+    for (const model of models) {
+      const responseUrl = 'https://queue.fal.run/' + model + '/requests/' + requestId;
+      const statusUrl = responseUrl + '/status';
+      const requests: string[] = [];
+      globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
+        const requestUrl = String(url);
+        requests.push(requestUrl);
+        if (requestUrl === 'https://queue.fal.run/' + model && init?.method === 'POST') {
+          return new Response(JSON.stringify({
+            request_id: requestId,
+            status_url: statusUrl,
+            response_url: responseUrl,
+          }), { status: 200 });
+        }
+        assert.equal(init?.method, 'GET');
+        assert.equal(init?.redirect, 'error');
+        if (requestUrl === statusUrl) {
+          return new Response(JSON.stringify({ status: 'COMPLETED' }), { status: 200 });
+        }
+        if (requestUrl === responseUrl) {
+          return new Response(JSON.stringify({
+            video: { url: 'https://media.example.test/result.mp4' },
+          }), { status: 200 });
+        }
+        throw new Error('Unexpected endpoint ' + requestUrl);
+      }) as typeof fetch;
+      const fal = new FalProvider({ apiKey: 'test-key' });
+      const task = await fal.generate({
+        params: { model, mediaType: AIMediaType.VIDEO, prompt: 'A fox walking' },
+      });
+      const urls = readFalQueueUrls(task.taskResult, task.taskId);
+      assert.ok(urls, model);
+      const result = await fal.query({
+        model, mediaType: AIMediaType.VIDEO,
+        taskId: task.taskId, queueUrls: urls,
+      });
+      assert.equal(result.taskStatus, AITaskStatus.SUCCESS);
+      assert.equal(result.taskInfo?.videos?.[0].videoUrl,
+        'https://media.example.test/result.mp4');
+      assert.deepEqual(requests, [
+        'https://queue.fal.run/' + model, statusUrl, responseUrl,
+      ]);
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
