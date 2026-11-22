@@ -143,6 +143,7 @@ const STATUSES = [
   'completed',
   'submission_unknown',
   'query_review',
+  'persistence_review',
   'refunding',
   'refunded',
 ] as const;
@@ -153,7 +154,8 @@ function statusVariant(status: string) {
     status === 'refunded' ||
     status === 'failed_preflight' ||
     status === 'submission_unknown' ||
-    status === 'query_review'
+    status === 'query_review' ||
+    status === 'persistence_review'
   ) {
     return 'destructive';
   }
@@ -910,6 +912,12 @@ function GenerationsPage() {
                       Provider query failed repeatedly. Verify the upstream
                       request and charges before retrying or manually refunding.
                       Credits are still reserved.
+                    </div>
+                  ) : detail.status === 'persistence_review' ? (
+                    <div className="text-destructive mt-1 text-xs">
+                      Provider generation completed, but saving the output to R2
+                      failed repeatedly. Verify storage and the original request
+                      before resuming; credits are still reserved.
                     </div>
                   ) : null}
                   <div className="text-muted-foreground mt-1 text-xs">
