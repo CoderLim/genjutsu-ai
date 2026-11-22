@@ -1,18 +1,20 @@
 import { createFileRoute } from '@tanstack/react-router';
 
 import { GeneratorForm } from '@/components/generator/GeneratorForm';
-import { ImageToVideoSeoSections, IMAGE_TO_VIDEO_FAQS, IMAGE_TO_VIDEO_STEPS } from '@/components/landing/ImageToVideoSeoSections';
+import { ImageToVideoSeoSections } from '@/components/landing/ImageToVideoSeoSections';
 import { SiteFooter } from '@/components/landing/SiteFooter';
 import { SiteHeader } from '@/components/landing/SiteHeader';
 import { SeoJsonLd } from '@/components/seo-json-ld';
 import { absoluteUrl, socialMeta } from '@/lib/seo';
+import {
+  IMAGE_TO_VIDEO_DESCRIPTION,
+  IMAGE_TO_VIDEO_FAQS,
+  IMAGE_TO_VIDEO_PATH,
+  IMAGE_TO_VIDEO_STEPS,
+  IMAGE_TO_VIDEO_TITLE,
+} from '@/modules/image-to-video/seo';
 
-// English-only SEO editorial until real translations are available.
-export const IMAGE_TO_VIDEO_PATH = '/image-to-video/';
-export const IMAGE_TO_VIDEO_TITLE = 'Image to Video AI — Turn Photos Into a Video Online';
-export const IMAGE_TO_VIDEO_DESCRIPTION =
-  'Turn a photo into a moving video with AI. Upload an image, describe the motion, and download your clip for social posts, product listings, or old family photos.';
-
+// English-only editorial until real translations are available.
 const CANONICAL = absoluteUrl(IMAGE_TO_VIDEO_PATH);
 
 function softwareApplicationJsonLd() {
@@ -35,7 +37,6 @@ function howToJsonLd() {
     '@type': 'HowTo',
     name: 'How to turn a photo into a video',
     description: 'Upload a photo, describe the motion, then generate and download the resulting MP4 video.',
-    totalTime: undefined,
     step: IMAGE_TO_VIDEO_STEPS.map((item, index) => ({
       '@type': 'HowToStep',
       position: index + 1,
