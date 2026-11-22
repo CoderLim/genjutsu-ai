@@ -8,6 +8,7 @@ import { getUuid } from '@/lib/hash';
 import { assertGenerationId } from './storage';
 import type { GeneratorState, CreditEstimate } from './types';
 import { nextGeneratorQueryFailure } from './query-recovery';
+import { nextGeneratorPersistenceFailure } from './persistence-recovery';
 import { serializeGeneratorFalQueueMetadata } from './fal-queue-metadata';
 import type { FalQueueUrls } from '@/core/ai/fal-queue-urls';
 
@@ -18,7 +19,11 @@ const REFUNDABLE = [
   'reserved', 'submitting', 'submitted', 'submission_unknown',
 ] as const;
 export const GENERATOR_QUERY_REVIEW_STATUS = 'query_review';
-type RefundableStatus = (typeof REFUNDABLE)[number] | typeof GENERATOR_QUERY_REVIEW_STATUS;
+export const GENERATOR_PERSISTENCE_REVIEW_STATUS = 'persistence_review';
+type RefundableStatus =
+  (typeof REFUNDABLE)[number] |
+  typeof GENERATOR_QUERY_REVIEW_STATUS |
+  typeof GENERATOR_PERSISTENCE_REVIEW_STATUS;
 
 export type GeneratorTask = typeof aiTask.$inferSelect;
 
@@ -350,16 +355,62 @@ export async function claimGeneratorCompletion(input: {
       ? undefined
       : eq(aiTask.taskResult, current.taskResult)
   );
+  const previous = parseTaskJson(current.taskResult);
   await db().update(aiTask).set({
     status: 'completing',
     taskResult: JSON.stringify({
-      completionClaim: token, completingClaimedAt: new Date().toISOString(),
+      completionClaim: token,
+      completingClaimedAt: new Date().toISOString(),
+      // Persist the count across lease reclamation. A stale worker cannot
+      // erase it when another worker acquires a new claim.
+      persistenceFailureCount: previous.persistenceFailureCount ?? 0,
     }),
   }).where(where);
 
   const after = await getGeneratorTask(input);
   return Boolean(after && after.status === 'completing' &&
     parseTaskJson(after.taskResult).completionClaim === token);
+}
+
+/**
+ * Preserve the active completion lease and record the save failure. After
+ * three consecutive failed persistence attempts, stop auto-polling and let
+ * an admin requery the original provider result. Never refund or POST again.
+ * The claim-token CAS prevents an expired worker overwriting a newer lease.
+ */
+export async function recordGeneratorPersistenceFailure(input: {
+  userId: string; generationId: string; completionClaim: string;
+  message: string;
+}) {
+  const current = await getGeneratorTask(input);
+  if (!current || current.status !== 'completing' || !current.taskResult) return current;
+  const previous = parseTaskJson(current.taskResult);
+  if (previous.completionClaim !== input.completionClaim) return current;
+
+  const { failures, needsReview } = nextGeneratorPersistenceFailure(
+    previous.persistenceFailureCount
+  );
+  const error = needsReview
+    ? 'The provider completed your generation, but saving the result needs support review. Credits remain reserved.'
+    : 'The provider completed your generation, but saving the result failed. We will retry automatically; credits remain reserved.';
+  await db().update(aiTask).set({
+    status: needsReview ? GENERATOR_PERSISTENCE_REVIEW_STATUS : 'completing',
+    taskResult: JSON.stringify({
+      ...previous,
+      persistenceFailureCount: failures,
+      lastPersistenceFailureAt: new Date().toISOString(),
+      providerStatus: 'RESULT_PERSISTENCE_ERROR',
+      persistenceMessage: input.message.slice(0, 500),
+      error,
+    }),
+  }).where(and(
+    eq(aiTask.id, input.generationId),
+    eq(aiTask.userId, input.userId),
+    eq(aiTask.scene, GENERATOR_SCENE),
+    eq(aiTask.status, 'completing'),
+    eq(aiTask.taskResult, current.taskResult)
+  ));
+  return getGeneratorTask(input);
 }
 
 export async function completeGeneratorTask(input: {
