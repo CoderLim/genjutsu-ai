@@ -7,7 +7,9 @@ import {
   Download,
   Image as ImageIcon,
   LoaderCircle,
+  X,
 } from 'lucide-react';
+import { createPortal } from 'react-dom';
 
 import { listGeneratorModels } from '@/modules/generator/catalog';
 import {
@@ -180,6 +182,75 @@ function mediaDurationFromBlobUrl(
   });
 }
 
+function ResultLightbox({
+  url,
+  mediaType,
+  onClose,
+}: {
+  url: string;
+  mediaType: MediaType;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [onClose]);
+
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[400] flex items-center justify-center p-4 sm:p-8"
+      role="dialog"
+      aria-modal="true"
+      aria-label={
+        mediaType === 'video' ? 'Fullscreen video' : 'Fullscreen image'
+      }
+    >
+      <button
+        type="button"
+        aria-label="Close fullscreen preview"
+        className="absolute inset-0 cursor-pointer bg-black/80 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      <div className="relative z-10 flex max-h-[92vh] max-w-[min(96vw,1100px)] items-center justify-center">
+        <button
+          type="button"
+          aria-label="Close"
+          onClick={onClose}
+          className="absolute -top-3 -right-3 z-20 flex size-8 cursor-pointer items-center justify-center rounded-full border border-white/15 bg-[rgba(41,30,23,0.95)] text-[rgb(237,234,222)] shadow-lg hover:bg-[rgba(60,44,34,0.98)]"
+        >
+          <X className="size-4" />
+        </button>
+        {mediaType === 'video' ? (
+          <video
+            src={url}
+            controls
+            autoPlay
+            playsInline
+            className="max-h-[92vh] w-auto max-w-full rounded-xl bg-black object-contain shadow-2xl"
+          />
+        ) : (
+          <img
+            src={url}
+            alt="Generated result"
+            className="max-h-[92vh] w-auto max-w-full rounded-xl object-contain shadow-2xl"
+          />
+        )}
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 export function GeneratorForm({
   mediaType: initialMediaType,
   initialModelId,
@@ -225,6 +296,7 @@ export function GeneratorForm({
   const mediaReadLock = useRef(false);
   const mediaDurations = useRef(new Map<string, number>());
   const [job, setJob] = useState<JobInfo | null>(null);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [priceChange, setPriceChange] = useState<PriceChange | null>(null);
   const [retryAttempt, setRetryAttempt] = useState<PriceChange | null>(null);
   // Synchronous guard; React busy state alone may not block same-tick clicks.
@@ -1207,27 +1279,44 @@ export function GeneratorForm({
                 <CheckCircle2 className="size-4 text-green-600" /> Generation
                 completed
               </p>
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div
+                className={
+                  job.resultUrls.length > 1
+                    ? 'grid gap-3 sm:grid-cols-2'
+                    : 'grid gap-3'
+                }
+              >
                 {job.resultUrls.map((url, index) => (
                   <div
                     key={url}
                     className="overflow-hidden rounded-xl border border-[rgba(20,17,18,0.086)]"
                   >
-                    {job.mediaType === 'video' ? (
-                      <video
-                        controls
-                        playsInline
-                        preload="metadata"
-                        src={url}
-                        className="aspect-video w-full bg-black object-contain"
-                      />
-                    ) : (
-                      <img
-                        src={url}
-                        alt={'Generated image ' + (index + 1)}
-                        className="aspect-video w-full bg-[rgba(20,17,18,0.04)] object-contain"
-                      />
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => setLightboxUrl(url)}
+                      aria-label={
+                        job.mediaType === 'video'
+                          ? 'View video fullscreen'
+                          : 'View image fullscreen'
+                      }
+                      className="flex max-h-[min(70vh,560px)] w-full cursor-zoom-in items-center justify-center bg-[rgba(20,17,18,0.04)]"
+                    >
+                      {job.mediaType === 'video' ? (
+                        <video
+                          playsInline
+                          muted
+                          preload="metadata"
+                          src={url}
+                          className="pointer-events-none mx-auto h-auto max-h-[min(70vh,560px)] w-auto max-w-full bg-black"
+                        />
+                      ) : (
+                        <img
+                          src={url}
+                          alt={'Generated image ' + (index + 1)}
+                          className="mx-auto h-auto max-h-[min(70vh,560px)] w-auto max-w-full"
+                        />
+                      )}
+                    </button>
                     <a
                       href={
                         url + (url.includes('?') ? '&' : '?') + 'download=1'
@@ -1239,6 +1328,13 @@ export function GeneratorForm({
                   </div>
                 ))}
               </div>
+              {lightboxUrl && job ? (
+                <ResultLightbox
+                  url={lightboxUrl}
+                  mediaType={job.mediaType}
+                  onClose={() => setLightboxUrl(null)}
+                />
+              ) : null}
             </div>
           ) : (
             <p role="alert" className="text-sm">
