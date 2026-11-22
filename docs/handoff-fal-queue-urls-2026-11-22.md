@@ -5,10 +5,12 @@ Based on `main` at `13c2219`. This is a provider-transport reliability fix, not 
 ## Root cause and invariant
 
 Some Fal endpoints accept POST on a longer path (for example,
-`minimax/h3-max-turbo/text-to-video`), while queue GETs may live at
-`/{owner}/{app}/requests/{requestId}`. Deriving GET URLs by splitting
-the submission model name caused successful paid jobs to go to
-`query_review`.
+`minimax/h3-max-turbo/text-to-video`). Fal's public queue documentation
+shows GETs at `/{owner}/{app}/requests/{requestId}`, but the production
+incident demonstrated that hard-coding a two-segment lookup can instead
+miss a completed request. **Neither two-segment nor multi-segment queue
+GET paths should be inferred from the submitted model ID.** The POST
+response URL is the only authoritative lookup location for new jobs.
 
 **New invariant:** The canonical queue `status_url` and `response_url`
 from Fal's POST response are bound to the corresponding `request_id`.
@@ -21,10 +23,12 @@ Reconciliation uses this saved pair, not the current product model profile.
   optional verified queue URLs, uses them for both status and result GETs,
   and disables redirect-following when sending an API key.
 - `core/ai/fal-queue-urls.ts`: strict URL allowlist: HTTPS only,
-  `queue.fal.run` only, exactly the queue GET path, same request ID,
-  matching status and result parent path, no credentials, query, fragments,
-  or encoded/path-traversal segments. Untrusted/malformed values are never
-  fetched.
+  `queue.fal.run` only. Accept **one or more safe model path segments**
+  before the final `/requests/{requestId}` and optional `/status`;
+  require the identical request ID and the exact matching status/result URL
+  pair. Reject userinfo, query, fragments, wrong host/port, percent-encoded
+  or traversal segments, and changed URL normalization. Do not truncate
+  canonical URLs to two segments. Untrusted/malformed values are never fetched.
 - `modules/generator/adapters.ts`: extract the validated pair from
   the Fal POST result, pass it through the provider abstraction.
 - `modules/generator/billing.ts`: atomically store the pair in
@@ -37,10 +41,13 @@ Reconciliation uses this saved pair, not the current product model profile.
   for this exact task. An exception, including corrupt persisted metadata,
   counts toward the existing `query_review` policy rather than leaving
   the task in Processing. A lookup failure is *not* a reason to refund.
-- **Legacy compatibility:** Old tasks without saved URLs continue to use
-  the existing `falQueueQueryModel` fallback. This includes the
-  `bytedance/*` and nested `/edit` special cases. No automatic
-  resubmission or account debit occurs when polling.
+- **Legacy compatibility only:** Old tasks without saved URLs continue
+  to use `falQueueQueryModel` (including the `bytedance/*` and nested
+  `/edit` special cases). On a 404/405 for the legacy long path, one
+  `owner/app` lookup is attempted. That is a best-effort historical
+  fallback, **not** the preferred URL for MiniMax or any new task. A
+  canonical saved URL is never replaced by a guessed fallback. No automatic
+  resubmission, credit debit, or refund occurs when polling.
 
 ## Operational recovery for prior query_review jobs
 
@@ -49,10 +56,43 @@ URLs were stored and is not silently reopened by this change. An admin should
 verify the Fal request ID and account result, then invoke
 `POST /api/admin/generator/resolve` with `action: "resume-query"` and
 the existing required `generationId`, `userId`, and operator `note`.
-The task is queried using the current legacy fallback. If Fal still returns
-404 for that request, the operator must use the verified provider status/result
-URLs to recover the output through an audited repair, not create a second
-charged task or automatically refund a possibly successful one.
+The task is queried using the legacy lookup algorithm (including its
+single owner/app retry on a 404/405). If Fal still returns 404, the
+operator must confirm the provider's actual result/URLs and recover through
+an audited repair, not create a second charged task or automatically refund
+a possibly successful one.
+
+## Canonical URL examples and verification status
+
+**These are examples, not a captured MiniMax production response:**
+
+```text
+# Two segments: fal API docs example shape
+https://queue.fal.run/minimax/h3-max-turbo/requests/<requestId>
+# Three segments: supported by validator, not yet observed live
+https://queue.fal.run/minimax/h3-max-turbo/text-to-video/requests/<requestId>
+# Deeply nested: supported by validator, not yet observed live
+https://queue.fal.run/fal-ai/kling-video/v3/pro/text-to-video/requests/<requestId>
+```
+
+Mock transport tests now assert that both two-segment and multi-segment
+canonical URLs survive parsing and are used **verbatim** for GET requests.
+This does not establish which shape Fal currently emits for MiniMax.
+
+**Actual Fal smoke: not executed in this patch.** No verified staging
+Fal API credentials or raw submit response were available to this
+GitHub code-editing session. The production sign-off owner must:
+
+1. Submit a paid/staging H3 Max Turbo text-to-video request; capture
+   `request_id`, `status_url` and `response_url` from the raw
+   **POST response** (redact request IDs and tokens in PR comments).
+2. Confirm the actual returned URL pair passes validation unchanged
+   and matches `aiTask.taskInfo.falQueue`, then inspect status/result
+   GETs and R2/DB completion for the **same** task.
+3. Optionally run the same path check with Kling v3, which has a
+   deeper model endpoint path.
+4. Document only observed endpoint shape as live evidence; do not
+   infer multi-segment status URLs from the original 404 incident.
 
 ## Release and verification gates
 
