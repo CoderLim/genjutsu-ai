@@ -188,7 +188,7 @@ test('FalProvider queries exact canonical URLs from submit rather than guessing 
       statusUrl,
       resultUrl,
     ]);
-    assert.ok(calls.slice(1).every(call => call.redirect === 'error'));
+    assert.ok(calls.slice(1).every(call => call.redirect === 'manual'));
   } finally {
     globalThis.fetch = prior;
   }
@@ -226,7 +226,7 @@ test('legacy long-path 404 retries the owner/app queue GET once without a second
     const key = String(url);
     calls.push(key);
     assert.equal(init?.method, 'GET');
-    assert.equal(init?.redirect, 'error');
+    assert.equal(init?.redirect, 'manual');
     if (key === longStatus) return new Response('not found', {status: 404});
     if (key === baseResult + '/status') return new Response(
       JSON.stringify({status: 'COMPLETED'}), {status: 200}
@@ -359,7 +359,7 @@ test('FalProvider uses supplied multi-segment URLs verbatim for submit/status/re
           }), { status: 200 });
         }
         assert.equal(init?.method, 'GET');
-        assert.equal(init?.redirect, 'error');
+        assert.equal(init?.redirect, 'manual');
         if (requestUrl === statusUrl) {
           return new Response(JSON.stringify({ status: 'COMPLETED' }), { status: 200 });
         }
@@ -435,7 +435,7 @@ test('legacy Seedance Mini recovers from truncated two-segment 404 via full path
     const current = String(url);
     calls.push(current);
     assert.equal(options?.method, 'GET');
-    assert.equal(options?.redirect, 'error');
+    assert.equal(options?.redirect, 'manual');
     if (current === shortStatus) return new Response('Not Found', {status: 404});
     if (current === fullResult + '/status') {
       return new Response(JSON.stringify({status: 'COMPLETED'}), {status: 200});
@@ -505,6 +505,102 @@ test('legacy recovery never retries 401/403 or 5xx as alternate endpoints', asyn
       assert.equal(result.taskInfo?.status,
         status >= 429 ? 'QUERY_ERROR' : 'QUERY_PERMANENT_ERROR');
     }
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+
+test('Cloudflare-compatible manual redirect prevents status lookup from following 3xx', async () => {
+  const requestId = 'mini-redirect-status-request';
+  const responseUrl = 'https://queue.fal.run/bytedance/seedance-2.0/requests/' + requestId;
+  const statusUrl = responseUrl + '/status';
+  const attempted: string[] = [];
+  const original = globalThis.fetch;
+  globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+    const url = String(input);
+    attempted.push(url);
+    assert.equal(init?.redirect, 'manual'); // Worker does not implement 'error'.
+    assert.equal(init?.method, 'GET');
+    assert.match(String((init?.headers as Record<string, string>)?.Authorization), /^Key /);
+    return new Response(null, {
+      status: 302,
+      headers: { Location: 'https://untrusted.example/steal-api-key' },
+    });
+  }) as typeof fetch;
+  try {
+    const result = await new FalProvider({ apiKey: 'private-key' }).query({
+      taskId: requestId,
+      mediaType: AIMediaType.VIDEO,
+      model: 'bytedance/seedance-2.0/mini/text-to-video',
+      queueUrls: { statusUrl, responseUrl },
+    });
+    assert.deepEqual(attempted, [statusUrl]);
+    assert.equal(result.taskStatus, AITaskStatus.FAILED);
+    assert.equal(result.taskInfo?.status, 'QUERY_PERMANENT_ERROR');
+    assert.equal(result.taskInfo?.errorCode, '302');
+    assert.match(result.taskInfo?.errorMessage ?? '', /redirect \(not followed\)/);
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+
+test('Cloudflare-compatible manual redirect prevents result lookup from following 3xx', async () => {
+  const requestId = 'mini-redirect-result-request';
+  const responseUrl = 'https://queue.fal.run/bytedance/seedance-2.0/requests/' + requestId;
+  const statusUrl = responseUrl + '/status';
+  const attempted: string[] = [];
+  const original = globalThis.fetch;
+  globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+    const url = String(input);
+    attempted.push(url);
+    assert.equal(init?.redirect, 'manual');
+    if (url === statusUrl) {
+      return new Response(JSON.stringify({ status: 'COMPLETED' }), { status: 200 });
+    }
+    assert.equal(url, responseUrl);
+    return new Response(null, {
+      status: 307,
+      headers: { Location: 'https://untrusted.example/steal-api-key' },
+    });
+  }) as typeof fetch;
+  try {
+    const result = await new FalProvider({ apiKey: 'private-key' }).query({
+      taskId: requestId,
+      mediaType: AIMediaType.VIDEO,
+      model: 'bytedance/seedance-2.0/mini/text-to-video',
+      queueUrls: { statusUrl, responseUrl },
+    });
+    assert.deepEqual(attempted, [statusUrl, responseUrl]);
+    assert.equal(result.taskStatus, AITaskStatus.FAILED);
+    assert.equal(result.taskInfo?.status, 'RESULT_FETCH_PERMANENT_ERROR');
+    assert.equal(result.taskInfo?.errorCode, '307');
+    assert.match(result.taskInfo?.errorMessage ?? '', /redirect \(not followed\)/);
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+
+test('legacy bytedance 3xx is not followed and does not trigger alternate queue paths', async () => {
+  const requestId = 'legacy-mini-redirect-request';
+  const original = globalThis.fetch;
+  const requests: string[] = [];
+  globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
+    requests.push(String(url));
+    assert.equal(init?.redirect, 'manual');
+    return new Response(null, {
+      status: 301, headers: { Location: 'https://untrusted.example/' },
+    });
+  }) as typeof fetch;
+  try {
+    const result = await new FalProvider({apiKey: 'test'}).query({
+      taskId: requestId,
+      model: 'bytedance/seedance-2.0/mini/text-to-video',
+      mediaType: AIMediaType.VIDEO,
+    });
+    assert.deepEqual(requests, [
+      'https://queue.fal.run/bytedance/seedance-2.0/requests/' + requestId + '/status',
+    ]);
+    assert.equal(result.taskInfo?.status, 'QUERY_PERMANENT_ERROR');
   } finally {
     globalThis.fetch = original;
   }
