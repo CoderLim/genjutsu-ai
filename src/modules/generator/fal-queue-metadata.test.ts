@@ -43,3 +43,19 @@ test('corrupted queue metadata is rejected before privileged polling', () => {
     responseUrl,
   }), /Invalid Fal queue URLs/);
 });
+
+test('multi-segment canonical URLs are preserved in durable Fal taskInfo', () => {
+  for (const modelPath of [
+    'minimax/h3-max-turbo/text-to-video',
+    'fal-ai/kling-video/v3/pro/text-to-video',
+  ]) {
+    const responseUrl = 'https://queue.fal.run/' + modelPath + '/requests/' + id;
+    const urls = {
+      responseUrl,
+      statusUrl: responseUrl + '/status',
+    };
+    const saved = serializeGeneratorFalQueueMetadata(id, urls);
+    assert.ok(saved);
+    assert.deepEqual(readGeneratorFalQueueMetadata(saved, id), urls);
+  }
+});
