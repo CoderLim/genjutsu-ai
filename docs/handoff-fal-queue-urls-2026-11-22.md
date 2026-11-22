@@ -41,13 +41,20 @@ Reconciliation uses this saved pair, not the current product model profile.
   for this exact task. An exception, including corrupt persisted metadata,
   counts toward the existing `query_review` policy rather than leaving
   the task in Processing. A lookup failure is *not* a reason to refund.
-- **Legacy compatibility only:** Old tasks without saved URLs continue
-  to use `falQueueQueryModel` (including the `bytedance/*` and nested
-  `/edit` special cases). On a 404/405 for the legacy long path, one
-  `owner/app` lookup is attempted. That is a best-effort historical
-  fallback, **not** the preferred URL for MiniMax or any new task. A
-  canonical saved URL is never replaced by a guessed fallback. No automatic
-  resubmission, credit debit, or refund occurs when polling.
+- **Compatibility only:** Tasks without saved URLs still start at
+  `falQueueQueryModel` (including the historic `bytedance/*` and `/edit`
+  rules). On a 404/405, a **bounded, model-agnostic** list of alternate
+  submitted-model prefixes is tried, including both two-segment → full
+  path (Seedance Mini) and full path → two-segment (MiniMax/Kling) recovery.
+  It never retries other errors and never sends a second POST. These paths
+  are strictly a fallback, **not** the canonical route for new jobs. A
+  saved canonical URL is never replaced by a guessed fallback.
+- A new Fal submission with missing/invalid `status_url` or `response_url`
+  now logs a server-side warning with request ID, endpoint, and the presence
+  of response fields, without dumping provider credentials or the full raw
+  response. Its `taskInfo` saves `falQueueUrlState: missing-at-submit` so
+  it is distinguishable from legacy null metadata. Recovery stays bounded;
+  no automatic refund or second generation is allowed.
 
 ## Operational recovery for prior query_review jobs
 
@@ -114,3 +121,79 @@ Source: https://fal.ai/docs/api-reference/inference-api/queue/submit-path
 and https://fal.ai/docs/api-reference/inference-api/queue/status
 
 No production deployment or data migration is performed by this patch.
+
+## Confirmed production incident: incompatible Cloudflare redirect mode
+
+The live D1 record for task `31cd04c8-86a4-4c7b-842a-603f307bc155`
+(model `bytedance/seedance-2.0/mini/text-to-video`) had a **saved**
+canonical `taskInfo.falQueue.statusUrl` under
+`https://queue.fal.run/bytedance/seedance-2.0/requests/...`.
+The `task_result` showed:
+
+```text
+providerStatus: QUERY_EXCEPTION
+queryMessage: Invalid redirect value, must be one of "follow" or "manual"
+("error" won't be implemented since it does not make sense at the edge ...)
+```
+
+This conclusively identifies the current incident as a **runtime compatibility
+bug in our Fal GET calls**, NOT Mini's missing `/mini` path. PR #38 had
+added `fetch(..., { redirect: 'error' })` while trying to prevent leaking a
+Fal API key across redirects. Cloudflare Workers implements only `follow`
+and `manual`: the former forwards sensitive headers to redirect targets,
+so **all three Fal query GET call sites now use `redirect: 'manual'`**.
+An HTTP 3xx response is treated as a blocked, permanent **lookup**
+error (`QUERY_PERMANENT_ERROR` or `RESULT_FETCH_PERMANENT_ERROR`) that
+the generator handles as `query-error` / `query_review`, NOT evidence of
+provider generation failure and NOT an automatic refund. Redirect target
+URLs are never fetched.
+
+Cloudflare reference:
+https://developers.cloudflare.com/workers/runtime-apis/request/
+
+The bidirectional legacy lookup fallback remains a **separate compatibility
+improvement** for records without saved canonical queue URLs; it **cannot**
+explain or repair the above task, because the canonical status URL was saved.
+
+After this change is deployed, admin may inspect the original Fal request,
+then use `resume-query` to restore the same paid task without resubmission
+or additional credit consumption. No recovery is performed automatically.
+The screenshot and D1 record do not establish that Fal finished generating
+or that R2 persistence has succeeded; both need verification.
+
+## Seedance 2.0 Mini query_review follow-up
+
+The original screenshot alone could not identify the root cause,
+but the subsequent D1 query **did**: canonical queue metadata was saved,
+and the Worker threw for an unsupported `redirect: 'error'` option before
+querying Fal. The remaining SQL below is still useful when investigating
+**other** `query_review` tasks.
+
+Read the D1 `ai_task` record before changing provider-specific routing:
+
+```sql
+SELECT id, status, model, task_id,
+       json_extract(task_info, '$.falQueue.statusUrl') AS status_url,
+       json_extract(task_info, '$.falQueue.responseUrl') AS response_url,
+       json_extract(task_info, '$.falQueueUrlState') AS url_state,
+       json_extract(task_result, '$.providerStatus') AS provider_status,
+       json_extract(task_result, '$.queryMessage') AS query_message,
+       json_extract(task_result, '$.queryFailureCount') AS failure_count
+FROM ai_task
+WHERE scene = 'generic-generator' AND id LIKE '31cd04c8%';
+```
+
+If `status_url` is present, code selects that URL directly,
+but edge/runtime configuration may still reject the fetch **before network
+I/O**, as this incident demonstrates. If `status_url` is missing, the
+bounded legacy fallback handles status 404/405 via alternate model paths.
+Do not infer a path mismatch from `query_review` alone.
+
+An existing `query_review` job will not restart on its own. After deploying
+the fix, an admin should verify the original Fal request and perform
+`resume-query` for that task, keeping the original request ID and credit
+reservation. **Never automatically retry generating or refund when upstream
+execution might have succeeded.**
+
+The fallback recovery unit tests are mocked, not proof of a real Mini result
+or real Cloudflare D1/R2 status reconciliation.

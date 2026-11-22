@@ -425,16 +425,21 @@ export async function generateWithGenerator(input: {
 
   let requestId: string | undefined;
   let falQueueUrls: FalQueueUrls | undefined;
+  let falQueueMetadataMissing = false;
   try {
     const started = await submitGeneratorProvider(sealedState, readUrls);
     requestId = started.requestId;
     falQueueUrls = 'falQueueUrls' in started ? started.falQueueUrls : undefined;
+    falQueueMetadataMissing =
+      'falQueueMetadataMissing' in started &&
+      started.falQueueMetadataMissing === true;
     if (!requestId) throw new Error('Provider returned no request ID');
     const updated = await markGeneratorSubmitted({
       generationId,
       userId: input.userId,
       requestId,
       falQueueUrls,
+      falQueueMetadataMissing,
     });
     if (!updated || updated.status !== 'submitted') {
       throw new Error('Unable to bind provider request ID');
@@ -450,6 +455,7 @@ export async function generateWithGenerator(input: {
           userId: input.userId,
           requestId,
           falQueueUrls,
+          falQueueMetadataMissing,
           message: 'Provider request needs reconciliation',
         });
       } catch (persistError) {

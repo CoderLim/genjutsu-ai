@@ -204,9 +204,10 @@ export async function claimGeneratorSubmission(input: {
 export async function markGeneratorSubmitted(input: {
   userId: string; generationId: string; requestId: string;
   falQueueUrls?: FalQueueUrls;
+  falQueueMetadataMissing?: boolean;
 }) {
   const taskInfo = serializeGeneratorFalQueueMetadata(
-    input.requestId, input.falQueueUrls
+    input.requestId, input.falQueueUrls, input.falQueueMetadataMissing
   );
   await db().update(aiTask).set({
     taskId: input.requestId,
@@ -223,9 +224,12 @@ export async function markGeneratorSubmitted(input: {
 export async function markGeneratorSubmissionUnknown(input: {
   userId: string; generationId: string; message: string; requestId?: string;
   falQueueUrls?: FalQueueUrls;
+  falQueueMetadataMissing?: boolean;
 }) {
   const taskInfo = input.requestId
-    ? serializeGeneratorFalQueueMetadata(input.requestId, input.falQueueUrls)
+    ? serializeGeneratorFalQueueMetadata(
+        input.requestId, input.falQueueUrls, input.falQueueMetadataMissing
+      )
     : null;
   await db().update(aiTask).set({
     status: 'submission_unknown',

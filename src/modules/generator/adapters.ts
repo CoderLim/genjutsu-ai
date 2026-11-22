@@ -584,7 +584,23 @@ export async function submitGeneratorProvider(
   // The submit response contains the canonical queue GET URLs, which may
   // differ from the POST endpoint's model/workflow path.
   const falQueueUrls = readFalQueueUrls(result.taskResult, result.taskId);
-  return { requestId: result.taskId, status: 'processing', falQueueUrls };
+  if (!falQueueUrls) {
+    // The queue response can omit nullable URLs or return a shape that our
+    // validator rejects. Make this degradation observable, not silent.
+    const response = result.taskResult;
+    const data = response && typeof response === 'object' && !Array.isArray(response)
+      ? response as Record<string, unknown> : {};
+    console.warn('[generator] Fal submitted without usable queue URLs', {
+      endpoint: identity.providerModelId,
+      requestId: result.taskId,
+      statusUrlProvided: typeof data.status_url === 'string',
+      responseUrlProvided: typeof data.response_url === 'string',
+    });
+  }
+  return {
+    requestId: result.taskId, status: 'processing', falQueueUrls,
+    falQueueMetadataMissing: !falQueueUrls,
+  };
 }
 
 export function classifyGeneratorSubmitError(

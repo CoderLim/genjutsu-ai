@@ -102,6 +102,32 @@ export function falQueueQueryModel(model?: string): string {
 }
 
 /**
+ * Recovery candidates for older submissions lacking authoritative queue URLs.
+ * Keep this model-agnostic: first the historical primary query path, then the
+ * complete submit endpoint, then shorter prefixes. Try an alternate only on
+ * 404/405 and never submit a second task.
+ *
+ * Bounded to at most five status GET paths. New tasks with saved Fal URLs
+ * bypass this entirely.
+ */
+export function falLegacyQueueCandidates(model?: string): string[] {
+  const primary = falQueueQueryModel(model);
+  const parts = (model ?? '').replace(/^\/+/, '').split('/').filter(Boolean);
+  if (!parts.length || parts.some(part =>
+    !/^[a-zA-Z0-9._~-]+$/.test(part) || part === '.' || part === '..'
+  )) return primary ? [primary] : [];
+  const possibilities = [
+    primary,
+    parts.join('/'),
+    parts.slice(0, 2).join('/'),
+    ...Array.from({ length: Math.max(0, parts.length - 3) }, (_, i) =>
+      parts.slice(0, parts.length - 1 - i).join('/')
+    ),
+  ];
+  return [...new Set(possibilities.filter(Boolean))].slice(0, 5);
+}
+
+/**
  * Fal configs
  * @docs https://fal.ai/
  */
@@ -226,32 +252,38 @@ export class FalProvider implements AIProvider {
     };
 
     let statusResp = await fetch(statusUrl, {
-      method: 'GET', headers, redirect: 'error',
+      method: 'GET', headers, redirect: 'manual',
     });
 
-    // Old tasks have no canonical URLs. If a long submit path is not a
-    // readable queue endpoint, try the standard owner/app GET once. This
-    // never submits another job and never affects new tasks with saved URLs.
+    // Only requests WITHOUT saved canonical URLs use bounded compatibility
+    // lookups. In particular, bytedance's historical two-segment route can
+    // 404 for Mini; the full /mini/text-to-video path must then be tried.
+    // A canonical 404 NEVER triggers a guessed fallback or resubmission.
     if (!verified && (statusResp.status === 404 || statusResp.status === 405)) {
-      const parts = (model ?? '').replace(/^\/+/, '').split('/');
-      const appPath = parts.slice(0, 2).join('/');
-      if (parts.length > 2 && appPath !== queryModel &&
-          /^[a-zA-Z0-9._-]+\/[a-zA-Z0-9._-]+$/.test(appPath)) {
-        const fallbackResult = `${this.baseUrl}/${appPath}/requests/${encodeURIComponent(taskId)}`;
+      for (const candidate of falLegacyQueueCandidates(model).slice(1)) {
+        const fallbackResult =
+          `${this.baseUrl}/${candidate}/requests/${encodeURIComponent(taskId)}`;
         const fallbackResp = await fetch(fallbackResult + '/status', {
-          method: 'GET', headers, redirect: 'error',
+          method: 'GET', headers, redirect: 'manual',
         });
+        statusResp = fallbackResp;
         if (fallbackResp.ok) {
-          statusResp = fallbackResp;
           resultUrl = fallbackResult;
+          break;
         }
+        if (fallbackResp.status !== 404 && fallbackResp.status !== 405) break;
       }
     }
 
     if (!statusResp.ok) {
-      const detail = await statusResp.text().catch(() => '');
-      const message =
-        detail || `request failed with status: ${statusResp.status}`;
+      // Workers does not implement redirect: 'error'. With 'manual' a 3xx
+      // is returned directly, without forwarding the Fal API key to Location.
+      const blockedRedirect = statusResp.status >= 300 && statusResp.status < 400;
+      const detail = blockedRedirect
+        ? '' : await statusResp.text().catch(() => '');
+      const message = blockedRedirect
+        ? `Fal queue status returned HTTP ${statusResp.status} redirect (not followed)`
+        : detail || `request failed with status: ${statusResp.status}`;
       // 429/5xx (and 408): retryable. 4xx like 401/403/404: permanent lookup
       // failure — callers must not keep polling forever or auto-refund.
       const transient = isTransientFalHttpStatus(statusResp.status);
@@ -289,13 +321,16 @@ export class FalProvider implements AIProvider {
     }
 
     const resultResp = await fetch(resultUrl, {
-      method: 'GET', headers, redirect: 'error',
+      method: 'GET', headers, redirect: 'manual',
     });
 
     if (!resultResp.ok) {
-      const detail = await resultResp.text().catch(() => '');
-      const message =
-        detail || `request failed with status: ${resultResp.status}`;
+      const blockedRedirect = resultResp.status >= 300 && resultResp.status < 400;
+      const detail = blockedRedirect
+        ? '' : await resultResp.text().catch(() => '');
+      const message = blockedRedirect
+        ? `Fal queue result returned HTTP ${resultResp.status} redirect (not followed)`
+        : detail || `request failed with status: ${resultResp.status}`;
       const transient = isTransientFalHttpStatus(resultResp.status);
       return {
         taskId,
