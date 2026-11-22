@@ -132,16 +132,6 @@ async function fetchRange(url: string, range: string) {
   };
 }
 
-function durationFromBytesOrThrow(bytes: Uint8Array) {
-  const seconds = parseIsoBmffDurationSeconds(bytes);
-  if (seconds == null) {
-    throw new Error(
-      'Could not read the source video duration. Seedance currently requires MP4 or MOV input with readable metadata.'
-    );
-  }
-  return assertSeedanceSourceDurationSeconds(seconds);
-}
-
 export async function probeSeedanceSourceDurationSeconds(videoUrl: string) {
   // E2E mock stores uploads in process memory. Self-fetching the public
   // localhost URL often fails Range (non-206), so read bytes directly.
