@@ -252,7 +252,7 @@ export class FalProvider implements AIProvider {
     };
 
     let statusResp = await fetch(statusUrl, {
-      method: 'GET', headers, redirect: 'error',
+      method: 'GET', headers, redirect: 'manual',
     });
 
     // Only requests WITHOUT saved canonical URLs use bounded compatibility
@@ -264,7 +264,7 @@ export class FalProvider implements AIProvider {
         const fallbackResult =
           `${this.baseUrl}/${candidate}/requests/${encodeURIComponent(taskId)}`;
         const fallbackResp = await fetch(fallbackResult + '/status', {
-          method: 'GET', headers, redirect: 'error',
+          method: 'GET', headers, redirect: 'manual',
         });
         statusResp = fallbackResp;
         if (fallbackResp.ok) {
@@ -276,9 +276,14 @@ export class FalProvider implements AIProvider {
     }
 
     if (!statusResp.ok) {
-      const detail = await statusResp.text().catch(() => '');
-      const message =
-        detail || `request failed with status: ${statusResp.status}`;
+      // Workers does not implement redirect: 'error'. With 'manual' a 3xx
+      // is returned directly, without forwarding the Fal API key to Location.
+      const blockedRedirect = statusResp.status >= 300 && statusResp.status < 400;
+      const detail = blockedRedirect
+        ? '' : await statusResp.text().catch(() => '');
+      const message = blockedRedirect
+        ? `Fal queue status returned HTTP ${statusResp.status} redirect (not followed)`
+        : detail || `request failed with status: ${statusResp.status}`;
       // 429/5xx (and 408): retryable. 4xx like 401/403/404: permanent lookup
       // failure — callers must not keep polling forever or auto-refund.
       const transient = isTransientFalHttpStatus(statusResp.status);
@@ -316,13 +321,16 @@ export class FalProvider implements AIProvider {
     }
 
     const resultResp = await fetch(resultUrl, {
-      method: 'GET', headers, redirect: 'error',
+      method: 'GET', headers, redirect: 'manual',
     });
 
     if (!resultResp.ok) {
-      const detail = await resultResp.text().catch(() => '');
-      const message =
-        detail || `request failed with status: ${resultResp.status}`;
+      const blockedRedirect = resultResp.status >= 300 && resultResp.status < 400;
+      const detail = blockedRedirect
+        ? '' : await resultResp.text().catch(() => '');
+      const message = blockedRedirect
+        ? `Fal queue result returned HTTP ${resultResp.status} redirect (not followed)`
+        : detail || `request failed with status: ${resultResp.status}`;
       const transient = isTransientFalHttpStatus(resultResp.status);
       return {
         taskId,
