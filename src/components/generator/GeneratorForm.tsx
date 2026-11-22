@@ -7,9 +7,7 @@ import {
   Download,
   Image as ImageIcon,
   LoaderCircle,
-  X,
 } from 'lucide-react';
-import { createPortal } from 'react-dom';
 
 import { useSession } from '@/core/auth/client';
 import { listGeneratorModels } from '@/modules/generator/catalog';
@@ -186,75 +184,6 @@ function mediaDurationFromBlobUrl(
   });
 }
 
-function ResultLightbox({
-  url,
-  mediaType,
-  onClose,
-}: {
-  url: string;
-  mediaType: MediaType;
-  onClose: () => void;
-}) {
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKey);
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      window.removeEventListener('keydown', onKey);
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [onClose]);
-
-  if (typeof document === 'undefined') return null;
-
-  return createPortal(
-    <div
-      className="fixed inset-0 z-[400] flex items-center justify-center p-4 sm:p-8"
-      role="dialog"
-      aria-modal="true"
-      aria-label={
-        mediaType === 'video' ? 'Fullscreen video' : 'Fullscreen image'
-      }
-    >
-      <button
-        type="button"
-        aria-label="Close fullscreen preview"
-        className="absolute inset-0 cursor-pointer bg-black/80 backdrop-blur-sm"
-        onClick={onClose}
-      />
-      <div className="relative z-10 flex max-h-[92vh] max-w-[min(96vw,1100px)] items-center justify-center">
-        <button
-          type="button"
-          aria-label="Close"
-          onClick={onClose}
-          className="absolute -top-3 -right-3 z-20 flex size-8 cursor-pointer items-center justify-center rounded-full border border-white/15 bg-[rgba(41,30,23,0.95)] text-[rgb(237,234,222)] shadow-lg hover:bg-[rgba(60,44,34,0.98)]"
-        >
-          <X className="size-4" />
-        </button>
-        {mediaType === 'video' ? (
-          <video
-            src={url}
-            controls
-            autoPlay
-            playsInline
-            className="max-h-[92vh] w-auto max-w-full rounded-xl bg-black object-contain shadow-2xl"
-          />
-        ) : (
-          <img
-            src={url}
-            alt="Generated result"
-            className="max-h-[92vh] w-auto max-w-full rounded-xl object-contain shadow-2xl"
-          />
-        )}
-      </div>
-    </div>,
-    document.body
-  );
-}
-
 export function GeneratorForm({
   mediaType: initialMediaType,
   initialModelId,
@@ -307,7 +236,6 @@ export function GeneratorForm({
   const mediaReadLock = useRef(false);
   const mediaDurations = useRef(new Map<string, number>());
   const [job, setJob] = useState<JobInfo | null>(null);
-  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [priceChange, setPriceChange] = useState<PriceChange | null>(null);
   const [retryAttempt, setRetryAttempt] = useState<PriceChange | null>(null);
   // Synchronous guard; React busy state alone may not block same-tick clicks.
@@ -1306,8 +1234,8 @@ export function GeneratorForm({
                 <LoaderCircle className="size-4 animate-spin" />
                 {job.taskStatus === 'completing' && job.error
                   ? 'Your generation is ready. Retrying result storage...'
-                  : `Generating and saving your ${job.mediaType}...`}
-                {' '}You can also follow it in My Creations.
+                  : `Generating and saving your ${job.mediaType}...`}{' '}
+                You can also follow it in My Creations.
               </p>
               {job.error ? (
                 <p role="status" className="text-sm text-amber-800">
@@ -1333,23 +1261,14 @@ export function GeneratorForm({
                     key={url}
                     className="overflow-hidden rounded-xl border border-[rgba(20,17,18,0.086)]"
                   >
-                    <button
-                      type="button"
-                      onClick={() => setLightboxUrl(url)}
-                      aria-label={
-                        job.mediaType === 'video'
-                          ? 'View video fullscreen'
-                          : 'View image fullscreen'
-                      }
-                      className="flex max-h-[min(70vh,560px)] w-full cursor-zoom-in items-center justify-center bg-[rgba(20,17,18,0.04)]"
-                    >
+                    <div className="flex max-h-[min(70vh,560px)] w-full items-center justify-center bg-[rgba(20,17,18,0.04)]">
                       {job.mediaType === 'video' ? (
                         <video
+                          controls
                           playsInline
-                          muted
                           preload="metadata"
                           src={url}
-                          className="pointer-events-none mx-auto h-auto max-h-[min(70vh,560px)] w-auto max-w-full bg-black"
+                          className="mx-auto h-auto max-h-[min(70vh,560px)] w-auto max-w-full bg-black"
                         />
                       ) : (
                         <img
@@ -1358,7 +1277,7 @@ export function GeneratorForm({
                           className="mx-auto h-auto max-h-[min(70vh,560px)] w-auto max-w-full"
                         />
                       )}
-                    </button>
+                    </div>
                     <a
                       href={
                         url + (url.includes('?') ? '&' : '?') + 'download=1'
@@ -1370,13 +1289,6 @@ export function GeneratorForm({
                   </div>
                 ))}
               </div>
-              {lightboxUrl && job ? (
-                <ResultLightbox
-                  url={lightboxUrl}
-                  mediaType={job.mediaType}
-                  onClose={() => setLightboxUrl(null)}
-                />
-              ) : null}
             </div>
           ) : (
             <p
@@ -1392,9 +1304,9 @@ export function GeneratorForm({
                   ? 'Your generation completed, but we could not save the result. Support review is required; credits remain reserved.'
                   : job.taskStatus === 'query_review'
                     ? 'We could not verify the provider result. Support will review this task; credits are still reserved.'
-                  : job.pollable
-                    ? 'Checking the existing generation. Do not start another task.'
-                    : 'Submission needs support review. Do not start a new generation for this request.'
+                    : job.pollable
+                      ? 'Checking the existing generation. Do not start another task.'
+                      : 'Submission needs support review. Do not start a new generation for this request.'
                 : 'Generation failed. Reserved credits were returned.'}
               {job.error ? (
                 <span className="mt-1 block font-normal text-[rgba(18,15,16,0.72)]">
