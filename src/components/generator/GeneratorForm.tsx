@@ -280,7 +280,7 @@ export function GeneratorForm({
           item.id ===
           (initialMediaType === 'image'
             ? 'nano-banana-2'
-            : 'photo-to-video-standard')
+            : 'seedance-2.5-flash')
       ) ??
       allModels.find((item) => item.mediaType === initialMediaType),
     [allModels, initialMediaType, initialModelId]
@@ -1051,7 +1051,7 @@ export function GeneratorForm({
                             item.id ===
                             (type === 'image'
                               ? 'nano-banana-2'
-                              : 'photo-to-video-standard')
+                              : 'seedance-2.5-flash')
                         ) ?? allModels.find((item) => item.mediaType === type);
                       if (next) setModel(next.id);
                     }}
@@ -1270,22 +1270,24 @@ export function GeneratorForm({
       </section>
 
       {job ? (
-        <div className="mt-5 space-y-4 rounded-[18px] border border-[rgba(20,17,18,0.086)] bg-white p-4 shadow-[0_12px_32px_-16px_rgba(24,14,16,0.08)] sm:p-5">
+        <div className="mt-5 space-y-4 rounded-[18px] border border-[rgba(20,17,18,0.086)] bg-white p-4 text-[rgb(18,15,16)] shadow-[0_12px_32px_-16px_rgba(24,14,16,0.08)] sm:p-5">
           <div className="flex items-center justify-between gap-3">
-            <h2 className="font-semibold">Latest generation</h2>
+            <h2 className="font-semibold text-[rgb(18,15,16)]">
+              Latest generation
+            </h2>
             <span className="text-xs text-[rgba(18,15,16,0.45)]">
               {job.generationId.slice(0, 8)}
             </span>
           </div>
           {job.status === 'processing' ? (
-            <p className="flex items-center gap-2 text-sm text-[rgba(18,15,16,0.55)]">
+            <p className="flex items-center gap-2 text-sm text-[rgba(18,15,16,0.7)]">
               <LoaderCircle className="size-4 animate-spin" />
               Generating and saving your {job.mediaType}... You can also follow
               it in My Creations.
             </p>
           ) : job.status === 'completed' ? (
             <div className="space-y-3">
-              <p className="flex items-center gap-2 text-sm">
+              <p className="flex items-center gap-2 text-sm text-[rgb(18,15,16)]">
                 <CheckCircle2 className="size-4 text-green-600" /> Generation
                 completed
               </p>
@@ -1347,7 +1349,14 @@ export function GeneratorForm({
               ) : null}
             </div>
           ) : (
-            <p role="alert" className="text-sm">
+            <p
+              role="alert"
+              className={
+                job.status === 'review'
+                  ? 'text-sm font-medium text-[rgb(18,15,16)]'
+                  : 'text-sm font-medium text-red-700'
+              }
+            >
               {job.status === 'review'
                 ? job.taskStatus === 'query_review'
                   ? 'We could not verify the provider result. Support will review this task; credits are still reserved.'
@@ -1355,7 +1364,11 @@ export function GeneratorForm({
                     ? 'Checking the existing generation. Do not start another task.'
                     : 'Submission needs support review. Do not start a new generation for this request.'
                 : 'Generation failed. Reserved credits were returned.'}
-              {job.error ? ' ' + job.error : ''}
+              {job.error ? (
+                <span className="mt-1 block font-normal text-[rgba(18,15,16,0.72)]">
+                  {job.error}
+                </span>
+              ) : null}
             </p>
           )}
           <a

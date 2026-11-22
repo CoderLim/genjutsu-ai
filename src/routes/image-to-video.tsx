@@ -150,7 +150,7 @@ function ImageToVideoPage() {
             <div id="generator" className="mt-8 scroll-mt-24 sm:mt-10">
               <GeneratorForm
                 mediaType="video"
-                initialModelId="photo-to-video-standard"
+                initialModelId="seedance-2.5-flash"
               />
             </div>
           </div>
