@@ -207,9 +207,8 @@ export async function markGeneratorSubmitted(input: {
   falQueueMetadataMissing?: boolean;
 }) {
   const taskInfo = serializeGeneratorFalQueueMetadata(
-    input.requestId, input.falQueueUrls
-  ) ?? (input.falQueueMetadataMissing
-    ? JSON.stringify({ falQueueUrlState: 'missing-at-submit' }) : null);
+    input.requestId, input.falQueueUrls, input.falQueueMetadataMissing
+  );
   await db().update(aiTask).set({
     taskId: input.requestId,
     taskInfo,
@@ -228,9 +227,9 @@ export async function markGeneratorSubmissionUnknown(input: {
   falQueueMetadataMissing?: boolean;
 }) {
   const taskInfo = input.requestId
-    ? (serializeGeneratorFalQueueMetadata(input.requestId, input.falQueueUrls)
-      ?? (input.falQueueMetadataMissing
-        ? JSON.stringify({ falQueueUrlState: 'missing-at-submit' }) : null))
+    ? serializeGeneratorFalQueueMetadata(
+        input.requestId, input.falQueueUrls, input.falQueueMetadataMissing
+      )
     : null;
   await db().update(aiTask).set({
     status: 'submission_unknown',
