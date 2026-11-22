@@ -248,9 +248,9 @@ test('legacy long-path 404 retries the owner/app queue GET once without a second
   }
 });
 
-test('canonical queue URLs never trigger legacy fallbacks even on 404', async () => {
+test('canonical multi-segment queue URLs never trigger legacy fallbacks even on 404', async () => {
   const id = 'new-request-id';
-  const resultUrl = 'https://queue.fal.run/minimax/h3-max-turbo/requests/' + id;
+  const resultUrl = 'https://queue.fal.run/minimax/h3-max-turbo/text-to-video/requests/' + id;
   const urls = {statusUrl: resultUrl + '/status', responseUrl: resultUrl};
   const called: string[] = [];
   const original = globalThis.fetch;
