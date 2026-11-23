@@ -60,7 +60,6 @@ export const envConfigs: Record<string, string> = {
   waffo_merchant_id: procEnv.WAFFO_MERCHANT_ID ?? '',
   waffo_private_key: procEnv.WAFFO_PRIVATE_KEY ?? '',
   waffo_store_id: procEnv.WAFFO_STORE_ID ?? '',
-  waffo_environment: procEnv.WAFFO_ENVIRONMENT ?? 'test',
   waffo_product_ids_mapping: procEnv.WAFFO_PRODUCT_IDS_MAPPING ?? '',
   default_payment_provider: procEnv.DEFAULT_PAYMENT_PROVIDER ?? '',
 

@@ -79,6 +79,8 @@ const PROTECTED_CONFIG_KEYS: ReadonlySet<string> = new Set([
   'db_schema',
   'db_singleton_enabled',
   'db_max_connections',
+  // Legacy Waffo environment rows are inert and hidden from admin editing.
+  'waffo_environment',
 ]);
 
 /**

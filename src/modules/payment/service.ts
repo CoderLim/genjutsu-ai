@@ -1,6 +1,7 @@
 import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 
 import { envConfigs } from '@/config';
+import { assertWaffoMode, getWaffoEnvironment } from '@/core/payment/waffo-environment';
 
 import { db } from '@/core/db';
 import {
@@ -63,7 +64,7 @@ async function getPaymentManager(): Promise<PaymentManager> {
     c('waffo_enabled'),
     c('waffo_merchant_id'),
     c('waffo_private_key'),
-    c('waffo_environment'),
+    getWaffoEnvironment(),
     c('waffo_store_id'),
     c('waffo_product_ids_mapping'),
     c('alipay_app_id'),
@@ -117,7 +118,7 @@ async function getPaymentManager(): Promise<PaymentManager> {
         merchantId: c('waffo_merchant_id'),
         privateKey: c('waffo_private_key'),
         storeId: c('waffo_store_id') || undefined,
-        environment: c('waffo_environment') === 'prod' ? 'prod' : 'test',
+        environment: getWaffoEnvironment(),
       }),
       isDefault
     );
@@ -286,6 +287,16 @@ export async function handlePaymentCallback(orderNo: string) {
     return;
   }
 
+  // Waffo GraphQL order lookups have no verified payment mode today.
+  // Production fulfillment requires a signed production webhook.
+  // Only localhost keeps the lookup fallback for testing.
+  if (
+    existingOrder.paymentProvider === 'waffo' &&
+    getWaffoEnvironment() === 'prod'
+  ) {
+    return;
+  }
+
   // Query the payment provider for latest status
   const pm = await getPaymentManager();
   const provider = pm.getProvider(existingOrder.paymentProvider);
@@ -298,7 +309,7 @@ export async function handlePaymentCallback(orderNo: string) {
   // Reuse the same atomic success handler as the webhook so that
   // subscriptions are created and credits granted on synchronous return too.
   // This is important in environments where webhooks aren't reachable (e.g. localhost).
-  await handleCheckoutSuccess(session, existingOrder.paymentProvider);
+  await handleCheckoutSuccess(session, existingOrder.paymentProvider, 'callback');
 }
 
 // --- Webhook handling ---
@@ -319,7 +330,7 @@ export async function handleWebhook(params: {
 
   // Route event to appropriate handler
   if (eventType === 'checkout.success') {
-    await handleCheckoutSuccess(session, params.provider);
+    await handleCheckoutSuccess(session, params.provider, 'webhook');
   } else if (eventType === 'payment.success') {
     if (
       session.paymentInfo?.subscriptionCycleType ===
@@ -327,7 +338,7 @@ export async function handleWebhook(params: {
     ) {
       await handleSubscriptionRenewal(session, params.provider);
     } else {
-      await handleCheckoutSuccess(session, params.provider);
+      await handleCheckoutSuccess(session, params.provider, 'webhook');
     }
   } else if (eventType === 'subscribe.updated') {
     await handleSubscriptionUpdated(session, params.provider);
@@ -340,7 +351,11 @@ export async function handleWebhook(params: {
 
 // --- Checkout Success: update order + create subscription + grant credits ---
 
-async function handleCheckoutSuccess(session: any, provider: string) {
+async function handleCheckoutSuccess(
+  session: any,
+  provider: string,
+  source: 'callback' | 'webhook'
+) {
   // Different providers expose the session identifier under different keys.
   // We try the common shapes; for Alipay the natural key is out_trade_no
   // (which equals our orderNo and the value we stored in paymentSessionId).
@@ -391,15 +406,21 @@ async function handleCheckoutSuccess(session: any, provider: string) {
     // mapping is still required. Check the actual paid amount and currency
     // against that immutable order snapshot before granting credits.
     if (provider === 'waffo') {
-      const configs = await getAllConfigs();
       const waffoMode =
         session.metadata?.waffoMode ||
         session.paymentResult?.mode ||
         session.paymentResult?.waffoMode;
-      if (configs.waffo_environment === 'prod' && waffoMode === 'test') {
-        throw new Error(
-          `Rejecting Waffo test_mode settlement in production for order ${existingOrder.orderNo}`
-        );
+      const expectedMode = getWaffoEnvironment();
+      // Only a localhost callback with an authenticated provider lookup can
+      // omit mode. Signed webhooks and all production settlements must match.
+      if (
+        !(
+          source === 'callback' &&
+          expectedMode === 'test' &&
+          waffoMode === undefined
+        )
+      ) {
+        assertWaffoMode(waffoMode, expectedMode);
       }
 
       const expectedAmount = existingOrder.amount || 0;

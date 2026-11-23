@@ -530,19 +530,6 @@ export function getSettings(): Setting[] {
       tab: 'payment',
     },
     {
-      name: 'waffo_environment',
-      title: 'Environment',
-      type: 'select',
-      options: [
-        { label: 'Test', value: 'test' },
-        { label: 'Production', value: 'prod' },
-      ],
-      group: 'waffo',
-      tab: 'payment',
-      defaultValue: 'test',
-      tip: 'Must be Production when charging real money. Pair with a Production API Key — Test keys always create test_mode checkouts even if this is set to Production.',
-    },
-    {
       name: 'waffo_merchant_id',
       title: 'Merchant ID',
       type: 'text',
@@ -556,7 +543,7 @@ export function getSettings(): Setting[] {
       title: 'Private Key',
       type: 'password',
       placeholder: 'RSA private key (PEM or base64)',
-      tip: 'Must be the Production (Live) RSA private key when Environment is Production. A Test key always creates test_mode checkouts — users will not be charged.',
+      tip: 'Use a Test private key only for localhost development. All deployed environments require a Production (Live) private key.',
       group: 'waffo',
       tab: 'payment',
     },
