@@ -31,6 +31,10 @@ import {
   type UpdateSubscription,
 } from '@/modules/subscriptions/service';
 import { getSnowId, getUniSeq, getUuid } from '@/lib/hash';
+import {
+  fulfillCheckoutAtomically,
+  isCheckoutSettled,
+} from './checkout-fulfillment';
 
 // --- Order types ---
 
@@ -268,7 +272,18 @@ export async function handlePaymentCallback(orderNo: string) {
     .limit(1);
 
   if (!existingOrder) return;
-  if (existingOrder.status === OrderStatus.PAID) return;
+  if (existingOrder.status === OrderStatus.PAID) {
+    // A redirect must not hide a PAID order with a missing credit grant.
+    if (!(await isCheckoutSettled(
+      db(),
+      { order, credit, subscription },
+      existingOrder,
+      existingOrder.paymentType === 'subscription'
+    ))) {
+      throw new Error(`Order ${existingOrder.orderNo} is no longer paid`);
+    }
+    return;
+  }
 
   // Query the payment provider for latest status
   const pm = await getPaymentManager();
@@ -324,57 +339,6 @@ export async function handleWebhook(params: {
 
 // --- Checkout Success: update order + create subscription + grant credits ---
 
-
-/**
- * A repeated delivery is successful only when the committed order and grant
- * agree. Historic grants have no fulfillment_key, so check by order_no too.
- * Never treat an arbitrary UNIQUE violation as a successful payment.
- */
-async function isCheckoutSettled(
-  checkoutOrder: {
-    id: string;
-    orderNo: string;
-    creditsAmount: number | null;
-  },
-  expectsSubscription: boolean
-): Promise<boolean> {
-  const [paidOrder] = await db()
-    .select({ status: order.status, subscriptionNo: order.subscriptionNo })
-    .from(order)
-    .where(eq(order.id, checkoutOrder.id))
-    .limit(1);
-
-  if (!paidOrder || paidOrder.status !== OrderStatus.PAID) return false;
-
-  if (expectsSubscription && !paidOrder.subscriptionNo) {
-    throw new Error(
-      `Paid order ${checkoutOrder.orderNo} is missing its subscription`
-    );
-  }
-
-  if (checkoutOrder.creditsAmount && checkoutOrder.creditsAmount > 0) {
-    const [grant] = await db()
-      .select({ credits: credit.credits })
-      .from(credit)
-      .where(
-        and(
-          eq(credit.orderNo, checkoutOrder.orderNo),
-          eq(credit.transactionType, 'grant'),
-          inArray(credit.transactionScene, ['payment', 'subscription'])
-        )
-      )
-      .limit(1);
-
-    if (!grant || grant.credits !== checkoutOrder.creditsAmount) {
-      throw new Error(
-        `Paid order ${checkoutOrder.orderNo} is missing its expected credit grant`
-      );
-    }
-  }
-
-  return true;
-}
-
 async function handleCheckoutSuccess(session: any, provider: string) {
   // Different providers expose the session identifier under different keys.
   // We try the common shapes; for Alipay the natural key is out_trade_no
@@ -399,15 +363,23 @@ async function handleCheckoutSuccess(session: any, provider: string) {
 
   // A paid order is only considered settled if its side effects exist.
   if (existingOrder.status === OrderStatus.PAID) {
-    await isCheckoutSettled(
+    if (!(await isCheckoutSettled(
+      db(),
+      { order, credit, subscription },
       existingOrder,
-      Boolean(session.subscriptionInfo && session.subscriptionId)
-    );
+      existingOrder.paymentType === 'subscription'
+    ))) {
+      throw new Error(`Order ${existingOrder.orderNo} is no longer paid`);
+    }
     return;
   }
+  // A provider-confirmed late SUCCESS is authoritative over a prior failure
+  // notification. CANCELED notifications use the same FAILED storage status.
   if (
     existingOrder.status !== OrderStatus.CREATED &&
-    existingOrder.status !== OrderStatus.PENDING
+    existingOrder.status !== OrderStatus.PENDING &&
+    !(existingOrder.status === OrderStatus.FAILED &&
+      session.paymentStatus === PaymentStatus.SUCCESS)
   )
     return;
 
@@ -536,40 +508,16 @@ async function handleCheckoutSuccess(session: any, provider: string) {
       };
     }
 
-    const dbInstance = db();
-    // The payment provider has confirmed SUCCESS. A prior FAILED delivery
-    // must not leave an atomically granted checkout in status=failed.
-    // Unique fulfillment keys, not the status check, gate concurrent grants.
-    const settledOrderFilter = eq(order.id, existingOrder.id);
-
-    try {
-      if (envConfigs.database_provider === 'd1') {
-        // D1 batch is atomic: a duplicate key or any failed INSERT rolls back
-        // subscription creation, credit grant AND order status update together.
-        const statements: any[] = [];
-        if (newSub) statements.push(dbInstance.insert(subscription).values(newSub));
-        if (newGrant) statements.push(dbInstance.insert(credit).values(newGrant));
-        statements.push(
-          dbInstance.update(order).set(orderUpdate).where(settledOrderFilter)
-        );
-        await dbInstance.batch(statements);
-      } else {
-        // Real Drizzle transactions are supported by postgres/mysql/libsql.
-        await dbInstance.transaction(async (tx: any) => {
-          if (newSub) await tx.insert(subscription).values(newSub);
-          if (newGrant) await tx.insert(credit).values(newGrant);
-          await tx
-            .update(order)
-            .set(orderUpdate)
-            .where(settledOrderFilter);
-        });
-      }
-    } catch (error) {
-      // A competing delivery may have committed first. Only accept this as
-      // idempotent success after verifying the completed order and grant.
-      if (await isCheckoutSettled(existingOrder, Boolean(newSub))) return;
-      throw error;
-    }
+    await fulfillCheckoutAtomically({
+      dbInstance: db(),
+      databaseProvider: envConfigs.database_provider,
+      tables: { order, credit, subscription },
+      checkoutOrder: existingOrder,
+      expectsSubscription: existingOrder.paymentType === 'subscription',
+      newSubscription: newSub,
+      newGrant,
+      orderUpdate,
+    });
   } else if (
     session.paymentStatus === PaymentStatus.FAILED ||
     session.paymentStatus === PaymentStatus.CANCELED
