@@ -32,6 +32,7 @@ import {
 } from '@/modules/subscriptions/service';
 import { getSnowId, getUniSeq, getUuid } from '@/lib/hash';
 import {
+  canProcessCheckoutStatus,
   fulfillCheckoutAtomically,
   isCheckoutSettled,
 } from './checkout-fulfillment';
@@ -376,12 +377,11 @@ async function handleCheckoutSuccess(session: any, provider: string) {
   // A provider-confirmed late SUCCESS is authoritative over a prior failure
   // notification. CANCELED notifications use the same FAILED storage status.
   if (
-    existingOrder.status !== OrderStatus.CREATED &&
-    existingOrder.status !== OrderStatus.PENDING &&
-    !(existingOrder.status === OrderStatus.FAILED &&
-      session.paymentStatus === PaymentStatus.SUCCESS)
-  )
-    return;
+    !canProcessCheckoutStatus(
+      existingOrder.status,
+      session.paymentStatus === PaymentStatus.SUCCESS
+    )
+  ) return;
 
   const paymentInfo = session.paymentInfo;
   const subscriptionInfo = session.subscriptionInfo;

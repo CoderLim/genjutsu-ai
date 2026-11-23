@@ -41,7 +41,7 @@ jobs:
           status=$?
           set -e
           if [ "$status" -eq 0 ]; then exit 0; fi
-          changed="$(grep -E '^src/(modules/payment/(service|checkout-fulfillment|checkout-fulfillment\.service|fulfillment-idempotency\.test)\.ts|config/db/schema\.(sqlite|postgres|mysql)\.ts)' tsc-report.txt || true)"
+          changed="$(grep -E '^src/(modules/payment/(service|checkout-fulfillment|checkout-fulfillment\.service\.test|fulfillment-idempotency\.test)\.ts|config/db/schema\.(sqlite|postgres|mysql)\.ts)' tsc-report.txt || true)"
           if [ -n "$changed" ]; then
             echo "$changed"
             exit 1

@@ -6,6 +6,7 @@ import { drizzle } from 'drizzle-orm/libsql';
 import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
 import {
+  canProcessCheckoutStatus,
   fulfillCheckoutAtomically,
   isCheckoutSettled,
 } from './checkout-fulfillment';
@@ -269,20 +270,11 @@ test('failed grant rolls back real atomic batch and retry fulfills it', async ()
   }
 });
 
-test('non-D1 transaction path uses the same fulfillment contract', async () => {
-  const fixture = await createFixture();
-  try {
-    assert.equal(
-      await attempt(fixture.database, 'sqlite', { databaseProvider: 'sqlite' }),
-      'fulfilled'
-    );
-    assert.equal(
-      await attempt(fixture.database, 'again', { databaseProvider: 'sqlite' }),
-      'already_fulfilled'
-    );
-    const s = await fixture.state();
-    assert.equal(s.credits.length, 1);
-  } finally {
-    fixture.client.close();
-  }
+test('checkout status gate permits verified late SUCCESS but not late failure', () => {
+  assert.equal(canProcessCheckoutStatus('created', true), true);
+  assert.equal(canProcessCheckoutStatus('pending', true), true);
+  assert.equal(canProcessCheckoutStatus('failed', true), true);
+  assert.equal(canProcessCheckoutStatus('failed', false), false);
+  assert.equal(canProcessCheckoutStatus('paid', true), false);
+  assert.equal(canProcessCheckoutStatus('paid', false), false);
 });

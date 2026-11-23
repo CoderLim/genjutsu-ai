@@ -17,6 +17,21 @@ export type CheckoutOrder = {
   creditsAmount: number | null;
 };
 
+/**
+ * Gate the initial checkout by order status.
+ * Verified late SUCCESS may recover a previously failed/canceled checkout.
+ */
+export function canProcessCheckoutStatus(
+  orderStatus: string,
+  isVerifiedSuccess: boolean
+): boolean {
+  return (
+    orderStatus === 'created' ||
+    orderStatus === 'pending' ||
+    (orderStatus === 'failed' && isVerifiedSuccess)
+  );
+}
+
 export async function isCheckoutSettled(
   dbInstance: any,
   tables: CheckoutTables,
