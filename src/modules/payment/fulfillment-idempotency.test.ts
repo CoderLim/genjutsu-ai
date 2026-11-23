@@ -45,8 +45,8 @@ function checkoutBatch(
     });
   }
   statements.push({
-    sql: 'UPDATE "order" SET status = ? WHERE id = ? AND status IN (?, ?)',
-    args: ['paid', 'order-1', 'created', 'pending'],
+    sql: 'UPDATE "order" SET status = ? WHERE id = ?',
+    args: ['paid', 'order-1'],
   });
   return statements;
 }
@@ -117,6 +117,20 @@ test('a failed grant rolls back the whole batch including subscription', async (
     await client.batch(checkoutBatch('retry', { withSubscription: true }), 'write');
     const grants = await client.execute('SELECT COUNT(*) AS n FROM credit');
     assert.equal(Number(grants.rows[0].n), 1);
+  } finally {
+    client.close();
+  }
+});
+
+test('verified payment success settles an earlier failed notification', async () => {
+  const client = await createLedger();
+  try {
+    await client.execute(`UPDATE "order" SET status = 'failed' WHERE id = 'order-1'`);
+    await client.batch(checkoutBatch('late-success'), 'write');
+    const order = await client.execute('SELECT status FROM "order"');
+    const grant = await client.execute('SELECT COUNT(*) AS n FROM credit');
+    assert.equal(order.rows[0].status, 'paid');
+    assert.equal(Number(grant.rows[0].n), 1);
   } finally {
     client.close();
   }

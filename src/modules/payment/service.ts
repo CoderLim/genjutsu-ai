@@ -537,10 +537,10 @@ async function handleCheckoutSuccess(session: any, provider: string) {
     }
 
     const dbInstance = db();
-    const pendingOrderFilter = and(
-      eq(order.id, existingOrder.id),
-      inArray(order.status, [OrderStatus.CREATED, OrderStatus.PENDING])
-    );
+    // The payment provider has confirmed SUCCESS. A prior FAILED delivery
+    // must not leave an atomically granted checkout in status=failed.
+    // Unique fulfillment keys, not the status check, gate concurrent grants.
+    const settledOrderFilter = eq(order.id, existingOrder.id);
 
     try {
       if (envConfigs.database_provider === 'd1') {
@@ -550,7 +550,7 @@ async function handleCheckoutSuccess(session: any, provider: string) {
         if (newSub) statements.push(dbInstance.insert(subscription).values(newSub));
         if (newGrant) statements.push(dbInstance.insert(credit).values(newGrant));
         statements.push(
-          dbInstance.update(order).set(orderUpdate).where(pendingOrderFilter)
+          dbInstance.update(order).set(orderUpdate).where(settledOrderFilter)
         );
         await dbInstance.batch(statements);
       } else {
@@ -561,7 +561,7 @@ async function handleCheckoutSuccess(session: any, provider: string) {
           await tx
             .update(order)
             .set(orderUpdate)
-            .where(pendingOrderFilter);
+            .where(settledOrderFilter);
         });
       }
     } catch (error) {
