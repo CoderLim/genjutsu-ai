@@ -1,4 +1,6 @@
-import { and, desc, eq, isNull } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
+
+import { envConfigs } from '@/config';
 
 import { db } from '@/core/db';
 import {
@@ -29,6 +31,11 @@ import {
   type UpdateSubscription,
 } from '@/modules/subscriptions/service';
 import { getSnowId, getUniSeq, getUuid } from '@/lib/hash';
+import {
+  canProcessCheckoutStatus,
+  fulfillCheckoutAtomically,
+  isCheckoutSettled,
+} from './checkout-fulfillment';
 
 // --- Order types ---
 
@@ -266,7 +273,18 @@ export async function handlePaymentCallback(orderNo: string) {
     .limit(1);
 
   if (!existingOrder) return;
-  if (existingOrder.status === OrderStatus.PAID) return;
+  if (existingOrder.status === OrderStatus.PAID) {
+    // A redirect must not hide a PAID order with a missing credit grant.
+    if (!(await isCheckoutSettled(
+      db(),
+      { order, credit, subscription },
+      existingOrder,
+      existingOrder.paymentType === 'subscription'
+    ))) {
+      throw new Error(`Order ${existingOrder.orderNo} is no longer paid`);
+    }
+    return;
+  }
 
   // Query the payment provider for latest status
   const pm = await getPaymentManager();
@@ -344,13 +362,26 @@ async function handleCheckoutSuccess(session: any, provider: string) {
 
   if (!existingOrder) return;
 
-  // Idempotency: skip if already paid
-  if (existingOrder.status === OrderStatus.PAID) return;
-  if (
-    existingOrder.status !== OrderStatus.CREATED &&
-    existingOrder.status !== OrderStatus.PENDING
-  )
+  // A paid order is only considered settled if its side effects exist.
+  if (existingOrder.status === OrderStatus.PAID) {
+    if (!(await isCheckoutSettled(
+      db(),
+      { order, credit, subscription },
+      existingOrder,
+      existingOrder.paymentType === 'subscription'
+    ))) {
+      throw new Error(`Order ${existingOrder.orderNo} is no longer paid`);
+    }
     return;
+  }
+  // A provider-confirmed late SUCCESS is authoritative over a prior failure
+  // notification. CANCELED notifications use the same FAILED storage status.
+  if (
+    !canProcessCheckoutStatus(
+      existingOrder.status,
+      session.paymentStatus === PaymentStatus.SUCCESS
+    )
+  ) return;
 
   const paymentInfo = session.paymentInfo;
   const subscriptionInfo = session.subscriptionInfo;
@@ -404,79 +435,88 @@ async function handleCheckoutSuccess(session: any, provider: string) {
       discountAmount: paymentInfo?.discountAmount || null,
     };
 
-    // Atomically update order + create subscription + grant credits
-    await db().transaction(async (tx: any) => {
-      // 1. Create subscription if applicable
-      if (subscriptionInfo && session.subscriptionId) {
-        const subNo = getSnowId();
-        const newSub: any = {
-          id: getUuid(),
-          subscriptionNo: subNo,
-          userId: existingOrder.userId,
-          userEmail:
-            existingOrder.userEmail || existingOrder.paymentEmail || '',
-          status: subscriptionInfo.status || SubscriptionStatus.ACTIVE,
-          paymentProvider: provider,
-          subscriptionId: session.subscriptionId,
-          subscriptionResult: JSON.stringify(session.subscriptionResult),
-          productId: existingOrder.productId,
-          description: subscriptionInfo.description || 'Subscription Created',
-          amount: subscriptionInfo.amount,
-          currency: subscriptionInfo.currency,
-          interval: subscriptionInfo.interval,
-          intervalCount: subscriptionInfo.intervalCount,
-          trialPeriodDays: subscriptionInfo.trialPeriodDays,
-          currentPeriodStart: subscriptionInfo.currentPeriodStart,
-          currentPeriodEnd: subscriptionInfo.currentPeriodEnd,
-          billingUrl: subscriptionInfo.billingUrl,
-          planName: existingOrder.planName || existingOrder.productName,
-          productName: existingOrder.productName,
-          creditsAmount: existingOrder.creditsAmount,
-          creditsValidDays: existingOrder.creditsValidDays,
-          paymentProductId: existingOrder.paymentProductId,
-          paymentUserId: paymentInfo?.paymentUserId,
-        };
-        await tx.insert(subscription).values(newSub);
-        orderUpdate.subscriptionNo = subNo;
-        orderUpdate.subscriptionId = session.subscriptionId;
-        orderUpdate.subscriptionResult = JSON.stringify(
-          session.subscriptionResult
-        );
-      }
+    // Prepare all writes before executing any of them. On D1, db().transaction
+    // is only a compatibility callback (NOT an actual transaction), so use
+    // Drizzle D1 batch, backed by D1Database.batch's atomic transaction.
+    // The unique fulfillment key makes concurrent callback/webhook deliveries
+    // mutually exclusive even when both read the same pending order.
+    const fulfillmentKey = `checkout:${existingOrder.orderNo}`;
+    let newSub: Record<string, any> | null = null;
 
-      // 2. Grant credits if applicable
-      if (existingOrder.creditsAmount && existingOrder.creditsAmount > 0) {
-        const credits = existingOrder.creditsAmount;
-        const expiresAt = calculateCreditExpirationTime({
-          creditsValidDays: existingOrder.creditsValidDays || 0,
-          currentPeriodEnd: subscriptionInfo?.currentPeriodEnd,
-        });
+    if (subscriptionInfo && session.subscriptionId) {
+      const subNo = getSnowId();
+      newSub = {
+        id: getUuid(),
+        subscriptionNo: subNo,
+        fulfillmentKey,
+        userId: existingOrder.userId,
+        userEmail: existingOrder.userEmail || existingOrder.paymentEmail || '',
+        status: subscriptionInfo.status || SubscriptionStatus.ACTIVE,
+        paymentProvider: provider,
+        subscriptionId: session.subscriptionId,
+        subscriptionResult: JSON.stringify(session.subscriptionResult),
+        productId: existingOrder.productId,
+        description: subscriptionInfo.description || 'Subscription Created',
+        amount: subscriptionInfo.amount,
+        currency: subscriptionInfo.currency,
+        interval: subscriptionInfo.interval,
+        intervalCount: subscriptionInfo.intervalCount,
+        trialPeriodDays: subscriptionInfo.trialPeriodDays,
+        currentPeriodStart: subscriptionInfo.currentPeriodStart,
+        currentPeriodEnd: subscriptionInfo.currentPeriodEnd,
+        billingUrl: subscriptionInfo.billingUrl,
+        planName: existingOrder.planName || existingOrder.productName,
+        productName: existingOrder.productName,
+        creditsAmount: existingOrder.creditsAmount,
+        creditsValidDays: existingOrder.creditsValidDays,
+        paymentProductId: existingOrder.paymentProductId,
+        paymentUserId: paymentInfo?.paymentUserId,
+      };
+      orderUpdate.subscriptionNo = subNo;
+      orderUpdate.subscriptionId = session.subscriptionId;
+      orderUpdate.subscriptionResult = JSON.stringify(
+        session.subscriptionResult
+      );
+    }
 
-        await tx.insert(credit).values({
-          id: getUuid(),
-          userId: existingOrder.userId,
-          userEmail: existingOrder.userEmail || '',
-          orderNo: existingOrder.orderNo,
-          subscriptionNo: orderUpdate.subscriptionNo || '',
-          transactionNo: getSnowId(),
-          transactionType: 'grant',
-          transactionScene:
-            existingOrder.paymentType === 'subscription'
-              ? 'subscription'
-              : 'payment',
-          credits,
-          remainingCredits: credits,
-          description: 'Grant credit',
-          expiresAt,
-          status: 'active',
-        });
-      }
+    let newGrant: Record<string, any> | null = null;
+    if (existingOrder.creditsAmount && existingOrder.creditsAmount > 0) {
+      const credits = existingOrder.creditsAmount;
+      const expiresAt = calculateCreditExpirationTime({
+        creditsValidDays: existingOrder.creditsValidDays || 0,
+        currentPeriodEnd: subscriptionInfo?.currentPeriodEnd,
+      });
 
-      // 3. Update order
-      await tx
-        .update(order)
-        .set(orderUpdate)
-        .where(eq(order.id, existingOrder.id));
+      newGrant = {
+        id: getUuid(),
+        userId: existingOrder.userId,
+        userEmail: existingOrder.userEmail || '',
+        orderNo: existingOrder.orderNo,
+        fulfillmentKey,
+        subscriptionNo: orderUpdate.subscriptionNo || '',
+        transactionNo: getSnowId(),
+        transactionType: 'grant',
+        transactionScene:
+          existingOrder.paymentType === 'subscription'
+            ? 'subscription'
+            : 'payment',
+        credits,
+        remainingCredits: credits,
+        description: 'Grant credit',
+        expiresAt,
+        status: 'active',
+      };
+    }
+
+    await fulfillCheckoutAtomically({
+      dbInstance: db(),
+      databaseProvider: envConfigs.database_provider,
+      tables: { order, credit, subscription },
+      checkoutOrder: existingOrder,
+      expectsSubscription: existingOrder.paymentType === 'subscription',
+      newSubscription: newSub,
+      newGrant,
+      orderUpdate,
     });
   } else if (
     session.paymentStatus === PaymentStatus.FAILED ||
@@ -488,7 +528,12 @@ async function handleCheckoutSuccess(session: any, provider: string) {
         status: OrderStatus.FAILED,
         paymentResult: JSON.stringify(session.paymentResult),
       })
-      .where(eq(order.id, existingOrder.id));
+      .where(
+        and(
+          eq(order.id, existingOrder.id),
+          inArray(order.status, [OrderStatus.CREATED, OrderStatus.PENDING])
+        )
+      );
   }
 }
 
