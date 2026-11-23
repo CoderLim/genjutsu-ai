@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - 'src/modules/payment/service.ts'
+      - 'src/modules/payment/checkout-fulfillment.ts'
+      - 'src/modules/payment/checkout-fulfillment.service.test.ts'
       - 'src/modules/payment/fulfillment-idempotency.test.ts'
       - 'src/config/db/schema.*.ts'
       - 'docs/migrations/**'
@@ -28,7 +30,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Payment ledger idempotency tests
-        run: node --import tsx --test src/modules/payment/fulfillment-idempotency.test.ts src/modules/payment/checkout-amount.test.ts
+        run: node --import tsx --test src/modules/payment/fulfillment-idempotency.test.ts src/modules/payment/checkout-fulfillment.service.test.ts src/modules/payment/checkout-amount.test.ts
       - name: Production build (no deploy)
         run: pnpm build
       - name: Check payment and schema TypeScript errors
@@ -39,7 +41,7 @@ jobs:
           status=$?
           set -e
           if [ "$status" -eq 0 ]; then exit 0; fi
-          changed="$(grep -E '^src/(modules/payment/(service|fulfillment-idempotency\.test)\.ts|config/db/schema\.(sqlite|postgres|mysql)\.ts)' tsc-report.txt || true)"
+          changed="$(grep -E '^src/(modules/payment/(service|checkout-fulfillment|checkout-fulfillment\.service|fulfillment-idempotency\.test)\.ts|config/db/schema\.(sqlite|postgres|mysql)\.ts)' tsc-report.txt || true)"
           if [ -n "$changed" ]; then
             echo "$changed"
             exit 1
