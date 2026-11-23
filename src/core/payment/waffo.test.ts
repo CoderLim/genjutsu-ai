@@ -473,19 +473,24 @@ test('createPayment does not override subscription product price', async () => {
   assert.equal(sdkParams?.priceSnapshot, undefined);
 });
 
-test('prod provider rejects test_mode webhook settlement', () => {
-  const provider = createWaffoProvider({
-    merchantId: 'MER_abcdefghijklmnopqrstuv',
-    privateKey: TEST_PRIVATE_KEY,
-    environment: 'prod',
-  }) as any;
+test('Waffo webhook settlement rejects wrong or missing mode', () => {
+  for (const expected of ['test', 'prod'] as const) {
+    const provider = createWaffoProvider({
+      merchantId: 'MER_abcdefghijklmnopqrstuv',
+      privateKey: TEST_PRIVATE_KEY,
+      environment: expected,
+    }) as any;
 
-  assert.throws(
-    () => provider.rejectTestModeInProduction('test'),
-    /test_mode settlement in production/
-  );
-  assert.doesNotThrow(() => provider.rejectTestModeInProduction('prod'));
-  assert.doesNotThrow(() => provider.rejectTestModeInProduction(undefined));
+    assert.doesNotThrow(() => provider.assertWebhookMode(expected));
+    assert.throws(
+      () => provider.assertWebhookMode(expected === 'prod' ? 'test' : 'prod'),
+      /Waffo payment mode mismatch/
+    );
+    assert.throws(
+      () => provider.assertWebhookMode(undefined),
+      /Waffo payment mode mismatch/
+    );
+  }
 });
 
 test('webhook session carries waffoMode for settlement guards', () => {

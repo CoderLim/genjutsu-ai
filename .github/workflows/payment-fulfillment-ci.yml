@@ -31,6 +31,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Payment ledger idempotency tests
         run: node --import tsx --test src/modules/payment/fulfillment-idempotency.test.ts src/modules/payment/checkout-fulfillment.service.test.ts src/modules/payment/checkout-amount.test.ts
+      - name: Waffo environment and webhook tests
+        run: node --import tsx --test src/core/payment/waffo-environment.test.ts src/core/payment/waffo.test.ts
       - name: Production build (no deploy)
         run: pnpm build
       - name: Check payment and schema TypeScript errors

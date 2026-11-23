@@ -8,6 +8,8 @@ import {
   type WebhookEventData,
 } from '@waffo/pancake-ts';
 
+import { assertWaffoMode } from './waffo-environment';
+
 import {
   CheckoutSession,
   PaymentConfigs,
@@ -129,17 +131,9 @@ export class WaffoProvider implements PaymentProvider {
     return this.configs.environment === 'prod' ? 'prod' : 'test';
   }
 
-  /**
-   * Production must never settle Waffo test_mode traffic. API keys are
-   * environment-bound: a Test key still yields mode=test even when
-   * waffo_environment is set to prod.
-   */
-  private rejectTestModeInProduction(mode: string | undefined): void {
-    if (this.apiEnvironment === 'prod' && mode === 'test') {
-      throw new Error(
-        'Rejecting Waffo test_mode settlement in production — use a Production API Key'
-      );
-    }
+  /** Reject mismatched or missing modes even with a misconfigured API key. */
+  private assertWebhookMode(mode: string | undefined): void {
+    assertWaffoMode(mode, this.apiEnvironment);
   }
 
   private webhookReady = false;
@@ -469,10 +463,8 @@ export class WaffoProvider implements PaymentProvider {
       mode: event.mode,
     });
 
-    // Fail closed: a production app must never settle Waffo test_mode events.
-    // API keys are environment-bound; a Test key + waffo_environment=prod still
-    // emits mode=test webhooks that would otherwise grant real credits.
-    this.rejectTestModeInProduction(event.mode);
+    // The event is signature-verified above. Never settle a mode mismatch.
+    this.assertWebhookMode(event.mode);
 
     const eventType = this.mapWaffoEventType(event.eventType);
     const paymentSession = this.buildPaymentSessionFromWebhook(event);
