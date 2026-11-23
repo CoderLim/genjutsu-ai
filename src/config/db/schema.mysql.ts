@@ -9,6 +9,7 @@
 import {
   boolean,
   index,
+  uniqueIndex,
   int,
   longtext,
   mysqlTable,
@@ -225,6 +226,7 @@ export const subscription = table(
   {
     id: varchar191('id').primaryKey(),
     subscriptionNo: varchar191('subscription_no').unique().notNull(),
+    fulfillmentKey: varchar191('fulfillment_key'),
     userId: varchar191('user_id')
       .notNull()
       .references(() => user.id, { onDelete: 'cascade' }),
@@ -268,6 +270,7 @@ export const subscription = table(
       table.paymentProvider
     ),
     index('idx_subscription_created_at').on(table.createdAt),
+    uniqueIndex('ux_subscription_fulfillment_key').on(table.fulfillmentKey),
   ]
 );
 
@@ -280,6 +283,7 @@ export const credit = table(
       .references(() => user.id, { onDelete: 'cascade' }),
     userEmail: varchar191('user_email'),
     orderNo: varchar191('order_no'),
+    fulfillmentKey: varchar191('fulfillment_key'),
     subscriptionNo: varchar191('subscription_no'),
     transactionNo: varchar191('transaction_no').unique().notNull(),
     transactionType: varchar('transaction_type', { length: 50 }).notNull(),
@@ -304,6 +308,7 @@ export const credit = table(
       table.expiresAt
     ),
     index('idx_credit_order_no').on(table.orderNo),
+    uniqueIndex('ux_credit_fulfillment_key').on(table.fulfillmentKey),
     index('idx_credit_subscription_no').on(table.subscriptionNo),
   ]
 );

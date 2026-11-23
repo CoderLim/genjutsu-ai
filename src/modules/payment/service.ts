@@ -1,4 +1,6 @@
-import { and, desc, eq, isNull } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
+
+import { envConfigs } from '@/config';
 
 import { db } from '@/core/db';
 import {
@@ -322,6 +324,57 @@ export async function handleWebhook(params: {
 
 // --- Checkout Success: update order + create subscription + grant credits ---
 
+
+/**
+ * A repeated delivery is successful only when the committed order and grant
+ * agree. Historic grants have no fulfillment_key, so check by order_no too.
+ * Never treat an arbitrary UNIQUE violation as a successful payment.
+ */
+async function isCheckoutSettled(
+  checkoutOrder: {
+    id: string;
+    orderNo: string;
+    creditsAmount: number | null;
+  },
+  expectsSubscription: boolean
+): Promise<boolean> {
+  const [paidOrder] = await db()
+    .select({ status: order.status, subscriptionNo: order.subscriptionNo })
+    .from(order)
+    .where(eq(order.id, checkoutOrder.id))
+    .limit(1);
+
+  if (!paidOrder || paidOrder.status !== OrderStatus.PAID) return false;
+
+  if (expectsSubscription && !paidOrder.subscriptionNo) {
+    throw new Error(
+      `Paid order ${checkoutOrder.orderNo} is missing its subscription`
+    );
+  }
+
+  if (checkoutOrder.creditsAmount && checkoutOrder.creditsAmount > 0) {
+    const [grant] = await db()
+      .select({ credits: credit.credits })
+      .from(credit)
+      .where(
+        and(
+          eq(credit.orderNo, checkoutOrder.orderNo),
+          eq(credit.transactionType, 'grant'),
+          inArray(credit.transactionScene, ['payment', 'subscription'])
+        )
+      )
+      .limit(1);
+
+    if (!grant || grant.credits !== checkoutOrder.creditsAmount) {
+      throw new Error(
+        `Paid order ${checkoutOrder.orderNo} is missing its expected credit grant`
+      );
+    }
+  }
+
+  return true;
+}
+
 async function handleCheckoutSuccess(session: any, provider: string) {
   // Different providers expose the session identifier under different keys.
   // We try the common shapes; for Alipay the natural key is out_trade_no
@@ -344,8 +397,14 @@ async function handleCheckoutSuccess(session: any, provider: string) {
 
   if (!existingOrder) return;
 
-  // Idempotency: skip if already paid
-  if (existingOrder.status === OrderStatus.PAID) return;
+  // A paid order is only considered settled if its side effects exist.
+  if (existingOrder.status === OrderStatus.PAID) {
+    await isCheckoutSettled(
+      existingOrder,
+      Boolean(session.subscriptionInfo && session.subscriptionId)
+    );
+    return;
+  }
   if (
     existingOrder.status !== OrderStatus.CREATED &&
     existingOrder.status !== OrderStatus.PENDING
@@ -404,80 +463,113 @@ async function handleCheckoutSuccess(session: any, provider: string) {
       discountAmount: paymentInfo?.discountAmount || null,
     };
 
-    // Atomically update order + create subscription + grant credits
-    await db().transaction(async (tx: any) => {
-      // 1. Create subscription if applicable
-      if (subscriptionInfo && session.subscriptionId) {
-        const subNo = getSnowId();
-        const newSub: any = {
-          id: getUuid(),
-          subscriptionNo: subNo,
-          userId: existingOrder.userId,
-          userEmail:
-            existingOrder.userEmail || existingOrder.paymentEmail || '',
-          status: subscriptionInfo.status || SubscriptionStatus.ACTIVE,
-          paymentProvider: provider,
-          subscriptionId: session.subscriptionId,
-          subscriptionResult: JSON.stringify(session.subscriptionResult),
-          productId: existingOrder.productId,
-          description: subscriptionInfo.description || 'Subscription Created',
-          amount: subscriptionInfo.amount,
-          currency: subscriptionInfo.currency,
-          interval: subscriptionInfo.interval,
-          intervalCount: subscriptionInfo.intervalCount,
-          trialPeriodDays: subscriptionInfo.trialPeriodDays,
-          currentPeriodStart: subscriptionInfo.currentPeriodStart,
-          currentPeriodEnd: subscriptionInfo.currentPeriodEnd,
-          billingUrl: subscriptionInfo.billingUrl,
-          planName: existingOrder.planName || existingOrder.productName,
-          productName: existingOrder.productName,
-          creditsAmount: existingOrder.creditsAmount,
-          creditsValidDays: existingOrder.creditsValidDays,
-          paymentProductId: existingOrder.paymentProductId,
-          paymentUserId: paymentInfo?.paymentUserId,
-        };
-        await tx.insert(subscription).values(newSub);
-        orderUpdate.subscriptionNo = subNo;
-        orderUpdate.subscriptionId = session.subscriptionId;
-        orderUpdate.subscriptionResult = JSON.stringify(
-          session.subscriptionResult
+    // Prepare all writes before executing any of them. On D1, db().transaction
+    // is only a compatibility callback (NOT an actual transaction), so use
+    // Drizzle D1 batch, backed by D1Database.batch's atomic transaction.
+    // The unique fulfillment key makes concurrent callback/webhook deliveries
+    // mutually exclusive even when both read the same pending order.
+    const fulfillmentKey = `checkout:${existingOrder.orderNo}`;
+    let newSub: Record<string, any> | null = null;
+
+    if (subscriptionInfo && session.subscriptionId) {
+      const subNo = getSnowId();
+      newSub = {
+        id: getUuid(),
+        subscriptionNo: subNo,
+        fulfillmentKey,
+        userId: existingOrder.userId,
+        userEmail: existingOrder.userEmail || existingOrder.paymentEmail || '',
+        status: subscriptionInfo.status || SubscriptionStatus.ACTIVE,
+        paymentProvider: provider,
+        subscriptionId: session.subscriptionId,
+        subscriptionResult: JSON.stringify(session.subscriptionResult),
+        productId: existingOrder.productId,
+        description: subscriptionInfo.description || 'Subscription Created',
+        amount: subscriptionInfo.amount,
+        currency: subscriptionInfo.currency,
+        interval: subscriptionInfo.interval,
+        intervalCount: subscriptionInfo.intervalCount,
+        trialPeriodDays: subscriptionInfo.trialPeriodDays,
+        currentPeriodStart: subscriptionInfo.currentPeriodStart,
+        currentPeriodEnd: subscriptionInfo.currentPeriodEnd,
+        billingUrl: subscriptionInfo.billingUrl,
+        planName: existingOrder.planName || existingOrder.productName,
+        productName: existingOrder.productName,
+        creditsAmount: existingOrder.creditsAmount,
+        creditsValidDays: existingOrder.creditsValidDays,
+        paymentProductId: existingOrder.paymentProductId,
+        paymentUserId: paymentInfo?.paymentUserId,
+      };
+      orderUpdate.subscriptionNo = subNo;
+      orderUpdate.subscriptionId = session.subscriptionId;
+      orderUpdate.subscriptionResult = JSON.stringify(
+        session.subscriptionResult
+      );
+    }
+
+    let newGrant: Record<string, any> | null = null;
+    if (existingOrder.creditsAmount && existingOrder.creditsAmount > 0) {
+      const credits = existingOrder.creditsAmount;
+      const expiresAt = calculateCreditExpirationTime({
+        creditsValidDays: existingOrder.creditsValidDays || 0,
+        currentPeriodEnd: subscriptionInfo?.currentPeriodEnd,
+      });
+
+      newGrant = {
+        id: getUuid(),
+        userId: existingOrder.userId,
+        userEmail: existingOrder.userEmail || '',
+        orderNo: existingOrder.orderNo,
+        fulfillmentKey,
+        subscriptionNo: orderUpdate.subscriptionNo || '',
+        transactionNo: getSnowId(),
+        transactionType: 'grant',
+        transactionScene:
+          existingOrder.paymentType === 'subscription'
+            ? 'subscription'
+            : 'payment',
+        credits,
+        remainingCredits: credits,
+        description: 'Grant credit',
+        expiresAt,
+        status: 'active',
+      };
+    }
+
+    const dbInstance = db();
+    const pendingOrderFilter = and(
+      eq(order.id, existingOrder.id),
+      inArray(order.status, [OrderStatus.CREATED, OrderStatus.PENDING])
+    );
+
+    try {
+      if (envConfigs.database_provider === 'd1') {
+        // D1 batch is atomic: a duplicate key or any failed INSERT rolls back
+        // subscription creation, credit grant AND order status update together.
+        const statements: any[] = [];
+        if (newSub) statements.push(dbInstance.insert(subscription).values(newSub));
+        if (newGrant) statements.push(dbInstance.insert(credit).values(newGrant));
+        statements.push(
+          dbInstance.update(order).set(orderUpdate).where(pendingOrderFilter)
         );
-      }
-
-      // 2. Grant credits if applicable
-      if (existingOrder.creditsAmount && existingOrder.creditsAmount > 0) {
-        const credits = existingOrder.creditsAmount;
-        const expiresAt = calculateCreditExpirationTime({
-          creditsValidDays: existingOrder.creditsValidDays || 0,
-          currentPeriodEnd: subscriptionInfo?.currentPeriodEnd,
-        });
-
-        await tx.insert(credit).values({
-          id: getUuid(),
-          userId: existingOrder.userId,
-          userEmail: existingOrder.userEmail || '',
-          orderNo: existingOrder.orderNo,
-          subscriptionNo: orderUpdate.subscriptionNo || '',
-          transactionNo: getSnowId(),
-          transactionType: 'grant',
-          transactionScene:
-            existingOrder.paymentType === 'subscription'
-              ? 'subscription'
-              : 'payment',
-          credits,
-          remainingCredits: credits,
-          description: 'Grant credit',
-          expiresAt,
-          status: 'active',
+        await dbInstance.batch(statements);
+      } else {
+        // Real Drizzle transactions are supported by postgres/mysql/libsql.
+        await dbInstance.transaction(async (tx: any) => {
+          if (newSub) await tx.insert(subscription).values(newSub);
+          if (newGrant) await tx.insert(credit).values(newGrant);
+          await tx
+            .update(order)
+            .set(orderUpdate)
+            .where(pendingOrderFilter);
         });
       }
-
-      // 3. Update order
-      await tx
-        .update(order)
-        .set(orderUpdate)
-        .where(eq(order.id, existingOrder.id));
-    });
+    } catch (error) {
+      // A competing delivery may have committed first. Only accept this as
+      // idempotent success after verifying the completed order and grant.
+      if (await isCheckoutSettled(existingOrder, Boolean(newSub))) return;
+      throw error;
+    }
   } else if (
     session.paymentStatus === PaymentStatus.FAILED ||
     session.paymentStatus === PaymentStatus.CANCELED
@@ -488,7 +580,12 @@ async function handleCheckoutSuccess(session: any, provider: string) {
         status: OrderStatus.FAILED,
         paymentResult: JSON.stringify(session.paymentResult),
       })
-      .where(eq(order.id, existingOrder.id));
+      .where(
+        and(
+          eq(order.id, existingOrder.id),
+          inArray(order.status, [OrderStatus.CREATED, OrderStatus.PENDING])
+        )
+      );
   }
 }
 

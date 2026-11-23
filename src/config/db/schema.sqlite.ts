@@ -6,7 +6,7 @@
  */
 
 import { sql } from 'drizzle-orm';
-import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 const table = sqliteTable;
 
@@ -257,6 +257,7 @@ export const subscription = table(
   {
     id: text('id').primaryKey(),
     subscriptionNo: text('subscription_no').unique().notNull(),
+    fulfillmentKey: text('fulfillment_key'),
     userId: text('user_id')
       .notNull()
       .references(() => user.id, { onDelete: 'cascade' }),
@@ -307,6 +308,7 @@ export const subscription = table(
       table.paymentProvider
     ),
     index('idx_subscription_created_at').on(table.createdAt),
+    uniqueIndex('ux_subscription_fulfillment_key').on(table.fulfillmentKey),
   ]
 );
 
@@ -319,6 +321,7 @@ export const credit = table(
       .references(() => user.id, { onDelete: 'cascade' }),
     userEmail: text('user_email'),
     orderNo: text('order_no'),
+    fulfillmentKey: text('fulfillment_key'),
     subscriptionNo: text('subscription_no'),
     transactionNo: text('transaction_no').unique().notNull(),
     transactionType: text('transaction_type').notNull(),
@@ -348,6 +351,7 @@ export const credit = table(
       table.expiresAt
     ),
     index('idx_credit_order_no').on(table.orderNo),
+    uniqueIndex('ux_credit_fulfillment_key').on(table.fulfillmentKey),
     index('idx_credit_subscription_no').on(table.subscriptionNo),
   ]
 );
