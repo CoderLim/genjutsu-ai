@@ -31,10 +31,6 @@ import {
   ENZO_FERNANDEZ_AI_TEMPLATE_POSTER_PATH,
 } from '@/modules/enzo-fernandez-ai/constants';
 import {
-  FLYING_CAR_AI_TEMPLATE_PATH,
-  FLYING_CAR_AI_TEMPLATE_POSTER_PATH,
-} from '@/modules/flying-car-ai/constants';
-import {
   GTA_5_GOODBYE_AI_VIDEO_TEMPLATE_DISPLAY_PATH,
   GTA_5_GOODBYE_AI_VIDEO_TEMPLATE_POSTER_PATH,
 } from '@/modules/gta-5-goodbye-ai-video/constants';
@@ -320,14 +316,6 @@ export const MOTION_TEMPLATES: MotionTemplate[] = [
     aspect: 'landscape',
   },
   {
-    id: 'flying-car-ai',
-    titleKey: 'site.templates.flying_car_ai',
-    poster: FLYING_CAR_AI_TEMPLATE_POSTER_PATH,
-    sourceVideo: FLYING_CAR_AI_TEMPLATE_PATH,
-    href: '/flying-car-ai',
-    aspect: 'portrait',
-  },
-  {
     id: 'a2o-lite-ai',
     titleKey: 'site.templates.a2o_lite_ai',
     poster: A2O_LITE_AI_TEMPLATE_POSTER_PATH,
@@ -444,17 +432,6 @@ export const MOTION_TEMPLATES: MotionTemplate[] = [
     aspect: 'portrait',
   },
   {
-    id: 'cat-fight',
-    titleKey: 'site.templates.cat_fight',
-    poster: '/videos/cat-fight-tpl-poster.jpg',
-    sourceVideo: '/videos/cat-fight-tpl.mp4',
-    prompt:
-      'Replace the cats in @Video 1 with the subject in @Image 1. Keep the fight choreography, camera path, and timing. Use only this authorized likeness.',
-    mode: 'objects-swap',
-    resolution: DEFAULT_OBJECTS_RESOLUTION,
-    aspect: 'landscape',
-  },
-  {
     id: 'bruce-li-dog',
     titleKey: 'site.templates.bruce_li_dog',
     poster: '/videos/bruce-li-dog-tpl-poster.jpg',
@@ -475,17 +452,6 @@ export const MOTION_TEMPLATES: MotionTemplate[] = [
     mode: 'objects-swap',
     resolution: DEFAULT_OBJECTS_RESOLUTION,
     aspect: 'landscape',
-  },
-  {
-    id: 'car-drop',
-    titleKey: 'site.templates.car_drop',
-    poster: '/videos/car-drop-tpl-poster.jpg',
-    sourceVideo: '/videos/car-drop-tpl.mp4',
-    prompt:
-      'Replace the car in @Video 1 with the subject in @Image 1. Keep the drop motion, camera path, and timing. Use only this authorized likeness.',
-    mode: 'objects-swap',
-    resolution: DEFAULT_OBJECTS_RESOLUTION,
-    aspect: 'portrait',
   },
   {
     id: 'two-cats-dance',

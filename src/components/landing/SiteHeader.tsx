@@ -98,11 +98,6 @@ const TRENDING_LINKS = [
     poster: '/videos/shan-shen-bu-tpl-poster.jpg',
   },
   {
-    label: 'Flying Car AI',
-    href: '/flying-car-ai',
-    poster: '/videos/flying-car-ai-tpl-poster.jpg',
-  },
-  {
     label: 'A2O LITE AI',
     href: '/a2o-lite-ai',
     poster: '/videos/a2o-lite-ai-tpl-poster.jpg',
@@ -166,11 +161,6 @@ const TRENDING_LINKS = [
     label: 'Zombie Hug',
     href: '/ai-zombie-hug',
     poster: '/readme/zombie-hug.jpg',
-  },
-  {
-    label: 'Day of the Dead AI Video',
-    href: '/day-of-the-dead-ai-video',
-    poster: '/videos/day-of-the-dead-ai-video-demo-poster.jpg',
   },
 ] as const;
 
