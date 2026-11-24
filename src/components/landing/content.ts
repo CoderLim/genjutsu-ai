@@ -10,26 +10,8 @@ import type {
   ToolCard,
 } from '@/types/landing';
 
+/** Only real public routes / sister-tool URLs — no phantom model landing paths. */
 export const NAV_ITEMS: NavItem[] = [
-  {
-    label: 'AI Image',
-    groups: [
-      {
-        items: [
-          {
-            title: 'Image to Image',
-            description: 'Generate from reference images',
-            href: '/image-to-image',
-          },
-          {
-            title: 'Image Templates',
-            description: 'Start faster from image templates',
-            href: '/image-templates',
-          },
-        ],
-      },
-    ],
-  },
   {
     label: 'AI Video',
     groups: [
@@ -41,19 +23,24 @@ export const NAV_ITEMS: NavItem[] = [
             href: '/ai-video-generator',
           },
           {
-            title: 'Text to Video',
-            description: 'Create videos from text prompts',
-            href: '/text-to-video',
+            title: 'Image to Video',
+            description: 'Animate a photo into a short video',
+            href: '/image-to-video',
           },
           {
-            title: 'Image to Video',
-            description: 'Animate reference images',
-            href: '/image-to-video',
+            title: 'Photo to Video',
+            description: 'Turn still photos into motion clips',
+            href: '/photo-to-video',
           },
           {
             title: 'Video Face Swap',
             description: 'Replace a head in a short video with one portrait',
             href: '/video-face-swap',
+          },
+          {
+            title: 'Live Face Swap',
+            description: 'Real-time face swap in the browser',
+            href: '/live-face-swap',
           },
           {
             title: 'Lip Sync',
@@ -66,153 +53,19 @@ export const NAV_ITEMS: NavItem[] = [
     ],
   },
   {
-    label: 'AI Photo Editor',
+    label: 'AI Image',
     groups: [
       {
         items: [
+          {
+            title: 'AI Image Generator',
+            description: 'Generate and edit images in the workspace',
+            href: '/ai-image-generator',
+          },
           {
             title: 'AI Photo Editor',
             description: 'Edit existing images with text',
-            href: '/ai-image-editor',
-          },
-          {
-            title: 'Expand Image',
-            description: 'Extend images beyond their original borders',
-            href: '/uncrop',
-          },
-          {
-            title: 'Remove Background',
-            description: 'Remove background from any image instantly',
-            href: '/background-remover',
-          },
-          {
-            title: 'AI Image Upscaler',
-            description: 'Upscale images 2× or 4× with AI',
-            href: '/image-upscaler',
-            badge: 'NEW',
-          },
-        ],
-      },
-    ],
-  },
-  {
-    label: 'AI Models',
-    groups: [
-      {
-        label: 'Image Models',
-        items: [
-          {
-            title: '🍌Nano Banana 2 Lite',
-            description: 'Fast 1K generation and editing',
-            href: '/nano-banana-2-lite',
-            badge: 'NEW',
-          },
-          {
-            title: 'Seedream 5.0 Pro',
-            description: 'Professional 1K / 2K generation and editing',
-            href: '/seedream-5-pro',
-            badge: '-30%',
-            iconSrc: '/images/logos/image-models/seedream.svg',
-          },
-          {
-            title: 'GPT Image 2',
-            description: 'Precise prompts, clean text, product shots',
-            href: '/gpt-image-2',
-            iconSrc: '/images/logos/image-models/openai.svg',
-          },
-          {
-            title: '🍌Nano Banana 2',
-            description: 'Faster next-generation image model',
-            href: '/nano-banana-2',
-          },
-          {
-            title: 'Seedream 5.0 Lite',
-            description: 'Cinematic realism with dramatic lighting',
-            href: '/seedream-5',
-            iconSrc: '/images/logos/image-models/seedream.svg',
-          },
-          {
-            title: 'Seedream 4.5',
-            description: '2K / 4K generation and reference editing',
-            href: '/seedream-4-5',
-            iconSrc: '/images/logos/image-models/seedream.svg',
-          },
-          {
-            title: 'Seedream 4.0',
-            description: 'Cost-efficient 1K / 2K / 4K generation and editing',
-            href: '/seedream-4',
-            iconSrc: '/images/logos/image-models/seedream.svg',
-          },
-          {
-            title: '🍌Nano Banana Pro',
-            description: 'High-quality model for professional image work',
-            href: '/nano-banana-pro',
-          },
-          {
-            title: '🍌Nano Banana',
-            description: 'Lightweight fast image generation model',
-            href: '/nano-banana',
-          },
-          {
-            title: 'Seedream 3.5 Pro',
-            description: 'Consistent portraits and brand visuals',
-            href: '/raphael-image-model',
-            iconSrc: '/images/logos/image-models/seedream.svg',
-          },
-        ],
-      },
-      {
-        label: 'Video Models',
-        items: [
-          {
-            title: 'Seedance 2.0 Mini',
-            description: 'Lower-cost drafts with rich reference control',
-            href: '/seedance-2-mini',
-            badge: 'NEW',
-            iconSrc: '/images/logos/video-models/seedance.svg',
-          },
-          {
-            title: 'Seedance 1.5 Pro',
-            description: '1080p video with synchronized native audio',
-            href: '/seedance-1-5',
-            iconSrc: '/images/logos/video-models/seedance.svg',
-          },
-          {
-            title: 'Seedance 1.0 Pro Fast',
-            description: 'Fast video up to 1080p from 4 credits/sec',
-            href: '/seedance-1',
-            iconSrc: '/images/logos/video-models/seedance.svg',
-          },
-          {
-            title: 'Kling 3.0 Turbo',
-            description: 'Faster short-form text and image-to-video',
-            href: '/kling-3-turbo',
-            badge: 'NEW',
-            iconSrc: '/images/logos/video-models/kling-official.png',
-          },
-          {
-            title: 'Seedance 2.0',
-            description: 'Smooth motion and natural choreography',
-            href: '/seedance-2',
-            iconSrc: '/images/logos/video-models/seedance.svg',
-          },
-          {
-            title: 'Veo 3.1',
-            description: 'Native audio, 4K output, cinematic realism',
-            href: '/veo-3-1',
-            iconSrc: '/images/logos/video-models/google-g.svg',
-          },
-          {
-            title: 'Kling 3.0',
-            description: 'Fast action with bold camera moves',
-            href: '/kling-3',
-            iconSrc: '/images/logos/video-models/kling-official.png',
-          },
-          {
-            title: 'Seedance 1.0 Turbo',
-            description: 'Stable shots with commercial control',
-            href: '/raphael-video-pro',
-            iconSrc: '/images/logos/video-models/seedance.svg',
+            href: 'https://getaiphotoeditor.com/?utm_source=genjutsu-ai',
           },
         ],
       },
@@ -223,6 +76,11 @@ export const NAV_ITEMS: NavItem[] = [
     groups: [
       {
         items: [
+          {
+            title: 'Genjutsu Prompts',
+            description: 'Prompt ideas for motion transfer and object swap',
+            href: '/genjutsu-prompts',
+          },
           {
             title: 'AI 3D Model Generator',
             description: 'Turn text or images into 3D models in seconds',
@@ -248,100 +106,71 @@ export const NAV_ITEMS: NavItem[] = [
 
 export const TOOL_CARDS: ToolCard[] = [
   {
-    title: 'Image Editor',
-    href: '/ai-image-editor',
-    imageSrc: '/images/app-tools/image-editor.webp',
-    imageAlt: 'Image Editor',
-  },
-  {
-    title: 'Remove Background',
-    href: '/background-remover',
-    imageSrc: '/images/app-tools/remove-background.webp',
-    imageAlt: 'Remove Background',
-  },
-  {
-    title: 'Image Expand',
-    href: '/uncrop',
-    imageSrc: '/images/app-tools/image-expand.webp',
-    imageAlt: 'Image Expand',
-  },
-  {
-    title: 'Image Upscaler',
-    href: '/image-upscaler',
-    imageSrc: '/images/comparison-high.webp',
-    imageAlt: 'Image Upscaler',
-  },
-  {
-    title: 'Transform Style',
-    href: '/image-templates',
+    title: 'Image to Video',
+    href: '/image-to-video',
     imageSrc: '/images/app-tools/transform-style.webp',
-    imageAlt: 'Transform Style',
+    imageAlt: 'Image to Video',
+  },
+  {
+    title: 'AI Video Generator',
+    href: '/ai-video-generator',
+    imageSrc: '/images/app-tools/image-editor.webp',
+    imageAlt: 'AI Video Generator',
+  },
+  {
+    title: 'AI Image Generator',
+    href: '/ai-image-generator',
+    imageSrc: '/images/comparison-high.webp',
+    imageAlt: 'AI Image Generator',
+  },
+  {
+    title: 'Video Face Swap',
+    href: '/video-face-swap',
+    imageSrc: '/images/app-tools/remove-background.webp',
+    imageAlt: 'Video Face Swap',
+  },
+  {
+    title: 'AI Photo Editor',
+    href: 'https://getaiphotoeditor.com/?utm_source=genjutsu-ai',
+    imageSrc: '/images/app-tools/image-expand.webp',
+    imageAlt: 'AI Photo Editor',
   },
 ];
 
 export const MODEL_CARDS: ModelCard[] = [
   {
-    name: 'Seedance 2.0 Mini',
-    description: 'Lower-cost drafts with rich reference control.',
-    href: '/seedance-2-mini',
+    name: 'Image to Video',
+    description: 'Animate a reference photo into a short clip.',
+    href: '/image-to-video',
     badge: 'NEW',
     badgeTone: 'new',
-    iconSrc: '/images/logos/video-models/seedance.svg',
   },
   {
-    name: 'GPT Image 2',
-    description: 'Precise prompts, clean text, product shots.',
-    href: '/gpt-image-2',
+    name: 'AI Video Generator',
+    description: 'Text, image, and reference workflows in one workspace.',
+    href: '/ai-video-generator',
     badge: 'HOT',
     badgeTone: 'hot',
-    iconSrc: '/images/logos/image-models/openai.svg',
   },
   {
-    name: '🍌Nano Banana 2 Lite',
-    description: 'Fast 1K generation and editing for 11 credits.',
-    href: '/nano-banana-2-lite',
-    badge: 'NEW',
-    badgeTone: 'new',
+    name: 'AI Image Generator',
+    description: 'Generate and edit stills with multi-model routing.',
+    href: '/ai-image-generator',
   },
   {
-    name: 'Seedream 5.0 Pro',
-    description: 'Professional 1K/2K generation and multi-reference editing.',
-    href: '/seedream-5-pro',
-    badge: '-30%',
-    badgeTone: 'sale',
-    iconSrc: '/images/logos/image-models/seedream.svg',
+    name: 'Video Face Swap',
+    description: 'Replace a head in a short video with one portrait.',
+    href: '/video-face-swap',
   },
   {
-    name: 'Seedance 2.0',
-    description: 'Smooth motion and natural choreography.',
-    href: '/seedance-2',
-    iconSrc: '/images/logos/video-models/seedance.svg',
+    name: 'Live Face Swap',
+    description: 'Real-time face swap in the browser.',
+    href: '/live-face-swap',
   },
   {
-    name: 'Veo 3.1',
-    description: 'Native audio, 4K output, cinematic realism.',
-    href: '/veo-3-1',
-    iconSrc: '/images/logos/video-models/google-g.svg',
-  },
-  {
-    name: '🍌Nano Banana 2',
-    description: 'Multi-reference edits with fast style control.',
-    href: '/nano-banana-2',
-  },
-  {
-    name: 'Kling 3.0 Turbo',
-    description: 'Faster short-form text and first-frame video generation.',
-    href: '/kling-3-turbo',
-    badge: 'NEW',
-    badgeTone: 'new',
-    iconSrc: '/images/logos/video-models/kling-official.png',
-  },
-  {
-    name: 'Seedance 2.5',
-    description: 'Coming soon: next-generation video model.',
-    href: '/seedance-2-mini',
-    badge: 'COMING',
-    badgeTone: 'coming',
+    name: 'Photo to Video',
+    description: 'Turn still photos into motion clips.',
+    href: '/photo-to-video',
   },
 ];
 
@@ -636,7 +465,7 @@ export const FOOTER_COLUMNS: FooterColumn[] = [
       { label: 'Features', href: '/#feature' },
       { label: 'Pricing', href: '/pricing' },
       { label: 'Blog', href: '/blog' },
-      { label: 'Partners', href: '/partners' },
+      { label: 'Prompts', href: '/genjutsu-prompts' },
     ],
   },
   {
