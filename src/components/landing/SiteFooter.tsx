@@ -1,4 +1,5 @@
-import { Github } from 'lucide-react';
+import type { SVGProps } from 'react';
+import { Github, Mail } from 'lucide-react';
 
 import { Link } from '@/core/i18n/navigation';
 import { envConfigs } from '@/config';
@@ -37,6 +38,18 @@ function translatedFooterText(value: string) {
 }
 
 const GITHUB_REPO_URL = 'https://github.com/limbuilder/genjutsu-ai';
+const X_PROFILE_URL = 'https://x.com/limbuilder';
+
+const socialIconClassName =
+  'text-muted-foreground hover:text-foreground inline-flex size-9 items-center justify-center rounded-md transition-colors';
+
+function XIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...props}>
+      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231 5.45-6.231Zm-1.161 17.52h1.833L7.084 4.126H5.117L17.083 19.77Z" />
+    </svg>
+  );
+}
 
 const isExternalHref = (href: string) => /^https?:\/\//.test(href);
 
@@ -104,16 +117,36 @@ export function SiteFooter() {
                 <p className="text-md text-muted-foreground mt-6">
                   {m['site.footer.description']()}
                 </p>
-                <a
-                  href={GITHUB_REPO_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label="Genjutsu AI on GitHub"
-                  title="GitHub"
-                  className="text-muted-foreground hover:text-foreground mt-5 inline-flex size-9 items-center justify-center rounded-md transition-colors"
-                >
-                  <Github className="size-5" />
-                </a>
+                <div className="mt-5 flex items-center gap-1">
+                  <a
+                    href={X_PROFILE_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="Genjutsu AI on X"
+                    title="X"
+                    className={socialIconClassName}
+                  >
+                    <XIcon className="size-5" />
+                  </a>
+                  <a
+                    href={`mailto:${envConfigs.app_support_email}`}
+                    aria-label={`Email ${envConfigs.app_support_email}`}
+                    title={envConfigs.app_support_email}
+                    className={socialIconClassName}
+                  >
+                    <Mail className="size-5" />
+                  </a>
+                  <a
+                    href={GITHUB_REPO_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="Genjutsu AI on GitHub"
+                    title="GitHub"
+                    className={socialIconClassName}
+                  >
+                    <Github className="size-5" />
+                  </a>
+                </div>
               </div>
             </div>
 
