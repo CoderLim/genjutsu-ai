@@ -28,7 +28,7 @@ export const PRODUCT_GENJUTSU_MODEL_PROFILES: Partial<
   Record<GenjutsuProductId, HiggsfieldGenjutsuProfile>
 > = {
   'glow-stick': 'light',
-  'tiny-desk-ai': 'light',
+  'tiny-desk-ai': 'standard',
   'chipmunks-dance': 'light',
   'bicep-heart': 'light',
   'deck-the-halls-dance-ai': 'light',

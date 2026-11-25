@@ -15,12 +15,15 @@ export class TinyDeskAiProviderBindingError extends Error {
 
 /** Resolve this product's server-owned model pin (independent of homepage env). */
 export function resolveTinyDeskAiProviderTarget(): GenjutsuProviderTarget {
-  return resolveProductProviderTarget(TINY_DESK_AI_PRODUCT_ID, TINY_DESK_AI_MODE);
+  return resolveProductProviderTarget(
+    TINY_DESK_AI_PRODUCT_ID,
+    TINY_DESK_AI_MODE
+  );
 }
 
 /**
  * Persisted attempts keep the provider/model they were created with.
- * Accept previous Standard jobs as well as the current product-scoped Light pin.
+ * Accept previous Light jobs as well as the current product-scoped Standard pin.
  */
 export function assertTinyDeskAiProviderBinding(
   provider: unknown,

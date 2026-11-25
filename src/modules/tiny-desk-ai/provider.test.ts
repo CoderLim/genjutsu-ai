@@ -3,32 +3,43 @@ import test from 'node:test';
 
 import { envConfigs } from '@/config';
 import { HIGGSFIELD_GENJUTSU_MODELS } from '@/modules/genjutsu/model-config';
+
 import { TINY_DESK_AI_MODE } from './constants';
 import {
   assertTinyDeskAiProviderBinding,
-  TinyDeskAiProviderBindingError,
   resolveTinyDeskAiProviderTarget,
+  TinyDeskAiProviderBindingError,
 } from './provider';
 
-test('tiny-desk-ai pins Genjutsu Light independently of the homepage', () => {
+test('tiny-desk-ai pins Genjutsu Standard independently of the homepage', () => {
   assert.deepEqual(resolveTinyDeskAiProviderTarget(), {
     provider: 'higgsfield',
-    model: HIGGSFIELD_GENJUTSU_MODELS.light[TINY_DESK_AI_MODE],
+    model: HIGGSFIELD_GENJUTSU_MODELS.standard[TINY_DESK_AI_MODE],
   });
 });
 
-test('tiny-desk-ai accepts persisted Light and historical Standard tasks', () => {
+test('tiny-desk-ai accepts current Standard and historical Light tasks', () => {
   assert.doesNotThrow(() =>
-    assertTinyDeskAiProviderBinding('higgsfield', HIGGSFIELD_GENJUTSU_MODELS.light[TINY_DESK_AI_MODE])
+    assertTinyDeskAiProviderBinding(
+      'higgsfield',
+      HIGGSFIELD_GENJUTSU_MODELS.light[TINY_DESK_AI_MODE]
+    )
   );
   assert.doesNotThrow(() =>
-    assertTinyDeskAiProviderBinding('higgsfield', HIGGSFIELD_GENJUTSU_MODELS.standard[TINY_DESK_AI_MODE])
+    assertTinyDeskAiProviderBinding(
+      'higgsfield',
+      HIGGSFIELD_GENJUTSU_MODELS.standard[TINY_DESK_AI_MODE]
+    )
   );
 });
 
 test('tiny-desk-ai rejects unrelated providers and unknown models', () => {
   assert.throws(
-    () => assertTinyDeskAiProviderBinding('seedance-wavespeed', 'bytedance/seedance-2.5/video-edit'),
+    () =>
+      assertTinyDeskAiProviderBinding(
+        'seedance-wavespeed',
+        'bytedance/seedance-2.5/video-edit'
+      ),
     TinyDeskAiProviderBindingError
   );
   assert.throws(
@@ -43,7 +54,10 @@ test('Tiny Desk ignores global and product provider env overrides', () => {
   try {
     envConfigs.genjutsu_object_swap_provider = 'seedance-wavespeed';
     envConfigs.genjutsu_product_provider = 'seedance-higgsfield';
-    assert.equal(resolveTinyDeskAiProviderTarget().model, HIGGSFIELD_GENJUTSU_MODELS.light['objects-swap']);
+    assert.equal(
+      resolveTinyDeskAiProviderTarget().model,
+      HIGGSFIELD_GENJUTSU_MODELS.standard['objects-swap']
+    );
   } finally {
     envConfigs.genjutsu_object_swap_provider = previousMode;
     envConfigs.genjutsu_product_provider = previousProduct;
