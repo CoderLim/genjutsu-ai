@@ -103,6 +103,31 @@ const DEFAULT_OBJECTS_RESOLUTION = '480p' as const;
  */
 export const MOTION_TEMPLATES: MotionTemplate[] = [
   {
+    id: 'huss-huss-huss-ai',
+    titleKey: 'site.templates.huss_huss_huss_ai',
+    poster: '/videos/huss-huss-huss-ai-tpl-poster.jpg',
+    sourceVideo: '/videos/huss-huss-huss-ai-tpl.mp4',
+    prompt: [
+      'ORIGINAL SUBJECT CUES (identify who to replace; do NOT copy these looks onto the replacements):',
+      '- Person A: man on the left — short dark hair, glasses, oversized white t-shirt, long pearl/bead necklace, baggy white track pants with red side stripes.',
+      '- Person B: woman on the right — short dark hair with bangs, high-collared grey wool coat over grey pleated mini skirt with belt, black sheer tights, bulky black buckled platform boots.',
+      '',
+      'ROLE MAPPING (same two identities for the whole clip):',
+      '- Person A → @Image 1 (left dancer).',
+      '- Person B → @Image 2 (right dancer).',
+      '',
+      'SHOT BEAT (same two people throughout):',
+      '1) Low-angle full-body studio shot — both face camera / each other and start the synced dance.',
+      '2) Energetic choreography continues — arm gestures, steps, smiles; keep left/right roles.',
+      '3) Mid-clip turn: both face away showing backs, then turn back to camera for the finish.',
+      '',
+      'Preserve low camera angle, studio mirrors, hanging black ceiling straps, bright lighting, polished floor reflections, and timing. Use only these authorized likenesses.',
+    ].join('\n'),
+    mode: 'objects-swap',
+    resolution: DEFAULT_OBJECTS_RESOLUTION,
+    aspect: 'portrait',
+  },
+  {
     id: 'gta-5-goodbye-ai-video',
     titleKey: 'site.templates.gta_5_goodbye_ai_video',
     poster: GTA_5_GOODBYE_AI_VIDEO_TEMPLATE_POSTER_PATH,
