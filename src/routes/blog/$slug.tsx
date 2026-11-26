@@ -131,11 +131,13 @@ function BlogPostPage() {
           </header>
 
           {post.image && (
-            <img
-              src={post.image}
-              alt={post.title}
-              className="border-border mb-8 w-full rounded-2xl border object-cover"
-            />
+            <div className="border-border mb-8 aspect-video max-h-[28rem] overflow-hidden rounded-2xl border">
+              <img
+                src={post.image}
+                alt={post.title}
+                className="size-full object-cover object-center"
+              />
+            </div>
           )}
 
           {LocalContent ? (

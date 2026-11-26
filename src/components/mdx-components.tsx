@@ -103,7 +103,7 @@ export const mdxComponents: MDXComponents = {
     <img
       alt={alt ?? ''}
       className={cn(
-        'border-border my-6 w-full rounded-xl border object-cover',
+        'border-border mx-auto my-6 max-h-[min(60vh,32rem)] w-auto max-w-full rounded-xl border object-contain',
         className
       )}
       {...props}
@@ -112,14 +112,18 @@ export const mdxComponents: MDXComponents = {
   video: ({ className, ...props }: VideoHTMLAttributes<HTMLVideoElement>) => (
     <video
       className={cn(
-        'border-border my-6 w-full rounded-xl border bg-black object-cover',
+        // Portrait demos: cap width so 9:16 never fills the article column.
+        'border-border mx-auto my-6 block h-auto max-h-[min(50vh,26rem)] w-auto max-w-[min(100%,18rem)] rounded-xl border bg-black object-contain',
         className
       )}
       {...props}
     />
   ),
   figure: ({ className, ...props }: HTMLAttributes<HTMLElement>) => (
-    <figure className={cn('my-6', className)} {...props} />
+    <figure
+      className={cn('my-6 flex flex-col items-center', className)}
+      {...props}
+    />
   ),
   figcaption: ({ className, ...props }: HTMLAttributes<HTMLElement>) => (
     <figcaption
